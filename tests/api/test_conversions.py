@@ -50,8 +50,8 @@ def conversion(system):
     with patch('apps.api.conversions.storage_client',return_value=store):yield client,app,store,{'Authorization':'Bearer '+token},system
 
 
-def uploaded(client,data=b'synthetic source bytes'):
-    result=client.post('/api/conversions',json={'title':'New lesson','filename':'demo.mp4','bytes':len(data),'start':0,'duration':2})
+def uploaded(client,data=b'synthetic source bytes',provider='local'):
+    result=client.post('/api/conversions',json={'title':'New lesson','filename':'demo.mp4','bytes':len(data),'start':0,'duration':2,'processing_provider':provider})
     assert result.status_code==201,result.text
     job=result.json();path='/api/conversions/'+job['id']
     result=client.put(path+'/parts/1',content=data,headers={'Content-Type':'application/octet-stream'})
@@ -113,7 +113,8 @@ def test_verified_finalisation_is_idempotent_and_stale_attempt_cannot_publish(co
     for stage in ('processing','exporting','verifying'):
         assert client.post(base+'/heartbeat',headers=headers,json={'stage':stage}).status_code==200
     manifest=json.loads((ROOT/'packages/lesson-schema/fixture.json').read_text())
-    manifest['engine']='sam-3d-body';manifest['section_set']['sections']=[{'id':'whole','label':'Full movement','start':0,'end':2}]
+    from apps.api.processing import ENGINE_VERSION
+    manifest['engine']='sam-3d-body';manifest['engine_version']=ENGINE_VERSION;manifest['section_set']['sections']=[{'id':'whole','label':'Full movement','start':0,'end':2}]
     for field,name,data in [('animation','reference.glb',(ROOT/'packages/lesson-schema/synthetic.glb').read_bytes()),('landmarks','reference.json',b'{}'),('source_video','preview.mp4',b'preview'),('thumbnail','thumbnail.jpg',b'image')]:
         result=client.put(base+'/files/'+name,headers=headers,content=data)
         assert result.status_code==200,result.text

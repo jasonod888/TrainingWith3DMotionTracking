@@ -78,6 +78,12 @@ class Conversion(Base):
     __tablename__ = 'conversions'
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'), index=True)
+    provider: Mapped[str] = mapped_column(String(16),default='local',server_default='local',index=True)
+    pipeline_version: Mapped[str] = mapped_column(String(80),default='sam-3d-body-v1',server_default='sam-3d-body-v1')
+    provider_target: Mapped[str] = mapped_column(String(200),default='',server_default='')
+    provider_request_id: Mapped[str | None] = mapped_column(String(200))
+    submission_state: Mapped[str] = mapped_column(String(16),default='none',server_default='none')
+    input_token_hash: Mapped[str | None] = mapped_column(String(64))
     title: Mapped[str] = mapped_column(String(200))
     filename: Mapped[str] = mapped_column(String(255))
     source_bytes: Mapped[int] = mapped_column(Integer)
@@ -101,6 +107,8 @@ class WorkerCredential(Base):
     __tablename__ = 'worker_credentials'
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    provider: Mapped[str] = mapped_column(String(16),default='local',server_default='local')
+    pipeline_version: Mapped[str] = mapped_column(String(80),default='sam-3d-body-v1',server_default='sam-3d-body-v1')
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -144,6 +152,7 @@ def database_ready(engine):
         connection.execute(text('SELECT a.id, s.token_hash, t.token_hash, l.version, l.archived, m.key, h.hits '
                                 'FROM accounts a, login_sessions s, account_tokens t, lessons l, lesson_assets m, auth_throttles h LIMIT 0'))
         connection.execute(text('SELECT account_id, lesson_id, revision_id, time FROM practice_progress LIMIT 0'))
-        connection.execute(text('SELECT id, state, lease_until FROM conversions LIMIT 0'))
+        connection.execute(text('SELECT id, state, lease_until, provider, pipeline_version, submission_state FROM conversions LIMIT 0'))
+        connection.execute(text('SELECT id, provider, pipeline_version FROM worker_credentials LIMIT 0'))
         connection.execute(text('SELECT l.published_revision_id, g.account_id, i.token_hash, r.id '
                                 'FROM lessons l, lesson_grants g, lesson_invitations i, lesson_reports r LIMIT 0'))

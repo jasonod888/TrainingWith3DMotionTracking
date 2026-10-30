@@ -2,6 +2,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
 from urllib.parse import urlparse
+from typing import Literal
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -31,10 +32,20 @@ class Settings(BaseSettings):
     max_active_conversions: int = 2
     max_account_storage_bytes: int = 2 * 1024 * 1024 * 1024
     worker_lease_seconds: int = 120
+    conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'local'
+    # Explicit operator gate after the custom full-pipeline deployment is verified.
+    remote_conversion_enabled: bool = False
+    conversion_target: str = ''
+    remote_conversion_concurrency: int = 1
     upload_temp_dir: Path = ROOT / '.local/upload-tmp'
 
     @model_validator(mode='after')
     def deployment_security(self):
+        import re
+        if self.conversion_target and not re.fullmatch(r'[A-Za-z0-9_-]+/[A-Za-z0-9_-]+', self.conversion_target):
+            raise ValueError('CONVERSION_TARGET must be an owner/deployment or owner/app identifier.')
+        if not 1 <= self.remote_conversion_concurrency <= 10:
+            raise ValueError('REMOTE_CONVERSION_CONCURRENCY must be between 1 and 10.')
         origin = urlparse(self.public_url)
         if origin.scheme not in ('http', 'https') or not origin.hostname or origin.path not in ('', '/') or origin.query or origin.fragment or origin.username:
             raise ValueError('PUBLIC_URL must be a browser origin without a path, query, credentials or fragment.')

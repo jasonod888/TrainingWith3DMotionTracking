@@ -91,7 +91,7 @@ The original native CUDA environment is preserved. The separate GPU image passed
 
 ## Accounts and saved lessons
 
-Run all migrations through `0005` with `.venv-saas/Scripts/python.exe -m alembic upgrade head` before starting the updated API. Create an account from **Account**, then open the local test mailbox at `http://127.0.0.1:8025` to follow the verification link. Local email stays in Mailpit; it is not delivered externally. Sign in, choose **Create → Add private lesson**, edit the whole animation into sections, and **Save**. Refreshing or signing in from another browser retains the saved revision. **Keep draft** remains session-only for the public demonstration; private copies use central Save.
+Run all migrations through `0006` with `.venv-saas/Scripts/python.exe -m alembic upgrade head` before starting the updated API. Create an account from **Account**, then open the local test mailbox at `http://127.0.0.1:8025` to follow the verification link. Local email stays in Mailpit; it is not delivered externally. Sign in, choose **Create → Add private lesson**, edit the whole animation into sections, and **Save**. Refreshing or signing in from another browser retains the saved revision. **Keep draft** remains session-only for the public demonstration; private copies use central Save.
 
 To import a different trusted, prepared manifest as an operator:
 
@@ -144,3 +144,7 @@ Choose **Create**, select a video, trim its range, and upload. Processing appear
 Choose **Share** on a private lesson, review it, confirm permission to share, and publish. Invite a specific email or generate a link. Local invitations appear in Mailpit on port 8025. Learners sign in with a verified account and explicitly join; **Shared** contains their read-only published lessons. Further teacher edits stay private until republished. Access and recent activity are visible to the teacher; camera frames and pose scores stay on the learner's device. Revoke a learner or make the lesson private to block subsequent API/media requests. Already downloaded media cannot be recalled.
 
 See `phase-4-verification.md` for expiry, revision and revocation behavior and the operator report-review command. No paid plans, group synchronization, cloud resources or physical-device certification are included in this checkpoint.
+
+## Processing provider selection
+
+See `processing-providers.md` for the independent local/Replicate/fal switch, remote compatibility gate, scoped dispatchers and charge-safe reconciliation. The default remains local GPU processing. Deploying the CPU application on Railway or AWS does not deploy or select an AI model. Migration `0006` preserves existing jobs and worker credentials as local.

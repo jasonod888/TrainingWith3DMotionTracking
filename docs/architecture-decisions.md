@@ -11,3 +11,7 @@
 - Web/API runtime has no dependency on CUDA. PostgreSQL is the portable queue authority. Object storage has a small S3-compatible interface.
 - No mandatory cloud dependency for UI preview. A missing database/storage returns a truthful non-ready status rather than pretending the application is deployable.
 - Original prototype remains untouched during migration; React state does not drive the Three.js rendering frame loop.
+
+## Independent inference providers — 30 October 2026
+
+The hosting platform and inference provider are independent settings. New conversions snapshot `CONVERSION_PROVIDER`, custom deployment target and the SAM pipeline version; provider-scoped workers cannot claim another route. The default remains local. Replicate/fal use a separate CPU-only dispatcher and an explicitly verified full-pipeline contract; the web service never imports or runs reconstruction. Remote submissions persist intent and request IDs, recover by polling, hold ambiguous/cancelled billable reservations until terminal confirmation, and never automatically fall back or resubmit. Paid integrations remain inactive pending model compatibility, credentials and an authorized benchmark. See `processing-providers.md`.

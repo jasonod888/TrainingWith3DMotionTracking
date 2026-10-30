@@ -31,6 +31,8 @@ class Worker:
         self.api=httpx.Client(base_url=url.rstrip('/'),headers={'Authorization':f'Bearer {token}'},timeout=60,trust_env=False)
 
     def run(self,job):
+        if job.get('provider','local')!='local' or job.get('pipeline_version','sam-3d-body-v1')!='sam-3d-body-v1':
+            raise ValueError('This GPU worker only supports the local SAM pipeline.')
         job_id=job['id'];lease=job['attempt_token']
         if not all(value and len(value)<81 and all(c in '0123456789abcdef' for c in value) for value in (job_id,lease)):raise ValueError('Invalid job identity.')
         folder=ROOT/'outputs/jobs'/job_id/lease
