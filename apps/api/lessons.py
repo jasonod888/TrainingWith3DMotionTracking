@@ -13,8 +13,10 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from .contracts import LessonManifest, Section, SectionSet
-from .database import Account, Lesson, LessonAsset, LessonRevision, PracticeProgress
+from .database import Account, Lesson, LessonAsset, LessonRevision, PracticeProgress, LessonGrant
 from .storage import storage_client
+from .permissions import owned_lesson,latest_revision,readable_lesson
+from .auth import now
 
 
 def import_fixture(engine, settings, owner_id, manifest_path, asset_dir):
@@ -85,18 +87,15 @@ def install_lessons(app, engine, settings, identity, db):
     router = APIRouter(prefix='/api/lessons')
 
     def owned(session, lesson_id, owner_id):
-        lesson = session.scalar(select(Lesson).where(Lesson.id == lesson_id, Lesson.owner_id == owner_id, Lesson.archived.is_(False)))
-        if not lesson:
-            raise HTTPException(404, 'Lesson unavailable.')
-        return lesson
+        return owned_lesson(session,lesson_id,owner_id)
 
     def latest(session, lesson):
-        return session.scalar(select(LessonRevision).where(LessonRevision.lesson_id == lesson.id, LessonRevision.version == lesson.version))
+        return latest_revision(session,lesson)
 
     @router.get('')
     def library(account=Depends(identity), session: Session = Depends(db)):
         rows = session.execute(select(LessonRevision).join(Lesson, Lesson.id == LessonRevision.lesson_id).where(
-            Lesson.owner_id == account.id, Lesson.archived.is_(False), LessonRevision.version == Lesson.version)
+            Lesson.owner_id == account.id, Lesson.archived.is_(False), Lesson.disabled.is_(False), LessonRevision.version == Lesson.version)
             .order_by(Lesson.created_at.desc())).scalars().all()
         return [row.manifest for row in rows]
 
@@ -111,13 +110,11 @@ def install_lessons(app, engine, settings, identity, db):
 
     @router.get('/{lesson_id}', response_model=LessonManifest)
     def detail(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
-        lesson = owned(session, lesson_id, account.id)
-        return latest(session, lesson).manifest
+        return readable_lesson(session,lesson_id,account.id)[1].manifest
 
     @router.get('/{lesson_id}/progress')
     def progress(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
-        lesson = owned(session, lesson_id, account.id)
-        revision = latest(session, lesson)
+        lesson,revision = readable_lesson(session,lesson_id,account.id)
         value = session.get(PracticeProgress, (account.id, lesson_id))
         if not value or value.revision_id != revision.id:
             return None
@@ -125,8 +122,7 @@ def install_lessons(app, engine, settings, identity, db):
 
     @router.put('/{lesson_id}/progress')
     def keep_progress(lesson_id: str, body: ProgressInput, account=Depends(identity), session: Session = Depends(db)):
-        lesson = owned(session, lesson_id, account.id)
-        revision = latest(session, lesson)
+        lesson,revision = readable_lesson(session,lesson_id,account.id)
         if body.revision_id != revision.id:
             raise HTTPException(409, 'This lesson has a newer revision. Reopen it to save your position.')
         if body.time > revision.manifest['duration']:
@@ -138,6 +134,9 @@ def install_lessons(app, engine, settings, identity, db):
         statement = insert(PracticeProgress).values(account_id=account.id,lesson_id=lesson_id,**values)
         statement = statement.on_conflict_do_update(index_elements=['account_id','lesson_id'],set_=values)
         session.execute(statement)
+        if lesson.owner_id!=account.id:
+            grant=session.get(LessonGrant,(lesson_id,account.id))
+            if grant:grant.last_active_at=now()
         session.commit()
         return {'saved':True}
 
@@ -159,7 +158,7 @@ def install_lessons(app, engine, settings, identity, db):
             raise HTTPException(422, 'Give your lesson a name.')
         # Compare-and-swap remains safe when two requests read the same base revision.
         updated = session.execute(update(Lesson).where(Lesson.id == lesson.id, Lesson.owner_id == account.id,
-            Lesson.archived.is_(False), Lesson.version == revision.version).values(version=revision.version+1, title=manifest.title))
+            Lesson.archived.is_(False), Lesson.disabled.is_(False), Lesson.version == revision.version).values(version=revision.version+1, title=manifest.title))
         if updated.rowcount != 1:
             raise HTTPException(409, 'This lesson has newer changes. Reopen it from your library before editing.')
         manifest.revision_id = uuid4().hex
@@ -177,8 +176,10 @@ def install_lessons(app, engine, settings, identity, db):
 
     @router.get('/{lesson_id}/assets/{name}')
     def asset(lesson_id: str, name: str, request: Request, account=Depends(identity), session: Session = Depends(db)):
-        owned(session, lesson_id, account.id)
+        _,revision=readable_lesson(session,lesson_id,account.id)
         key = f'lessons/{lesson_id}/{name}'
+        allowed={value['key'] for value in (revision.manifest.get(field) for field in ('animation','landmarks','source_video','thumbnail')) if value}
+        if key not in allowed:raise HTTPException(404,'Media unavailable.')
         record = session.scalar(select(LessonAsset).where(LessonAsset.key == key, LessonAsset.lesson_id == lesson_id))
         if not record:
             raise HTTPException(404, 'Media unavailable.')

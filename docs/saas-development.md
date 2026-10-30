@@ -1,4 +1,4 @@
-# SaaS development — Phase 2 desktop checkpoint
+# SaaS development — Upload, conversion and sharing checkpoint
 
 The new application is additive. The existing `scripts/start_practice.ps1` prototype is unchanged.
 
@@ -91,7 +91,7 @@ The original native CUDA environment is preserved. The separate GPU image passed
 
 ## Accounts and saved lessons
 
-Run the `0003` migration with `.venv-saas/Scripts/python.exe -m alembic upgrade head` before starting the updated API. Create an account from **Account**, then open the local test mailbox at `http://127.0.0.1:8025` to follow the verification link. Local email stays in Mailpit; it is not delivered externally. Sign in, choose **Create → Add private lesson**, edit the whole animation into sections, and **Save**. Refreshing or signing in from another browser retains the saved revision. **Keep draft** remains session-only for the public demonstration; private copies use central Save.
+Run all migrations through `0005` with `.venv-saas/Scripts/python.exe -m alembic upgrade head` before starting the updated API. Create an account from **Account**, then open the local test mailbox at `http://127.0.0.1:8025` to follow the verification link. Local email stays in Mailpit; it is not delivered externally. Sign in, choose **Create → Add private lesson**, edit the whole animation into sections, and **Save**. Refreshing or signing in from another browser retains the saved revision. **Keep draft** remains session-only for the public demonstration; private copies use central Save.
 
 To import a different trusted, prepared manifest as an operator:
 
@@ -107,7 +107,7 @@ Removing a lesson archives it: the owner library, manifest and media routes imme
 
 Account sessions and verification/reset tokens are random and stored only as SHA-256 digests. Passwords use salted scrypt (N=131072, r=8, p=1). Session cookies are HTTP-only and SameSite=Lax; hosted environments require HTTPS (Secure cookies) and SMTP STARTTLS. Write requests require an allowed Origin, the application header, JSON and, after sign-in, a session-bound CSRF token. Shared database throttles survive process restarts. Reset invalidates all sessions and existing account tokens. Do not expose local development credentials or Mailpit to the internet.
 
-For Railway/AWS, set `ENVIRONMENT`, `PUBLIC_URL`, SMTP and storage/database settings explicitly. `PUBLIC_URL` is the browser-facing HTTPS origin, never an internal service hostname. No CORS wildcard or trusted forwarding-header assumption is used. Media is streamed through an owner-authorized API route, with byte ranges for video seeking; storage stays private and has no browser-facing internal hostname dependency.
+For Railway/AWS, set `ENVIRONMENT`, `PUBLIC_URL`, SMTP and storage/database settings explicitly. `PUBLIC_URL` is the browser-facing HTTPS origin, never an internal service hostname. No CORS wildcard or trusted forwarding-header assumption is used. Media is streamed through an account-authorized API route, with byte ranges for video seeking; storage stays private and has no browser-facing internal hostname dependency.
 
 Additional checks (using the disposable project smoke container on port 8010):
 
@@ -125,7 +125,7 @@ The practice screen adds explicit camera/voice activation, height calibration, c
 
 **Camera and voice settings → Recorded test** uses the real tracker on the supplied instructor video. It briefly freezes the configured standing pose for deterministic calibration, then plays the recording. This is a labelled software check, not a live student assessment. No live camera or microphone was enabled during automated browser checks.
 
-Phone testing is deferred by the user. See `phase-2-verification.md` for local evidence and `phase-2-phone-checks.md` for device acceptance and the optional HTTPS launcher. No certificates or firewall settings were installed or changed. Phase 2's full acceptance gate remains open; Phase 3 is not implemented at this checkpoint.
+Phone testing is deferred by the user. See `phase-2-verification.md` for local evidence and `phase-2-phone-checks.md` for device acceptance and the optional HTTPS launcher. No certificates or firewall settings were installed or changed. The physical-device acceptance gate remains open. Upload/conversion and sharing subsequently proceeded at the user's explicit request; see `phase-3-verification.md` and `phase-4-verification.md`.
 
 ## Original Phase 0 checkpoint
 
@@ -134,3 +134,13 @@ Real demonstration playback, section split/merge/rename/boundary editing, and a 
 ## UI review
 
 Check library, practice, and editor at 320/360/390/768/1024/1440 CSS-pixel widths and landscape. Verify no horizontal overflow, labelled icon buttons, visible focus, usable touch targets, and the large content stage. Browser viewport emulation is not a claim of real phone/camera testing.
+
+## Upload, conversion and sharing
+
+See `phase-3-verification.md` for the scoped GPU worker setup and cleanup commands. Set `PUBLIC_URL=http://127.0.0.1:8001` when using the built local application so email links return to that origin. The container worker needs the API on the Docker host bridge; run the native API with `--host 0.0.0.0` only on a trusted local development network. CPU app and GPU worker remain separate services.
+
+Choose **Create**, select a video, trim its range, and upload. Processing appears in the library; interrupted uploads can resume using the same source file. Converted lessons remain private and begin with one section covering the whole animation. Open **Edit sections** to split, rename, adjust boundaries and save; the Mimic Interface uses these sections for next/back/pause playback and voice commands.
+
+Choose **Share** on a private lesson, review it, confirm permission to share, and publish. Invite a specific email or generate a link. Local invitations appear in Mailpit on port 8025. Learners sign in with a verified account and explicitly join; **Shared** contains their read-only published lessons. Further teacher edits stay private until republished. Access and recent activity are visible to the teacher; camera frames and pose scores stay on the learner's device. Revoke a learner or make the lesson private to block subsequent API/media requests. Already downloaded media cannot be recalled.
+
+See `phase-4-verification.md` for expiry, revision and revocation behavior and the operator report-review command. No paid plans, group synchronization, cloud resources or physical-device certification are included in this checkpoint.

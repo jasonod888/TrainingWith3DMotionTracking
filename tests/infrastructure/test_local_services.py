@@ -29,7 +29,7 @@ def test_migrated_postgresql_schema(services):
     _,engine,_=services
     database_ready(engine)
     with engine.connect() as connection:
-        assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one()=='0004'
+        assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one()=='0005'
 
 def test_lesson_revision_round_trip_across_connections(services):
     _,engine,_=services

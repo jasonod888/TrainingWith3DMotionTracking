@@ -9,7 +9,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from apps.api.auth import now
 from apps.api.config import Settings
 from apps.api.conversions import stamp
-from apps.api.database import Conversion,make_engine
+from apps.api.database import Conversion,Lesson,make_engine
 from apps.api.storage import storage_client
 
 
@@ -31,6 +31,9 @@ def cleanup(engine,settings,apply=False):
             prefix=f'attempts/{job.id}/'
             for page in store.get_paginator('list_objects_v2').paginate(Bucket=settings.storage_bucket,Prefix=prefix):
                 for obj in page.get('Contents',[]):store.delete_object(Bucket=settings.storage_bucket,Key=obj['Key'])
+            if not job.lesson_id and not session.get(Lesson,job.id):
+                for page in store.get_paginator('list_objects_v2').paginate(Bucket=settings.storage_bucket,Prefix=f'lessons/{job.id}/'):
+                    for obj in page.get('Contents',[]):store.delete_object(Bucket=settings.storage_bucket,Key=obj['Key'])
             if expired:job.state='cancelled'
             if failed:job.error='source_expired'
         if apply:session.commit()

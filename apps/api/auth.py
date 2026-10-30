@@ -80,8 +80,9 @@ def send_account_mail(settings, email, purpose, token):
     message = EmailMessage()
     message['From'] = settings.mail_from
     message['To'] = email
-    message['Subject'] = 'Verify your Form account' if purpose == 'verify' else 'Reset your Form password'
-    message.set_content(f'{message["Subject"]}\n\n{link}\n\nThis link expires in 30 minutes. If you did not request it, ignore this email.')
+    message['Subject'] = {'verify':'Verify your Form account','reset':'Reset your Form password','invite':'A lesson is waiting for you on Form'}[purpose]
+    lifetime = '7 days' if purpose == 'invite' else '30 minutes'
+    message.set_content(f'{message["Subject"]}\n\n{link}\n\nThis link expires in {lifetime}. If you did not expect it, ignore this email.')
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
             if settings.smtp_starttls:

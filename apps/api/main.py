@@ -12,6 +12,7 @@ from .storage import check_storage
 from .auth import install_auth
 from .lessons import install_lessons
 from .conversions import install_conversions
+from .sharing import install_sharing
 
 logger = logging.getLogger('form')
 
@@ -29,6 +30,7 @@ def create_app(settings: Settings | None = None):
     identity, db = install_auth(app, engine, settings)
     install_lessons(app, engine, settings, identity, db)
     install_conversions(app, engine, settings, identity, db)
+    install_sharing(app,settings,identity,db)
 
     from fastapi.exceptions import RequestValidationError
 
@@ -74,7 +76,7 @@ def create_app(settings: Settings | None = None):
 
     @app.get('/api/capabilities')
     def capabilities():
-        return {'phase':3, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':True, 'sharing':False}
+        return {'phase':4, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':True, 'sharing':True}
 
     @app.get('/api/{path:path}', include_in_schema=False)
     def missing_api(path: str):

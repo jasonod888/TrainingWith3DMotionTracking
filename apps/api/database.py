@@ -14,6 +14,12 @@ class Lesson(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
     version: Mapped[int] = mapped_column(Integer, default=1, server_default='1')
+    published_revision_id: Mapped[str | None] = mapped_column(String(80))
+    distribution: Mapped[str] = mapped_column(String(16), default='private', server_default='private')
+    share_token_hash: Mapped[str | None] = mapped_column(String(64))
+    share_generation: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    share_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    disabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
 
 class LessonRevision(Base):
     __tablename__ = 'lesson_revisions'
@@ -98,6 +104,36 @@ class WorkerCredential(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+class LessonGrant(Base):
+    __tablename__ = 'lesson_grants'
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'),primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'),primary_key=True)
+    source: Mapped[str] = mapped_column(String(16))
+    generation: Mapped[int] = mapped_column(Integer,default=0)
+    revoked: Mapped[bool] = mapped_column(Boolean,default=False)
+    invitation_id: Mapped[str | None] = mapped_column(String(80))
+    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+class LessonInvitation(Base):
+    __tablename__ = 'lesson_invitations'
+    id: Mapped[str] = mapped_column(String(80),primary_key=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'),index=True)
+    email: Mapped[str] = mapped_column(String(254))
+    token_hash: Mapped[str] = mapped_column(String(64),unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked: Mapped[bool] = mapped_column(Boolean,default=False)
+    accepted_account_id: Mapped[str | None] = mapped_column(String(80))
+
+class LessonReport(Base):
+    __tablename__ = 'lesson_reports'
+    __table_args__=(UniqueConstraint('lesson_id','account_id',name='uq_lesson_reporter'),)
+    id: Mapped[str] = mapped_column(String(80),primary_key=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'))
+    account_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'))
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
 def make_engine(url):
     return create_engine(url, pool_pre_ping=True, connect_args={'connect_timeout': 3} if url.startswith('postgresql') else {})
 
@@ -109,3 +145,5 @@ def database_ready(engine):
                                 'FROM accounts a, login_sessions s, account_tokens t, lessons l, lesson_assets m, auth_throttles h LIMIT 0'))
         connection.execute(text('SELECT account_id, lesson_id, revision_id, time FROM practice_progress LIMIT 0'))
         connection.execute(text('SELECT id, state, lease_until FROM conversions LIMIT 0'))
+        connection.execute(text('SELECT l.published_revision_id, g.account_id, i.token_hash, r.id '
+                                'FROM lessons l, lesson_grants g, lesson_invitations i, lesson_reports r LIMIT 0'))
