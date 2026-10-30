@@ -14,13 +14,13 @@ services:
       timeout: 3s
       retries: 20
   storage:
-    image: rustfs/rustfs:1.0.4
-    command: /data
+    image: chrislusf/seaweedfs:4.51
+    command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0"]
     environment:
-      RUSTFS_ACCESS_KEY: form-local
-      RUSTFS_SECRET_KEY: local-development-only
-      RUSTFS_CONSOLE_ENABLE: "true"
-    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+      AWS_ACCESS_KEY_ID: form-local
+      AWS_SECRET_ACCESS_KEY: local-development-only
+      S3_BUCKET: form
+    ports: ["127.0.0.1:9000:8333"]
     volumes: ["storage-data:/data"]
   mail:
     image: axllent/mailpit:v1.27.9
@@ -44,7 +44,7 @@ services:
     ports: ["127.0.0.1:8001:8000"]
     environment:
       DATABASE_URL: postgresql+psycopg://form:form@postgres:5432/form
-      STORAGE_ENDPOINT: http://storage:9000
+      STORAGE_ENDPOINT: http://storage:8333
       STORAGE_REGION: us-east-1
       STORAGE_BUCKET: form
       STORAGE_ADDRESSING_STYLE: path

@@ -1,10 +1,20 @@
 param(
-    [ValidatePattern('^[A-Za-z]$')][string]$DockerDataDrive = 'C',
+    [ValidatePattern('^$|^[A-Za-z]$')][string]$DockerDataDrive = '',
     [switch]$Gpu,
     [switch]$CheckOnly
 )
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
+if (-not $DockerDataDrive) {
+    $formDockerSettingsPath = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'Docker/settings-store.json'
+    if (Test-Path -LiteralPath $formDockerSettingsPath) {
+        $formDockerSettings = Get-Content -LiteralPath $formDockerSettingsPath -Raw | ConvertFrom-Json
+        if ($formDockerSettings.CustomWslDistroDir) {
+            $DockerDataDrive = [System.IO.Path]::GetPathRoot($formDockerSettings.CustomWslDistroDir).Substring(0, 1)
+        }
+    }
+    if (-not $DockerDataDrive) { $DockerDataDrive = [System.IO.Path]::GetPathRoot([Environment]::SystemDirectory).Substring(0, 1) }
+}
 $formMinimumGB = if ($Gpu) { 25 } else { 10 }
 $formVolume = [System.IO.DriveInfo]::new($DockerDataDrive + ':\')
 if (-not $formVolume.IsReady) { throw 'The configured Docker data drive is unavailable.' }

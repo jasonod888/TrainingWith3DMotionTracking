@@ -24,9 +24,9 @@ powershell -ExecutionPolicy Bypass -File scripts/start_saas_services.ps1
 
 Only copy `.env.example` when creating a new local environment. Do not overwrite existing configuration. The Compose credentials are local development values and its ports bind only to localhost.
 
-The service launcher checks free space before downloading or starting containers. It requires 10 GB free on Docker's data drive (25 GB for GPU-image preparation). Pass `-DockerDataDrive D` if Docker has been relocated to D:. This argument checks the drive; it does not relocate Docker. Use Docker Desktop's supported disk-location setting for relocation. Do not factory-reset or prune existing user data to make space.
+The service launcher detects Docker's configured WSL disk drive from its settings and checks free space before downloading or starting containers. It requires 10 GB free on Docker's data drive (25 GB for GPU-image preparation). You can override detection with `-DockerDataDrive D`. This argument checks the drive; it does not relocate Docker. Docker on the original development machine now uses `D:\DockerData\DockerDesktopWSL`, moved using Docker Desktop's supported disk-location setting with the user's approval. Do not factory-reset or prune existing user data to make space.
 
-Local object storage uses pinned RustFS 1.0.4 through the same S3 interface as hosted storage. The original MinIO image was unavailable during the real container pull test; the application does not depend on either server's SDK.
+Local object storage uses pinned SeaweedFS 4.51 through the same S3 interface as hosted storage. The original MinIO image was unavailable and the local RustFS images failed to execute during container verification. SeaweedFS passed the real private-object and signed-download tests. The application depends only on S3 APIs, not the development server's SDK. Only its S3 port is published, on localhost; its internal management endpoints are not published.
 
 If the accepted `web/dist/assets/reference.json`, `reference.glb`, and `demonstration.mp4` already exist:
 
@@ -87,7 +87,7 @@ The migration service runs before the app. Do not start the native API on port 8
 
 ## GPU portability check
 
-The original native CUDA environment is preserved. The separate GPU Dockerfile is a portability candidate, not a verified production worker. Run `docker compose --profile gpu run --build --rm gpu` only with working Docker GPU access and the existing model mount. Then run a one-frame conversion into a new output directory and exporter verification before approving Linux portability. The image can require several GB of downloads. Do not substitute a successful native Windows check for this gate.
+The original native CUDA environment is preserved. The separate GPU image passed local Linux inference and GLB export checks on 30 October 2026; see `phase-0-verification.md`. This does not certify production throughput or motion accuracy. `infra/docker/gpu-requirements-lock.txt` is the tested Linux environment snapshot, not yet an installed build constraint. Rebuilding its ranged dependencies requires repeating these checks. Use at least two frames for animation export. The image can require many GB of downloads; use the disk preflight before rebuilding.
 
 ## Scope of this checkpoint
 
