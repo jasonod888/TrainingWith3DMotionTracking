@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from apps.api.auth import COOKIE, csrf_token, digest, now, password_hash
 from apps.api.config import ROOT, Settings
-from apps.api.database import Account, AccountToken, Lesson, LessonAsset, LessonRevision, LoginSession
+from apps.api.database import Account, AccountToken, Lesson, LessonAsset, LessonRevision, LoginSession, PracticeProgress
 from apps.api.lessons import import_fixture
 from apps.api.main import create_app
 from apps.api.storage import storage_client
@@ -75,6 +75,11 @@ def test_private_revision_assets_concurrency_and_reconnection():
                 assert manifest['section_set']['sections'][0]['label'] == 'Saved privately'
                 assert manifest['section_set']['revision'] == 2
                 assert reopened.get(media).content == (ROOT/'packages/lesson-schema/synthetic.glb').read_bytes()
+            progress = {'revision_id':manifest['revision_id'],'time':1.1,'speed':.75,'mode':'sections'}
+            assert owner.put(path+'/progress',json=progress).status_code == 200
+            engine.dispose()
+            assert owner.get(path+'/progress').json() == progress
+            assert stranger.get(path+'/progress').status_code == 404
             assert owner.request('DELETE',path,json={}).status_code == 200
             assert owner.get(path).status_code == 404
             assert owner.get(media).status_code == 404
@@ -83,6 +88,7 @@ def test_private_revision_assets_concurrency_and_reconnection():
             for asset in (lesson.animation, lesson.landmarks):
                 store.delete_object(Bucket=settings.storage_bucket,Key=asset.key)
             with engine.begin() as connection:
+                connection.execute(delete(PracticeProgress).where(PracticeProgress.lesson_id == lesson.lesson_id))
                 connection.execute(delete(LessonAsset).where(LessonAsset.lesson_id == lesson.lesson_id))
                 connection.execute(delete(LessonRevision).where(LessonRevision.lesson_id == lesson.lesson_id))
                 connection.execute(delete(Lesson).where(Lesson.id == lesson.lesson_id))

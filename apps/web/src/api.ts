@@ -13,8 +13,8 @@ export type Account={id:string;email:string};
 export type SessionInfo={account:Account;csrf:string};
 let csrf='';
 export class ApiError extends Error{constructor(message:string,public status:number){super(message);}}
-export async function request<T>(path:string,method='GET',body?:unknown):Promise<T>{
- const response=await fetch(`/api${path}`,{method,credentials:'same-origin',headers:method==='GET'?{}:{'Content-Type':'application/json','X-Form-Request':'1','X-CSRF-Token':csrf},body:method==='GET'?undefined:JSON.stringify(body??{})});
+export async function request<T>(path:string,method='GET',body?:unknown,keepalive=false):Promise<T>{
+ const response=await fetch(`/api${path}`,{method,keepalive,credentials:'same-origin',headers:method==='GET'?{}:{'Content-Type':'application/json','X-Form-Request':'1','X-CSRF-Token':csrf},body:method==='GET'?undefined:JSON.stringify(body??{})});
  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(typeof data?.detail==='string'?data.detail:'Something went wrong. Please try again.',response.status);}
  return response.json();
 }
@@ -27,3 +27,6 @@ export const loadLibrary=()=>request<LessonManifest[]>('/lessons');
 export const loadLesson=(id:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`);
 export const copyDemo=()=>request<LessonManifest>('/lessons/from-demo','POST');
 export const saveSections=(lesson:LessonManifest,sections:LessonManifest['section_set']['sections'],title:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/sections`,'PUT',{base_revision_id:lesson.revision_id,sections,title});
+export type Progress={revision_id:string;time:number;speed:.5|.75|1;mode:'sections'|'continuous'};
+export const loadProgress=(lesson:LessonManifest)=>request<Progress|null>(`/lessons/${lesson.lesson_id}/progress`);
+export const saveProgress=(lesson:LessonManifest,value:Omit<Progress,'revision_id'>)=>request(`/lessons/${lesson.lesson_id}/progress`,'PUT',{revision_id:lesson.revision_id,...value},true);

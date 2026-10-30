@@ -1,5 +1,6 @@
 """Verify the local account-enabled CPU container, real email, privacy and restart persistence."""
 import json
+import hashlib
 import re
 import sys
 import time
@@ -14,7 +15,7 @@ from sqlalchemy.orm import Session
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from apps.api.config import Settings
-from apps.api.database import Account, AccountToken, Lesson, LessonAsset, LessonRevision, LoginSession, make_engine
+from apps.api.database import Account, AccountToken, Lesson, LessonAsset, LessonRevision, LoginSession, PracticeProgress, make_engine
 from apps.api.lessons import import_fixture
 from apps.api.storage import storage_client
 from scripts.verify_local_deployment import docker
@@ -76,15 +77,31 @@ def main():
             saved = owner.put(path+'/sections',json={'base_revision_id':imported.revision_id,'title':'Private restart fixture','sections':sections})
             assert saved.status_code == 200, saved.text
             before = saved.json()
+            phase_two = owner.get('/api/capabilities').json()['phase'] >= 2
+            position = {'revision_id':before['revision_id'],'time':1.1,'speed':.75,'mode':'sections'}
+            if phase_two:
+                assert owner.get('/pose-worker.js').status_code == 200
+                model = owner.get('/tracking/pose_landmarker_lite.task')
+                assert model.status_code == 200 and hashlib.sha256(model.content).hexdigest() == '59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a'
+                wasm = owner.get('/tracking/wasm/vision_wasm_internal.wasm',headers={'Range':'bytes=0-3'})
+                assert wasm.status_code == 206 and wasm.content == b'\0asm'
+                report('Packaged worker, hash-verified pose model and WASM byte-range delivery passed.')
+                assert owner.put(path+'/progress',json=position).status_code == 200
+                assert other.get(path+'/progress').status_code == 404
             docker('restart','form-saas-postgres-1','form-saas-storage-1')
             docker('restart','form-saas-cpu-check')
             wait_ready(owner)
             assert owner.get('/api/auth/session').status_code == 200
             assert owner.get(path).json() == before
             assert owner.get(asset_path).content == (ROOT/'packages/lesson-schema/synthetic.glb').read_bytes()
+            if phase_two:
+                assert owner.get(path+'/progress').json() == position
+                report('Private revision-bound practice position survives service restart.')
             with httpx.Client(base_url='http://127.0.0.1:8010',headers=headers,trust_env=False,timeout=30) as reopened:
                 assert reopened.post('/api/auth/login',json={'email':emails[0],'password':password}).status_code == 200
                 assert reopened.get(path).json() == before
+                if phase_two:
+                    assert reopened.get(path+'/progress').json() == position
             report('Accounts, sessions, saved revisions and private media survive database/storage/application restart and reopen in a fresh client.')
             assert owner.request('DELETE',path,json={}).status_code == 200
             assert owner.get(path).status_code == 404
@@ -95,6 +112,7 @@ def main():
                 for asset in (imported.animation,imported.landmarks):
                     store.delete_object(Bucket=settings.storage_bucket,Key=asset.key)
                 with engine.begin() as connection:
+                    connection.execute(delete(PracticeProgress).where(PracticeProgress.lesson_id == imported.lesson_id))
                     connection.execute(delete(LessonAsset).where(LessonAsset.lesson_id == imported.lesson_id))
                     connection.execute(delete(LessonRevision).where(LessonRevision.lesson_id == imported.lesson_id))
                     connection.execute(delete(Lesson).where(Lesson.id == imported.lesson_id))
@@ -103,7 +121,7 @@ def main():
                 connection.execute(delete(AccountToken).where(AccountToken.account_id.in_(account_ids)))
                 connection.execute(delete(Account).where(Account.id.in_(account_ids)))
             engine.dispose()
-    target = ROOT/'.local/qa/phase-1-deployment.json'
+    target = ROOT/f'.local/qa/phase-{2 if phase_two else 1}-deployment.json'
     target.parent.mkdir(exist_ok=True,parents=True)
     target.write_text(json.dumps({'passed':True,'checks':checks},indent=2),encoding='utf-8')
 

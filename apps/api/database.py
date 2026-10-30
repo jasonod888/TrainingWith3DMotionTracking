@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, DateTime, JSON, Integer, ForeignKey, Boolean, UniqueConstraint
+from sqlalchemy import String, DateTime, JSON, Integer, ForeignKey, Boolean, UniqueConstraint, Float
 from datetime import datetime, timezone
 
 class Base(DeclarativeBase):
@@ -59,6 +59,15 @@ class LessonAsset(Base):
     bytes: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
 
+class PracticeProgress(Base):
+    __tablename__ = 'practice_progress'
+    account_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'), primary_key=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), primary_key=True)
+    revision_id: Mapped[str] = mapped_column(String(80))
+    time: Mapped[float] = mapped_column(Float)
+    speed: Mapped[float] = mapped_column(Float)
+    mode: Mapped[str] = mapped_column(String(16))
+
 def make_engine(url):
     return create_engine(url, pool_pre_ping=True, connect_args={'connect_timeout': 3} if url.startswith('postgresql') else {})
 
@@ -68,3 +77,4 @@ def database_ready(engine):
         connection.execute(text('SELECT id FROM lesson_revisions LIMIT 0'))
         connection.execute(text('SELECT a.id, s.token_hash, t.token_hash, l.version, l.archived, m.key, h.hits '
                                 'FROM accounts a, login_sessions s, account_tokens t, lessons l, lesson_assets m, auth_throttles h LIMIT 0'))
+        connection.execute(text('SELECT account_id, lesson_id, revision_id, time FROM practice_progress LIMIT 0'))

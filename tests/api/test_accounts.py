@@ -221,3 +221,25 @@ def test_import_rejects_altered_assets_before_writing(system, tmp_path):
 def test_hosted_configuration_requires_https_and_mail_encryption(values):
     with pytest.raises(ValidationError):
         Settings(environment='production',_env_file=None,**values)
+
+
+def test_practice_progress_is_private_bounded_and_revision_bound(system):
+    lesson = imported(system)
+    client, app, _, mail, _ = system
+    path = f'/api/lessons/{lesson.lesson_id}'
+    progress = path+'/progress'
+    assert client.get(progress).json() is None
+    value = {'revision_id':lesson.revision_id,'time':1.25,'speed':.5,'mode':'sections'}
+    assert client.put(progress,json=value).status_code == 200
+    assert client.get(progress).json() == value
+    with TestClient(app) as second:
+        second.headers.update({'Origin':'http://testserver','X-Form-Request':'1'})
+        register(second,mail,'other@example.test')
+        login(second,'other@example.test')
+        assert second.get(progress).status_code == 404
+        assert second.put(progress,json=value).status_code == 404
+    for changed in ({'time':-1},{'time':3},{'speed':2},{'revision_id':'stale'}):
+        assert client.put(progress,json={**value,**changed}).status_code in (409,422)
+    assert client.get(progress).json() == value
+    assert client.put(path+'/sections',json={'base_revision_id':lesson.revision_id,'title':lesson.title,'sections':[s.model_dump() for s in lesson.section_set.sections]}).status_code == 200
+    assert client.get(progress).json() is None

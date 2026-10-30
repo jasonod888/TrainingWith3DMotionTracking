@@ -3,6 +3,7 @@ import hashlib
 import re
 from pathlib import Path
 from uuid import uuid4
+from typing import Literal
 
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,7 +13,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from .contracts import LessonManifest, Section, SectionSet
-from .database import Account, Lesson, LessonAsset, LessonRevision
+from .database import Account, Lesson, LessonAsset, LessonRevision, PracticeProgress
 from .storage import storage_client
 
 
@@ -73,6 +74,12 @@ class SaveSections(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     sections: list[Section] = Field(min_length=1, max_length=1000)
 
+class ProgressInput(BaseModel):
+    revision_id: str = Field(min_length=1, max_length=80)
+    time: float = Field(ge=0, allow_inf_nan=False)
+    speed: Literal[0.5, 0.75, 1] = 1
+    mode: Literal['sections', 'continuous'] = 'sections'
+
 
 def install_lessons(app, engine, settings, identity, db):
     router = APIRouter(prefix='/api/lessons')
@@ -106,6 +113,33 @@ def install_lessons(app, engine, settings, identity, db):
     def detail(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
         lesson = owned(session, lesson_id, account.id)
         return latest(session, lesson).manifest
+
+    @router.get('/{lesson_id}/progress')
+    def progress(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
+        lesson = owned(session, lesson_id, account.id)
+        revision = latest(session, lesson)
+        value = session.get(PracticeProgress, (account.id, lesson_id))
+        if not value or value.revision_id != revision.id:
+            return None
+        return {'revision_id':value.revision_id,'time':value.time,'speed':value.speed,'mode':value.mode}
+
+    @router.put('/{lesson_id}/progress')
+    def keep_progress(lesson_id: str, body: ProgressInput, account=Depends(identity), session: Session = Depends(db)):
+        lesson = owned(session, lesson_id, account.id)
+        revision = latest(session, lesson)
+        if body.revision_id != revision.id:
+            raise HTTPException(409, 'This lesson has a newer revision. Reopen it to save your position.')
+        if body.time > revision.manifest['duration']:
+            raise HTTPException(422, 'Position is outside this lesson.')
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+        insert = pg_insert if engine.dialect.name == 'postgresql' else sqlite_insert
+        values = body.model_dump()
+        statement = insert(PracticeProgress).values(account_id=account.id,lesson_id=lesson_id,**values)
+        statement = statement.on_conflict_do_update(index_elements=['account_id','lesson_id'],set_=values)
+        session.execute(statement)
+        session.commit()
+        return {'saved':True}
 
     @router.put('/{lesson_id}/sections', response_model=LessonManifest)
     def save(lesson_id: str, body: SaveSections, account=Depends(identity), session: Session = Depends(db)):

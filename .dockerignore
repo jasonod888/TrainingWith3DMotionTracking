@@ -3,6 +3,7 @@
 .venv-saas
 **/node_modules
 apps/web/dist
+apps/web/public/tracking
 web/dist/vendor
 web/dist/assets
 models

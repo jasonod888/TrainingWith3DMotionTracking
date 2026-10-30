@@ -6,6 +6,7 @@ import smtplib
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from uuid import uuid4
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
@@ -219,7 +220,7 @@ def install_auth(app, engine, settings):
         raw = secrets.token_urlsafe(32)
         session.add(LoginSession(token_hash=digest(raw), account_id=account.id, expires_at=now()+timedelta(days=settings.session_days)))
         session.commit()
-        response.set_cookie(COOKIE, raw, httponly=True, secure=settings.environment != 'development',
+        response.set_cookie(COOKIE, raw, httponly=True, secure=urlparse(settings.public_url).scheme == 'https' or settings.environment != 'development',
                             samesite='lax', max_age=settings.session_days*86400, path='/')
         return {'account': {'id': account.id, 'email': account.email}, 'csrf': csrf_token(raw)}
 

@@ -29,8 +29,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def deployment_security(self):
+        origin = urlparse(self.public_url)
+        if origin.scheme not in ('http', 'https') or not origin.hostname or origin.path not in ('', '/') or origin.query or origin.fragment or origin.username:
+            raise ValueError('PUBLIC_URL must be a browser origin without a path, query, credentials or fragment.')
         if self.environment != 'development':
-            if urlparse(self.public_url).scheme != 'https' or not self.smtp_starttls:
+            if origin.scheme != 'https' or not self.smtp_starttls:
                 raise ValueError('Hosted environments require an HTTPS public URL and SMTP STARTTLS.')
         if not 1 <= self.session_days <= 30:
             raise ValueError('Session lifetime must be between 1 and 30 days.')

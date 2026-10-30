@@ -72,7 +72,7 @@ def create_app(settings: Settings | None = None):
 
     @app.get('/api/capabilities')
     def capabilities():
-        return {'phase':1, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':False, 'sharing':False}
+        return {'phase':2, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':False, 'sharing':False}
 
     @app.get('/api/{path:path}', include_in_schema=False)
     def missing_api(path: str):

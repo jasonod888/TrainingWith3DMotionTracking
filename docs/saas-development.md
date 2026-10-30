@@ -1,4 +1,4 @@
-# SaaS development — Phase 1
+# SaaS development — Phase 2 desktop checkpoint
 
 The new application is additive. The existing `scripts/start_practice.ps1` prototype is unchanged.
 
@@ -91,7 +91,7 @@ The original native CUDA environment is preserved. The separate GPU image passed
 
 ## Accounts and saved lessons
 
-Run the `0002` migration with `.venv-saas/Scripts/python.exe -m alembic upgrade head` before starting the updated API. Create an account from **Account**, then open the local test mailbox at `http://127.0.0.1:8025` to follow the verification link. Local email stays in Mailpit; it is not delivered externally. Sign in, choose **Create → Add private lesson**, edit the whole animation into sections, and **Save**. Refreshing or signing in from another browser retains the saved revision. **Keep draft** remains session-only for the public demonstration; private copies use central Save.
+Run the `0003` migration with `.venv-saas/Scripts/python.exe -m alembic upgrade head` before starting the updated API. Create an account from **Account**, then open the local test mailbox at `http://127.0.0.1:8025` to follow the verification link. Local email stays in Mailpit; it is not delivered externally. Sign in, choose **Create → Add private lesson**, edit the whole animation into sections, and **Save**. Refreshing or signing in from another browser retains the saved revision. **Keep draft** remains session-only for the public demonstration; private copies use central Save.
 
 To import a different trusted, prepared manifest as an operator:
 
@@ -116,6 +116,16 @@ Additional checks (using the disposable project smoke container on port 8010):
 ```
 
 See `phase-1-verification.md` for results and the remaining phase boundaries.
+
+## Phase 2 practice and browser assets
+
+The practice screen adds explicit camera/voice activation, height calibration, comparison/composite views, L/R labels and approximate similarity. Private lessons save paused position/speed/mode in PostgreSQL. Revising sections resets old resume state. Returning never restores camera/microphone permission use or calibration automatically.
+
+`npm run dev` and `npm run build` prepare pinned MediaPipe 0.10.21 files into ignored `apps/web/public/tracking/`. The model is copied from the existing local prototype when available, otherwise downloaded from Google's versioned model URL and checked against SHA-256 `59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a`. The Docker build follows the same preparation; it needs download access to prepare a missing model. There is no runtime CDN dependency for camera frames.
+
+**Camera and voice settings → Recorded test** uses the real tracker on the supplied instructor video. It briefly freezes the configured standing pose for deterministic calibration, then plays the recording. This is a labelled software check, not a live student assessment. No live camera or microphone was enabled during automated browser checks.
+
+Phone testing is deferred by the user. See `phase-2-verification.md` for local evidence and `phase-2-phone-checks.md` for device acceptance and the optional HTTPS launcher. No certificates or firewall settings were installed or changed. Phase 2's full acceptance gate remains open; Phase 3 is not implemented at this checkpoint.
 
 ## Original Phase 0 checkpoint
 

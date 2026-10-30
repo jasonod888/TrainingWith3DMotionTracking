@@ -4,6 +4,7 @@ COPY apps/web/package*.json ./
 RUN npm ci --no-audit --no-fund
 COPY apps/web/ ./
 COPY packages/ /app/packages/
+COPY web/dist/pose.js web/dist/voice.js web/dist/composite.js web/dist/hand-labels.js /app/web/dist/
 RUN npm run build
 
 FROM python:3.12-slim-bookworm
