@@ -68,6 +68,36 @@ class PracticeProgress(Base):
     speed: Mapped[float] = mapped_column(Float)
     mode: Mapped[str] = mapped_column(String(16))
 
+class Conversion(Base):
+    __tablename__ = 'conversions'
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    filename: Mapped[str] = mapped_column(String(255))
+    source_bytes: Mapped[int] = mapped_column(Integer)
+    source_sha256: Mapped[str | None] = mapped_column(String(64))
+    source_key: Mapped[str] = mapped_column(String(512))
+    upload_id: Mapped[str | None] = mapped_column(String(512))
+    parts: Mapped[dict] = mapped_column(JSON, default=dict)
+    start: Mapped[float] = mapped_column(Float)
+    duration: Mapped[float] = mapped_column(Float)
+    state: Mapped[str] = mapped_column(String(32), default='uploading', index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    attempt_token: Mapped[str | None] = mapped_column(String(80))
+    worker_id: Mapped[str | None] = mapped_column(String(80))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    frames: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(String(40))
+    lesson_id: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class WorkerCredential(Base):
+    __tablename__ = 'worker_credentials'
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
 def make_engine(url):
     return create_engine(url, pool_pre_ping=True, connect_args={'connect_timeout': 3} if url.startswith('postgresql') else {})
 
@@ -78,3 +108,4 @@ def database_ready(engine):
         connection.execute(text('SELECT a.id, s.token_hash, t.token_hash, l.version, l.archived, m.key, h.hits '
                                 'FROM accounts a, login_sessions s, account_tokens t, lessons l, lesson_assets m, auth_throttles h LIMIT 0'))
         connection.execute(text('SELECT account_id, lesson_id, revision_id, time FROM practice_progress LIMIT 0'))
+        connection.execute(text('SELECT id, state, lease_until FROM conversions LIMIT 0'))

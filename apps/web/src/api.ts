@@ -30,3 +30,9 @@ export const saveSections=(lesson:LessonManifest,sections:LessonManifest['sectio
 export type Progress={revision_id:string;time:number;speed:.5|.75|1;mode:'sections'|'continuous'};
 export const loadProgress=(lesson:LessonManifest)=>request<Progress|null>(`/lessons/${lesson.lesson_id}/progress`);
 export const saveProgress=(lesson:LessonManifest,value:Omit<Progress,'revision_id'>)=>request(`/lessons/${lesson.lesson_id}/progress`,'PUT',{revision_id:lesson.revision_id,...value},true);
+export function uploadChunk(jobId:string,part:number,body:Blob,signal:AbortSignal,progress:(bytes:number)=>void):Promise<void>{
+ return new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open('PUT',`/api/conversions/${jobId}/parts/${part}`);xhr.setRequestHeader('Content-Type','application/octet-stream');xhr.setRequestHeader('X-Form-Request','1');xhr.setRequestHeader('X-CSRF-Token',csrf);xhr.timeout=120000;
+ const abort=()=>xhr.abort();signal.addEventListener('abort',abort,{once:true});const clean=()=>signal.removeEventListener('abort',abort);
+ xhr.upload.onprogress=e=>progress(e.loaded);xhr.onload=()=>{clean();if(xhr.status>=200&&xhr.status<300)resolve();else{let message='Upload stopped. You can resume it from your library.';try{message=JSON.parse(xhr.responseText).detail??message;}catch{}reject(new ApiError(message,xhr.status));}};xhr.onerror=xhr.ontimeout=()=>{clean();reject(new Error('Connection interrupted. Resume the upload from your library.'));};xhr.onabort=()=>{clean();reject(new DOMException('Upload paused.','AbortError'));};if(signal.aborted){clean();reject(new DOMException('Upload paused.','AbortError'));return;}xhr.send(body);
+ });
+}

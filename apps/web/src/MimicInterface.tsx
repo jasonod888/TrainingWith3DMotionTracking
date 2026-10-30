@@ -12,7 +12,7 @@ import {assetUrl} from './api';
 
 type Mode='off'|'camera'|'recorded';
 type TrackerMessage={type:string;epoch?:number;landmarks?:Point[];world?:Point[];message?:string};
-export function PracticeStudio({lesson,player,onCommand,renderReference}:{lesson:LessonManifest;player:Playback;onCommand:(c:Command)=>void;renderReference:(framing:PracticeFraming)=>ReactNode}){
+export function MimicInterface({lesson,player,onCommand,renderReference}:{lesson:LessonManifest;player:Playback;onCommand:(c:Command)=>void;renderReference:(framing:PracticeFraming)=>ReactNode}){
  const video=useRef<HTMLVideoElement>(null),canvas=useRef<HTMLCanvasElement>(null),pane=useRef<HTMLDivElement>(null),left=useRef<HTMLSpanElement>(null),right=useRef<HTMLSpanElement>(null);
  const calibration=useRef(new HeightCalibration()).current;
  const lifetime=useRef(new SourceSession()).current;
@@ -119,7 +119,7 @@ export function PracticeStudio({lesson,player,onCommand,renderReference}:{lesson
  },[calibration,player,clear,stop]);
 
  const active=mode!=='off';
- return <div className="practice-studio">
+ return <div className="practice-studio" aria-label="Mimic interface">
   <div className={`practice-stage-grid ${active?'camera-active':''} ${active&&framing.composite?'is-composite':''}`}>
    <div className="camera-pane" ref={pane} hidden={!active}><video ref={video} muted playsInline className={mode==='camera'&&options.current.facing==='user'?'mirrored':''}/><canvas ref={canvas} aria-hidden="true"/><span ref={left} className="hand-label" hidden>L</span><span ref={right} className="hand-label" hidden>R</span><span className="camera-tag">{mode==='recorded'?'RECORDED TEST':'YOU'}</span>{framing.calibrating&&<div className="calibration-card" role="status"><span>{message}</span><progress aria-label="Height calibration" value={progress} max={1}/></div>}</div>
    <div className="reference-pane">{renderReference(framing)}</div>

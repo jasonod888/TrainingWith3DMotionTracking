@@ -1,6 +1,7 @@
 """Database-backed, revocable cookie sessions and single-use email tokens."""
 import hashlib
 import hmac
+import re
 import secrets
 import smtplib
 from datetime import datetime, timedelta, timezone
@@ -105,10 +106,12 @@ def install_auth(app, engine, settings):
     @app.middleware('http')
     async def protect_requests(request, call_next):
         from fastapi.responses import JSONResponse
-        if request.url.path.startswith('/api/') and request.method not in ('GET', 'HEAD', 'OPTIONS'):
+        worker_route = request.url.path.startswith('/api/worker/')
+        binary_upload = request.method == 'PUT' and bool(re.fullmatch(r'/api/conversions/[a-f0-9]{32}/parts/\d+', request.url.path))
+        if request.url.path.startswith('/api/') and not worker_route and request.method not in ('GET', 'HEAD', 'OPTIONS'):
             if request.headers.get('origin') not in allowed_origins or request.headers.get('x-form-request') != '1':
                 return JSONResponse({'detail': 'Please reload Form and try again.'}, status_code=403)
-            if request.headers.get('content-type', '').split(';')[0] != 'application/json':
+            if request.headers.get('content-type', '').split(';')[0] != ('application/octet-stream' if binary_upload else 'application/json'):
                 return JSONResponse({'detail': 'Expected JSON.'}, status_code=415)
         response = await call_next(request)
         if request.url.path.startswith('/api/'):

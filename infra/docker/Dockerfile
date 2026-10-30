@@ -17,5 +17,6 @@ COPY apps/api/ /app/apps/api/
 COPY alembic.ini /app/
 COPY --from=web /app/apps/web/dist/ /app/apps/web/dist/
 RUN useradd --create-home --uid 10001 form
+RUN mkdir -p /app/.local/upload-tmp && chown form:form /app/.local/upload-tmp
 USER form
 CMD ["python", "-m", "apps.api.serve"]
