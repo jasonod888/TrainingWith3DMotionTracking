@@ -236,7 +236,7 @@ Tasks:
 6. Test the existing pipeline in a Linux CUDA worker image; retain native Windows worker execution until validated.
 7. Establish CI for CPU-safe tests and contract fixtures; keep GPU verification a separate explicit check.
 
-Gate: local startup works from documented steps; existing practice remains usable; CPU image deploys as a Railway smoke test; the GPU container result is recorded honestly. Review the content-first mobile screens before expanding features.
+Gate: local startup works from documented steps; existing practice remains usable; the CPU image starts locally against PostgreSQL and private object storage; the GPU container result is recorded honestly. Review the content-first mobile screens before expanding features. Railway smoke deployment is deferred by the user's 30 October 2026 instruction to keep testing local; retain its configuration and verify hosting when cloud deployment is authorised later.
 
 ### Phase 1 — Accounts, private library, and persistent lessons
 

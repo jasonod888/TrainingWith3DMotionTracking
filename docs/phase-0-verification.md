@@ -24,8 +24,9 @@ Do not start Phase 1 until the outstanding infrastructure gates below pass or th
 | New engine and original synthetic GLB tests | 9/9 passed |
 | API and contract integration tests | 17/17 passed |
 | TypeScript check and production frontend build | Passed |
-| Alembic PostgreSQL SQL generation | Passed; execution on PostgreSQL still pending |
-| Docker Compose configuration validation | Passed; starting containers still pending |
+| Alembic PostgreSQL migration | SQL generation and real execution on the local PostgreSQL 17 container passed |
+| CPU application Docker build | Passed; image `form-saas:phase0` built successfully |
+| Docker Compose dependencies | PostgreSQL and Mailpit started healthy; object storage startup pending disk-space recovery |
 | Native CUDA environment | RTX 4060 Laptop GPU, CUDA 12.8, SAM/PyMomentum imports and checkpoint detected |
 | Real reference in browser | Loads and renders without console errors in tested flow |
 | Section navigation | Section 3 stopped at exactly 13.7 seconds with “Hold this pose” |
@@ -46,15 +47,15 @@ Local visual evidence, intentionally ignored by Git:
 
 ## Outstanding gates and blockers
 
-1. **Docker Desktop startup failure.** Docker's backend reports an inaccessible `dockerInference` socket and crashes before the Linux engine starts. A reversible attempt to rename that stale socket also failed; no factory reset, image/volume deletion, or security change was performed. Compose startup, CPU image build, PostgreSQL migration/persistence, and storage round trips cannot be marked passed. Docker Desktop must be repaired before these checks can run.
-2. **Railway staging resources need explicit approval.** The CLI is authenticated, but automatic approval review rejected creating a new project because this creates external resources and may incur charges. A specific user approval request was sent. No new Railway project, database or bucket was created; existing projects were not modified.
-3. **Linux CUDA portability remains unverified.** The native environment check passed, but Docker's failure prevents image build and a real inference/export smoke test. A native success is not substituted for Linux verification.
+1. **Local Docker disk space.** The startup failure was resolved by renaming the socket-only runtime folders, while Docker was stopped, to `C:\Users\enqui\AppData\Local\Docker\run.phase0-backup-20261030` and `C:\Users\enqui\AppData\Local\docker-secrets-engine.phase0-backup-20261030`. Originals were preserved; no factory reset or data deletion was performed. Docker 29.2.1 then started, the CPU image built and the PostgreSQL migration ran. Subsequent image downloads exhausted C: and Docker storage became read-only, preventing object-storage/container startup and GPU build. Docker was stopped; this recovered roughly 0.7 GB but remains below the safe preflight threshold. User was asked whether to relocate Docker's approximately 13 GB data disk to `D:\DockerData` or free C: space themselves. No relocation has been performed. A guarded launcher now checks available space first.
+2. **Railway testing deferred by user.** The user selected “Keep testing local for now.” Do not create cloud projects, databases or storage. No new Railway resources were created and existing projects were not modified. Hosted smoke testing is a future deployment gate, not a reason to request the same approval again during local development.
+3. **Linux CUDA portability remains unverified.** The native environment check passed, but the GPU build failed before dependency installation because Docker's metadata filesystem became read-only. A native success is not substituted for Linux verification.
 4. **Real mobile devices remain untested.** Responsive browser checks passed. Camera/microphone and sustained phone behaviour belong to Phase 2 and cannot be certified from viewport resizing.
 
 ## Next actions after unblocking
 
 1. Start PostgreSQL/storage/mail, initialize the local bucket, execute migration, restart and verify persistence, and run private object round-trip checks.
 2. Build/start the CPU image and verify `/health/live`, `/health/ready`, static UI delivery and failure/recovery behaviour.
-3. With resource approval, create isolated Railway staging, configure secret references, deploy the same image and verify readiness after migration/restart. Keep source demonstration disabled in hosted staging unless rights are confirmed.
+3. Leave Railway deployment deferred, respecting the user's local-only choice. Retain portable deployment configuration for a later release.
 4. Build/test the CUDA image with a one-frame sample and exporter verification, recording any Linux dependency fixes.
 5. Mark Phase 0 complete only after the gates pass, then proceed to accounts/private library in Phase 1.
