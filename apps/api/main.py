@@ -9,6 +9,8 @@ from .config import Settings, ROOT
 from .contracts import LessonManifest
 from .database import make_engine, database_ready
 from .storage import check_storage
+from .auth import install_auth
+from .lessons import install_lessons
 
 logger = logging.getLogger('form')
 
@@ -22,6 +24,16 @@ def create_app(settings: Settings | None = None):
         engine.dispose()
 
     app = FastAPI(title='Form', version='0.1.0', lifespan=lifespan)
+    app.state.engine = engine
+    identity, db = install_auth(app, engine, settings)
+    install_lessons(app, engine, settings, identity, db)
+
+    from fastapi.exceptions import RequestValidationError
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request, exc):
+        # Do not reflect submitted passwords or email tokens in validation responses.
+        return JSONResponse({'detail': 'Please check the fields and try again.'}, status_code=422)
 
     @app.get('/health/live')
     def live():
@@ -60,7 +72,7 @@ def create_app(settings: Settings | None = None):
 
     @app.get('/api/capabilities')
     def capabilities():
-        return {'phase':0, 'demo':settings.demo_enabled, 'accounts':False, 'conversion':False, 'sharing':False}
+        return {'phase':1, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':False, 'sharing':False}
 
     @app.get('/api/{path:path}', include_in_schema=False)
     def missing_api(path: str):

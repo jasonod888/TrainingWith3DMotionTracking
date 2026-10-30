@@ -9,4 +9,6 @@ Use a **separate** project for this application. Do not repurpose the user's exi
 5. Check liveness and readiness, restart the service, and verify the revision tables persist. Railway readiness probes run during deployment; add continuous monitoring in the pilot-hardening phase.
 6. Record project/service/deployment IDs and test evidence, but never commit secrets or full variable dumps.
 
+Phase 1 also requires `PUBLIC_URL=https://your-browser-domain`, `SMTP_HOST`, `SMTP_PORT=587`, `SMTP_STARTTLS=true`, `SMTP_USERNAME`, `SMTP_PASSWORD` and an approved `MAIL_FROM`. Secure session cookies are automatic outside development. Run all Alembic migrations before routing traffic. No Railway resources have been provisioned or tested; the user has deferred deployment.
+
 The GPU image is separate. The current native worker and eventual outbound HTTPS worker protocol do not require exposing a home-machine port. Hosted worker integration is Phase 3.

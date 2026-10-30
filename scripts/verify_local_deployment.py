@@ -48,7 +48,7 @@ def main():
             index=http.get('/')
             assert index.status_code==200 and 'text/html' in index.headers['content-type'] and 'Form' in index.text
             assert http.get('/api/demo').status_code==404
-            assert http.get('/api/capabilities').json()['accounts'] is False
+            assert http.get('/api/capabilities').json()['accounts'] is True
             report('CPU application: live, ready, frontend served, undeployed features disabled.')
             with Session(engine) as session:
                 session.add(Lesson(id=identity,owner_id='verification',title='Synthetic restart check'))

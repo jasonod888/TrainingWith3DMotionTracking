@@ -4,4 +4,6 @@ The Phase 0 CPU application uses standard Docker, PostgreSQL and private S3 APIs
 
 Use an ECS task IAM role for bucket permissions rather than static access keys. Run the Alembic migration as a one-off task before shifting application traffic. Do not build GPU dependencies into the API service.
 
+Accounts and sessions live in PostgreSQL, not process memory or a local disk. Preserve account IDs, password hashes, session/token digests and object keys during migration. Set the HTTPS `PUBLIC_URL` and an SMTP provider (for example SES SMTP with STARTTLS); store SMTP credentials in deployment secrets. Asset requests are authorized through the same API on both platforms, including byte-range streaming. There is no Railway-specific authentication or file-serving dependency.
+
 The CUDA worker belongs on GPU-capable EC2/ECS capacity after Linux verification. Cloud infrastructure provisioning, migration rehearsal, backups, DNS cutover and rollback are Phase 6; these have not been implemented or tested by the foundation.

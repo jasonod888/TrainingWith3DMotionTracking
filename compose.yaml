@@ -52,6 +52,9 @@ services:
       STORAGE_SECRET_KEY: local-development-only
       DEMO_ENABLED: "true"
       DEMO_ASSETS_DIR: /demo
+      PUBLIC_URL: http://127.0.0.1:8001
+      SMTP_HOST: mail
+      SMTP_PORT: 1025
     volumes: ["./web/dist/assets:/demo:ro"]
     depends_on:
       migrate:

@@ -46,7 +46,7 @@ def test_api_demo_disabled_by_default(tmp_path):
         assert c.get('/health/live').status_code==200
         assert c.get('/api/demo').status_code==404
         assert c.get('/api/demo/assets/private.key').status_code==404
-        assert c.get('/api/capabilities').json()['accounts'] is False
+        assert c.get('/api/capabilities').json()['accounts'] is True
         assert c.get('/api/unknown').status_code==404
 
 def test_readiness_checks_both_database_and_storage(tmp_path):

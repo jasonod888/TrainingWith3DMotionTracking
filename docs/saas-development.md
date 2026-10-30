@@ -1,4 +1,4 @@
-# SaaS development — Phase 0
+# SaaS development — Phase 1
 
 The new application is additive. The existing `scripts/start_practice.ps1` prototype is unchanged.
 
@@ -89,7 +89,35 @@ The migration service runs before the app. Do not start the native API on port 8
 
 The original native CUDA environment is preserved. The separate GPU image passed local Linux inference and GLB export checks on 30 October 2026; see `phase-0-verification.md`. This does not certify production throughput or motion accuracy. `infra/docker/gpu-requirements-lock.txt` is the tested Linux environment snapshot, not yet an installed build constraint. Rebuilding its ranged dependencies requires repeating these checks. Use at least two frames for animation export. The image can require many GB of downloads; use the disk preflight before rebuilding.
 
-## Scope of this checkpoint
+## Accounts and saved lessons
+
+Run the `0002` migration with `.venv-saas/Scripts/python.exe -m alembic upgrade head` before starting the updated API. Create an account from **Account**, then open the local test mailbox at `http://127.0.0.1:8025` to follow the verification link. Local email stays in Mailpit; it is not delivered externally. Sign in, choose **Create → Add private lesson**, edit the whole animation into sections, and **Save**. Refreshing or signing in from another browser retains the saved revision. **Keep draft** remains session-only for the public demonstration; private copies use central Save.
+
+To import a different trusted, prepared manifest as an operator:
+
+```powershell
+.venv-saas/Scripts/python.exe scripts/import_saas_lesson.py --email your-account@example.com --manifest path/to/manifest.json --assets path/to/assets
+```
+
+This validates asset sizes and SHA-256 hashes, uploads private objects and registers the manifest/revision/assets in PostgreSQL. It is a trusted operator import, not a general file-upload feature. The demonstration import button only uses the server-configured allowlisted demonstration; it never accepts filesystem paths from the browser.
+
+Earlier prototype edits are imported only by choosing **Earlier prototype edits → Import browser sections** in a private copy of the same animation. This reads that browser origin's old `form-sections-v1-{duration}` entry only after the explicit click, validates its timings, and leaves changes unsaved for review. Cross-origin browser storage cannot be read; no edits are automatically imported or overwritten.
+
+Removing a lesson archives it: the owner library, manifest and media routes immediately reject further requests, while immutable revisions and private objects remain retained. Phase 1 performs no automatic permanent purge. Already downloaded bytes cannot be recalled. A later retention/cleanup worker must operate only on archived records under the chosen retention policy.
+
+Account sessions and verification/reset tokens are random and stored only as SHA-256 digests. Passwords use salted scrypt (N=131072, r=8, p=1). Session cookies are HTTP-only and SameSite=Lax; hosted environments require HTTPS (Secure cookies) and SMTP STARTTLS. Write requests require an allowed Origin, the application header, JSON and, after sign-in, a session-bound CSRF token. Shared database throttles survive process restarts. Reset invalidates all sessions and existing account tokens. Do not expose local development credentials or Mailpit to the internet.
+
+For Railway/AWS, set `ENVIRONMENT`, `PUBLIC_URL`, SMTP and storage/database settings explicitly. `PUBLIC_URL` is the browser-facing HTTPS origin, never an internal service hostname. No CORS wildcard or trusted forwarding-header assumption is used. Media is streamed through an owner-authorized API route, with byte ranges for video seeking; storage stays private and has no browser-facing internal hostname dependency.
+
+Additional checks (using the disposable project smoke container on port 8010):
+
+```powershell
+.venv-saas/Scripts/python.exe scripts/verify_phase1_deployment.py
+```
+
+See `phase-1-verification.md` for results and the remaining phase boundaries.
+
+## Original Phase 0 checkpoint
 
 Real demonstration playback, section split/merge/rename/boundary editing, and a draft held in the current browser session. **Keep draft** is explicitly temporary. Refreshing clears it. Camera/voice integration, accounts, central saving, upload, and sharing are subsequent phases. The original prototype still provides its existing camera/voice experience.
 
