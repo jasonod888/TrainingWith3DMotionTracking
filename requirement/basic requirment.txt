@@ -1,0 +1,216 @@
+# AI Video-to-Interactive Movement Training Platform
+**Project Summary & Initial Technical Proof of Concept**
+
+## 1. Project Objective
+
+Build a **general-purpose AI-powered movement learning platform** that converts an ordinary demonstration video into an interactive training experience.
+
+An instructor, trainer, or content creator uploads a video demonstrating a physical movement, exercise, or sequence. The platform automatically converts that video into a 3D skeletal animation that students can follow using their own phone cameras.
+
+The platform compares the student's live movements against the reference animation and provides visual feedback to help them match the demonstrated movements.
+
+**Core concept: Upload a video → Generate a 3D movement reference → Share an interactive lesson → Students learn by matching movements.**
+
+The product should not be restricted to a particular activity. Potential applications include Taekwondo, martial arts, dance, yoga, fitness, sports drills, and other body-movement-based training.
+
+### Initial scope
+
+The emphasis is on **visual pose and motion matching**, not intelligent coaching.
+
+The initial system does not need to understand the specific sport or technique, deliver verbal instructions, or determine whether a movement is professionally correct. It needs to measure how closely the student reproduces the reference movement.
+
+Advanced coaching and activity-specific intelligence can be introduced later.
+
+## 2. Student Learning Experience
+
+Students access an interactive lesson through a web browser, preferably without installing an application.
+
+Two viewing modes must be supported, and students can switch between them according to their preference.
+
+**Mode A — Overlay**
+
+The student's live camera feed fills the screen, with a translucent reference silhouette or 3D avatar superimposed over their body. Students adjust their position to align with the reference.
+
+**Mode B — Side-by-side**
+
+The instructor's animated 3D avatar and the student's live camera feed are displayed next to each other. Students follow the reference movements visually.
+
+Both modes use the same underlying pose-tracking and movement-comparison engine.
+
+### Learning modes
+
+- **Step-by-step:** The system pauses at key poses or checkpoints and allows the student to match each position before advancing.
+- **Continuous movement:** The reference animation plays as the student follows it, with the system comparing their movements throughout the sequence.
+
+Visual feedback can include body-joint highlighting, alignment indicators, and an overall match score.
+
+## 3. Proposed Technical Architecture
+
+The system consists of two separate processing pipelines that share a common 3D skeletal representation.
+
+### Pipeline A — Convert Instructor Video into 3D Animation
+
+**Primary model: Meta SAM 3D Body**
+
+SAM 3D Body reconstructs a 3D human body from a single image. It estimates body geometry, pose, joint locations, and skeletal/body parameters.
+
+For a video, the model can be applied across individual frames to reconstruct a sequence of poses.
+
+Processing stages:
+
+1. **Video upload:** Accept a recorded instructor demonstration in MP4 or MOV format.
+2. **Frame extraction:** Extract video frames while preserving timestamps.
+3. **SAM 3D Body inference:** Estimate the instructor's 3D body and skeletal pose for each selected frame.
+4. **Temporal reconstruction:** Combine individual poses into a continuous movement sequence.
+5. **Motion correction:** Reduce jitter, maintain consistent body proportions, reconstruct orientation and movement through space, and minimise foot sliding.
+6. **Animation generation:** Convert the reconstructed motion into a reusable skeletal animation.
+7. **Export:** Generate structured motion data (JSON or binary) and an animated 3D asset (GLB).
+
+**Important:** SAM 3D Body provides individual 3D body reconstructions. It is not, by itself, a complete video-to-animation solution. Temporal reconstruction and animation export require additional processing.
+
+### Pipeline B — Live Student Pose Tracking
+
+**Primary model: Google MediaPipe Pose Landmarker**
+
+MediaPipe tracks human body landmarks using a live camera feed. It can operate locally in a mobile web browser.
+
+Processing stages:
+
+1. Student opens the interactive lesson.
+2. Browser requests camera access.
+3. MediaPipe tracks the student's body landmarks in real time.
+4. The student's pose is converted into the same skeletal representation used by the reference.
+5. A comparison engine evaluates alignment, joint angles, relative limb positions, body orientation, and movement progression.
+6. Visual feedback is displayed in the selected viewing mode.
+
+**Why combine these models?**
+
+SAM 3D Body is used for the more computationally demanding task of creating high-quality instructor reference animations. MediaPipe is used for lightweight, real-time student tracking.
+
+There is no need to run SAM 3D Body continuously on every student's device.
+
+A joint-mapping and coordinate-normalisation layer will be needed because SAM 3D Body and MediaPipe use different body representations.
+
+### 3D Rendering
+
+Use **Three.js** in the browser to display the reference animation, including a translucent avatar for overlay mode.
+
+The reference should be adaptable to the student's proportions and camera perspective. Comparing joint angles and normalised body movement will generally be more reliable than comparing silhouettes pixel by pixel.
+
+## 4. Computing and Deployment
+
+For initial development, we intend to run SAM 3D Body locally on an **NVIDIA RTX 4060 with 8 GB VRAM**, using a memory-optimised implementation where necessary.
+
+The initial workflow will process video frames sequentially to reduce peak GPU memory usage.
+
+Possible implementations to investigate:
+
+- [Meta SAM 3D Body](https://github.com/facebookresearch/sam-3d-body) — Original model.
+- [Fast SAM 3D Body](https://github.com/yangtiming/Fast-SAM-3D-Body) — Accelerated implementation.
+- [SAM3D Video Pose](https://github.com/quietscientist/sam3d-video-pose) — Community video-processing approach.
+- [SAM3DBody to GLB](https://github.com/rem0g/sam3dbody_to_glb) — Animated GLB export approach.
+
+Commercial licensing, dependency compatibility, and GPU memory requirements must be validated before production use.
+
+For the eventual product, video reconstruction can run on a GPU server, while student tracking and 3D rendering can run locally in the browser.
+
+## 5. First Technical Test — Video to 3D Skeletal Animation
+
+### Objective
+
+**Verify that SAM 3D Body can convert an ordinary movement video into a sufficiently accurate, smooth, reusable 3D skeletal animation using our RTX 4060 GPU.**
+
+We will not build the complete student interface during this first test.
+
+### Test input
+
+Start with one short, 10–20-second video showing a single person performing a series of movements.
+
+A Taekwondo pattern is a useful example because it includes joint articulation, stances, body turns, and directional movement.
+
+Ideally, the video should have a fixed camera, clear lighting, and the full body visible.
+
+### Test procedure
+
+**Step 1 — Local setup**
+
+Install the required SAM 3D Body implementation, model weights, Python dependencies, and GPU environment. Confirm inference works on one image.
+
+**Step 2 — Video processing**
+
+Extract frames from the demonstration video, preserving their timestamps. Run SAM 3D Body on the selected frames.
+
+**Step 3 — Generate motion data**
+
+Save the estimated 3D body pose and joint parameters for each frame.
+
+**Step 4 — Temporal reconstruction**
+
+Combine the poses, stabilise the motion, maintain consistent body proportions, and estimate body turns and root movement.
+
+**Step 5 — Export animation**
+
+Generate a reusable skeletal animation in GLB format along with structured motion data.
+
+**Step 6 — Visual validation**
+
+Load the GLB into a Three.js viewer.
+
+Display the original instructor video beside the reconstructed 3D avatar. Synchronise playback and allow the 3D camera to rotate freely around the avatar.
+
+### Expected deliverables
+
+1. A locally running SAM 3D Body inference environment.
+2. A pipeline that accepts a demonstration video.
+3. Extracted 3D pose/motion data for the video.
+4. An animated skeletal GLB.
+5. A simple browser viewer with video and 3D animation shown side by side.
+6. Initial measurements of processing time, VRAM usage, and reconstruction quality.
+
+### Test success criteria
+
+The reconstruction should demonstrate:
+
+- Correct major body poses and limb positions.
+- Reasonably stable skeleton proportions.
+- Smooth motion without severe joint jitter.
+- Correctly represented body turns and directional movement.
+- Minimal foot sliding and obvious animation artefacts.
+- Successful playback in Three.js from multiple viewing angles.
+
+Particular attention should be paid to movements where body parts overlap or become temporarily hidden.
+
+### Critical uncertainties
+
+Single-camera 3D reconstruction has inherent ambiguity. Hidden limbs, fast movement, camera perspective, root translation, and foot orientation may be estimated incorrectly.
+
+The test will establish whether SAM 3D Body provides sufficient quality directly or whether we need a more sophisticated video-motion reconstruction stage.
+
+## 6. Second Technical Test — Integrate MediaPipe
+
+Once the reference animation works, the next test will focus on live student tracking and pose comparison.
+
+The objectives will be to:
+
+- Capture a student's live pose using MediaPipe in a mobile browser.
+- Map MediaPipe's landmarks to the reference skeleton.
+- Normalise differences in body size and camera positioning.
+- Compare static body poses using joint angles and limb orientation.
+- Display a basic match score.
+- Render the reference as an overlay or in a side-by-side viewer.
+
+The first student-matching test should focus on static poses before progressing to continuous movement sequences.
+
+## 7. Longer-Term Product Direction
+
+Following successful technical validation, the platform can expand to include automatic lesson segmentation, guided checkpoints, continuous motion matching, creator publishing tools, and student progress tracking.
+
+The long-term goal is not to develop a separate AI model for every activity. It is to build **one reusable video-to-movement-learning engine** that supports many forms of physical training.
+
+---
+
+## Immediate Next Action
+
+**Set up SAM 3D Body locally on the RTX 4060 and process one short demonstration video into a 3D skeletal animation viewable in Three.js.**
+
+This is the first technical milestone. Its outcome will determine whether SAM 3D Body is suitable as the primary reference-animation generation engine.

@@ -1,0 +1,5 @@
+{
+  "name": "movement-practice", "private": true, "type": "module",
+  "scripts": { "prepare-assets": "node prepare-assets.mjs", "test": "node --test tests/*.test.mjs" },
+  "dependencies": { "@mediapipe/tasks-vision": "0.10.21", "three": "0.180.0" }
+}
