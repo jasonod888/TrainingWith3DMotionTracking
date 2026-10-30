@@ -4,6 +4,11 @@ Scope: run Meta's official SAM 3D Body on the RTX 4060, process one short
 single-person video, and export structured motion plus a skinned skeletal GLB.
 The reconstruction pipeline is kept separate from the browser practice interface.
 
+The new SaaS foundation lives in `apps/`, with a responsive library, 3D practice
+preview, and section editor. See [SaaS setup](docs/saas-development.md) and the
+[phase verification record](docs/phase-0-verification.md). The existing local
+prototype below remains available while the new application is built.
+
 ## Repository contents
 
 This repository tracks the application source, setup scripts, dependency locks,

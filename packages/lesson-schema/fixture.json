@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "lesson_id": "synthetic-lesson",
+  "revision_id": "synthetic-v1",
+  "title": "Synthetic contract fixture",
+  "duration": 2,
+  "source_start": 0,
+  "standing_time": 0,
+  "engine": "synthetic",
+  "engine_version": "1",
+  "units": "metres",
+  "landmark_axes": "x-right/y-down/z-forward",
+  "root_motion": "in-place",
+  "confidence": "unmeasured",
+  "animation": {
+    "key": "fixture/synthetic.glb",
+    "mime": "model/gltf-binary",
+    "bytes": 1628,
+    "sha256": "88d634848850fcd89ee8769e6470d39a8e4b95fa9e482d26892394a291b1375f"
+  },
+  "landmarks": {
+    "key": "fixture/synthetic-landmarks.json",
+    "mime": "application/json",
+    "bytes": 95,
+    "sha256": "21e9d406b17dfa0c17227435f00ed4ace8cb07f1b1bc8fc41b94b2319f195c33"
+  },
+  "source_video": null,
+  "thumbnail": null,
+  "section_set": {
+    "id": "synthetic-sections",
+    "revision": 1,
+    "duration": 2,
+    "sections": [
+      {
+        "id": "a",
+        "label": "Ready",
+        "start": 0,
+        "end": 1
+      },
+      {
+        "id": "b",
+        "label": "Move",
+        "start": 1,
+        "end": 2
+      }
+    ]
+  },
+  "warnings": [
+    "Contract fixture only. Contains no human motion or media."
+  ]
+}

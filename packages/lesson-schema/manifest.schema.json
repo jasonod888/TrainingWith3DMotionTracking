@@ -1,0 +1,239 @@
+{
+  "$defs": {
+    "Asset": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_./-]*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "mime": {
+          "title": "Mime",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "mime",
+        "bytes",
+        "sha256"
+      ],
+      "title": "Asset",
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "start",
+        "end"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "SectionSet": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "duration": {
+          "exclusiveMinimum": 0,
+          "title": "Duration",
+          "type": "number"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/Section"
+          },
+          "minItems": 1,
+          "title": "Sections",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "duration",
+        "sections"
+      ],
+      "title": "SectionSet",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "lesson_id": {
+      "title": "Lesson Id",
+      "type": "string"
+    },
+    "revision_id": {
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "duration": {
+      "exclusiveMinimum": 0,
+      "title": "Duration",
+      "type": "number"
+    },
+    "source_start": {
+      "minimum": 0,
+      "title": "Source Start",
+      "type": "number"
+    },
+    "engine": {
+      "enum": [
+        "sam-3d-body",
+        "mediapipe",
+        "synthetic"
+      ],
+      "title": "Engine",
+      "type": "string"
+    },
+    "engine_version": {
+      "title": "Engine Version",
+      "type": "string"
+    },
+    "units": {
+      "const": "metres",
+      "default": "metres",
+      "title": "Units",
+      "type": "string"
+    },
+    "landmark_axes": {
+      "const": "x-right/y-down/z-forward",
+      "default": "x-right/y-down/z-forward",
+      "title": "Landmark Axes",
+      "type": "string"
+    },
+    "root_motion": {
+      "enum": [
+        "estimated-camera-relative",
+        "hip-relative",
+        "in-place"
+      ],
+      "title": "Root Motion",
+      "type": "string"
+    },
+    "confidence": {
+      "enum": [
+        "unmeasured",
+        "measured"
+      ],
+      "title": "Confidence",
+      "type": "string"
+    },
+    "standing_time": {
+      "minimum": 0,
+      "title": "Standing Time",
+      "type": "number"
+    },
+    "animation": {
+      "$ref": "#/$defs/Asset"
+    },
+    "landmarks": {
+      "$ref": "#/$defs/Asset"
+    },
+    "source_video": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "thumbnail": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "section_set": {
+      "$ref": "#/$defs/SectionSet"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "lesson_id",
+    "revision_id",
+    "title",
+    "duration",
+    "source_start",
+    "engine",
+    "engine_version",
+    "root_motion",
+    "confidence",
+    "standing_time",
+    "animation",
+    "landmarks",
+    "section_set"
+  ],
+  "title": "LessonManifest",
+  "type": "object"
+}

@@ -1,4 +1,11 @@
 .venv/
+.venv-saas/
+node_modules/
+apps/web/dist/
+.pytest_cache/
+.local/
+test-results/
+playwright-report/
 vendor/
 models/
 inputs/*

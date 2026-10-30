@@ -1,0 +1,17 @@
+.git
+.venv
+.venv-saas
+**/node_modules
+apps/web/dist
+web/dist/vendor
+web/dist/assets
+models
+vendor
+inputs
+outputs
+.env
+.env.*
+.local
+test-results
+playwright-report
+**/__pycache__

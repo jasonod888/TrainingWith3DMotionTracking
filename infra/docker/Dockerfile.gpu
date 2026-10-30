@@ -1,0 +1,12 @@
+# Portability candidate: must pass Linux/CUDA smoke verification before release.
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv git ffmpeg libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+RUN python3 -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+COPY requirements.txt ./
+RUN pip install --no-cache-dir torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128 && pip install --no-cache-dir -r requirements.txt
+RUN git clone https://github.com/facebookresearch/sam-3d-body.git vendor/sam-3d-body && git -C vendor/sam-3d-body checkout b5c765a0d89d789985e186d396315e7590887b94 && git clone https://github.com/facebookresearch/dinov3.git vendor/dinov3 && git -C vendor/dinov3 checkout 6876159a11b4df116f30f667f8c9888617df0751
+COPY scripts/ scripts/
+CMD ["python", "scripts/check_environment.py"]
