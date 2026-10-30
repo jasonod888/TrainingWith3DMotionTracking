@@ -3,8 +3,8 @@ export function parseCommand(text){
   return ['next','back','again','pause'].includes(word)?word:null;
 }
 export class VoiceCommands{
-  constructor({Recognition,onCommand,onState,onError,now=()=>Date.now(),schedule=setTimeout,cancel=clearTimeout}){
-    Object.assign(this,{Recognition,onCommand,onState,onError,now,schedule,cancel});this.enabled=false;this.generation=0;this.lastCommand=null;this.lastAt=-Infinity;this.restarts=[];
+  constructor({Recognition,onCommand,onState,onError,now=()=>Date.now(),schedule=setTimeout,cancel=clearTimeout,extended=false}){
+    Object.assign(this,{Recognition,onCommand,onState,onError,now,schedule,cancel,extended});this.enabled=false;this.generation=0;this.lastCommand=null;this.lastAt=-Infinity;this.restarts=[];
   }
   start(){
     if(!this.Recognition){this.onError('Voice commands are unavailable in this browser. Use the section buttons instead.');return;}
@@ -20,7 +20,7 @@ export class VoiceCommands{
       if(generation!==this.generation||!this.enabled)return;
       for(let i=event.resultIndex;i<event.results.length;i++){
         if(!event.results[i].isFinal)continue;
-        const result=event.results[i][0],command=parseCommand(result.transcript);
+        const result=event.results[i][0],word=String(result.transcript).toLowerCase().replace(/[.,!?]/g,'').trim(),command=parseCommand(word)??(this.extended?({start:'resume',resume:'resume',slower:'slower',faster:'faster',loop:'loop'}[word]??null):null);
         if(!command||(result.confidence>0&&result.confidence<.5))continue;
         const now=this.now();if(command===this.lastCommand&&now-this.lastAt<900)continue;
         this.lastCommand=command;this.lastAt=now;this.onCommand(command);

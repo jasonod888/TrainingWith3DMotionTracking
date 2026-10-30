@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {Playback} from '../../packages/learning-engine/playback';
+import {PracticeSession} from '../../packages/learning-engine/practice-session';
+const make=()=>new PracticeSession(new Playback([{id:'a',label:'A',start:0,end:2},{id:'b',label:'B',start:2,end:4}],4));
+test('countdown never advances lesson and pause cancels queued start',()=>{const s=make();s.action('play');s.tick(2);assert.equal(s.player.state.time,0);s.pause();s.tick(10);assert.equal(s.phase,'paused');assert.equal(s.player.state.playing,false);});
+test('range repeats exactly, rests and stops after requested count',()=>{const s=make();s.countdownSeconds=0;s.restSeconds=1;s.setRange(.5,1.5);s.loop=true;s.repetitions=2;const attempts:unknown[]=[];s.onAttempt=a=>attempts.push(a);s.action('resume');s.tick(2);assert.equal(s.phase,'rest');assert.equal(s.player.state.time,.5);s.tick(1);s.tick(2);assert.equal(s.phase,'paused');assert.equal(s.player.state.time,1.5);assert.equal(attempts.length,2);});
+test('calibration and navigation cancel countdown; resume is idempotent',()=>{const s=make();s.countdownSeconds=0;s.action('resume');s.tick(.5);s.action('resume');assert.equal(s.player.state.time,.5);s.player.calibrating(true);s.tick(.1);assert.equal(s.phase,'paused');s.action('next');assert.equal(s.player.state.index,0);});
+test('selecting a section clears a temporary range and never edits boundaries',()=>{const s=make();s.setRange(.2,.7);s.select(1);assert.equal(s.range,null);assert.equal(s.player.state.time,2);assert.equal(s.player.sections[0].end,2);assert.throws(()=>s.setRange(3,2));});
+test('repeated remote start cannot restart a countdown and range scrubbing stays bounded',()=>{const s=make();s.action('resume');s.tick(1);s.action('resume');assert.equal(s.remaining,2);s.setRange(.5,1.5);s.seek(3);assert.equal(s.player.state.time,1.5);});

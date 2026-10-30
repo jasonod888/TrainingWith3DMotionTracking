@@ -142,6 +142,33 @@ class LessonReport(Base):
     reason: Mapped[str] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
 
+class MimicAttempt(Base):
+    __tablename__='mimic_attempts'
+    id: Mapped[str]=mapped_column(String(80),primary_key=True)
+    account_id: Mapped[str]=mapped_column(ForeignKey('accounts.id'),index=True)
+    lesson_id: Mapped[str]=mapped_column(ForeignKey('lessons.id'),index=True)
+    revision_id: Mapped[str]=mapped_column(String(80))
+    summary: Mapped[dict]=mapped_column(JSON)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
+class MimicPair(Base):
+    __tablename__ = 'mimic_pairs'
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'), index=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'))
+    revision_id: Mapped[str] = mapped_column(String(80))
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    capture_hash: Mapped[str] = mapped_column(String(64))
+    receiver_hash: Mapped[str | None] = mapped_column(String(64))
+    approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    commands: Mapped[list] = mapped_column(JSON, default=list)
+    signals: Mapped[dict] = mapped_column(JSON, default=dict)
+    receiver_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
 def make_engine(url):
     return create_engine(url, pool_pre_ping=True, connect_args={'connect_timeout': 3} if url.startswith('postgresql') else {})
 
@@ -156,3 +183,5 @@ def database_ready(engine):
         connection.execute(text('SELECT id, provider, pipeline_version FROM worker_credentials LIMIT 0'))
         connection.execute(text('SELECT l.published_revision_id, g.account_id, i.token_hash, r.id '
                                 'FROM lessons l, lesson_grants g, lesson_invitations i, lesson_reports r LIMIT 0'))
+        connection.execute(text('SELECT id, account_id, revision_id, sequence FROM mimic_pairs LIMIT 0'))
+        connection.execute(text('SELECT id, account_id, revision_id FROM mimic_attempts LIMIT 0'))

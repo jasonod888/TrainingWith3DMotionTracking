@@ -20,5 +20,5 @@ declare module '*web/dist/hand-labels.js' {
  export function placeHandLabels(elements:Record<string,HTMLElement>,positions:Record<string,{x:number;y:number}|null>,w:number,h:number):void;
 }
 declare module '*web/dist/voice.js' {
- export class VoiceCommands{enabled:boolean;constructor(options:{Recognition:unknown;onCommand:(command:'next'|'back'|'again'|'pause')=>void;onState:(state:string)=>void;onError:(message:string)=>void});start():void;stop():void;}
+ export class VoiceCommands{enabled:boolean;constructor(options:{Recognition:unknown;extended?:boolean;onCommand:(command:'next'|'back'|'again'|'pause'|'resume'|'slower'|'faster'|'loop')=>void;onState:(state:string)=>void;onError:(message:string)=>void});start():void;stop():void;}
 }

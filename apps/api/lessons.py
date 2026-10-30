@@ -79,7 +79,7 @@ class SaveSections(BaseModel):
 class ProgressInput(BaseModel):
     revision_id: str = Field(min_length=1, max_length=80)
     time: float = Field(ge=0, allow_inf_nan=False)
-    speed: Literal[0.5, 0.75, 1] = 1
+    speed: Literal[0.25, 0.5, 0.75, 1] = 1
     mode: Literal['sections', 'continuous'] = 'sections'
 
 

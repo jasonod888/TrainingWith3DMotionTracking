@@ -36,7 +36,7 @@ export class Playback {
   }
   updateIndex(){this.state.index=this.sections.findIndex((s,i)=>this.state.time>=s.start && (this.state.time<s.end || i===this.sections.length-1));}
   seek(time:number){if(!Number.isFinite(time))return;this.state.time=Math.max(0,Math.min(this.duration,time));this.state.playing=false;this.updateIndex();}
-  speed(value:number){if([.5,.75,1].includes(value))this.state.speed=value;}
+  speed(value:number){if([.25,.5,.75,1].includes(value))this.state.speed=value;}
   mode(value:'sections'|'continuous'){this.state.mode=value;this.state.playing=false;this.updateIndex();}
   calibrating(value:boolean){this.state.calibrating=value;this.state.playing=false;}
   replace(sections:Section[]){this.sections=validateSections(sections,this.duration);this.seek(this.state.time);}

@@ -32,3 +32,9 @@ test('stopping voice cancels pending reconnection and ignores late recognition r
 test('unsupported browsers fail clearly without affecting button controls',()=>{
   const errors=[];const v=new VoiceCommands({Recognition:null,onCommand:()=>{},onState:()=>{},onError:e=>errors.push(e)});v.start();assert.equal(v.enabled,false);assert.ok(errors[0].includes('buttons'));
 });
+test('extended practice commands are opt-in and reject embedded background speech',()=>{
+ const commands=[];const voice=new VoiceCommands({Recognition,extended:true,onCommand:c=>commands.push(c),onState:()=>{},onError:()=>{}});
+ voice.start();const r=voice.recognition;r.result('start');r.result('slower');r.result('faster');r.result('loop');r.result('please start the music');
+ assert.deepEqual(commands,['resume','slower','faster','loop']);voice.stop();
+ const basic=setup();basic.voice.start();basic.voice.recognition.result('start');assert.deepEqual(basic.commands,[]);basic.voice.stop();
+});

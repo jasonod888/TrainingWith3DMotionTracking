@@ -1,13 +1,14 @@
-import {useCallback,useEffect,useState} from 'react';
+import {lazy,Suspense,useCallback,useEffect,useState} from 'react';
 import {ArrowLeft,ArrowRight,BookOpen,Check,LogOut,MoveUpRight,Play,Plus,Rotate3D,Scissors,Trash2,User,Video} from 'lucide-react';
 import type {LessonManifest,Section} from '../../../packages/lesson-schema/index';
+const MimicReceiver=lazy(()=>import('./MimicReceiver').then(module=>({default:module.MimicReceiver})));
 import {LessonWorkspace} from './LessonWorkspace';
 import {CreateLesson,ConversionList} from './CreateLesson';
 import {ShareLesson,JoinLesson,incomingShare} from './ShareLesson';
 import {Share2,Flag} from 'lucide-react';
 import {ApiError,assetUrl,copyDemo,getSession,loadDemo,loadLesson,loadLibrary,request,saveSections,signIn,signOut,type Account} from './api';
 
-type Page='library'|'practice'|'review'|'create'|'account'|'share'|'join';
+type Page='library'|'practice'|'review'|'create'|'account'|'share'|'join'|'receiver';
 type AuthView='login'|'register'|'forgot'|'reset'|'verify';
 const stamp=(time:number)=>`${Math.floor(time/60)}:${Math.floor(time%60).toString().padStart(2,'0')}`;
 const linkAction=()=>{const match=location.hash.match(/^#(verify|reset)=([A-Za-z0-9_-]{32,128})$/);return match?{view:match[1] as AuthView,token:match[2]}:null;};
@@ -40,7 +41,9 @@ export function App(){
   <main aria-busy={busy||loading}>
    {error&&<div className="inline-notice error-notice" role="alert">{error}{page==='library'&&<button className="back-link" onClick={()=>void refresh()}>Try again</button>}</div>}
    {busy&&<p className="operation-status" role="status">One moment…</p>}
+   {page==='receiver'&&<Suspense fallback={<p>Opening display…</p>}><MimicReceiver onBack={()=>navigate('library')}/></Suspense>}
    {page==='library'&&<>
+    <button className="secondary" onClick={()=>navigate(account?'receiver':'account')}>Use as practice display</button>
     <section className="library-heading"><div><p className="eyebrow">YOUR PRACTICE SPACE</p><h1>A little practice.<br/><span>A lot of progress.</span></h1><p className="subtle">Find your rhythm, one movement at a time.</p></div><button className="primary" onClick={()=>navigate('create')}><Plus size={18}/>Create lesson</button></section>
     {account&&<ConversionList onReady={refresh} onOpen={id=>void run(async()=>{setLesson(await loadLesson(id));navigate('review');})}/>}
     <div className="library-filter"><h2>{libraryView==='own'?'Your library':'Shared with you'} <span>{libraryView==='own'?library.length:shared.length}</span></h2>{account?<div className="library-tabs" aria-label="Library collection"><button aria-pressed={libraryView==='own'} onClick={()=>setLibraryView('own')}>Yours</button><button aria-pressed={libraryView==='shared'} onClick={()=>setLibraryView('shared')}>Shared</button></div>:<span className="muted small">Sign in to save your practice</span>}</div>

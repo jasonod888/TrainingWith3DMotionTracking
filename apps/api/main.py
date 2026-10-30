@@ -13,6 +13,8 @@ from .auth import install_auth
 from .lessons import install_lessons
 from .conversions import install_conversions
 from .sharing import install_sharing
+from .mimic_pairing import install_mimic_pairing
+from .mimic_attempts import install_mimic_attempts
 
 logger = logging.getLogger('form')
 
@@ -31,6 +33,8 @@ def create_app(settings: Settings | None = None):
     install_lessons(app, engine, settings, identity, db)
     install_conversions(app, engine, settings, identity, db)
     install_sharing(app,settings,identity,db)
+    install_mimic_pairing(app,settings,identity,db)
+    install_mimic_attempts(app,identity,db)
 
     from fastapi.exceptions import RequestValidationError
 
