@@ -39,6 +39,7 @@ The user confirmed both phones are available, then selected **“Leave phone tes
 | View switch | Composite retained calibration; source-video mode disabled while compositing |
 | Responsive browser | Composite and comparison fit at 320/360/390/768/1024/1440 CSS pixels with no unnamed icon buttons |
 | Final completion/resume | Final Next held exactly at duration without wrapping; reopening restored paused position with camera off |
+| Comparison shutdown | Recorded source paused and cleared; both reference L/R labels changed from visible to hidden |
 
 75 automated tests passed. Ignored evidence lives under `.local/qa/phase-2-*`. Visual review caught and corrected an initial anchor-transform error in standing-height measurement; the real synthetic rig regression covers it. Similarity remains approximate pose comparison, not certified technique assessment.
 

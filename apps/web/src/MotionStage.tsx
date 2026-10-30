@@ -49,7 +49,7 @@ export function MotionStage({lesson,player,source=false,framing}:{lesson:LessonM
         if(aligned&&leftHand.current&&rightHand.current){const positions:Record<string,{x:number;y:number}|null>={left:null,right:null};for(const side of ['left','right']){if(hands[side]){hands[side].getWorldPosition(handPoint);handPoint.project(camera);if(Math.abs(handPoint.x)<=1&&Math.abs(handPoint.y)<=1&&Math.abs(handPoint.z)<=1)positions[side]={x:(handPoint.x+1)/2*host.clientWidth,y:(1-handPoint.y)/2*host.clientHeight};}}placeHandLabels({left:leftHand.current,right:rightHand.current},positions,host.clientWidth,host.clientHeight);}
       };render();
     }catch{setLoading(false);setError('3D is unavailable on this device. Try the original video.');}
-    return()=>{disposed=true;cancelAnimationFrame(frame);observer.disconnect();controls?.dispose();mixer?.stopAllAction();if(model){mixer?.uncacheRoot(model);disposeModel(model);}grid.geometry.dispose();disposeMaterial(grid.material);renderer?.dispose();renderer?.domElement.remove();};
+    return()=>{disposed=true;cancelAnimationFrame(frame);if(leftHand.current)leftHand.current.hidden=true;if(rightHand.current)rightHand.current.hidden=true;observer.disconnect();controls?.dispose();mixer?.stopAllAction();if(model){mixer?.uncacheRoot(model);disposeModel(model);}grid.geometry.dispose();disposeMaterial(grid.material);renderer?.dispose();renderer?.domElement.remove();};
   },[lesson,player,source,framing?.active]);
   useEffect(()=>{
     if(!source)return;
