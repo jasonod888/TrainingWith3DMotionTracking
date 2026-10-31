@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from .contracts import LessonManifest, Section, SectionSet
 from .database import Account, Lesson, LessonAsset, LessonRevision, PracticeProgress, LessonGrant
 from .storage import storage_client
-from .permissions import owned_lesson,latest_revision,readable_lesson
+from .permissions import access_reasons, latest_acceptance, owned_lesson,latest_revision,public_lesson,public_manifest,readable_lesson
 from .auth import now
 
 
@@ -76,6 +76,9 @@ class SaveSections(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     sections: list[Section] = Field(min_length=1, max_length=1000)
 
+class RenameInput(BaseModel):
+    title: str = Field(max_length=200)
+
 class ProgressInput(BaseModel):
     revision_id: str = Field(min_length=1, max_length=80)
     time: float = Field(ge=0, allow_inf_nan=False)
@@ -108,13 +111,20 @@ def install_lessons(app, engine, settings, identity, db):
         except (ValueError, FileNotFoundError) as exc:
             raise HTTPException(503, 'The demonstration is unavailable for import.') from exc
 
-    @router.get('/{lesson_id}', response_model=LessonManifest)
+    @router.get('/{lesson_id}')
     def detail(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
-        return readable_lesson(session,lesson_id,account.id)[1].manifest
+        lesson,reasons=access_reasons(session,lesson_id,account.id)
+        if not lesson or not reasons:raise HTTPException(404,'Move unavailable.')
+        if 'owner' in reasons or 'direct' in reasons or 'group' in reasons:
+            return readable_lesson(session,lesson_id,account.id)[1].manifest
+        # A public-only reader never receives private source media.
+        _,revision,publication=public_lesson(session,lesson_id)
+        from .workflow import public_tags
+        return public_manifest(revision,publication,public_tags(session,lesson_id))
 
     @router.get('/{lesson_id}/progress')
-    def progress(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
-        lesson,revision = readable_lesson(session,lesson_id,account.id)
+    def progress(lesson_id: str, revision_id: str | None = None, account=Depends(identity), session: Session = Depends(db)):
+        lesson,revision = readable_lesson(session,lesson_id,account.id,revision_id)
         value = session.get(PracticeProgress, (account.id, lesson_id))
         if not value or value.revision_id != revision.id:
             return None
@@ -122,7 +132,7 @@ def install_lessons(app, engine, settings, identity, db):
 
     @router.put('/{lesson_id}/progress')
     def keep_progress(lesson_id: str, body: ProgressInput, account=Depends(identity), session: Session = Depends(db)):
-        lesson,revision = readable_lesson(session,lesson_id,account.id)
+        lesson,revision = readable_lesson(session,lesson_id,account.id,body.revision_id)
         if body.revision_id != revision.id:
             raise HTTPException(409, 'This lesson has a newer revision. Reopen it to save your position.')
         if body.time > revision.manifest['duration']:
@@ -167,6 +177,19 @@ def install_lessons(app, engine, settings, identity, db):
         session.commit()
         return manifest
 
+    @router.patch('/{lesson_id}', response_model=LessonManifest)
+    def rename(lesson_id: str, body: RenameInput, account=Depends(identity), session: Session = Depends(db)):
+        lesson = owned_lesson(session, lesson_id, account.id, True)
+        title = body.title.strip() or 'Untitled move'
+        lesson.title = title
+        revision = latest(session, lesson)
+        # A name is metadata: no new revision, inference, acceptance or release change.
+        manifest = dict(revision.manifest)
+        manifest['title'] = title
+        revision.manifest = manifest
+        session.commit()
+        return manifest
+
     @router.delete('/{lesson_id}')
     def archive(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
         lesson = owned(session, lesson_id, account.id)
@@ -176,9 +199,12 @@ def install_lessons(app, engine, settings, identity, db):
 
     @router.get('/{lesson_id}/assets/{name}')
     def asset(lesson_id: str, name: str, request: Request, account=Depends(identity), session: Session = Depends(db)):
+        lesson,reasons=access_reasons(session,lesson_id,account.id)
+        if not lesson or not reasons:raise HTTPException(404,'Move unavailable.')
         _,revision=readable_lesson(session,lesson_id,account.id)
         key = f'lessons/{lesson_id}/{name}'
-        allowed={value['key'] for value in (revision.manifest.get(field) for field in ('animation','landmarks','source_video','thumbnail')) if value}
+        fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail')
+        allowed={value['key'] for value in (revision.manifest.get(field) for field in fields) if value}
         if key not in allowed:raise HTTPException(404,'Media unavailable.')
         record = session.scalar(select(LessonAsset).where(LessonAsset.key == key, LessonAsset.lesson_id == lesson_id))
         if not record:

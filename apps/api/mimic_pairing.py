@@ -13,8 +13,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 from .auth import now, digest
-from .database import MimicPair
-from .permissions import readable_lesson
+from .database import MimicPair, Lesson
+from .permissions import readable_lesson, visible_manifest
 
 class Create(BaseModel):
     lesson_id:str=Field(min_length=1,max_length=80)
@@ -51,7 +51,7 @@ def install_mimic_pairing(app,settings,identity,db):
     def get(session,id,account,token,role=None):
         row=session.scalar(select(MimicPair).where(MimicPair.id==id).with_for_update())
         if not row or row.account_id!=account.id or row.revoked or aware(row.expires_at)<=now():raise HTTPException(404,'Pairing expired. Connect again.')
-        _,revision=readable_lesson(session,row.lesson_id,account.id)
+        _,revision=readable_lesson(session,row.lesson_id,account.id,row.revision_id)
         if revision.id!=row.revision_id:raise HTTPException(409,'Lesson changed. Open the new lesson and connect again.')
         hashed=digest(token or '')
         actual='capture' if hmac.compare_digest(hashed,row.capture_hash) else 'receiver' if row.receiver_hash and hmac.compare_digest(hashed,row.receiver_hash) else None
@@ -60,7 +60,7 @@ def install_mimic_pairing(app,settings,identity,db):
 
     @router.post('',status_code=201)
     def create(body:Create,account=Depends(identity),session:Session=Depends(db)):
-        _,revision=readable_lesson(session,body.lesson_id,account.id)
+        _,revision=readable_lesson(session,body.lesson_id,account.id,body.revision_id)
         if revision.id!=body.revision_id:raise HTTPException(409,'Reopen the current lesson before connecting.')
         session.execute(delete(MimicPair).where(MimicPair.expires_at<now()))
         active=session.scalars(select(MimicPair).where(MimicPair.account_id==account.id,MimicPair.revoked.is_(False))).all()
@@ -74,7 +74,7 @@ def install_mimic_pairing(app,settings,identity,db):
     def claim(body:Claim,account=Depends(identity),session:Session=Depends(db)):
         row=session.scalar(select(MimicPair).where(MimicPair.code_hash==digest(body.code.upper()),MimicPair.account_id==account.id).with_for_update())
         if not row or row.revoked or row.receiver_hash or aware(row.expires_at)<=now():raise HTTPException(404,'Code unavailable. Check the capture device.')
-        _,revision=readable_lesson(session,row.lesson_id,account.id)
+        _,revision=readable_lesson(session,row.lesson_id,account.id,row.revision_id)
         if revision.id!=row.revision_id:raise HTTPException(409,'Lesson changed.')
         token=secrets.token_urlsafe(32);row.receiver_hash=digest(token);row.receiver_seen=now();session.commit()
         return {'id':row.id,'token':token}
@@ -85,7 +85,7 @@ def install_mimic_pairing(app,settings,identity,db):
         if role=='receiver':row.receiver_seen=now();session.commit()
         return {'approved':row.approved,'pending':bool(row.receiver_hash),'receiver_online':bool(row.receiver_seen and (now()-aware(row.receiver_seen)).total_seconds()<5),
                 'sequence':row.sequence,'snapshot':row.snapshot if row.approved else {},'commands':row.commands if role=='capture' and row.approved else [],
-                'manifest':revision.manifest if role=='receiver' and row.approved else None,'signal':row.signals.get('receiver' if role=='capture' else 'capture') if row.approved else None,'server_time':now().timestamp()*1000}
+                'manifest':visible_manifest(session,session.get(Lesson,row.lesson_id),revision,account.id) if role=='receiver' and row.approved else None,'signal':row.signals.get('receiver' if role=='capture' else 'capture') if row.approved else None,'server_time':now().timestamp()*1000}
 
     @router.post('/{id}/approve')
     def approve(id:str,x_mimic_token:str=Header(default=''),account=Depends(identity),session:Session=Depends(db)):

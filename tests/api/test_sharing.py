@@ -112,3 +112,17 @@ def test_reports_and_operator_disablement_block_media(system):
     assert student.get(path).status_code==404
     assert owner.get(path).status_code==404
     assert student.get(path+'/assets/synthetic.glb').status_code==404
+
+
+def test_failed_invitation_delivery_can_be_retried(system):
+    from unittest.mock import patch
+    lesson = imported(system)
+    owner, app, _, mail, _ = system
+    owner.post(f'/api/lessons/{lesson.lesson_id}/publish', json={
+        'revision_id': lesson.revision_id, 'mode': 'invite', 'reviewed': True, 'rights_acknowledged': True})
+    path = f'/api/lessons/{lesson.lesson_id}/invitations'
+    with patch('apps.api.auth.send_account_mail', side_effect=RuntimeError('mail unavailable')):
+        assert owner.post(path, json={'email': 'friend@example.test'}).status_code == 503
+    assert owner.post(path, json={'email': 'friend@example.test'}).status_code == 201
+    invitations = owner.get(f'/api/lessons/{lesson.lesson_id}/sharing').json()['invitations']
+    assert len(invitations) == 1

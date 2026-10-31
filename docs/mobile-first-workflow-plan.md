@@ -1,6 +1,6 @@
 # Mobile-first everyday workflow: phased implementation plan
 
-Status: proposed, revised after a source cross-check. Prepared 30 October 2026 and verified against the current source the same day. Documentation only; no application changes are made by this plan.
+Status: W1–W7 implementation and reviewed correctness fixes delivered through 31 October 2026; W8 device and hosted-service qualification remains open. Remaining product decisions are recorded separately from verified fixes. See `docs/workflow-implementation.md` for delivered scope, tests and unverified items. Prepared 30 October 2026 and revised after a source cross-check the same day.
 
 This plan refines the existing application around casual creation, sharing and practice. It preserves the Mimic Interface, conversion pipeline, private storage, versioning, access controls and advanced teaching capabilities. Its W0–W8 phase names are independent of the previous SaaS and Mimic phases.
 

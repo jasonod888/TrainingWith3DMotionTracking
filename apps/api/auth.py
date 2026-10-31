@@ -16,6 +16,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import Account, AccountToken, AuthThrottle, LoginSession
+from .database import AdminControl
+from .admin_security import ADMIN_ROLES, account_view, audit, matching_counter, new_mfa_secret, lock_admin_control
 
 COOKIE = 'form_session'
 
@@ -74,14 +76,22 @@ class ResetInput(TokenInput):
     password: str = Field(min_length=12, max_length=128)
 
 
+class MfaSetup(BaseModel):
+    password: str = Field(min_length=12, max_length=128)
+
+
+class MfaCode(BaseModel):
+    code: str = Field(pattern=r'^[0-9]{6}$', max_length=6)
+
+
 def send_account_mail(settings, email, purpose, token):
     # Links carry secrets in the fragment, avoiding HTTP logs and Referer headers.
     link = f'{settings.public_url.rstrip("/")}/#{purpose}={token}'
     message = EmailMessage()
     message['From'] = settings.mail_from
     message['To'] = email
-    message['Subject'] = {'verify':'Verify your Form account','reset':'Reset your Form password','invite':'A lesson is waiting for you on Form'}[purpose]
-    lifetime = '7 days' if purpose == 'invite' else '30 minutes'
+    message['Subject'] = {'verify':'Verify your Form account','reset':'Reset your Form password','invite':'A move is waiting for you on Form','group':'You are invited to a group on Form'}[purpose]
+    lifetime = '7 days' if purpose in ('invite', 'group') else '30 minutes'
     message.set_content(f'{message["Subject"]}\n\n{link}\n\nThis link expires in {lifetime}. If you did not expect it, ignore this email.')
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
@@ -131,11 +141,20 @@ def install_auth(app, engine, settings):
         if not login or (login.expires_at if login.expires_at.tzinfo else login.expires_at.replace(tzinfo=timezone.utc)) <= now():
             raise HTTPException(401, 'Sign in to continue.')
         account = session.get(Account, login.account_id)
-        if not account or not account.verified:
+        if not account or not account.verified or account.status != 'active':
             raise HTTPException(401, 'Sign in to continue.')
         if request.method not in ('GET', 'HEAD') and not hmac.compare_digest(request.headers.get('x-csrf-token', ''), csrf_token(raw)):
             raise HTTPException(403, 'Please reload Form and try again.')
         return account
+
+    def optional_identity(request: Request, session: Session = Depends(db)):
+        """Identity for public routes: signed-in readers are recognised, anonymous readers are allowed."""
+        raw = request.cookies.get(COOKIE, '')
+        login = session.get(LoginSession, digest(raw)) if raw else None
+        if not login or (login.expires_at if login.expires_at.tzinfo else login.expires_at.replace(tzinfo=timezone.utc)) <= now():
+            return None
+        account = session.get(Account, login.account_id)
+        return account if account and account.verified and account.status == 'active' else None
 
     def throttle(request, action, email, limit=10):
         # Shared across processes and restarts; atomic upsert prevents concurrent bypass.
@@ -172,6 +191,9 @@ def install_auth(app, engine, settings):
     @router.post('/register', status_code=202)
     def register(body: Credentials, request: Request, session: Session = Depends(db)):
         throttle(request, 'register', body.email, 5)
+        control = session.get(AdminControl, 'platform')
+        if control and not control.registration_enabled:
+            raise HTTPException(403, 'New account registration is temporarily closed.')
         hashed = password_hash(body.password)
         account = session.scalar(select(Account).where(Account.email == body.email))
         if not account:
@@ -215,22 +237,77 @@ def install_auth(app, engine, settings):
         throttle(request, 'login', body.email)
         account = session.scalar(select(Account).where(Account.email == body.email))
         valid = password_matches(body.password, account.password_hash if account else dummy_hash)
-        if not valid or not account or not account.verified:
+        if not valid or not account or not account.verified or account.status != 'active':
             raise HTTPException(401, 'Check your email and password, and verify your email before signing in.')
         old = request.cookies.get(COOKIE)
         if old:
             session.execute(delete(LoginSession).where(LoginSession.token_hash == digest(old)))
         session.execute(delete(LoginSession).where(LoginSession.expires_at < now()))
         raw = secrets.token_urlsafe(32)
+        account.last_login_at = now()
         session.add(LoginSession(token_hash=digest(raw), account_id=account.id, expires_at=now()+timedelta(days=settings.session_days)))
         session.commit()
         response.set_cookie(COOKIE, raw, httponly=True, secure=urlparse(settings.public_url).scheme == 'https' or settings.environment != 'development',
                             samesite='lax', max_age=settings.session_days*86400, path='/')
-        return {'account': {'id': account.id, 'email': account.email}, 'csrf': csrf_token(raw)}
+        return {'account': account_view(account), 'csrf': csrf_token(raw)}
 
     @router.get('/session')
     def current(request: Request, account=Depends(identity)):
-        return {'account': {'id': account.id, 'email': account.email}, 'csrf': csrf_token(request.cookies[COOKIE])}
+        return {'account': account_view(account), 'csrf': csrf_token(request.cookies[COOKIE])}
+
+    @router.get('/admin-mfa')
+    def mfa_status(request: Request, account=Depends(identity), session: Session = Depends(db)):
+        if account.platform_role not in ADMIN_ROLES:
+            raise HTTPException(403, 'Administrative access required.')
+        login = session.get(LoginSession, digest(request.cookies[COOKIE]))
+        until = login.admin_verified_until
+        return {'enrolled': bool(account.mfa_secret), 'verified': bool(until and
+            (until if until.tzinfo else until.replace(tzinfo=timezone.utc)) > now())}
+
+    @router.post('/admin-mfa/setup')
+    def mfa_setup(body: MfaSetup, request: Request, account=Depends(identity), session: Session = Depends(db)):
+        throttle(request, 'mfa-setup', account.id, 5)
+        lock_admin_control(session)
+        session.refresh(account)
+        if account.platform_role not in ADMIN_ROLES or account.status != 'active':
+            raise HTTPException(403, 'Administrative access required.')
+        login = session.get(LoginSession, digest(request.cookies[COOKIE]), populate_existing=True)
+        if not login:
+            raise HTTPException(401, 'Sign in again.')
+        if account.mfa_secret:
+            raise HTTPException(409, 'An authenticator is already enrolled.')
+        if not password_matches(body.password, account.password_hash):
+            raise HTTPException(401, 'Check your password.')
+        secret = new_mfa_secret()
+        login.pending_mfa_secret = secret
+        session.commit()
+        from urllib.parse import quote
+        uri = f'otpauth://totp/{quote("Form:" + account.email, safe="")}?secret={secret}&issuer=Form&algorithm=SHA1&digits=6&period=30'
+        return {'secret': secret, 'uri': uri}
+
+    @router.post('/admin-mfa/verify')
+    def mfa_verify(body: MfaCode, request: Request, account=Depends(identity), session: Session = Depends(db)):
+        throttle(request, 'mfa-verify', account.id, 10)
+        lock_admin_control(session)
+        session.refresh(account)
+        if account.platform_role not in ADMIN_ROLES or account.status != 'active':
+            raise HTTPException(403, 'Administrative access required.')
+        login = session.get(LoginSession, digest(request.cookies[COOKIE]), populate_existing=True)
+        if not login:
+            raise HTTPException(401, 'Sign in again.')
+        secret = account.mfa_secret or login.pending_mfa_secret
+        counter = matching_counter(secret, body.code, account.mfa_counter) if secret else None
+        if counter is None:
+            raise HTTPException(400, 'Invalid or already used code. Try the next code from your authenticator.')
+        enrolling = not account.mfa_secret
+        account.mfa_secret = secret
+        account.mfa_counter = counter
+        login.pending_mfa_secret = None
+        login.admin_verified_until = now() + timedelta(minutes=30)
+        audit(session, account.id, 'mfa.enroll' if enrolling else 'mfa.verify', account.id,
+              'Authenticator verified for administrative access.')
+        session.commit()
+        return {'verified': True}
 
     @router.post('/logout')
     def logout(request: Request, response: Response, account=Depends(identity), session: Session = Depends(db)):
@@ -259,4 +336,4 @@ def install_auth(app, engine, settings):
         return {'message': 'Password updated. Sign in again.'}
 
     app.include_router(router)
-    return identity, db
+    return identity, db, optional_identity

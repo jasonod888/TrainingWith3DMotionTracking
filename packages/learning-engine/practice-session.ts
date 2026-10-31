@@ -13,12 +13,13 @@ export class PracticeSession {
   restSeconds=2;
   range:{start:number;end:number}|null=null;
   onAttempt?:(attempt:Attempt)=>void;
+  onPause?:(reason:string)=>void;
   onAttemptStart?:(time:number)=>void;
   private attempt:{id:string;start:number}|null=null;
   constructor(readonly player:Playback){}
   get bounds(){return this.range??(this.player.state.mode==='sections'?(this.player.current??this.player.sections[0]):{start:0,end:this.player.duration});}
   private finish(completed:boolean,reason:string){if(this.attempt){this.onAttempt?.({...this.attempt,end:this.player.state.time,completed,reason});this.attempt=null;}}
-  pause(reason='paused'){this.remaining=0;this.phase='paused';this.player.command('pause');this.finish(false,reason);}
+  pause(reason='paused'){this.onPause?.(reason);this.remaining=0;this.phase='paused';this.player.command('pause');this.finish(false,reason);}
   setRange(start:number,end:number){
     if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end>this.player.duration||end-start<.05)throw new Error('Choose a range inside this lesson, at least 0.05 seconds long.');
     this.pause('range changed');this.range={start,end};this.player.mode('continuous');this.player.seek(start);this.completed=0;

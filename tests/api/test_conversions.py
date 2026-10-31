@@ -13,6 +13,8 @@ from test_accounts import system,register,login,FakeStorage
 from apps.api.auth import digest,now
 from apps.api.config import ROOT
 from apps.api.database import Conversion,Lesson,LessonRevision,WorkerCredential
+from apps.api.lessons import import_fixture
+from apps.api.processing import ENGINE_VERSION
 
 
 class MultipartStore(FakeStorage):
@@ -74,6 +76,18 @@ def test_upload_completion_and_ownership(conversion):
         assert other.put(path+'/parts/1',content=b'x',headers={'Content-Type':'application/octet-stream'}).status_code==404
 
 
+def test_pretrimmed_five_minute_upload_limits(conversion):
+    client,_,store,_,_=conversion
+    limits=client.get('/api/conversions/limits').json()
+    assert limits['max_seconds']==300
+    body={'title':'Performance','filename':'performance-clip.mp4','bytes':10,'start':0,'duration':300}
+    # Reject oversize clips and attempts to send a longer source with a server-side trim.
+    for changes in ({'duration':300.01},{'start':1},{'bytes':limits['max_bytes']+1}):
+        assert client.post('/api/conversions',json={**body,**changes}).status_code==422
+    assert not store.uploads
+    assert client.post('/api/conversions',json=body).status_code==201
+
+
 def test_part_limits_missing_parts_and_cancel(conversion):
     client,_,store,_,_=conversion
     job=client.post('/api/conversions',json={'title':'Resume','filename':'anything','bytes':5*1024*1024+3,'start':0,'duration':2}).json();path='/api/conversions/'+job['id']
@@ -128,3 +142,63 @@ def test_verified_finalisation_is_idempotent_and_stale_attempt_cannot_publish(co
     assert len(lesson['section_set']['sections'])==1
     assert client.post(base+'/heartbeat',headers=headers,json={'stage':'verifying'}).status_code==409
     with Session(app.state.engine) as session:assert len(session.scalars(select(LessonRevision)).all())==1
+
+
+def fixture_move(client,app,settings,store):
+    account_id=client.get('/api/auth/session').json()['account']['id']
+    with patch('apps.api.lessons.storage_client',return_value=store):
+        return import_fixture(app.state.engine,settings,account_id,
+            ROOT/'packages/lesson-schema/fixture.json',ROOT/'packages/lesson-schema')
+
+
+def test_rename_is_metadata_only(conversion):
+    client,app,store,_,system=conversion
+    lesson=fixture_move(client,app,system[2],store)
+    result=client.patch(f'/api/lessons/{lesson.lesson_id}',json={'title':'  Renamed move  '})
+    assert result.status_code==200,result.text
+    assert result.json()['title']=='Renamed move'
+    assert result.json()['revision_id']==lesson.revision_id
+    assert client.patch(f'/api/lessons/{lesson.lesson_id}',json={'title':'   '}).json()['title']=='Untitled move'
+    with Session(app.state.engine) as session:
+        assert session.get(Lesson,lesson.lesson_id).title=='Untitled move'
+        assert len(session.scalars(select(LessonRevision)).all())==1
+
+
+def test_clip_replacement_targets_the_existing_move(conversion):
+    client,app,store,headers,system=conversion
+    lesson=fixture_move(client,app,system[2],store)
+    data=b'replacement source bytes'
+    result=client.post('/api/conversions',json={'title':'','filename':'again.mp4','bytes':len(data),
+        'start':0,'duration':2,'processing_provider':'local','lesson_id':lesson.lesson_id})
+    assert result.status_code==201,result.text
+    job=result.json();assert job['target_lesson_id']==lesson.lesson_id
+    assert client.post('/api/conversions',json={'title':'second','filename':'again.mp4','bytes':len(data),
+        'start':0,'duration':2,'processing_provider':'local','lesson_id':lesson.lesson_id}).status_code==409
+    path='/api/conversions/'+job['id']
+    assert client.put(path+'/parts/1',content=data,headers={'Content-Type':'application/octet-stream'}).status_code==200
+    assert client.post(path+'/complete',json={}).status_code==200
+    claim=client.post('/api/worker/claim',headers=headers,json={}).json()
+    lease={**headers,'X-Job-Lease':claim['attempt_token']};base='/api/worker/jobs/'+job['id']
+    for stage in ('processing','exporting','verifying'):
+        assert client.post(base+'/heartbeat',headers=lease,json={'stage':stage}).status_code==200
+    manifest=json.loads((ROOT/'packages/lesson-schema/fixture.json').read_text())
+    manifest['engine']='sam-3d-body';manifest['engine_version']=ENGINE_VERSION
+    manifest['section_set']['sections']=[{'id':'whole','label':'Full movement','start':0,'end':2}]
+    for field,name,payload in [('animation','reference.glb',(ROOT/'packages/lesson-schema/synthetic.glb').read_bytes()),
+        ('landmarks','reference.json',b'{}'),('source_video','preview.mp4',b'preview'),('thumbnail','thumbnail.jpg',b'image')]:
+        uploaded_file=client.put(base+'/files/'+name,headers=lease,content=payload)
+        assert uploaded_file.status_code==200,uploaded_file.text
+        manifest[field]=uploaded_file.json()
+    finished=client.post(base+'/finish',headers=lease,json=manifest)
+    assert finished.status_code==200,finished.text
+    assert finished.json()['lesson_id']==lesson.lesson_id
+    detail=client.get(f'/api/lessons/{lesson.lesson_id}').json()
+    assert detail['revision_id']!=lesson.revision_id
+    assert detail['title']==lesson.title
+    assert len(detail['section_set']['sections'])==1
+    with Session(app.state.engine) as session:
+        assert session.get(Lesson,lesson.lesson_id).version==2
+        assert len(session.scalars(select(LessonRevision)).all())==2
+    accepted=client.post(f'/api/workflow/lessons/{lesson.lesson_id}/accept',json={'revision_id':detail['revision_id']})
+    assert accepted.status_code==200
+    assert accepted.json()['accepted_revision_id']==detail['revision_id']

@@ -11,7 +11,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -27,12 +27,13 @@ FILES={'reference.glb':'model/gltf-binary','reference.json':'application/json','
 
 
 class NewConversion(BaseModel):
-    title:str=Field(min_length=1,max_length=200)
+    title:str=Field(max_length=200)
     filename:str=Field(min_length=1,max_length=255)
     bytes:int=Field(gt=0)
     start:float=Field(ge=0,allow_inf_nan=False)
     duration:float=Field(ge=.2,allow_inf_nan=False)
     processing_provider:Provider='local'
+    lesson_id:str|None=Field(default=None,max_length=80)
 
 
 class Heartbeat(BaseModel):
@@ -65,6 +66,7 @@ def install_conversions(app,engine,settings,identity,db):
     def summary(job):
         return {'id':job.id,'title':job.title,'filename':job.filename,'bytes':job.source_bytes,'start':job.start,'duration':job.duration,
                 'state':job.state,'attempts':job.attempts,'frames':job.frames,'error':job.error,'lesson_id':job.lesson_id,
+                'target_lesson_id':job.target_lesson_id,
                 'parts':job.parts if job.state=='uploading' else {},'part_size':PART_SIZE,
                 'provider':job.provider,'pipeline_version':job.pipeline_version,
                 'retryable':job.state=='failed' and job.attempts<3 and job.error not in ('invalid_video','source_expired') and job.submission_state=='none'}
@@ -104,7 +106,7 @@ def install_conversions(app,engine,settings,identity,db):
         route=processing_status(settings)
         if not route['available']:raise HTTPException(503,'Video processing is temporarily unavailable. Please try later.')
         if body.processing_provider!=route['provider']:raise HTTPException(409,'The video processor changed. Reopen Create before uploading.')
-        if body.bytes>settings.max_upload_bytes or body.duration>settings.max_conversion_seconds or body.start+body.duration>1800:
+        if body.bytes>settings.max_upload_bytes or body.duration>settings.max_conversion_seconds or body.start!=0:
             raise HTTPException(422,'Choose a video within the displayed size and time limits.')
         session.scalar(select(Account).where(Account.id==account.id).with_for_update())
         active=session.scalar(select(func.count()).select_from(Conversion).where(Conversion.owner_id==account.id,Conversion.state.not_in(('failed','cancelled','ready_for_review'))))
@@ -112,13 +114,21 @@ def install_conversions(app,engine,settings,identity,db):
         assets=session.scalar(select(func.coalesce(func.sum(LessonAsset.bytes),0)).join(Lesson).where(Lesson.owner_id==account.id))
         if active>=settings.max_active_conversions or usage+assets+body.bytes>settings.max_account_storage_bytes:
             raise HTTPException(409,'Your current processing or storage limit is reached. Finish or remove a video first.')
-        title=body.title.strip()
-        if not title:raise HTTPException(422,'Give your lesson a name.')
+        title=body.title.strip() or 'Untitled move'
+        if len(title)>200:raise HTTPException(422,'Use a shorter name for this move.')
+        target=None
+        if body.lesson_id:
+            target=session.scalar(select(Lesson).where(Lesson.id==body.lesson_id,Lesson.owner_id==account.id,
+                Lesson.archived.is_(False),Lesson.disabled.is_(False)))
+            if not target:raise HTTPException(404,'Move unavailable.')
+            replacing=session.scalar(select(func.count()).select_from(Conversion).where(
+                Conversion.target_lesson_id==target.id,Conversion.state.not_in(('failed','cancelled','ready_for_review'))))
+            if replacing:raise HTTPException(409,'This move already has a replacement in progress.')
         key=f'uploads/{account.id}/{uuid4().hex}/source'
         store=storage_client(settings)
         upload=store.create_multipart_upload(Bucket=settings.storage_bucket,Key=key,ContentType='application/octet-stream')['UploadId']
-        job=Conversion(id=uuid4().hex,owner_id=account.id,title=title,filename=body.filename,source_bytes=body.bytes,source_key=key,
-                       upload_id=upload,start=body.start,duration=body.duration,state='uploading',parts={},
+        job=Conversion(id=uuid4().hex,owner_id=account.id,title=title if not target else target.title,filename=body.filename,source_bytes=body.bytes,source_key=key,
+                       upload_id=upload,start=body.start,duration=body.duration,state='uploading',parts={},target_lesson_id=target.id if target else None,
                        provider=route['provider'],pipeline_version=PIPELINE_VERSION,provider_target=settings.conversion_target if route['external_processing'] else '')
         try:session.add(job);session.commit()
         except Exception:
@@ -283,7 +293,7 @@ def install_conversions(app,engine,settings,identity,db):
             total=0;checksum=hashlib.sha256()
             async for chunk in request.stream():
                 total+=len(chunk)
-                if total>64*1024*1024:raise HTTPException(413,'Output exceeded its limit.')
+                if total>160*1024*1024:raise HTTPException(413,'Output exceeded its limit.')
                 checksum.update(chunk);file.write(chunk)
             file.seek(0)
             def upload():
@@ -316,14 +326,28 @@ def install_conversions(app,engine,settings,identity,db):
         try:header=obj['Body'].read()
         finally:obj['Body'].close()
         if len(header)!=12 or struct.unpack('<4sII',header)!=(b'glTF',2,body.animation.bytes):raise HTTPException(422,'Invalid animation container.')
-        lesson_id=job.id;revision_id=uuid4().hex
+        lesson_id=job.target_lesson_id or job.id;revision_id=uuid4().hex
+        target=None
+        if job.target_lesson_id:
+            target=session.scalar(select(Lesson).where(Lesson.id==job.target_lesson_id,Lesson.owner_id==job.owner_id,
+                Lesson.archived.is_(False),Lesson.disabled.is_(False)).with_for_update())
+            if not target:raise HTTPException(409,'This move is no longer available for replacement.')
+            version=target.version+1
+        else:
+            version=1
         for asset,name in zip(assets,FILES):
-            key=f'lessons/{lesson_id}/{name}'
+            file_name=f'{revision_id}-{name}' if target else name
+            key=f'lessons/{lesson_id}/{file_name}'
             store.copy_object(Bucket=settings.storage_bucket,Key=key,CopySource={'Bucket':settings.storage_bucket,'Key':asset.key})
             asset.key=key
-        body.lesson_id=lesson_id;body.revision_id=revision_id;body.title=job.title
-        session.add(Lesson(id=lesson_id,owner_id=job.owner_id,title=job.title));session.flush()
-        session.add(LessonRevision(id=revision_id,lesson_id=lesson_id,version=1,manifest=body.model_dump()))
+        body.lesson_id=lesson_id;body.revision_id=revision_id;body.title=target.title if target else job.title
+        if target:
+            changed=session.execute(update(Lesson).where(Lesson.id==lesson_id,Lesson.owner_id==job.owner_id,
+                Lesson.version==target.version).values(version=version,title=target.title))
+            if changed.rowcount!=1:raise HTTPException(409,'This move changed while the clip was being replaced. Reopen it and try again.')
+        else:
+            session.add(Lesson(id=lesson_id,owner_id=job.owner_id,title=job.title));session.flush()
+        session.add(LessonRevision(id=revision_id,lesson_id=lesson_id,version=version,manifest=body.model_dump()))
         for asset in assets:session.add(LessonAsset(lesson_id=lesson_id,**asset.model_dump()))
         job.lesson_id=lesson_id;job.state='ready_for_review';job.lease_until=None;session.commit()
         try:

@@ -99,7 +99,7 @@ class Worker:
             command(['ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe','-ss',str(job['start']),'-i',str(source),'-t',str(job['duration']),'-map','0:v:0','-an','-sn','-dn','-map_metadata','-1','-vf',"scale=w='min(1280,iw)':h='min(1280,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,fps=15",'-c:v','libx264','-crf','23','-pix_fmt','yuv420p','-movflags','+faststart',str(preview)])
             advance('processing')
             # Normalisation already produces 15 fps. Preserve every resulting frame.
-            command([sys.executable,str(ROOT/'scripts/process_video.py'),str(preview),'--duration',str(job['duration']),'--fps','0','--output',str(folder/'motion')],timeout=1800)
+            command([sys.executable,str(ROOT/'scripts/process_video.py'),str(preview),'--duration',str(job['duration']),'--fps','0','--output',str(folder/'motion')],timeout=max(1800,job['duration']*15))
             advance('exporting')
             command([sys.executable,str(ROOT/'scripts/export_glb.py'),str(folder/'motion/motion.npz'),'--output',str(folder/'reference.glb')])
             advance('verifying')

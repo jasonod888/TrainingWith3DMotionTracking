@@ -33,3 +33,10 @@ test('split and merge preserve timeline and left section ID',()=>{
 test('rejects gaps, overlaps, nonfinite times, duplicate IDs and truncated timeline',()=>{
  for(const bad of [[{...sections[0],end:1},sections[1]],[sections[0],{...sections[1],start:1}],[{...sections[0],end:NaN},sections[1]],[sections[0],{...sections[1],id:'a'}],[sections[0]]])assert.throws(()=>validateSections(bad,4));
 });
+
+test('continuous reference preview crosses every section boundary',()=>{
+ const player=new Playback([{id:'a',label:'First',start:0,end:1},{id:'b',label:'Second',start:1,end:2}],2);
+ player.mode('continuous');player.command('play');player.tick(1.25);
+ assert.equal(player.state.playing,true);assert.equal(player.state.time,1.25);
+ player.tick(1);assert.equal(player.state.time,2);assert.equal(player.state.playing,false);
+});

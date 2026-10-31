@@ -10,9 +10,13 @@ from .contracts import LessonManifest
 from .database import make_engine, database_ready
 from .storage import check_storage
 from .auth import install_auth
+from .admin import install_admin
 from .lessons import install_lessons
 from .conversions import install_conversions
 from .sharing import install_sharing
+from .workflow import install_workflow
+from .groups import install_groups
+from .public import install_public
 from .mimic_pairing import install_mimic_pairing
 from .mimic_attempts import install_mimic_attempts
 
@@ -29,10 +33,14 @@ def create_app(settings: Settings | None = None):
 
     app = FastAPI(title='Form', version='0.1.0', lifespan=lifespan)
     app.state.engine = engine
-    identity, db = install_auth(app, engine, settings)
+    identity, db, optional_identity = install_auth(app, engine, settings)
+    install_admin(app, settings, identity, db)
     install_lessons(app, engine, settings, identity, db)
     install_conversions(app, engine, settings, identity, db)
     install_sharing(app,settings,identity,db)
+    install_workflow(app,identity,db)
+    install_groups(app,settings,identity,optional_identity,db)
+    install_public(app,settings,identity,db)
     install_mimic_pairing(app,settings,identity,db)
     install_mimic_attempts(app,identity,db)
 
@@ -80,7 +88,8 @@ def create_app(settings: Settings | None = None):
 
     @app.get('/api/capabilities')
     def capabilities():
-        return {'phase':4, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':True, 'sharing':True}
+        return {'phase':7, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':True, 'sharing':True,
+                'acceptance':True, 'groups':True, 'public':True, 'take_export':True, 'studio':True}
 
     @app.get('/api/{path:path}', include_in_schema=False)
     def missing_api(path: str):

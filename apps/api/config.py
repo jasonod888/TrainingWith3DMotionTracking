@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     smtp_starttls: bool = False
     mail_from: str = 'Form <hello@form.local>'
     max_upload_bytes: int = 250 * 1024 * 1024
-    max_conversion_seconds: int = 120
+    max_conversion_seconds: int = 300
     max_active_conversions: int = 2
     max_account_storage_bytes: int = 2 * 1024 * 1024 * 1024
     worker_lease_seconds: int = 120
@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     conversion_target: str = ''
     remote_conversion_concurrency: int = 1
     upload_temp_dir: Path = ROOT / '.local/upload-tmp'
+    silhouettes_enabled: bool = False
 
     @model_validator(mode='after')
     def deployment_security(self):

@@ -89,7 +89,7 @@ class RemoteWorker:
                     response.raise_for_status()
                     for chunk in response.iter_bytes(1024*1024):
                         check();data.extend(chunk)
-                        if len(data)>64*1024*1024:raise ValueError('Provider output exceeded its limit.')
+                        if len(data)>160*1024*1024:raise ValueError('Provider output exceeded its limit.')
                 response=self.api.put(path+'/files/'+name,headers={**headers,'Content-Type':'application/octet-stream'},content=bytes(data))
                 response.raise_for_status();manifest[field]=response.json()
             check();post('/finish',manifest)

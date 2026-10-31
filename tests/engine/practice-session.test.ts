@@ -8,3 +8,14 @@ test('range repeats exactly, rests and stops after requested count',()=>{const s
 test('calibration and navigation cancel countdown; resume is idempotent',()=>{const s=make();s.countdownSeconds=0;s.action('resume');s.tick(.5);s.action('resume');assert.equal(s.player.state.time,.5);s.player.calibrating(true);s.tick(.1);assert.equal(s.phase,'paused');s.action('next');assert.equal(s.player.state.index,0);});
 test('selecting a section clears a temporary range and never edits boundaries',()=>{const s=make();s.setRange(.2,.7);s.select(1);assert.equal(s.range,null);assert.equal(s.player.state.time,2);assert.equal(s.player.sections[0].end,2);assert.throws(()=>s.setRange(3,2));});
 test('repeated remote start cannot restart a countdown and range scrubbing stays bounded',()=>{const s=make();s.action('resume');s.tick(1);s.action('resume');assert.equal(s.remaining,2);s.setRange(.5,1.5);s.seek(3);assert.equal(s.player.state.time,1.5);});
+
+test('record countdown cancellation clears intent for every interruption',()=>{
+ for(const interrupt of ['cancel','settings','seek','section','background','exit']){
+  const s=make();let recordNext=true,recordings=0;
+  s.onPause=()=>{recordNext=false;};s.onAttemptStart=()=>{if(recordNext){recordings++;recordNext=false;}};
+  s.action('play');s.tick(1);
+  if(interrupt==='seek')s.seek(.2);else if(interrupt==='section')s.select(0);else s.pause(interrupt);
+  s.action('play');s.tick(3);
+  assert.equal(recordings,0,interrupt);
+ }
+});
