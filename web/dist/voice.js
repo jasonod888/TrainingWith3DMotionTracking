@@ -2,6 +2,11 @@ export function parseCommand(text){
   const word=String(text).toLowerCase().replace(/[.,!?]/g,'').trim();
   return ['next','back','again','pause'].includes(word)?word:null;
 }
+export function parsePracticeCommand(text){
+ const word=String(text).toLowerCase().replace(/[.,!?]/g,'').trim().replace(/\s+/g,' ');
+ return parseCommand(word)??({start:'resume',play:'resume',resume:'resume',stop:'pause',repeat:'again',
+  'next section':'next','go back':'back','slow down':'slower','speed up':'faster',slower:'slower',faster:'faster',loop:'loop'}[word]??null);
+}
 export class VoiceCommands{
   constructor({Recognition,onCommand,onState,onError,now=()=>Date.now(),schedule=setTimeout,cancel=clearTimeout,extended=false}){
     Object.assign(this,{Recognition,onCommand,onState,onError,now,schedule,cancel,extended});this.enabled=false;this.generation=0;this.lastCommand=null;this.lastAt=-Infinity;this.restarts=[];
@@ -20,7 +25,7 @@ export class VoiceCommands{
       if(generation!==this.generation||!this.enabled)return;
       for(let i=event.resultIndex;i<event.results.length;i++){
         if(!event.results[i].isFinal)continue;
-        const result=event.results[i][0],word=String(result.transcript).toLowerCase().replace(/[.,!?]/g,'').trim(),command=parseCommand(word)??(this.extended?({start:'resume',resume:'resume',slower:'slower',faster:'faster',loop:'loop'}[word]??null):null);
+        const result=event.results[i][0],command=this.extended?parsePracticeCommand(result.transcript):parseCommand(result.transcript);
         if(!command||(result.confidence>0&&result.confidence<.5))continue;
         const now=this.now();if(command===this.lastCommand&&now-this.lastAt<900)continue;
         this.lastCommand=command;this.lastAt=now;this.onCommand(command);
@@ -29,7 +34,7 @@ export class VoiceCommands{
     recognition.onerror=event=>{
       if(generation!==this.generation||!this.enabled||event.error==='aborted'||event.error==='no-speech')return;
       const messages={'not-allowed':'Microphone permission was denied. Allow microphone access, then enable voice control again.','service-not-allowed':'Speech recognition is blocked by this browser. Use the buttons or another supported browser.','audio-capture':'No microphone is available. Connect one or use the section buttons.','network':'The browser’s speech service could not connect. Check your internet connection or use the buttons.','language-not-supported':'English voice recognition is unavailable in this browser.'};
-      this.stop();this.onError(messages[event.error]??`Voice recognition stopped (${event.error}). Use the buttons or enable it again.`);
+      this.stop();this.onError((event.error==='network'&&event.message)||messages[event.error]||event.message||`Voice recognition stopped (${event.error}). Use the buttons or enable it again.`);
     };
     recognition.onend=()=>{
       if(generation!==this.generation||!this.enabled)return;

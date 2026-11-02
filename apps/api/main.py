@@ -34,6 +34,8 @@ def create_app(settings: Settings | None = None):
     app = FastAPI(title='Form', version='0.1.0', lifespan=lifespan)
     app.state.engine = engine
     identity, db, optional_identity = install_auth(app, engine, settings)
+    from .voice import install_voice
+    install_voice(app,settings,identity,optional_identity)
     install_admin(app, settings, identity, db)
     install_lessons(app, engine, settings, identity, db)
     install_conversions(app, engine, settings, identity, db)

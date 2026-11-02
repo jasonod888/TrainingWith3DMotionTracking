@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseCommand,VoiceCommands} from '../dist/voice.js';
+import {parseCommand,parsePracticeCommand,VoiceCommands} from '../dist/voice.js';
 class Recognition{
   static instances=[];
   constructor(){Recognition.instances.push(this);}
@@ -37,4 +37,10 @@ test('extended practice commands are opt-in and reject embedded background speec
  voice.start();const r=voice.recognition;r.result('start');r.result('slower');r.result('faster');r.result('loop');r.result('please start the music');
  assert.deepEqual(commands,['resume','slower','faster','loop']);voice.stop();
  const basic=setup();basic.voice.start();basic.voice.recognition.result('start');assert.deepEqual(basic.commands,[]);basic.voice.stop();
+});
+
+test('common practice phrases resolve to explicit commands without matching background sentences',()=>{
+ for(const [text,command] of [['play','resume'],['stop','pause'],['repeat','again'],['go back','back'],['next section','next'],['slow down','slower'],['speed up','faster']])assert.equal(parsePracticeCommand(text),command);
+ assert.equal(parsePracticeCommand('please start the music'),null);
+ assert.equal(parsePracticeCommand('my next move'),null);
 });

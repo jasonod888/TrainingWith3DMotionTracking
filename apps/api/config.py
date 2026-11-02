@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     remote_conversion_concurrency: int = 1
     upload_temp_dir: Path = ROOT / '.local/upload-tmp'
     silhouettes_enabled: bool = False
+    voice_enabled: bool = True
+    voice_model_dir: Path = ROOT / 'models/vosk-model-small-en-us-0.15'
     # Temporary operator switch for testing: skips guided camera setup and uses
     # the default instructor alignment. On by default; set
     # CAMERA_CALIBRATION_ENABLED=false to bypass height matching.

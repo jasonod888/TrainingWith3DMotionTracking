@@ -55,7 +55,7 @@ services:
       PUBLIC_URL: http://127.0.0.1:8001
       SMTP_HOST: mail
       SMTP_PORT: 1025
-    volumes: ["./web/dist/assets:/demo:ro"]
+    volumes: ["./web/dist/assets:/demo:ro", "./models/vosk-model-small-en-us-0.15:/app/models/vosk-model-small-en-us-0.15:ro"]
     depends_on:
       migrate:
         condition: service_completed_successfully

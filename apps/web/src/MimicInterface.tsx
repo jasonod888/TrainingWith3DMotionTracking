@@ -12,7 +12,8 @@ import type {PracticeAction} from '../../../packages/learning-engine/practice-se
 import {SourceSession} from '../../../packages/learning-engine/source-session';
 import type {LessonManifest} from '../../../packages/lesson-schema/index';
 import type {PracticeFraming} from './practice-types';
-import {assetUrl} from './api';
+import {assetUrl,request} from './api';
+import {localRecognition} from './local-voice';
 import {CameraFailure,acquireCamera,cameraIO,listCameras,stopStream,watchCameras,type AcquiredCamera} from './camera-acquisition';
 import {
   applyRequest,describeCamera,deviceLabel,facingModeFor,loadPreference,savePreference,
@@ -49,6 +50,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
  const [framing,setFraming]=useState<PracticeFraming>({active:false,calibrating:false,calibration:null,videoWidth:16,videoHeight:9,mirrored:true,mirrorReference:false,composite:matchMedia('(max-width:700px)').matches,position:.23,opacity:.85,display:displayHandle.current});
  const voice=useRef<VoiceCommands|null>(null);
  const [voiceSupported,setVoiceSupported]=useState(false);
+ const voiceCallbacks=useRef({onCommand,onClose,stop:()=>{},clear:()=>{}});
  const currentFacing=()=>{const actual=resources.current.selection?.actualFacing;return (actual&&actual!=='unknown'?actual:facingModeFor(options.current.request.facing))==='environment'?'environment':'user';};
  const setupSource=():SetupSourceIdentity=>{const r=resources.current,v=video.current,s=r.selection;return {generation:r.epoch,deviceId:s?.actualDeviceId||options.current.request.deviceId||options.current.request.facing,width:v?.videoWidth??0,height:v?.videoHeight??0};};
  const applyCalibration=useCallback((value:Calibration)=>{
@@ -182,15 +184,23 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
  // Labels only become readable after a grant, and devices can arrive later.
  useEffect(()=>{void refreshCameras();return watchCameras(cameraIO(),()=>{void refreshCameras();});},[]);
 
+ voiceCallbacks.current={onCommand,onClose,stop,clear};
  useEffect(()=>{
   const Speech=(window as unknown as {SpeechRecognition?:unknown;webkitSpeechRecognition?:unknown}).SpeechRecognition??(window as unknown as {webkitSpeechRecognition?:unknown}).webkitSpeechRecognition;
-  setVoiceSupported(!!Speech);
-  voice.current=new VoiceCommands({Recognition:Speech,extended:true,onCommand:c=>{clear();setLastCommand(c);onCommand(c);},onState:setVoiceState,onError:setVoiceError});
-  const suspend=()=>{if(document.hidden){voice.current?.stop();stop();setMessage('Practice paused. Enable your camera again when ready.');}};
-  const leave=()=>{voice.current?.stop();stop();};
+  let disposed=false;
+  const initialize=async()=>{
+   const local=await request<{available:boolean}>('/voice/capability').catch(()=>({available:false}));
+   if(disposed)return;
+   const Recognition=local.available&&typeof navigator.mediaDevices?.getUserMedia==='function'&&typeof AudioWorkletNode!=='undefined'
+    ?localRecognition(pcm=>request('/voice/recognize','POST',{pcm})):Speech;
+   setVoiceSupported(!!Recognition);
+   voice.current=new VoiceCommands({Recognition,extended:true,onCommand:c=>{voiceCallbacks.current.clear();setLastCommand(c);voiceCallbacks.current.onCommand(c);},onState:state=>{setVoiceState(state);if(state==='listening')voiceCallbacks.current.onClose();},onError:setVoiceError});
+  };void initialize();
+  const suspend=()=>{if(document.hidden){voice.current?.stop();voiceCallbacks.current.stop();setMessage('Practice paused. Enable your camera again when ready.');}};
+  const leave=()=>{voice.current?.stop();voiceCallbacks.current.stop();};
   document.addEventListener('visibilitychange',suspend);window.addEventListener('pagehide',leave);
-  return()=>{document.removeEventListener('visibilitychange',suspend);window.removeEventListener('pagehide',leave);voice.current?.stop();stop();};
- },[onCommand,stop,clear]);
+  return()=>{disposed=true;document.removeEventListener('visibilitychange',suspend);window.removeEventListener('pagehide',leave);voice.current?.stop();voiceCallbacks.current.stop();};
+ },[]);
 
  // Warm the pose tracker while the person is still on the practice screen. The
  // model and WASM are about 14.6 MB (pose_landmarker_lite.task plus the vision
@@ -362,6 +372,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
    <div className="reference-pane">{renderReference(framing)}</div>
   </div>
   <div className="practice-tracking" role={error||voiceError?'alert':undefined} aria-live={error||voiceError?'assertive':'off'}>{error||voiceError|| (active?angle!==0?'Observation angle · comparison paused':message:'Camera off · watch freely')}{!competition&&feedback&&active&&score!==null&&<span> · {score}% similarity</span>}{!competition&&feedback&&active&&cue&&<span> · {cue}</span>}</div>
+  {voiceState!=='off'&&<p className="small" role="status">Voice {voiceState}{lastCommand&&` · heard “${lastCommand}”`}</p>}
   {panel&&<PracticePanel title={panel==='sound'?'Sound & voice':panel==='feedback'?'Feedback':'Camera setup'} onClose={close}>
    {panel==='camera'&&<>
     {cameraPage===0&&<><p>Choose the camera before you position the phone. Video is captured only when you choose Record practice.</p><div className="practice-option-grid"><button aria-pressed={!options.current.request.deviceId&&options.current.request.facing==='front'} onClick={()=>void setCamera({...options.current.request,deviceId:'',facing:'front'})}>Front camera</button><button aria-pressed={!options.current.request.deviceId&&options.current.request.facing==='rear'} onClick={()=>void setCamera({...options.current.request,deviceId:'',facing:'rear'})}>Rear camera</button></div>{options.current.request.facing==='rear'&&!options.current.request.deviceId&&<label>Prefer wide view<input type="checkbox" checked={options.current.request.lens==='prefer-wide'} onChange={e=>void setCamera({...options.current.request,lens:e.target.checked?'prefer-wide':'default'})}/></label>}<p className="small muted">Requested: {options.current.request.deviceId?'a camera you chose':options.current.request.facing==='rear'?options.current.request.lens==='prefer-wide'?'rear · prefer wide view':'rear camera':'front camera'}.</p>{resources.current.selection&&<p className="small muted" role="status">Opened: {describeCamera(resources.current.selection)}.</p>}<button onClick={()=>{if(active)stop();else void start('camera');}}>{active?'End practice':'Start practice'}</button><label>Auto-frame me<input type="checkbox" disabled={!autoFrameSupported} checked={autoFrame} onChange={e=>{const next=e.target.checked;setAutoFrame(next);autoFrameRef.current=next;setMessage(next?'Auto-frame on. Keeps you centred while leaving room to move.':'Auto-frame off · showing the complete camera image.');clear();}}/></label><p className="small muted">{autoFrameSupported?'Keeps you centred while leaving room to move.':layout!=='separate'?'Auto-framing applies to the front camera in side-by-side view.':currentFacing()==='environment'?'Auto-framing applies to the front camera in side-by-side view.':'Auto-framing applies to live front-camera practice.'}</p></>}
@@ -371,7 +382,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
     {cameraPage===4&&<><label>Instructor opacity<input type="range" min={.25} max={1} step={.05} value={framing.opacity} onChange={e=>setFraming(value=>({...value,opacity:Number(e.target.value)}))}/></label><label>Instructor position<input type="range" min={.05} max={.95} step={.01} value={framing.position} onChange={e=>setFraming(value=>({...value,position:Number(e.target.value)}))}/></label></>}
     <div className="practice-pagination"><button disabled={cameraPage===0} onClick={()=>setCameraPage(cameraPage-1)}>Back</button><span>{cameraPage+1} / 5</span><button disabled={cameraPage===4} onClick={()=>setCameraPage(cameraPage+1)}>More</button></div>
    </>}
-   {panel==='sound'&&<>{cameraPage===0&&<><p>Voice may send audio to your browser’s speech service.</p><label>Allow voice service<input type="checkbox" checked={voiceConsent} onChange={e=>{setVoiceConsent(e.target.checked);if(!e.target.checked)voice.current?.stop();}}/></label><button disabled={!voiceSupported||!voiceConsent} onClick={()=>{setVoiceError('');if(voice.current?.enabled)voice.current.stop();else voice.current?.start();}}>{voiceState==='off'?'Enable voice':`Voice ${voiceState} · turn off`}</button></>}{cameraPage===1&&<p>{voiceSupported?'Say: start, pause, next, back, again, slower, faster, loop.':'Speech is unavailable here. Use touch, keyboard or a paired screen.'} {lastCommand&&`Heard: ${lastCommand}`}</p>}<div className="practice-pagination"><button disabled={cameraPage===0} onClick={()=>setCameraPage(0)}>Back</button><span>{cameraPage+1} / 2</span><button disabled={cameraPage===1} onClick={()=>setCameraPage(1)}>More</button></div></>}
+   {panel==='sound'&&<>{voiceError&&<p role="alert">{voiceError}</p>}{cameraPage===0&&<><p>Voice uses this app’s speech service when available, otherwise your browser’s. This app does not save microphone audio.</p>{!voiceSupported&&<p role="status">Voice recognition is unavailable here. Check microphone access and use a supported browser.</p>}<label>Allow voice service<input type="checkbox" checked={voiceConsent} onChange={e=>{setVoiceConsent(e.target.checked);if(!e.target.checked)voice.current?.stop();}}/></label><button disabled={!voiceSupported||!voiceConsent} onClick={()=>{setVoiceError('');if(voice.current?.enabled)voice.current.stop();else voice.current?.start();}}>{voiceState==='off'?'Enable voice':`Voice ${voiceState} · turn off`}</button></>}{cameraPage===1&&<p>{voiceSupported?'Say: start, pause, next, back, again, slower, faster, loop.':'Speech is unavailable here. Use touch, keyboard or a paired screen.'} {lastCommand&&`Heard: ${lastCommand}`}</p>}<div className="practice-pagination"><button disabled={cameraPage===0} onClick={()=>setCameraPage(0)}>Back</button><span>{cameraPage+1} / 2</span><button disabled={cameraPage===1} onClick={()=>setCameraPage(1)}>More</button></div></>}
    {panel==='feedback'&&<><label>Show similarity and cues<input type="checkbox" checked={feedback} onChange={e=>setFeedback(e.target.checked)}/></label><label>Show skeleton<input type="checkbox" checked={options.current.skeleton} onChange={e=>{options.current.skeleton=e.target.checked;clear();}}/></label><p>Similarity is approximate, not technique correctness. Unclear joints are excluded. Reference motion confidence is unmeasured. Camera processing stays on this device.</p></>}
   </PracticePanel>}
  </div>;

@@ -5,3 +5,4 @@ SQLAlchemy==2.0.44
 alembic==1.17.0
 psycopg[binary]==3.2.12
 boto3==1.40.59
+vosk==0.3.45
