@@ -207,28 +207,51 @@ FINGER_CHAINS = {
 
 FINGER_PRESETS = {
     # Relaxed instructor hand: a gentle curl, not a fist.
-    'relaxed': {'axis': (1.0, 0.0, 0.0), 'sign': 1.0, 'scale': 1.0},
+    'relaxed': {'scale': 1.0},
     # Explicit bind pose, for diagnostics only.
     'none': None,
 }
 
+# In the authored T-pose the palms face down, which fixes the sign of the curl axis.
+PALM_NORMAL_WORLD = np.array([0.0, -1.0, 0.0])
+FINGER_ALONG_LOCAL = np.array([0.0, 0.0, -1.0])
 
-def finger_preset_rotations(preset_name):
+
+def palm_normal_local(profile, side):
+    """Which local axis of a hand points palm-ward, read from its rest orientation.
+
+    Deriving this per hand is what keeps the two hands mirror-correct: their local
+    frames are mirrored, so a hardcoded sign curls one hand backwards.
+    """
+    rest = profile_rest_world(profile)
+    rotation = rotation_from_matrix(rest[f'{side}Hand'])
+    scale = float(np.cbrt(np.linalg.det(rotation))) or 1.0
+    rotation = rotation / scale
+    best, best_dot = None, -2.0
+    for candidate in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)):
+        axis = np.array(candidate, dtype=np.float64)
+        score = float(np.dot(rotation @ axis, PALM_NORMAL_WORLD))
+        if score > best_dot:
+            best, best_dot = axis, score
+    return best
+
+
+def finger_preset_rotations(profile, preset_name='relaxed'):
     """Local rotations for every finger bone in a named preset.
 
-    Returns {bone_name: quaternion} for both hands. The right hand mirrors the left by
-    negating the curl, because its local axes are mirrored.
+    The curl axis is ``along x palm``, so a positive angle moves each phalanx toward the
+    palm for whichever hand it belongs to.
     """
     preset = FINGER_PRESETS[preset_name]
     if preset is None:
         return {}
-    axis, sign, scale = preset['axis'], preset['sign'], preset['scale']
+    scale = preset['scale']
     rotations = {}
-    for chain, angles in FINGER_CHAINS.values():
-        for side, mirror in (('Left', 1.0), ('Right', -1.0)):
+    for side in ('Left', 'Right'):
+        axis = np.cross(FINGER_ALONG_LOCAL, palm_normal_local(profile, side))
+        for chain, angles in FINGER_CHAINS.values():
             for bone, angle in zip(chain, angles):
-                name = bone.replace('Left', side)
-                rotations[name] = quat_from_axis_angle(axis, angle * scale * sign * mirror)
+                rotations[bone.replace('Left', side)] = quat_from_axis_angle(axis, angle * scale)
     return rotations
 
 

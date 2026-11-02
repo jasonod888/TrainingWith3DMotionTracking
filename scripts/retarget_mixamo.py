@@ -290,7 +290,7 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
     hip_height = float(profile['measurements']['hip_height'])
     translation_scale = hip_height / float(source_root_rest[1])
 
-    preset = rig.finger_preset_rotations(finger_preset)
+    preset = rig.finger_preset_rotations(profile, finger_preset)
     preset_missing = sorted(set(preset) - set(bone_by_name))
     if preset_missing:
         failures.append(f'finger preset bones absent from the profile: {preset_missing}')
