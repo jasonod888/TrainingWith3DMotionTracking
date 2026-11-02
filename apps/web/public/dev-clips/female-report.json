@@ -151,11 +151,11 @@
   "written_tracks_resolve": true,
   "written_timestamps_match": true
  },
- "elapsed_seconds": 0.822,
+ "elapsed_seconds": 0.803,
  "output": {
   "file": "female.glb",
   "bytes": 252108,
-  "sha256": "e01b604370557ec236418ce2146d774d8730c5095064a0ae89b1cf89abbfa8df",
+  "sha256": "95a1583da35e5681464abf246775be8bbe4ccb47a9bce1cdfa9f5bc1b2543e07",
   "tracks": 63,
   "animated_bones": 62,
   "frames": 225,
