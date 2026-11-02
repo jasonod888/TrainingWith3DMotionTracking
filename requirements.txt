@@ -20,4 +20,6 @@ joblib>=1.4,<2
 huggingface_hub>=1,<2
 pymomentum-cpu==0.1.114.post0
 pygltflib>=1.16,<2
+# Shared silhouette contract (apps/api/silhouettes.py) used by the evaluation harness.
+pydantic>=2.9,<3
 cryptography==50.0.2  # Local phone-camera HTTPS server

@@ -291,7 +291,7 @@ def database_ready(engine):
                                 'FROM accounts a, login_sessions s, account_tokens t, lessons l, lesson_assets m, auth_throttles h LIMIT 0'))
         connection.execute(text('SELECT account_id, lesson_id, revision_id, time FROM practice_progress LIMIT 0'))
         connection.execute(text('SELECT id, state, lease_until, provider, pipeline_version, submission_state, target_lesson_id FROM conversions LIMIT 0'))
-        connection.execute(text('SELECT id, provider, pipeline_version FROM worker_credentials LIMIT 0'))
+        connection.execute(text('SELECT id, provider, pipeline_version, silhouettes FROM worker_credentials LIMIT 0'))
         connection.execute(text('SELECT l.published_revision_id, g.account_id, i.token_hash, r.id '
                                 'FROM lessons l, lesson_grants g, lesson_invitations i, lesson_reports r LIMIT 0'))
         connection.execute(text('SELECT id, account_id, revision_id, sequence FROM mimic_pairs LIMIT 0'))
