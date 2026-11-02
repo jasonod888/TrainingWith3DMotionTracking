@@ -1,0 +1,20 @@
+{
+  "asset_version": "1.0.0",
+  "prep_version": "1",
+  "avatars": {
+    "male": {
+      "source": "ybot.glb",
+      "source_sha256": "6c076c4b4a320256306f1e50ab259c850671deb2d5e3d044982db756fbb369a3",
+      "file": "male-b5c58711b071.glb",
+      "sha256": "b5c58711b071f7e4d3483baf00def8a2417fca5463de355ab875a389ab0c4777",
+      "bytes": 2388852
+    },
+    "female": {
+      "source": "xbot.glb",
+      "source_sha256": "231b9f8a26ed024aad32487bd1784c1dd0243b7ca6c0176103e6626c7778a037",
+      "file": "female-bb4c98eb8a76.glb",
+      "sha256": "bb4c98eb8a7651414a8f2e93b69aeae7e103ee5c5ec90a72c4d2e657dba1b85b",
+      "bytes": 1974652
+    }
+  }
+}

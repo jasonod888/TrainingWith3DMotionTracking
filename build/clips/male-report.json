@@ -1,0 +1,164 @@
+{
+ "schema": 1,
+ "status": "ok",
+ "failures": [],
+ "warnings": [],
+ "retargeter": {
+  "version": "1.0.0",
+  "finger_preset": "relaxed"
+ },
+ "source": {
+  "name": "motion.glb",
+  "joints": 127,
+  "frames": 225,
+  "duration_seconds": 14.948282,
+  "first_timestamp": 0.0,
+  "last_timestamp": 14.948282,
+  "timestamps_sha256": "ee1a96e79f50215cb1327c063b7934a1148b3ef56340fb987b8fc5568f4086e5",
+  "source_file": "motion.glb",
+  "source_sha256": "6dbcf5056337994ae950c57040364f00b39f356f13804a3cfc050745cff2e14c",
+  "profile_file": "male.json"
+ },
+ "target": {
+  "avatar_id": "male",
+  "asset_file": "male-b5c58711b071.glb",
+  "asset_sha256": "b5c58711b071f7e4d3483baf00def8a2417fca5463de355ab875a389ab0c4777",
+  "profile_schema": 1,
+  "prep_version": "1",
+  "bones": 65,
+  "profile_file": "male.json"
+ },
+ "root_motion": {
+  "source_root_rest_height_m": 0.923987,
+  "target_hip_height_m": 0.997919,
+  "translation_scale": 1.080014,
+  "axes_preserved": [
+   "x",
+   "y",
+   "z"
+  ],
+  "note": "display centring is the viewer's responsibility, not the clip's"
+ },
+ "mapping": {
+  "direct": {
+   "Hips": "root",
+   "Spine": "c_spine0",
+   "Spine1": "c_spine1",
+   "Spine2": "c_spine3",
+   "Neck": "c_neck",
+   "Head": "c_head",
+   "LeftShoulder": "l_clavicle",
+   "RightShoulder": "r_clavicle",
+   "LeftArm": "l_uparm",
+   "RightArm": "r_uparm",
+   "LeftForeArm": "l_lowarm",
+   "RightForeArm": "r_lowarm",
+   "LeftHand": "l_wrist",
+   "RightHand": "r_wrist",
+   "LeftUpLeg": "l_upleg",
+   "RightUpLeg": "r_upleg",
+   "LeftLeg": "l_lowleg",
+   "RightLeg": "r_lowleg",
+   "LeftFoot": "l_transversetarsal",
+   "RightFoot": "r_transversetarsal",
+   "LeftToeBase": "l_ball",
+   "RightToeBase": "r_ball"
+  },
+  "compound": {
+   "Spine2": [
+    "c_spine2",
+    "c_spine3"
+   ],
+   "LeftHand": [
+    "l_wrist_twist",
+    "l_wrist"
+   ],
+   "RightHand": [
+    "r_wrist_twist",
+    "r_wrist"
+   ],
+   "LeftFoot": [
+    "l_foot",
+    "l_talocrural",
+    "l_subtalar",
+    "l_transversetarsal"
+   ],
+   "RightFoot": [
+    "r_foot",
+    "r_talocrural",
+    "r_subtalar",
+    "r_transversetarsal"
+   ]
+  },
+  "unmapped_target_bones": [
+   "HeadTop_End",
+   "LeftToe_End",
+   "RightToe_End"
+  ],
+  "fingers": {
+   "bones": [
+    "LeftHandIndex1",
+    "LeftHandIndex2",
+    "LeftHandIndex3",
+    "LeftHandIndex4",
+    "LeftHandMiddle1",
+    "LeftHandMiddle2",
+    "LeftHandMiddle3",
+    "LeftHandMiddle4",
+    "LeftHandPinky1",
+    "LeftHandPinky2",
+    "LeftHandPinky3",
+    "LeftHandPinky4",
+    "LeftHandRing1",
+    "LeftHandRing2",
+    "LeftHandRing3",
+    "LeftHandRing4",
+    "LeftHandThumb1",
+    "LeftHandThumb2",
+    "LeftHandThumb3",
+    "LeftHandThumb4",
+    "RightHandIndex1",
+    "RightHandIndex2",
+    "RightHandIndex3",
+    "RightHandIndex4",
+    "RightHandMiddle1",
+    "RightHandMiddle2",
+    "RightHandMiddle3",
+    "RightHandMiddle4",
+    "RightHandPinky1",
+    "RightHandPinky2",
+    "RightHandPinky3",
+    "RightHandPinky4",
+    "RightHandRing1",
+    "RightHandRing2",
+    "RightHandRing3",
+    "RightHandRing4",
+    "RightHandThumb1",
+    "RightHandThumb2",
+    "RightHandThumb3",
+    "RightHandThumb4"
+   ],
+   "preset": "relaxed"
+  }
+ },
+ "checks": {
+  "frame_count": 225,
+  "timing_max_timestamp_drift": 0.0,
+  "duration_seconds": 14.948282,
+  "max_quaternion_norm_error": 2.220446049250313e-16,
+  "min_consecutive_quaternion_dot": 0.63975,
+  "max_bone_length_error_m": 0.0,
+  "written_tracks_resolve": true,
+  "written_timestamps_match": true
+ },
+ "elapsed_seconds": 0.878,
+ "output": {
+  "file": "male.glb",
+  "bytes": 252204,
+  "sha256": "0369d74d4562a6f7bc0250befc9727f5f09bacb3b2c440d135f5e83ba07cbfb1",
+  "tracks": 63,
+  "animated_bones": 62,
+  "frames": 225,
+  "duration_seconds": 14.948282
+ }
+}

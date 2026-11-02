@@ -1,7 +1,8 @@
 # Male and female Mixamo avatar implementation plan
 
 Date: 2 November 2026  
-Status: inspection complete; implementation proposed, not started.
+Status: Phase A complete (see `avatar-phase-a-verification.md`); the rigs are prepared and
+validated, Phase B retargeting is not started.
 
 ## 1. Inspection result
 
