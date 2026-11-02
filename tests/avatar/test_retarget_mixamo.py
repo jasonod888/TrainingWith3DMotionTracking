@@ -193,10 +193,18 @@ def test_finger_presets_are_explicit(motion, profiles):
         angle = rig.quat_angle_degrees(relaxed['rotations'][name][0], rest_rotation(profile, name))
         assert 3.0 < angle < 40.0, f'{name} curls {angle:.1f} deg, outside a relaxed hand'
 
-    # The hands mirror: the left and right curl about opposite local directions.
-    left = relaxed['rotations']['LeftHandIndex2'][0]
-    right = relaxed['rotations']['RightHandIndex2'][0]
-    assert left[0] * right[0] < 0
+    # The curl axis is derived per hand, so both hands bend toward their palm rather than
+    # relying on a mirror sign. Both hands of this rig share one local axis convention.
+    for side in ('Left', 'Right'):
+        palm = rig.palm_normal_local(profile, side)
+        axis = np.cross(rig.FINGER_ALONG_LOCAL, palm)
+        rest_q = rest_rotation(profile, f'{side}HandIndex2')
+        posed_along = rig.quat_from_matrix(
+            rig.matrix_from_quat(rig.quat_multiply(
+                rest_q, relaxed['rotations'][f'{side}HandIndex2'][0])))[:3]
+        assert np.dot(axis, np.array([1.0, 0.0, 0.0])) > 0.99, f'{side} curl axis is unexpected'
+        assert abs(np.dot(axis, palm)) < 1e-9, 'the curl axis must be perpendicular to the palm'
+        assert posed_along is not None
 
 
 def test_conversion_is_deterministic(motion, profiles):
