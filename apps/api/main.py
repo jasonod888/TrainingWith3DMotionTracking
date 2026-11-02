@@ -81,7 +81,8 @@ def create_app(settings: Settings | None = None):
         assets = {Path(a.key).name:a for a in [manifest.animation, manifest.landmarks, manifest.source_video, manifest.thumbnail] if a}
         # The demonstration has no database lesson, so its avatar clips are served from the
         # fixture directory beside the other demo assets.
-        demo_extra = {'avatar-male.glb': 'model/gltf-binary', 'avatar-female.glb': 'model/gltf-binary'}
+        demo_extra = {'avatar-male.glb': 'model/gltf-binary', 'avatar-female.glb': 'model/gltf-binary',
+                      'avatar-report.json': 'application/json'}
         mime = assets[name].mime if name in assets else demo_extra.get(name)
         if not mime:
             raise HTTPException(404)

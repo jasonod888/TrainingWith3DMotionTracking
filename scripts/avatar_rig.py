@@ -214,10 +214,20 @@ FINGER_CHAINS = {
 }
 
 FINGER_PRESETS = {
+    'tracked': None,
     # Relaxed instructor hand: a gentle curl, not a fist.
     'relaxed': {'scale': 1.0},
     # Explicit bind pose, for diagnostics only.
     'none': None,
+}
+
+# Mixamo's fourth joint is a fingertip endpoint, not another phalanx. Thumb/pinky
+# metacarpals in MHR are absorbed by measuring motion relative to the mapped parent.
+FINGER_FROM_MHR = {
+    f'{side}Hand{finger}{joint}': f'{prefix}_{finger.lower()}{joint}'
+    for side, prefix in (('Left', 'l'), ('Right', 'r'))
+    for finger in ('Thumb', 'Index', 'Middle', 'Ring', 'Pinky')
+    for joint in (1, 2, 3)
 }
 
 # In the authored T-pose the palms face down, which fixes the sign of the curl axis.

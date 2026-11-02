@@ -13,6 +13,8 @@ import type {PracticeFraming} from './practice-types';
 import {measureStandingRig} from './rig';
 import {styleInstructor} from './instructor';
 import {avatarRequested,disposeAvatarStage,loadAvatarStage,pilotClipFor} from './avatar-stage';
+import {followHorizontal} from './camera-follow';
+import {continuousPlayback} from './animation-sampling';
 
 export function MotionStage({lesson,player,source=false,framing,immersive=false,locked=false,fit='none',interactive=true}:{lesson:LessonManifest;player:Playback;source?:boolean;framing?:PracticeFraming;immersive?:boolean;locked?:boolean;fit?:'none'|'envelope';interactive?:boolean}){
   const mount=useRef<HTMLDivElement>(null),video=useRef<HTMLVideoElement>(null);
@@ -115,7 +117,7 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
         loader.load(assetUrl(lesson.animation.key),gltf=>{
           if(disposed){disposeModel(gltf.scene);return;}
           if(!gltf.animations[0]){setError('This reference has no animation.');setLoading(false);return;}
-          model=gltf.scene;anchor.add(model);mixer=new THREE.AnimationMixer(model);action=mixer.clipAction(gltf.animations[0]);action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();mixer.setTime(lesson.standing_time);model.updateMatrixWorld(true);
+          model=gltf.scene;anchor.add(model);mixer=new THREE.AnimationMixer(model);action=mixer.clipAction(continuousPlayback(gltf.animations[0]));action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();mixer.setTime(lesson.standing_time);model.updateMatrixWorld(true);
           materials.push(...styleInstructor(model,aligned));
           model.traverse(node=>{if(node.name==='body_world')root=node;if(node.name==='l_wrist')hands.left=node;if(node.name==='r_wrist')hands.right=node;if(node instanceof THREE.Mesh)node.frustumCulled=false;});
           try{const bounds=measureStandingRig(anchor,model);avatarHeight=bounds.height;baseFoot=bounds.baseFoot;anchor.scale.setScalar(1.8/avatarHeight);anchor.position.y=-baseFoot*anchor.scale.y;}catch{setError('The reference has invalid dimensions. Try the original video.');setLoading(false);return;}
@@ -148,10 +150,8 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
           followPoint.copy(rootPoint);
         }}
         if(!aligned&&!fitEnvelope&&root&&model&&controls){
-          // OrbitControls keeps the camera at a fixed offset from its target, so moving the
-          // target is what carries the view: translating the camera as well would double it.
-          if(followReady){const dx=followPoint.x-lastFollow.x,dz=followPoint.z-lastFollow.z;if(dx||dz){controls.target.x+=dx;controls.target.z+=dz;}}
-          lastFollow.copy(followPoint);followReady=true;
+          followHorizontal(camera,controls.target,followPoint,lastFollow,followReady);
+          followReady=true;
         }else followReady=false;
         controls?.update();renderer?.render(scene,camera);
         if(aligned&&leftHand.current&&rightHand.current){const positions:Record<string,{x:number;y:number}|null>={left:null,right:null};for(const side of ['left','right']){if(hands[side]){hands[side].getWorldPosition(handPoint);handPoint.project(camera);if(Math.abs(handPoint.x)<=1&&Math.abs(handPoint.y)<=1&&Math.abs(handPoint.z)<=1)positions[side]={x:(handPoint.x+1)/2*host.clientWidth,y:(1-handPoint.y)/2*host.clientHeight};}}placeHandLabels({left:leftHand.current,right:rightHand.current},positions,host.clientWidth,host.clientHeight);}

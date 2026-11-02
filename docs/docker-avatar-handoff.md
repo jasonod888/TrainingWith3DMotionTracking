@@ -141,7 +141,8 @@ New:
 - `packages/avatar-rigs/` — `index.ts`, `profiles/male.json`, `profiles/female.json`
 - `apps/web/src/avatar-stage.ts` — loads avatar + clip, validates, returns bones
 - `apps/web/public/avatars/{male,female}-<hash>.glb` — the two prepared avatars (~4.4 MB)
-- `apps/web/avatar-lab.html`, `apps/web/src/avatar-lab.ts` — developer harness (not in the app build)
+- `apps/web/avatar-lab.html`, `apps/web/src/avatar-lab.ts` — project-aware comparison harness;
+  now a second Vite entry point served at `/avatar-lab.html` (not linked from the app shell)
 - `tests/avatar/` — 28 tests
 
 Modified:
@@ -180,7 +181,7 @@ Modified:
 - The camera follows by moving the OrbitControls target; drag-to-orbit still works, but the
   observation angles in the View panel now rotate around the followed instructor rather than the
   world origin.
-- Only the male avatar is selectable in lessons; the female is available in the lab only,
-  because the selector (Phase E) is not built.
+- Only the male avatar is selectable in lessons; the comparison lab has a male/female body
+  selector, but the lesson selector (Phase E) is still not built.
 - `apps/web/public/dev-clips/` is a scratch directory used by the lab; the app no longer reads
   it.

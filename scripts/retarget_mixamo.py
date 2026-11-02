@@ -23,11 +23,12 @@ One global translation is transferred, on the root (Hips), scaled by the ratio o
 hip heights and converted into the target's own node space (centimetres under the 0.01
 armature scale). All three axes are preserved; display centring belongs to the viewer.
 
-Fingers
--------
-Fingers are not retargeted yet. MHR has three phalanges plus a metacarpal per finger and
-Mixamo has four joints per chain; that correspondence is not validated. Fingers hold a
-reviewed static preset instead, so the hands never sit at the flat, splayed bind pose.
+Hands and feet
+--------------
+Wrist and finger motion is measured relative to each mapped target parent's source bone,
+including intermediate twist/metacarpal joints. Three phalanges are animated; fingertip
+endpoints keep their rest transforms. A two-bone leg solve preserves source ankle
+displacements within the target's reach, without stretching or inferring a world floor.
 
     python scripts/retarget_mixamo.py --source outputs/demo/motion.glb \
         --avatar male --output build/male-clip.glb --report build/male-report.json
@@ -51,11 +52,12 @@ from pygltflib import (
 )
 
 import avatar_rig as rig
+from avatar_kinematics import pose as target_pose, place_feet
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = ROOT / 'packages/avatar-rigs/profiles'
 
-RETARGETER_VERSION = '1.0.0'
+RETARGETER_VERSION = '2.0.0'
 CLIP_SCHEMA = 1
 SOURCE_ROOT = 'root'
 TIMESTAMP_TOLERANCE = 1e-6
@@ -143,6 +145,24 @@ class Motion:
                 worlds[bone['name']] = base @ rig.matrix_from_trs(bone['t'], bone['q'], bone['s'])
             self._rest_worlds = worlds
         return self._rest_worlds
+
+    def subject_rest_worlds(self):
+        """Neutral pose with the captured subject's lengths, excluding root travel.
+
+        MHR GLB node defaults describe its generic bind body. The exported translation
+        tracks carry the captured subject's shape. Using bind lengths as a positional
+        baseline turns a shorter subject's standing pose into a crouch on the target.
+        """
+        worlds = {}
+        for bone in self.bones:
+            name, parent = bone['name'], bone['parent']
+            track = self.tracks.get(name, {})
+            t = (np.median(track['translation'], axis=0)
+                 if 'translation' in track and name not in ('body_world', SOURCE_ROOT)
+                 else bone['t'])
+            scale = np.median(track['scale'], axis=0) if 'scale' in track else bone['s']
+            worlds[name] = (worlds[parent] if parent else self.ancestors) @ rig.matrix_from_trs(t, bone['q'], scale)
+        return worlds
 
 
 def load_motion(path, source_name=None):
@@ -243,7 +263,8 @@ def neutralise(motion, root_motion=False):
                   ancestors=motion.ancestors, source_name=motion.source_name)
 
 
-def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGETER_VERSION):
+def convert(motion, profile, finger_preset='tracked', retargeter_version=RETARGETER_VERSION,
+            foot_placement=True):
     """Convert a Motion onto a profile. Returns (clip, report)."""
     started = time.perf_counter()
     failures, warnings = [], []
@@ -307,6 +328,20 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
         raise RetargetError('; '.join(failures))
 
     mapped = {name: src for name, src in rig.MIXAMO_FROM_MHR.items()}
+    finger_mapping = {}
+    if finger_preset == 'tracked':
+        for bone in bones:
+            name = bone['name']
+            src = rig.FINGER_FROM_MHR.get(name)
+            if src in source_names and bone['parent'] in mapped:
+                finger_mapping[name] = src
+                mapped[name] = src
+        missing_fingers = sorted(set(rig.FINGER_FROM_MHR) - set(finger_mapping))
+        if missing_fingers:
+            warnings.append(f'captured finger joints missing; relaxed fallback: {missing_fingers}')
+            fallback = rig.finger_preset_rotations(profile, 'relaxed')
+            preset.update({name: value for name, value in fallback.items()
+                           if name in missing_fingers})
     source_rest_local = {bone['name']: np.asarray(bone['q'], float) for bone in motion.bones}
     source_parent_of = {bone['name']: bone['parent'] for bone in motion.bones}
     aligned_rest, alignment = aligned_rest_quats(
@@ -328,6 +363,7 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
     length_error = 0.0
     previous_source, previous_target = {}, {}
     source_steps, target_steps = {}, {}
+    source_jumps = []
     worst_direction = (0.0, None)
     source_travel = 0.0
     direction_total, direction_count = 0.0, 0
@@ -351,12 +387,14 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
 
             source_name = mapped.get(name)
             if source_name is not None:
-                if parent in ALIGNED_BONES and name not in ALIGNED_BONES:
+                if (parent in ALIGNED_BONES and name not in ALIGNED_BONES) or name in finger_mapping:
                     # The parent is aligned but this bone is not (the hands). Copying an
                     # absolute world delta here would keep the rig's own T-pose wrist angle
                     # against an aligned forearm, which reads as a twisted wrist. Apply the
                     # source's *relative* wrist motion to the hand's own rest angle instead.
-                    source_parent = source_parent_of.get(source_name)
+                    # The target parent may absorb several source joints. Using the
+                    # source's immediate parent loses wrist_twist and metacarpal motion.
+                    source_parent = mapped[parent]
                     rest_relative = rig.quat_multiply(
                         rig.quat_conjugate(source_rest_quats[source_parent]),
                         source_rest_quats[source_name])
@@ -389,6 +427,7 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
                 quaternion = rig.quat_multiply(quaternion, preset[name])
                 world_q = rig.quat_multiply(parent_q, quaternion)
             quaternion = quaternion / np.linalg.norm(quaternion)
+            world_q = rig.quat_multiply(parent_q, quaternion)
             target_quats[name] = world_q
 
             translation = np.asarray(bone['t'], float)
@@ -414,15 +453,25 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
                                    else source_rest_local[source_name])
                     previous_local = previous_source.get(source_name)
                     if previous_local is not None:
+                        step_angle = rig.quat_angle_degrees(previous_local, posed_local)
                         source_steps[source_name] = max(
                             source_steps.get(source_name, 0.0),
-                            rig.quat_angle_degrees(previous_local, posed_local))
+                            step_angle)
+                        if step_angle > 60 and name not in finger_mapping:
+                            source_jumps.append({'bone': source_name, 'frame': frame,
+                                                 'time': float(motion.times[frame]),
+                                                 'degrees': round(step_angle, 3)})
                     previous_source[source_name] = np.asarray(posed_local, float)
                 previous_target_local = previous_target.get(name)
                 if previous_target_local is not None:
                     target_steps[name] = max(
                         target_steps.get(name, 0.0),
                         rig.quat_angle_degrees(previous_target_local, quaternion))
+                previous_target[name] = quaternion
+            else:
+                if source_name is not None:
+                    previous_source[source_name] = np.asarray(
+                        motion.local_at(next(b for b in motion.bones if b['name'] == source_name), 0)[1])
                 previous_target[name] = quaternion
 
             target_worlds[name] = parent_world @ rig.matrix_from_trs(
@@ -470,7 +519,7 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
         failures.append(f'bone lengths changed by up to {length_error * 1000:.3f} mm')
 
     hips_rest = np.asarray(next(bone for bone in bones if bone['name'] == 'Hips')['t'], float)
-    travel = float(np.abs(translations['Hips'] - hips_rest).max()) * armature_scale
+    travel = float(np.linalg.norm(translations['Hips'] - hips_rest, axis=1).max()) * abs(armature_scale)
     # Check that the conversion preserved the source's travel rather than that travel is
     # small: handheld footage legitimately reconstructs several metres of root motion.
     expected_travel = source_travel * translation_scale
@@ -505,7 +554,7 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
         ((value, name) for name, value in source_steps.items()), default=(0.0, None))
 
     unmapped_targets = [name for name in bone_by_name if name not in rotations]
-    hands = sorted(name for name in preset if name in bone_by_name)
+    hands = sorted(set(finger_mapping) | {name for name in preset if name in bone_by_name})
     clip = {'times': motion.times.copy(), 'rotations': rotations,
             'translations': translations, 'preset': finger_preset}
     report = {
@@ -548,7 +597,8 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
             'rest_alignment_bones': len(alignment),
             'rest_alignment_missing': sorted(set(mapped) - set(alignment)),
             'max_rest_alignment_degrees': round(max_alignment, 3),
-            'fingers': {'bones': hands, 'preset': finger_preset},
+            'fingers': {'bones': hands, 'preset': finger_preset,
+                        'direct': finger_mapping, 'endpoints': 'keep target rest transforms'},
         },
         'checks': {
             'frame_count': frames,
@@ -567,6 +617,7 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
             'max_segment_direction_error_bone': worst_direction[1],
         },
         'elapsed_seconds': round(time.perf_counter() - started, 3),
+        'source_rotation_jumps': source_jumps,
     }
     if finger_preset == 'none':
         warnings.append('fingers are at the bind pose; review before showing this clip')
@@ -585,6 +636,50 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
         warnings.append(
             f'source joint {worst_source_step[1]} turns {worst_source_step[0]:.0f} deg in one '
             'frame; the clip reproduces that jump rather than inventing it')
+    if foot_placement:
+        # The reference for displacement is the aligned neutral pose, not the raw
+        # T-pose. A neutral source must remain neutral on the target.
+        neutral_rotations = {}
+        neutral_quats = {}
+        for bone in bones:
+            name, parent = bone['name'], bone['parent']
+            parent_q = neutral_quats[parent] if parent else ancestors_q
+            if name in mapped and not ((parent in ALIGNED_BONES and name not in ALIGNED_BONES)
+                                       or name in finger_mapping):
+                local = rig.quat_multiply(rig.quat_conjugate(parent_q), aligned_rest[name])
+            else:
+                local = np.asarray(bone['r'], float)
+            neutral_quats[name] = rig.quat_multiply(parent_q, local)
+            neutral_rotations[name] = local[None, :]
+        baseline, _ = target_pose(profile, neutral_rotations, {}, 0)
+        report['foot_placement'] = place_feet(
+            motion, profile, clip, baseline, translation_scale, _shortest_arc)
+        if report['foot_placement']['max_ankle_error_after_m'] > 0.02:
+            warnings.append('some source ankle positions exceed the target leg reach; see foot_placement')
+        for name in rotations:
+            rotations[name] = _quat_continuity(rotations[name])
+        # IK changes leg directions deliberately to preserve ankle placement. Report
+        # its residual independently of the orientation mapping checks above.
+        final_step, final_bone = max(
+            ((rig.quat_angle_degrees(a, b), name) for name, values in rotations.items()
+             for a, b in zip(values, values[1:])), default=(0., None))
+        report['checks']['max_step_rotation_target_degrees'] = round(final_step, 3)
+        report['checks']['max_step_rotation_target_bone'] = final_bone
+        report['checks']['min_consecutive_quaternion_dot'] = round(_continuity_floor(rotations), 6)
+        report['checks']['segment_direction_measurement'] = 'orientation transfer before ankle placement'
+        # Validate the final transforms, not only the orientation-only intermediate.
+        final_length_error = 0.
+        for frame in range(frames):
+            final_worlds, _ = target_pose(profile, rotations, translations, frame)
+            for bone in bones:
+                if bone['parent'] is not None:
+                    length = np.linalg.norm(final_worlds[bone['name']][:3, 3] - final_worlds[bone['parent']][:3, 3])
+                    final_length_error = max(final_length_error, abs(length-rest_lengths[bone['name']]))
+        report['checks']['max_bone_length_error_m'] = round(final_length_error, 9)
+        if final_length_error > LENGTH_TOLERANCE:
+            failures.append('ankle placement changed target bone lengths')
+    report['elapsed_seconds'] = round(time.perf_counter() - started, 3)
+    report['status'] = 'failed' if failures else 'ok'
     return clip, report
 
 
@@ -903,7 +998,7 @@ def _empty_report(source_path, profile_path, error, retargeter_version, finger_p
 
 
 def retarget(source_path, profile_path, output_path, report_path,
-             finger_preset='relaxed', retargeter_version=RETARGETER_VERSION):
+             finger_preset='tracked', retargeter_version=RETARGETER_VERSION):
     """Read, convert, write and verify. Returns the report; raises on a failed conversion."""
     try:
         profile = rig.load_profile(profile_path)
@@ -949,7 +1044,7 @@ def main():
     parser.add_argument('--profile', type=Path, help='explicit rig profile JSON')
     parser.add_argument('--output', required=True, type=Path, help='converted clip GLB')
     parser.add_argument('--report', required=True, type=Path, help='validation report JSON')
-    parser.add_argument('--finger-preset', default='relaxed', choices=sorted(rig.FINGER_PRESETS))
+    parser.add_argument('--finger-preset', default='tracked', choices=sorted(rig.FINGER_PRESETS))
     parser.add_argument('--retargeter-version', default=RETARGETER_VERSION)
     args = parser.parse_args()
 

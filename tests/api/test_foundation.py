@@ -70,6 +70,8 @@ def test_only_manifest_listed_demo_assets_served(tmp_path):
         # fixture directory and are served by name.
         (tmp_path/'avatar-male.glb').write_bytes(b'avatar')
         assert c.get('/api/demo/assets/avatar-male.glb').status_code==200
+        (tmp_path/'avatar-report.json').write_text('{"schema":1}')
+        assert c.get('/api/demo/assets/avatar-report.json').json()=={'schema':1}
         assert c.get('/api/demo/assets/avatar-missing.glb').status_code==404
 
 def test_json_schema_is_current():

@@ -243,7 +243,7 @@ def test_written_clip_round_trips(tmp_path, motion, profiles):
     assert report['checks']['written_timestamps_match'] is True
     assert report['source']['sha256'] == rt.hashlib.sha256(DEMO.read_bytes()).hexdigest()
     assert report['target']['asset_sha256'] == profile['asset']['sha256']
-    assert report['output']['tracks'] == len(report['mapping']['direct']) + 40 + 1
+    assert report['output']['tracks'] == len(report['mapping']['direct']) + 1
     assert json.loads(report_path.read_text())['status'] == 'ok'
 
     gltf = GLTF2().load(str(output))
@@ -268,12 +268,17 @@ def test_wrist_motion_is_relative_to_the_forearm(motion, profiles):
     clip, report = rt.convert(motion, profile)
     assert report['status'] == 'ok'
     for side, source_name in (('Left', 'l_wrist'), ('Right', 'r_wrist')):
-        source_rest = next(b['q'] for b in motion.bones if b['name'] == source_name)
-        source_track = motion.tracks[source_name]['rotation']
+        source_parent = 'l_lowarm' if side == 'Left' else 'r_lowarm'
+        rest_quats = motion.rest_quats()
+        source_rest = rig.quat_multiply(rig.quat_conjugate(rest_quats[source_parent]),
+                                       rest_quats[source_name])
         target_rest = rest_rotation(profile, f'{side}Hand')
         worst = 0.0
         for frame in range(0, motion.frame_count, 7):
-            source_motion = rig.quat_angle_degrees(source_rest, source_track[frame])
+            source_quats = motion.pose_at(frame)[1]
+            source_relative = rig.quat_multiply(rig.quat_conjugate(source_quats[source_parent]),
+                                               source_quats[source_name])
+            source_motion = rig.quat_angle_degrees(source_rest, source_relative)
             target_motion = rig.quat_angle_degrees(target_rest,
                                                    clip['rotations'][f'{side}Hand'][frame])
             worst = max(worst, abs(source_motion - target_motion))

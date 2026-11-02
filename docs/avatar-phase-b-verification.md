@@ -266,6 +266,29 @@ python scripts/publish_lesson_clips.py --lesson <id> --male <clip> --female <cli
 
 The two lessons in this repository were backfilled that way.
 
+## Project-aware comparison lab · 2 November 2026
+
+`apps/web/avatar-lab.html` now loads the signed-in account's projects from `/api/lessons` as
+well as the built-in `/api/demo` move, and is a second Vite entry point rather than a
+Vite-dev-only page. The built page is served at `/avatar-lab.html` on port 8001.
+
+For the selected project it loads the lesson's canonical MHR `reference.glb` and the prepared
+`avatar-{male,female}.glb` through the same authorized asset routes the viewer uses, then plays
+both bodies from one clip clock. The stage separates the bodies in the camera plane, so
+front/back and left/right views both keep them side by side; it also has frame stepping,
+0.25×/0.5× speed, skeleton and joint overlays, pin-travel, and a local clip upload. A project
+without a derivative falls back to the MHR reference and reports the missing clip instead of
+showing a stale one.
+
+Deep links carry the inspection state, for example:
+
+```
+/avatar-lab.html?project=<lesson id>&avatar=female&view=left&t=11
+```
+
+The in-app avatar selector is still not built; the lab is the inspection surface, not a lesson
+control.
+
 ## Open risks carried forward
 
 - **Foot contact is unmeasured.** The clip preserves the source's global translation and the

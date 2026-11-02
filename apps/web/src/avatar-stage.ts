@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {continuousPlayback} from './animation-sampling';
 import {
   avatarAssetUrl, avatarProfile, validateProfile,
   type AvatarId, type AvatarProfile,
@@ -69,13 +70,14 @@ export async function loadAvatarStage(
 
   const [avatarGltf, clipGltf] = await Promise.all([
     loader.loadAsync(avatarAssetUrl(id)),
-    loader.loadAsync(clipUrl),
+    loader.loadAsync(clipUrl.startsWith('blob:') ? clipUrl : `${clipUrl}${clipUrl.includes('?')?'&':'?'}retarget=2`),
   ]);
   if (avatarGltf.animations.length) {
     throw new AvatarUnavailable('the prepared avatar must not carry clips');
   }
-  const clip = clipGltf.animations[0];
-  if (!clip) throw new AvatarUnavailable('the converted clip carries no animation');
+  const sourceClip = clipGltf.animations[0];
+  if (!sourceClip) throw new AvatarUnavailable('the converted clip carries no animation');
+  const clip = continuousPlayback(sourceClip);
   // The clip must belong to this lesson's animation. A stale or borrowed clip is worse than
   // showing the canonical reference, so a duration mismatch is a hard rejection.
   if (expectedDuration !== undefined && Math.abs(clip.duration - expectedDuration) > 0.1) {
