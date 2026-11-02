@@ -6,6 +6,7 @@ import type {LessonManifest} from '../../../packages/lesson-schema/index';
 import type {Playback} from '../../../packages/learning-engine/playback';
 import {assetUrl} from './api';
 import {heightPlacement} from '../../../web/dist/pose.js';
+import {placementForTransform} from './camera-framing';
 import {compositeOffset} from '../../../web/dist/composite.js';
 import {placeHandLabels} from '../../../web/dist/hand-labels.js';
 import type {PracticeFraming} from './practice-types';
@@ -57,7 +58,7 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
       },undefined,()=>{if(!disposed){setLoading(false);setError('The 3D reference could not load. Try the original video.');}});
       let lastAngle:number|undefined,lastReset:number|undefined;
       const render=()=>{frame=requestAnimationFrame(render);const f=framingRef.current;let offset=0;
-        if(aligned&&f){const w=host.clientWidth,h=host.clientHeight;let scale=3*.68/avatarHeight,floorY=-3*.36;if(f.calibration){const placement=heightPlacement(f.calibration,f.videoWidth,f.videoHeight,w,h,3,avatarHeight);scale=placement.scale;floorY=placement.floorY;}anchor.scale.set(f.mirrored!==f.mirrorReference?-scale:scale,scale,scale);anchor.position.y=floorY-baseFoot*scale;if(f.composite)offset=compositeOffset(f.position,f.videoWidth,f.videoHeight,w,h,3).worldX;for(const material of materials)material.opacity=f.opacity;}
+        if(aligned&&f){const w=host.clientWidth,h=host.clientHeight;let scale=3*.68/avatarHeight,floorY=-3*.36;if(f.calibration){const display=f.display?.current;const samePane=!!display&&Math.abs(display.paneWidth-w)<2&&Math.abs(display.paneHeight-h)<2;const placement=display&&samePane&&display.sourceWidth===f.videoWidth&&display.sourceHeight===f.videoHeight?placementForTransform(f.calibration,display,h,3,avatarHeight):heightPlacement(f.calibration,f.videoWidth,f.videoHeight,w,h,3,avatarHeight);scale=placement.scale;floorY=placement.floorY;}anchor.scale.set(f.mirrored!==f.mirrorReference?-scale:scale,scale,scale);anchor.position.y=floorY-baseFoot*scale;if(f.composite)offset=compositeOffset(f.position,f.videoWidth,f.videoHeight,w,h,3).worldX;for(const material of materials)material.opacity=f.opacity;}
         if(!aligned&&f){const scale=anchor.scale.y;anchor.scale.x=f.mirrorReference?-scale:scale;}
         if(f?.angle!==undefined&&(f.angle!==lastAngle||f.resetVersion!==lastReset)){lastAngle=f.angle;lastReset=f.resetVersion;const yaw=f.angle,distance=aligned?8:immersive?fitDistance:4;camera.position.set(Math.sin(yaw)*distance,aligned?0:1,Math.cos(yaw)*distance);camera.lookAt(0,aligned?0:.9,0);}if(controls)controls.enabled=!aligned&&!locked;
         if(mixer){if(action){action.paused=false;action.enabled=true;}mixer.setTime(f?.active&&(f.calibrating||player.state.index<0)?lesson.standing_time:player.state.time);if(root){anchor.position.x=offset-root.position.x*anchor.scale.x;anchor.position.z=-root.position.z*anchor.scale.z;}}controls?.update();renderer?.render(scene,camera);

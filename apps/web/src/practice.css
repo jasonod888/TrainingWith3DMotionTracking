@@ -86,3 +86,16 @@ body.in-practice .app>.header{display:none}
 .mimic-immersive .compete-results .practice-panel-footer{flex-shrink:0;padding-top:12px;border-top:1px solid #ffffff18}.mimic-immersive .compete-results .practice-panel-body{flex:1;min-height:0}.mimic-immersive .compete-results{gap:10px}
 
 .mimic-shell.mimic-immersive .lets-compete-button{flex:1;min-height:44px;border-radius:30px;background:#ffffff14;border-color:#ffffff40;font-weight:600;font-size:12px}.compete-setup-actions{display:flex;gap:8px}.compete-setup-actions button{flex:1}
+
+/* Camera presentation surface. camera-framing.ts owns every left/top/size
+   value; this only clips the composed image and keeps overlays above it. */
+.mimic-stage .camera-pane{overflow:hidden;background:#14241c}
+.camera-frame{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;background:#14241c;transform-origin:50% 50%;will-change:left,top,width,height}
+.camera-frame video{position:absolute;left:0;top:0;display:block;max-width:none;max-height:none;object-fit:fill}
+.camera-pane canvas{z-index:1}
+.camera-pane .camera-tag,.camera-pane .hand-label{z-index:3}
+.camera-pane .calibration-card{z-index:4}
+/* Keep height-matching guidance out of the feet area in the supported
+   side-by-side layout. Other layouts retain their existing placement. */
+.mimic-immersive .layout-separate .calibration-card{top:152px;bottom:auto;left:auto;right:20px;max-width:min(300px,calc(100% - 40px));backdrop-filter:blur(12px)}
+@media(max-width:700px){.mimic-immersive .layout-separate .calibration-card{left:12px;right:12px;max-width:none}}
