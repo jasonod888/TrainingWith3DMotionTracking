@@ -63,6 +63,8 @@ def public_keys(manifest, lesson_id):
         if asset:
             value[field] = {**asset, 'key': f"public/{lesson_id}/{Path(asset['key']).name}"}
     value['source_video'] = None
+    value['presentation'] = {name:{**asset,'key':f"public/{lesson_id}/{Path(asset['key']).name}"}
+                             for name,asset in value.get('presentation',{}).items() if name in ('male','female')}
     return value
 
 
@@ -111,6 +113,8 @@ def install_public(app, settings, identity, db):
         lesson, revision, _ = public_lesson(session, lesson_id)
         allowed = {Path(revision.manifest[field]['key']).name for field in ('animation', 'landmarks')
                    if revision.manifest.get(field)}
+        allowed.update(Path(asset['key']).name for name,asset in revision.manifest.get('presentation',{}).items()
+                       if name in ('male','female'))
         if name not in allowed:
             raise HTTPException(404, 'Media unavailable.')
         key = f'lessons/{lesson_id}/{name}'

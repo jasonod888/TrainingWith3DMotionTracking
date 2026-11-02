@@ -10,5 +10,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128 && pip install --no-cache-dir -r requirements.txt
 RUN git clone https://github.com/facebookresearch/sam-3d-body.git vendor/sam-3d-body && git -C vendor/sam-3d-body checkout b5c765a0d89d789985e186d396315e7590887b94 && git clone https://github.com/facebookresearch/dinov3.git vendor/dinov3 && git -C vendor/dinov3 checkout 6876159a11b4df116f30f667f8c9888617df0751
 COPY scripts/ scripts/
+RUN git clone https://github.com/facebookresearch/sam2.git vendor/sam2 && git -C vendor/sam2 checkout 2b90b9f5ceec907a1c18123530e92e794ad901a4 && git clone https://github.com/microsoft/MoGe.git vendor/MoGe && git -C vendor/MoGe checkout 74fbce054ebed49800de42d0ad0e83495065719a && pip install --no-cache-dir --no-deps git+https://github.com/EasternJournalist/utils3d-moge.git@62f09d58509485564e24d5d9f6aac9ee9ebc0c37
+ENV FORM_SAM2_SOURCE=/app/vendor/sam2 FORM_MOGE_SOURCE=/app/vendor/MoGe
 COPY packages/avatar-rigs/ packages/avatar-rigs/
 CMD ["python", "scripts/check_environment.py"]

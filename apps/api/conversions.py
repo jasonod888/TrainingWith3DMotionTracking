@@ -326,6 +326,8 @@ def install_conversions(app,engine,settings,identity,db):
         token=request.headers.get('x-job-lease','')
         if job and job.state=='ready_for_review' and job.worker_id==credential and hmac.compare_digest(job.attempt_token or '',token):return {'lesson_id':job.lesson_id}
         job=leased(session,job_id,credential,token)
+        if body.presentation:
+            raise HTTPException(422,'Presentation assets must be verified through the derivative route.')
         if job.state!='verifying' or body.engine!='sam-3d-body' or body.engine_version!=ENGINE_VERSION or body.duration>job.duration+.1 or body.source_start!=0 or body.section_set.revision!=1 or len(body.section_set.sections)!=1:
             raise HTTPException(422,'Invalid converted lesson.')
         if job.provider!='local' and job.submission_state!='submitted':raise HTTPException(409,'Missing provider submission receipt.')

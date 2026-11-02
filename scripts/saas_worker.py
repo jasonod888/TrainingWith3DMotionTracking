@@ -46,6 +46,8 @@ class Worker:
             reports.append(json.loads((avatars/f'avatar-{avatar}.json').read_text(encoding='utf-8')))
         summary={'schema':1,'avatars':{report['target']['avatar_id']:report for report in reports},
                  'source':{'file':'reference.glb','sha256':hashlib.sha256((folder/'reference.glb').read_bytes()).hexdigest()}}
+        grounding=folder/'grounding/grounding-summary.json'
+        if grounding.exists():summary['grounding']=json.loads(grounding.read_text())
         (avatars/'avatar-report.json').write_text(json.dumps(summary,separators=(',',':')),encoding='utf-8')
         uploaded={}
         for name in ('avatar-male.glb','avatar-female.glb','avatar-report.json'):
@@ -133,7 +135,27 @@ class Worker:
             # Normalisation already produces 15 fps. Preserve every resulting frame.
             command([sys.executable,str(ROOT/'scripts/process_video.py'),str(preview),'--duration',str(job['duration']),'--fps','0','--output',str(folder/'motion')],timeout=max(1800,job['duration']*15))
             advance('exporting')
+            # Opt-in diagnostics only: image tracking is not proof of support.
+            # Failure must not discard an otherwise valid source reconstruction.
+            if os.environ.get('FORM_GROUNDING_DIAGNOSTICS') == '1':
+                try:
+                    command([sys.executable,str(ROOT/'scripts/ground_motion.py'),
+                             str(folder/'motion/motion.npz'),'--video',str(preview),
+                             '--output',str(folder/'grounding')],timeout=max(240,job['duration']*5))
+                except Exception as exc:
+                    check()
+                    print(f'Grounding diagnostics unavailable ({type(exc).__name__}).',flush=True)
             command([sys.executable,str(ROOT/'scripts/export_glb.py'),str(folder/'motion/motion.npz'),'--output',str(folder/'reference.glb')])
+            grounding={'status':'skipped','reason':'disabled'}
+            if os.environ.get('FORM_SOURCE_GROUNDING','auto')!='off':
+                try:
+                    command([sys.executable,str(ROOT/'scripts/source_grounding.py'),
+                        '--video',str(preview),'--motion',str(folder/'motion/motion.npz'),
+                        '--source',str(folder/'reference.glb'),'--output',str(folder/'grounding')],
+                        timeout=max(600,job['duration']*12))
+                    grounding=json.loads((folder/'grounding/grounding-summary.json').read_text())
+                except Exception:
+                    check();grounding={'status':'skipped','reason':'correction-failed'}
             advance('verifying')
             import numpy as np
             from pygltflib import GLTF2
@@ -167,6 +189,11 @@ class Worker:
                 'section_set':{'id':job_id,'revision':1,'duration':reference['duration'],'sections':[{'id':'whole','label':'Full movement','start':0,'end':reference['duration']}]},
                 'warnings':['Review the reconstruction before teaching. Pose accuracy and foot contact are not certified.',f'Source range starts at {job["start"]}s; preview is normalised to 15 fps with audio removed.']}
             # Avatar presentation is derived from the canonical export. Uploads must happen
+            if grounding['status']=='applied':
+                manifest['root_motion']='floor-guided'
+                manifest['warnings'].append('Floor movement was corrected using a fixed-camera estimate; review tracking and foot placement.')
+            else:
+                manifest['warnings'].append(f"Floor movement correction was not applied ({grounding.get('reason','unavailable')}).")
             # before finish (that releases the lease) and attaching them after; a failure at
             # either step must never fail the lesson, which stays fully usable.
             prepared=None

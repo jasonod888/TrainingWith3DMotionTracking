@@ -47,10 +47,14 @@ export function avatarRequested(): AvatarId {
  * keeps the canonical reference.
  */
 export function pilotClipFor(
-  lesson: {lesson_id: string; animation?: {key: string}},
+  lesson: {lesson_id: string; animation?: {key: string}; presentation?: Partial<Record<AvatarId, {key:string}>>},
   id: AvatarId,
 ): string {
   const key = lesson.animation?.key ?? '';
+  const prepared = lesson.presentation?.[id]?.key;
+  if (prepared) return prepared.startsWith('public/')
+    ? `/api/public/moves/${encodeURIComponent(lesson.lesson_id)}/assets/${encodeURIComponent(prepared.split('/').pop()!)}`
+    : `/api/lessons/${encodeURIComponent(lesson.lesson_id)}/assets/${encodeURIComponent(prepared.split('/').pop()!)}`;
   if (key.startsWith('demo/')) return `/api/demo/assets/avatar-${id}.glb`;
   return `/api/lessons/${encodeURIComponent(lesson.lesson_id)}/assets/avatar-${id}.glb`;
 }

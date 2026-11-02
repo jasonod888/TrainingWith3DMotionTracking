@@ -331,9 +331,12 @@
   <label class="check"><input id="show-skeleton" type="checkbox"> Skeleton</label>
   <label class="check"><input id="show-joints" type="checkbox" checked> Joints</label>
   <label class="check"><input id="show-ground" type="checkbox" checked> Floor</label>
-  <label class="check"><input id="pin-travel" type="checkbox" checked> Pin travel</label>
+  <label class="check"><input id="floor-movement" type="checkbox" role="switch"> Floor movement</label>
+  <label class="check"><input id="follow-movement" type="checkbox" checked disabled> Follow camera</label>
   <label class="upload">Upload clip<input id="upload" type="file" accept=".glb,.gltf"></label>
   <button id="clear-upload" type="button" hidden>Use project clip</button>
+  <label class="upload">Upload corrected MHR<input id="upload-source" type="file" accept=".glb"></label>
+  <label class="check"><input id="corrected-source" type="checkbox" disabled> Corrected source</label>
   <button id="next-source-jump" type="button" hidden>Next source jump</button>
 </div>
 
@@ -353,7 +356,8 @@
     <h2>How to read this</h2>
     <ul class="notes">
       <li>Both bodies play from the same clip time. The MHR reference is the motion source; the Mixamo body is the retargeted result.</li>
-      <li>Use <strong>Pin travel</strong> to cancel horizontal root motion so the bodies stay side by side. Turn it off to inspect the clip’s real travel.</li>
+      <li>Turn on <strong>Floor movement</strong> to let both characters travel across the floor. Turn it off to compare poses in place.</li>
+      <li><strong>Follow camera</strong> keeps travelling characters in view. Turn it off to hold the camera still and inspect movement against the floor grid. Movement settings are saved in the page link.</li>
       <li>Frame-step around a bad pose. Switch to <strong>Left</strong> or <strong>Right</strong> to judge knee, elbow and foot direction.</li>
       <li>New conversions transfer captured finger and wrist motion. The project panel identifies older clips that still use a static hand pose.</li>
       <li>Foot placement follows the source ankle movement within the avatar’s leg reach. Source tracking jumps and camera drift remain visible on both bodies.</li>

@@ -46,7 +46,7 @@ def set_timestamps(path, times):
     gltf.set_binary_blob(bytes(blob))
     gltf.save_binary(str(path))
 
-def export(motion_path, output, assets, sigma=0, root_motion=True):
+def export(motion_path, output, assets, sigma=0, root_motion=True, grounding=None):
     import pymomentum.geometry as geometry
     from scipy.ndimage import gaussian_filter1d
 
@@ -69,7 +69,12 @@ def export(motion_path, output, assets, sigma=0, root_motion=True):
         # assumptions about root parameter scaling or rig parameter transforms.
         translation = data['pred_cam_t'].astype(np.float32) * [1, -1, -1]
         translation -= translation[0]
-        if sigma > 0 and len(times) >= 3:
+        if grounding is not None:
+            if not root_motion:
+                raise ValueError('Grounding cannot be combined with in-place export.')
+            from ground_motion import load_placement
+            translation = load_placement(grounding, motion_path, data['timestamps'])
+        if grounding is None and sigma > 0 and len(times) >= 3:
             translation = gaussian_filter1d(translation, sigma, axis=0, mode='nearest')
             translation -= translation[0]
         if root_motion:
@@ -87,8 +92,11 @@ def export(motion_path, output, assets, sigma=0, root_motion=True):
         'source_motion': str(motion_path.resolve()), 'frames': len(times),
         'duration_seconds': float(times[-1]), 'joint_count': len(char.skeleton.joint_names),
         'smoothing_sigma_frames': sigma, 'body_scales': 'median over clip',
-        'root_motion': 'relative camera estimate' if root_motion else 'in place',
-        'limitations': 'Neutral MHR skin; no contact solver, no calibrated world trajectory. Gaussian smoothing may soften fast motion.',
+        'root_motion': 'reviewed contact correction' if grounding else ('relative camera estimate' if root_motion else 'in place'),
+        'grounding': str(grounding.resolve()) if grounding else None,
+        'limitations': ('Neutral MHR skin; reviewed contact placement, no calibrated world trajectory.'
+                       if grounding else 'Neutral MHR skin; no contact solver, no calibrated world trajectory.')
+                       + ' Gaussian smoothing may soften fast motion.',
     }
     output.with_suffix('.export.json').write_text(json.dumps(details, indent=2))
     print(json.dumps(details, indent=2))
@@ -101,10 +109,11 @@ def main():
     p.add_argument('--assets', type=Path, default=ROOT / 'models/mhr')
     p.add_argument('--smooth', type=float, default=0, help='Optional smoothing sigma in frames; raw data stays untouched')
     p.add_argument('--in-place', action='store_true')
+    p.add_argument('--grounding', type=Path, help='Validated placement artifact replacing camera translation')
     args = p.parse_args()
     if args.smooth < 0:
         p.error('--smooth must be nonnegative.')
-    export(args.motion, args.output or args.motion.with_suffix('.glb'), args.assets, args.smooth, not args.in_place)
+    export(args.motion, args.output or args.motion.with_suffix('.glb'), args.assets, args.smooth, not args.in_place, args.grounding)
 
 if __name__ == '__main__':
     main()

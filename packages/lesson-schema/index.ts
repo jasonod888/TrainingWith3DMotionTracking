@@ -6,9 +6,10 @@ export type LessonManifest = {
   duration: number; source_start: number; standing_time: number;
   engine: 'sam-3d-body' | 'mediapipe' | 'synthetic'; engine_version: string;
   units: 'metres'; landmark_axes: 'x-right/y-down/z-forward';
-  root_motion: 'estimated-camera-relative' | 'hip-relative' | 'in-place';
+  root_motion: 'estimated-camera-relative' | 'hip-relative' | 'in-place' | 'floor-guided';
   confidence: 'unmeasured' | 'measured'; animation: Asset; landmarks: Asset;
   source_video: Asset | null; thumbnail: Asset | null; section_set: SectionSet; warnings: string[];
+  presentation?: Partial<Record<'male' | 'female' | 'report', Asset>>;
 };
 
 export function validateSections(sections: Section[], duration: number): Section[] {

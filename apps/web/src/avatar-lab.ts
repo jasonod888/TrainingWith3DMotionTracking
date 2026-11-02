@@ -73,7 +73,8 @@ const rightLabel = $<HTMLSpanElement>('right-label');
 const showSkeleton = $<HTMLInputElement>('show-skeleton');
 const showJoints = $<HTMLInputElement>('show-joints');
 const showGround = $<HTMLInputElement>('show-ground');
-const pinTravel = $<HTMLInputElement>('pin-travel');
+const floorMovement = $<HTMLInputElement>('floor-movement');
+const followMovement = $<HTMLInputElement>('follow-movement');
 const uploadInput = $<HTMLInputElement>('upload');
 const clearUploadButton = $<HTMLButtonElement>('clear-upload');
 const projectInfo = $<HTMLDListElement>('project-info');
@@ -192,6 +193,21 @@ const avatarBase = new THREE.Vector2(-BODY_OFFSET, 0);
 const mhrBase = new THREE.Vector2(BODY_OFFSET, 0);
 let uploadedClipUrl: string | null = null;
 let uploadedName = '';
+let correctedSourceUrl: string | null = null;
+const sourceUpload = document.getElementById('upload-source') as HTMLInputElement;
+const correctedSource = document.getElementById('corrected-source') as HTMLInputElement;
+sourceUpload.addEventListener('change', () => {
+  const file = sourceUpload.files?.[0];
+  if (!file || !current) return;
+  if (correctedSourceUrl) URL.revokeObjectURL(correctedSourceUrl);
+  correctedSourceUrl = URL.createObjectURL(file);
+  correctedSource.disabled = false;
+  correctedSource.checked = true;
+  void loadProject(current, {time: clipTime});
+});
+correctedSource.addEventListener('change', () => {
+  if (current) void loadProject(current, {time: clipTime});
+});
 let lastFrame = performance.now();
 let lastUi = 0;
 let comparisonReport: Record<string, any> | null = null;
@@ -203,7 +219,9 @@ speedSelect.value = String(speed);
 showSkeleton.checked = params.get('skeleton') === '1';
 showJoints.checked = params.get('joints') !== '0';
 showGround.checked = params.get('ground') !== '0';
-pinTravel.checked = params.get('pin') !== '0';
+floorMovement.checked = params.get('movement') === '1' || (params.get('movement') === null && params.get('pin') === '0');
+followMovement.checked = params.get('follow') !== '0';
+followMovement.disabled = !floorMovement.checked;
 if (!showGround.checked) ground.visible = false;
 
 // ---------------------------------------------------------------------------------------------
@@ -282,8 +300,8 @@ function projectFromLesson(lesson: LessonManifest): Project {
     duration: lesson.duration,
     source: 'lesson',
     referenceUrl: lessonAsset(lesson.lesson_id, referenceName),
-    clipUrl: avatar => lessonAsset(lesson.lesson_id, `avatar-${avatar}.glb`),
-    reportUrl: lessonAsset(lesson.lesson_id, 'avatar-report.json'),
+    clipUrl: avatar => lessonAsset(lesson.lesson_id, basename(lesson.presentation?.[avatar]?.key ?? `avatar-${avatar}.glb`)),
+    reportUrl: lessonAsset(lesson.lesson_id, basename(lesson.presentation?.report?.key ?? 'avatar-report.json')),
   };
 }
 
@@ -508,8 +526,8 @@ function pinGroup(
   group.position.z = baseZ - point.z * group.scale.z;
 }
 
-function updateGroups() {
-  if (pinTravel.checked) {
+function updateGroups(frameTravel = false) {
+  if (!floorMovement.checked) {
     pinGroup(avatarGroup, avatarStage?.scene ?? null, avatarBase.x, avatarBase.y,
       avatarStage?.profile.rig.root_bone ?? 'Hips');
     pinGroup(mhrGroup, referenceStage?.scene ?? null, mhrBase.x, mhrBase.y, referenceStage?.root?.name ?? 'body_world');
@@ -523,11 +541,11 @@ function updateGroups() {
     for (const root of [avatarStage?.root, referenceStage?.root]) {
       if (root) points.push(root.getWorldPosition(new THREE.Vector3()));
     }
-    if (points.length) {
+    if (points.length && (followMovement.checked || frameTravel)) {
       const centre = points.reduce((sum, point) => sum.add(point), new THREE.Vector3()).divideScalar(points.length);
       followHorizontal(camera, controls.target, centre, previousFollow, followReady);
       followReady = true;
-    }
+    } else followReady = false;
   }
   avatarRing.position.set(avatarBase.x, 0.003, avatarBase.y);
   mhrRing.position.set(mhrBase.x, 0.003, mhrBase.y);
@@ -631,6 +649,7 @@ function placeCamera(nextView: string, targetY = 0.95) {
   controls.target.set(0, targetY, 0);
   controls.update();
   updateBodyLayout();
+  if (floorMovement.checked && !followMovement.checked) updateGroups(true);
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-view]')) {
     const active = button.dataset.view === nextView;
     button.classList.toggle('on', active);
@@ -677,6 +696,9 @@ function syncUrl() {
   query.set('view', view);
   query.set('speed', String(speed));
   query.set('t', clipTime.toFixed(2));
+  query.set('movement', floorMovement.checked ? '1' : '0');
+  query.set('follow', followMovement.checked ? '1' : '0');
+  query.delete('pin');
   const next = `${location.pathname}?${query.toString()}`;
   if (next !== location.pathname + location.search) {
     history.replaceState(null, '', next);
@@ -745,6 +767,11 @@ function renderInfo() {
 
   if (project.reportUrl && !uploadedClipUrl) addRow('Retarget report', link(project.reportUrl, 'avatar-report.json'));
   const report = comparisonReport?.avatars?.[avatarId];
+  if (comparisonReport?.grounding) {
+    const grounding = comparisonReport.grounding;
+    addRow('Floor movement', grounding.status === 'applied' ? 'Corrected source movement' : 'Original estimate');
+    if (grounding.support_fraction !== undefined) addRow('Foot evidence coverage', `${(100*grounding.support_fraction).toFixed(1)}% · coverage is not an accuracy score`);
+  }
   nextSourceJump.hidden = !report?.source_rotation_jumps?.length;
   if (report && !uploadedClipUrl) {
     addRow('Conversion version', String(report.retargeter?.version ?? 'unknown'));
@@ -790,7 +817,8 @@ async function loadProject(project: Project, options: {time?: number} = {}) {
   const expected = uploadedClipUrl ? undefined : project.duration;
 
   const [referenceResult, avatarResult, reportResult] = await Promise.allSettled([
-    loadReference(`${project.referenceUrl}?${freshness}`),
+    loadReference(correctedSource.checked && correctedSourceUrl
+      ? correctedSourceUrl : `${project.referenceUrl}?${freshness}`),
     loadAvatarStage(loader, avatarId, clipUrl, expected),
     project.reportUrl && !uploadedClipUrl ? getJson<Record<string, any>>(project.reportUrl) : Promise.resolve(null),
   ]);
@@ -857,7 +885,9 @@ async function loadProject(project: Project, options: {time?: number} = {}) {
   leftLabel.textContent = avatarStage
     ? `Mixamo · ${AVATAR_PROFILES[avatarId].display_name}`
     : 'Mixamo · unavailable';
-  rightLabel.textContent = referenceStage ? 'MHR reference' : 'MHR · unavailable';
+  rightLabel.textContent = referenceStage
+    ? (correctedSource.checked && correctedSourceUrl ? 'MHR · corrected upload' : 'MHR · original')
+    : 'MHR · unavailable';
 
   updateBodyLayout();
 
@@ -942,6 +972,11 @@ async function loadProjects(keepCurrent = false) {
 projectSelect.addEventListener('change', () => {
   const project = projects.find(item => item.id === projectSelect.value);
   if (!project) return;
+  if (correctedSourceUrl) URL.revokeObjectURL(correctedSourceUrl);
+  correctedSourceUrl = null;
+  correctedSource.checked = false;
+  correctedSource.disabled = true;
+  sourceUpload.value = '';
   if (uploadedClipUrl) {
     URL.revokeObjectURL(uploadedClipUrl);
     uploadedClipUrl = null;
@@ -1003,8 +1038,20 @@ showGround.addEventListener('change', () => {
   ground.visible = showGround.checked;
 });
 
-pinTravel.addEventListener('change', () => {
+floorMovement.addEventListener('change', () => {
+  followMovement.disabled = !floorMovement.checked;
+  followReady = false;
+  // Reframe the newly selected mode once; subsequent playback follows only
+  // when requested, so a fixed camera remains useful for inspecting floor travel.
+  placeCamera(view);
   seek(clipTime);
+  syncUrl();
+});
+
+followMovement.addEventListener('change', () => {
+  followReady = false;
+  seek(clipTime);
+  syncUrl();
 });
 
 uploadInput.addEventListener('change', () => {

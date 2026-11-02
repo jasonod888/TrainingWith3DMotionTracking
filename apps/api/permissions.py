@@ -152,6 +152,7 @@ def public_manifest(revision, publication, tags):
     value['source_video'] = None
     # Conversion thumbnails contain frames from the private upload, not the 3D model.
     value['thumbnail'] = None
+    value['presentation'] = {name:asset for name,asset in value.get('presentation',{}).items() if name in ('male','female')}
     value['title'] = publication.title or value.get('title', 'Move')
     value['public_tags'] = tags
     value['public_creator'] = publication.creator_name

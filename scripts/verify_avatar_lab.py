@@ -1,5 +1,6 @@
 """Headless checks of the served demo comparison lab; no sign-in or uploads."""
 import os
+import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 
@@ -45,12 +46,25 @@ with sync_playwright() as p:
         page.screenshot(path=str(SHOTS/f'{avatar}-8-left.png'))
         page.locator('#next-source-jump').click()
         assert float(page.locator('#time').input_value()) > 0
-        page.locator('#pin-travel').uncheck()
+        page.get_by_role('switch', name='Floor movement').check()
+        expect(page).to_have_url(re.compile(r'movement=1'))
+        page.get_by_label('Follow camera',exact=True).uncheck()
+        expect(page).to_have_url(re.compile(r'follow=0'))
+        page.reload()
+        expect(page.locator('#stage-overlay')).to_be_hidden(timeout=30000)
+        expect(page.get_by_role('switch',name='Floor movement')).to_be_checked()
+        expect(page.get_by_label('Follow camera',exact=True)).not_to_be_checked()
         page.get_by_role('button', name='Play comparison').click()
         page.wait_for_timeout(500)
         page.get_by_role('button', name='Pause comparison').click()
         expect(page.locator('#stage-overlay')).to_be_hidden()
         if avatar=='male':
+            page.locator('#upload-source').set_input_files(str(ROOT/'web/dist/assets/reference.glb'))
+            expect(page.locator('#right-label')).to_have_text('MHR · corrected upload')
+            expect(page.locator('#stage-overlay')).to_be_hidden(timeout=30000)
+            page.get_by_label('Corrected source',exact=True).uncheck()
+            expect(page.locator('#right-label')).to_have_text('MHR · original')
+            expect(page.locator('#stage-overlay')).to_be_hidden(timeout=30000)
             page.locator('#upload').set_input_files(str(ROOT/'web/dist/assets/avatar-male.glb'))
             expect(page.locator('#project-info')).to_contain_text('Uploaded file: avatar-male.glb')
             page.locator('#clear-upload').click()
@@ -58,7 +72,8 @@ with sync_playwright() as p:
     assert not errors, errors
     # Compact viewport must keep the two bodies and controls available.
     page.set_viewport_size({'width':390,'height':844})
-    page.locator('#pin-travel').check()
+    page.get_by_role('switch',name='Floor movement').uncheck()
+    expect(page.get_by_label('Follow camera',exact=True)).to_be_disabled()
     page.get_by_role('button', name='Front',exact=True).click()
     page.screenshot(path=str(SHOTS/'mobile.png'))
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')

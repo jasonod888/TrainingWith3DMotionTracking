@@ -210,6 +210,8 @@ def install_lessons(app, engine, settings, identity, db):
         key = f'lessons/{lesson_id}/{name}'
         fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail')
         allowed={value['key'] for value in (revision.manifest.get(field) for field in fields) if value}
+        allowed.update(value['key'] for kind,value in revision.manifest.get('presentation',{}).items()
+                       if reasons!=['public'] or kind in ('male','female'))
         # Avatar clips are presentation derivatives: they are not in the immutable manifest, so
         # they are allowed by name and still require a stored record for this lesson below.
         if name in DERIVATIVE_NAMES:

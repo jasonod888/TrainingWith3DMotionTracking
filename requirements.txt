@@ -1,6 +1,8 @@
 # CUDA PyTorch is installed separately; see scripts/setup.ps1.
 numpy>=1.26,<3
 scipy>=1.13,<2
+iopath==0.1.10
+portalocker==4.4.2
 opencv-python>=4.10,<5
 pytorch-lightning>=2.4,<3
 yacs>=0.1.8,<0.2

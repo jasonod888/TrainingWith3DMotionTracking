@@ -62,6 +62,25 @@ def test_diagonal_root_travel_is_not_rejected(fixture):
     assert report['root_motion']['travel_m']==pytest.approx(np.sqrt(.08),abs=1e-4)
 
 
+@pytest.mark.parametrize('avatar',['male','female'])
+def test_corrected_source_wrapper_transfers_to_mixamo_once(fixture,avatar):
+    motion,_=fixture
+    profile=rig.load_profile(rt.PROFILES/f'{avatar}.json')
+    root=next(b for b in motion.bones if b['name']=='root');root['parent']='body_world'
+    motion.bones.insert(0,dict(name='body_world',parent=None,t=np.zeros(3),q=np.array([0.,0.,0.,1.]),s=np.ones(3)))
+    motion.tracks['body_world']={'translation':np.zeros((3,3))}
+    before,_=rt.convert(motion,profile)
+    offsets=np.array([[0.,0.,0.],[.3,.1,-1.5],[.5,0.,-.8]])
+    motion.tracks['body_world']['translation']=offsets
+    after,report=rt.convert(motion,profile)
+    assert report['status']=='ok',report['failures']
+    for frame in range(3):
+        old,_=pose(profile,before['rotations'],before['translations'],frame)
+        new,_=pose(profile,after['rotations'],after['translations'],frame)
+        np.testing.assert_allclose(new['Hips'][:3,3]-old['Hips'][:3,3],
+            offsets[frame]*report['root_motion']['translation_scale'],atol=2e-6)
+
+
 def test_finger_motion_changes_only_its_chain(fixture):
     motion, profile = fixture
     original,_ = rt.convert(motion,profile)

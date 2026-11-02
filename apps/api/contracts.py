@@ -55,7 +55,7 @@ class LessonManifest(Contract):
     engine_version: str
     units: Literal['metres'] = 'metres'
     landmark_axes: Literal['x-right/y-down/z-forward'] = 'x-right/y-down/z-forward'
-    root_motion: Literal['estimated-camera-relative', 'hip-relative', 'in-place']
+    root_motion: Literal['estimated-camera-relative', 'hip-relative', 'in-place', 'floor-guided']
     confidence: Literal['unmeasured', 'measured']
     standing_time: float = Field(ge=0)
     animation: Asset
@@ -64,6 +64,7 @@ class LessonManifest(Contract):
     thumbnail: Asset | None = None
     section_set: SectionSet
     warnings: list[str] = Field(default_factory=list)
+    presentation: dict[Literal['male','female','report'], Asset] = Field(default_factory=dict)
 
     @model_validator(mode='after')
     def timeline(self):

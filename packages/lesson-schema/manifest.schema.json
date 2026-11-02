@@ -162,7 +162,8 @@
       "enum": [
         "estimated-camera-relative",
         "hip-relative",
-        "in-place"
+        "in-place",
+        "floor-guided"
       ],
       "title": "Root Motion",
       "type": "string"
@@ -217,6 +218,20 @@
       },
       "title": "Warnings",
       "type": "array"
+    },
+    "presentation": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Asset"
+      },
+      "propertyNames": {
+        "enum": [
+          "male",
+          "female",
+          "report"
+        ]
+      },
+      "title": "Presentation",
+      "type": "object"
     }
   },
   "required": [
