@@ -10,4 +10,5 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128 && pip install --no-cache-dir -r requirements.txt
 RUN git clone https://github.com/facebookresearch/sam-3d-body.git vendor/sam-3d-body && git -C vendor/sam-3d-body checkout b5c765a0d89d789985e186d396315e7590887b94 && git clone https://github.com/facebookresearch/dinov3.git vendor/dinov3 && git -C vendor/dinov3 checkout 6876159a11b4df116f30f667f8c9888617df0751
 COPY scripts/ scripts/
+COPY packages/avatar-rigs/ packages/avatar-rigs/
 CMD ["python", "scripts/check_environment.py"]

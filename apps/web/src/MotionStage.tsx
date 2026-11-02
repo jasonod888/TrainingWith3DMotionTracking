@@ -30,7 +30,16 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
     scene.add(new THREE.HemisphereLight(0xf3f6ff,0x444039,1.5));
     const light=new THREE.DirectionalLight(0xfff4e5,2.6);light.position.set(3,5,4);scene.add(light);
     const rim=new THREE.DirectionalLight(0xc4d9ff,1.5);rim.position.set(-3,2,-2);scene.add(rim);
-    const grid=new THREE.GridHelper(12,24,0x44564c,0x283c32);grid.visible=!aligned;scene.add(grid);
+    // The floor has to carry orientation now: the instructor keeps its real travel and the
+    // camera follows, so the ground is what shows which way it moved. A large grid, one
+    // coloured axis per horizontal direction, and metre rings from the start point.
+    const ground=new THREE.Group();ground.visible=!aligned;scene.add(ground);
+    const grid=new THREE.GridHelper(40,40,0x5f8676,0x2b3d34);const gridMaterial=grid.material as THREE.Material;gridMaterial.transparent=true;gridMaterial.opacity=.5;ground.add(grid);
+    const flat=(geometry:THREE.BufferGeometry,color:number,opacity:number)=>{const material=new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide});const mesh=new THREE.Mesh(geometry,material);mesh.rotation.x=-Math.PI/2;mesh.position.y=.002;ground.add(mesh);return mesh;};
+    flat(new THREE.PlaneGeometry(40,.04),0x8a5a3c,.8);            // left/right axis
+    flat(new THREE.PlaneGeometry(.04,40),0x3c6f8a,.8);            // forward/back axis
+    flat(new THREE.RingGeometry(.30,.38,40),0xa8d8bf,.65);        // where the instructor started
+    for(const radius of [1,2,3])flat(new THREE.RingGeometry(radius-.012,radius,64),0x6f9585,.22);
     let fitDistance=4;
     // Motion-inclusive envelope, measured once per loaded clip. Measuring every
     // frame would make the instructor appear to change scale as it moves.
@@ -69,6 +78,8 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
     let root:THREE.Object3D|undefined,action:THREE.AnimationAction|undefined;
     let avatarHeight=1.8,baseFoot=0;const hands:Record<string,THREE.Object3D>={};const handPoint=new THREE.Vector3();const materials:THREE.MeshStandardMaterial[]=[];
     const rootPoint=new THREE.Vector3(),rootInverse=new THREE.Matrix4();
+    // Camera follow: the instructor travels for real, the view keeps it framed.
+    const followPoint=new THREE.Vector3(),lastFollow=new THREE.Vector3();let followReady=false;
     setLoading(true);setError('');
     try{
       renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
@@ -118,23 +129,35 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
         if(aligned&&f){const w=host.clientWidth,h=host.clientHeight;let scale=3*.68/avatarHeight,floorY=-3*.36;if(f.calibration){const display=f.display?.current;const samePane=!!display&&Math.abs(display.paneWidth-w)<2&&Math.abs(display.paneHeight-h)<2;const placement=display&&samePane&&display.sourceWidth===f.videoWidth&&display.sourceHeight===f.videoHeight?placementForTransform(f.calibration,display,h,3,avatarHeight):heightPlacement(f.calibration,f.videoWidth,f.videoHeight,w,h,3,avatarHeight);scale=placement.scale;floorY=placement.floorY;}anchor.scale.set(f.mirrored!==f.mirrorReference?-scale:scale,scale,scale);anchor.position.y=floorY-baseFoot*scale;if(f.composite)offset=compositeOffset(f.position,f.videoWidth,f.videoHeight,w,h,3).worldX;for(const material of materials)material.opacity=f.opacity;}
         if(!aligned&&f){const scale=anchor.scale.y;anchor.scale.x=f.mirrorReference?-scale:scale;}
         if(!aligned&&fitEnvelope&&envelope&&camera instanceof THREE.PerspectiveCamera){const w=host.clientWidth||1,h=host.clientHeight||1,aspect=w/Math.max(h,1),tan=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));const halfHeight=Math.max((envelope.maxY-envelope.minY)/2*1.16,.3),halfWidth=Math.max((envelope.maxX-envelope.minX)/2*1.16,.3);fitDistance=Math.max(halfHeight/tan,halfWidth/(tan*aspect))+(envelope.maxZ-envelope.minZ)/2;}
-        if(f?.angle!==undefined&&(fitEnvelope||f.angle!==lastAngle||f.resetVersion!==lastReset)){lastAngle=f.angle;lastReset=f.resetVersion;const yaw=f.angle,distance=aligned?8:fitEnvelope||immersive?fitDistance:4;camera.position.set(Math.sin(yaw)*distance,aligned?0:fitEnvelope?fitCentreY:1,Math.cos(yaw)*distance);camera.lookAt(0,aligned?0:fitEnvelope?fitCentreY:.9,0);}if(controls)controls.enabled=!aligned&&!locked&&interactive;
+        if(f?.angle!==undefined&&(fitEnvelope||f.angle!==lastAngle||f.resetVersion!==lastReset)){lastAngle=f.angle;lastReset=f.resetVersion;const yaw=f.angle,distance=aligned?8:fitEnvelope||immersive?fitDistance:4;const follows=!aligned&&!fitEnvelope,centreX=follows?followPoint.x:0,centreZ=follows?followPoint.z:0,centreY=aligned?0:fitEnvelope?fitCentreY:.9;camera.position.set(centreX+Math.sin(yaw)*distance,aligned?0:fitEnvelope?fitCentreY:1,centreZ+Math.cos(yaw)*distance);camera.lookAt(centreX,centreY,centreZ);if(controls)controls.target.set(centreX,centreY,centreZ);}if(controls)controls.enabled=!aligned&&!locked&&interactive;
         if(mixer){if(action){action.paused=false;action.enabled=true;}mixer.setTime(f?.active&&(f.calibrating||player.state.index<0)?lesson.standing_time:player.state.time);if(root&&model){
-          // Pin horizontally using the root's position in the model's own space, which is
-          // metres for both rigs. Reading the bone's local position only works when its parent
-          // is unscaled: Mixamo bones sit under a 0.01 armature and are expressed in cm, which
-          // would displace the stage by ~100 m. Update the whole subtree so the bone matrix and
-          // its inverse come from the same frame while the anchor scale is still settling.
+          // Update the whole subtree so the bone matrix and any inverse come from one frame.
           model.updateWorldMatrix(true,true);
-          rootInverse.copy(model.matrixWorld).invert();
-          rootPoint.setFromMatrixPosition(root.matrixWorld).applyMatrix4(rootInverse);
-          anchor.position.x=offset-rootPoint.x*anchor.scale.x;
-          anchor.position.z=-rootPoint.z*anchor.scale.z;
-        }}controls?.update();renderer?.render(scene,camera);
+          if(aligned){
+            // Composited into the user's camera: the instructor must stay anchored to the
+            // calibration, so horizontal root motion is cancelled here and only here.
+            rootInverse.copy(model.matrixWorld).invert();
+            rootPoint.setFromMatrixPosition(root.matrixWorld).applyMatrix4(rootInverse);
+            anchor.position.x=offset-rootPoint.x*anchor.scale.x;
+            anchor.position.z=-rootPoint.z*anchor.scale.z;
+          }else{
+            // Free viewing keeps the real travel; the camera follows it instead.
+            anchor.position.x=offset;anchor.position.z=0;
+            rootPoint.setFromMatrixPosition(root.matrixWorld);
+          }
+          followPoint.copy(rootPoint);
+        }}
+        if(!aligned&&!fitEnvelope&&root&&model&&controls){
+          // OrbitControls keeps the camera at a fixed offset from its target, so moving the
+          // target is what carries the view: translating the camera as well would double it.
+          if(followReady){const dx=followPoint.x-lastFollow.x,dz=followPoint.z-lastFollow.z;if(dx||dz){controls.target.x+=dx;controls.target.z+=dz;}}
+          lastFollow.copy(followPoint);followReady=true;
+        }else followReady=false;
+        controls?.update();renderer?.render(scene,camera);
         if(aligned&&leftHand.current&&rightHand.current){const positions:Record<string,{x:number;y:number}|null>={left:null,right:null};for(const side of ['left','right']){if(hands[side]){hands[side].getWorldPosition(handPoint);handPoint.project(camera);if(Math.abs(handPoint.x)<=1&&Math.abs(handPoint.y)<=1&&Math.abs(handPoint.z)<=1)positions[side]={x:(handPoint.x+1)/2*host.clientWidth,y:(1-handPoint.y)/2*host.clientHeight};}}placeHandLabels({left:leftHand.current,right:rightHand.current},positions,host.clientWidth,host.clientHeight);}
       };render();
     }catch{setLoading(false);setError('3D is unavailable on this device. Try the original video.');}
-    return()=>{disposed=true;cancelAnimationFrame(frame);if(leftHand.current)leftHand.current.hidden=true;if(rightHand.current)rightHand.current.hidden=true;observer.disconnect();controls?.dispose();mixer?.stopAllAction();if(model){mixer?.uncacheRoot(model);disposeModel(model);}grid.geometry.dispose();disposeMaterial(grid.material);renderer?.dispose();renderer?.domElement.remove();};
+    return()=>{disposed=true;cancelAnimationFrame(frame);if(leftHand.current)leftHand.current.hidden=true;if(rightHand.current)rightHand.current.hidden=true;observer.disconnect();controls?.dispose();mixer?.stopAllAction();if(model){mixer?.uncacheRoot(model);disposeModel(model);}for(const child of ground.children){if(child instanceof THREE.Mesh||child instanceof THREE.LineSegments){child.geometry.dispose();disposeMaterial(child.material as THREE.Material);}}renderer?.dispose();renderer?.domElement.remove();};
   },[lesson,player,source,framing?.active,immersive,locked,fit,interactive]);
   useEffect(()=>{
     if(!source)return;

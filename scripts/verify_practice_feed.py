@@ -23,7 +23,7 @@ with sync_playwright() as p:
  browser=p.chromium.launch(headless=True)
  page=browser.new_page(viewport={'width':390,'height':844})
  errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
- mode={'signed_in':True,'public_error':False,'empty':False}
+ mode={'signed_in':True,'public_error':False,'empty':False,'jobs':[]}
  def api(route):
   parsed=urlparse(route.request.url);path=parsed.path.split('/api/',1)[1];query=parse_qs(parsed.query)
   if path=='auth/session':route.fulfill(json={'account':account,'csrf':'test'}) if mode['signed_in'] else route.fulfill(status=401,json={'detail':'Sign in'})
@@ -31,7 +31,7 @@ with sync_playwright() as p:
   elif path=='lessons':route.fulfill(json=[] if mode['empty'] else own)
   elif path=='shared-lessons':route.fulfill(json=[] if mode['empty'] else shared)
   elif path=='workflow/lessons':route.fulfill(json={'lessons':[{'lesson_id':v['lesson_id'],'accepted_revision_id':v['revision_id'] if i==0 else None,'latest_revision_id':v['revision_id'],'audiences':{'direct':0,'groups':0,'public':i==0}} for i,v in enumerate(own)]})
-  elif path=='conversions':route.fulfill(json={'jobs':[],'worker_online':True})
+  elif path=='conversions':route.fulfill(json={'jobs':mode['jobs'],'worker_online':True})
   elif path=='public/moves':
    if mode['public_error']:route.fulfill(status=503,json={'detail':'Public unavailable'});return
    q=query.get('q',[''])[0].lower();offset=int(query.get('offset',['0'])[0]);items=[] if mode['empty'] else [v for v in public if q in (v['title']+' '+v['creator_name']).lower()]
@@ -89,6 +89,32 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Back to feed',exact=True).click()
  expect(page.locator('.feed-card-public')).to_have_count(25)
  page.wait_for_function('expected=>Math.abs(scrollY-expected)<30',arg=saved_scroll)
+ # Processing uploads must be visible without expanding a disclosure, including after reload.
+ job={'id':'in-progress','title':'My new upload','filename':'clip.mp4','bytes':1234,'start':0,'duration':20,'state':'processing','attempts':1,'frames':30,'error':None,'provider':'local','processor_online':True,'retryable':False,'lesson_id':None,'parts':{},'part_size':5242880}
+ mode['jobs']=[job];page.reload()
+ card=page.locator('.conversion-card');expect(card).to_be_visible()
+ expect(card.get_by_role('status')).to_have_text('Preparing your 3D move')
+ expect(card.get_by_role('button',name='Check move')).to_have_count(0)
+ expect(card.locator('.conversion-thumbnail')).to_have_attribute('aria-disabled','true')
+ # Seed a saved local thumbnail, then verify it survives navigation and appears dimmed.
+ import base64
+ poster='data:image/jpeg;base64,'+base64.b64encode((ROOT/'web/dist/assets/thumbnail.jpg').read_bytes()).decode()
+ page.evaluate("""async image=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('form-prepared-clips',2);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});await new Promise((resolve,reject)=>{const tx=db.transaction('posters','readwrite');tx.objectStore('posters').put({image,expires:Date.now()+86400000},'in-progress');tx.oncomplete=resolve;tx.onerror=reject;});db.close();}""",poster)
+ page.reload();expect(card.locator('img')).to_have_count(1)
+ for w,h in [(390,844),(320,568),(1440,900)]:
+  page.set_viewport_size({'width':w,'height':h})
+  expect(card).to_be_visible()
+  assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),(w,'upload card overflow')
+  page.screenshot(path=str(ROOT/f'test-results/processing-upload-{w}.png'))
+ job['state']='exporting'
+ expect(card.get_by_role('status')).to_have_text('Creating your 3D move',timeout=10000)
+ job.update(state='failed',error='conversion_failed',retryable=True)
+ expect(card.get_by_role('button',name='Retry',exact=True)).to_be_visible(timeout=10000)
+ job.update(state='ready_for_review',error=None,retryable=False,lesson_id='own-check')
+ expect(card.get_by_role('button',name='Check move',exact=True)).to_be_visible(timeout=10000)
+ job['state']='cancelled'
+ expect(card).to_have_count(0,timeout=10000)
+ mode['jobs']=[];page.set_viewport_size({'width':390,'height':844})
  # Empty personal libraries still show public practices; public failure leaves private sources usable.
  mode['empty']=True;page.goto(os.environ.get('PRACTICE_TEST_URL','http://127.0.0.1:5195')+'/')
  expect(page.get_by_text('Your next practice starts here',exact=True)).to_be_visible()

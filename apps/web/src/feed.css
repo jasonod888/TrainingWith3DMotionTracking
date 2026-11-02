@@ -35,3 +35,7 @@
 @media(prefers-reduced-motion:reduce){.feed-thumbnail>img,.feed-hover-play{transition:none}}
 
 .feed-uploads:not(:has(.conversion-list)){display:none}
+.conversion-heading{margin:0 0 18px}.conversion-heading h2{font-size:15px;font-weight:600;color:#293a28;margin-bottom:6px}.conversion-heading p{font-size:12px;color:#697366}
+.conversion-card .conversion-row{padding:14px 0 0;flex-wrap:wrap;border:0;align-items:flex-start}.conversion-card .conversion-info{flex-basis:100%}.conversion-card .conversion-info h3{font-size:15px;margin-bottom:6px}.conversion-card .conversion-actions{margin-left:0;flex-wrap:wrap}.conversion-card .conversion-actions .primary,.conversion-card .conversion-actions .secondary{font-size:12px;padding:10px 14px}
+.conversion-thumbnail>img{filter:blur(2px) brightness(.55);object-fit:cover}.conversion-thumbnail:hover>img{transform:none}.conversion-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;padding:20px;text-align:center;background:#172d2466}.conversion-status{display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px;font-weight:600;line-height:1.4}.conversion-overlay>span:last-child{font-size:11px;line-height:1.6;max-width:230px}.conversion-status .loader{flex-shrink:0;border-color:#ffffff55;border-top-color:#fff}
+@media(prefers-reduced-motion:reduce){.conversion-status .loader{animation:none}}

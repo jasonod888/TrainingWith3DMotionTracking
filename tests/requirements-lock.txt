@@ -1,0 +1,10 @@
+# CPU test environment, including the API and avatar test dependencies.
+-r ../apps/api/requirements-lock.txt
+dataclasses-json==0.6.7
+Deprecated==3.0.0
+marshmallow==3.26.2
+mypy_extensions==1.1.0
+numpy==2.5.2
+pygltflib==1.16.5
+typing-inspect==0.9.0
+wrapt==2.5.1

@@ -57,6 +57,7 @@ Without Docker, the local demonstration interface still works with `DEMO_ENABLED
 ## Test
 
 ```powershell
+.venv-saas/Scripts/python.exe -m pip install -r tests/requirements-lock.txt
 .venv-saas/Scripts/python.exe -m pytest -q
 npm.cmd --prefix apps/web test
 npm.cmd --prefix apps/web run build
@@ -65,7 +66,7 @@ docker compose config --quiet
 docker build -f infra/docker/Dockerfile -t form-saas:phase0 .
 ```
 
-The original `web` tests use the real local GLB. New CPU contract/controller tests use synthetic fixtures and run without model weights. The JSON Schema in `packages/lesson-schema/manifest.schema.json` is generated from `apps/api/contracts.py` and checked for drift.
+The CPU test requirements include the API dependencies plus NumPy and pygltflib for the avatar tests. The original `web` tests use the real local GLB. New CPU contract/controller tests use synthetic fixtures and run without model weights. The JSON Schema in `packages/lesson-schema/manifest.schema.json` is generated from `apps/api/contracts.py` and checked for drift.
 
 After real PostgreSQL/storage services are running and initialized, run the opt-in integration tests:
 
