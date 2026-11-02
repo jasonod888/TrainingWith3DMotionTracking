@@ -10,9 +10,9 @@ body.in-practice .app>.header{display:none}
 .mimic-status{font-size:.8rem;color:#46513e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.mimic-dock{display:grid;gap:5px;max-width:1000px;width:100%;margin:auto}.mimic-shortcuts,.mimic-transport{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.mimic-transport .mimic-play{background:#d8ed9b;font-weight:700;border-color:#a6be72}.mimic-scrub{display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums;font-size:.75rem}.mimic-scrub input{min-width:0;flex:1;min-height:24px;accent-color:#667b3f}.mimic-shortcuts button{font-size:.85rem}
 .practice-modal-backdrop{position:absolute;inset:0;background:#101d1680;z-index:20;display:flex;align-items:center;justify-content:center;padding:10px;min-height:0}.practice-modal{width:min(520px,100%);max-height:100%;padding:12px;border-radius:14px;background:#fffefa;border:1px solid #c9cfbe;display:flex;flex-direction:column;gap:8px;min-height:0;box-shadow:0 8px 40px #0003}.practice-modal>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.practice-modal h2{font-size:1.15rem;overflow-wrap:anywhere}.practice-panel-body{display:flex;flex-direction:column;gap:8px;min-height:0}.practice-panel-body label{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;line-height:1.3}.practice-panel-body p{font-size:.9rem;line-height:1.5}.practice-panel-body select,.practice-panel-body input:not([type=checkbox]){min-height:44px;min-width:0;max-width:65%;border:1px solid #bbc5ad;border-radius:6px;padding:6px;background:white;font-size:1rem}.practice-panel-body>input{max-width:100%!important}.practice-panel-body input[type=checkbox]{min-width:24px;height:24px;accent-color:#607837}.practice-option-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.practice-option-grid button{overflow-wrap:anywhere}.practice-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px;font-size:.85rem}
 .practice-countdown{position:absolute;inset:0;z-index:5;background:#10241dba;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:white}.practice-countdown strong{font-size:clamp(36px,12vh,100px)}.practice-review{position:absolute;z-index:6;bottom:12px;left:12px;right:12px;background:#fffefaef;border-radius:12px;padding:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.practice-review p{flex:1;font-size:.85rem}.large-display{font-size:1.25rem}
-.receiver-stage{height:100%;position:relative}.receiver-camera{position:absolute;right:12px;bottom:12px;max-width:35%;max-height:50%;border-radius:10px}.receiver-entry{color:white;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;height:100%;padding:16px}.receiver-entry input{display:block;max-width:100%;min-height:44px;padding:8px;border-radius:6px}.pair-code{font-family:monospace;font-size:1.3rem;letter-spacing:2px}.practice-replay{width:100%;max-height:min(28vh,200px);object-fit:contain;background:#182e25}.practice-beat{position:absolute;right:12px;top:12px;border-radius:8px;padding:8px;background:#10241dcc;color:white}
+.receiver-stage{min-height:0}.receiver-entry{color:white;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;height:100%;padding:16px}.receiver-entry input{display:block;max-width:100%;min-height:44px;padding:8px;border-radius:6px}.pair-code{font-family:monospace;font-size:1.3rem;letter-spacing:2px}.practice-replay{width:100%;max-height:min(28vh,200px);object-fit:contain;background:#182e25}.practice-beat{position:absolute;right:12px;top:12px;border-radius:8px;padding:8px;background:#10241dcc;color:white}
 .live-practice-layer{height:100%}.live-practice-layer[hidden]{display:none}.practice-replay-grid{height:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));position:relative}.practice-replay-grid>video{width:100%;height:100%;min-height:0;object-fit:contain}.replay-close{position:absolute;top:8px;right:8px}
-.receiver-camera.mirrored{transform:scaleX(-1)}
+.receiver-video.mirrored{transform:scaleX(-1)}
 .mimic-shell .practice-stage-grid.camera-active:not(.is-composite) .camera-pane,.mimic-shell .practice-stage-grid.camera-active:not(.is-composite) .motion-stage{height:100%;min-height:0}
 .mimic-status{white-space:normal;overflow-wrap:anywhere}.practice-tracking{display:block;-webkit-line-clamp:unset;overflow:visible}.practice-tracking>span:last-child{display:block}
 .practice-range-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.practice-range-fields label{flex-direction:column;align-items:stretch;gap:4px}.practice-range-fields input{max-width:100%!important;width:100%}
@@ -99,3 +99,174 @@ body.in-practice .app>.header{display:none}
    side-by-side layout. Other layouts retain their existing placement. */
 .mimic-immersive .layout-separate .calibration-card{top:152px;bottom:auto;left:auto;right:20px;max-width:min(300px,calc(100% - 40px));backdrop-filter:blur(12px)}
 @media(max-width:700px){.mimic-immersive .layout-separate .calibration-card{left:12px;right:12px;max-width:none}}
+
+/* ------------------------------------------------------------------ *
+ * Guided camera setup surface (Phase B)
+ *
+ * The workspace keeps its camera pane mounted; it is promoted to a
+ * full-viewport layer so the stream, worker and instructor stay warm and one
+ * display transform keeps mapping video, guide and regions together.
+ * ------------------------------------------------------------------ */
+.mimic-shell.is-setting-up .mimic-header,
+.mimic-shell.is-setting-up .mimic-context,
+.mimic-shell.is-setting-up .mimic-dock,
+.mimic-shell.is-setting-up .practice-tracking,
+.mimic-shell.is-setting-up .practice-reference-label,
+.mimic-shell.is-setting-up .practice-review,
+.mimic-shell.is-setting-up .practice-countdown,
+.mimic-shell.is-setting-up .practice-beat{display:none!important}
+.mimic-shell.is-setting-up .mimic-stage{inset:0;right:0}
+.mimic-shell.is-setting-up .mimic-stage:after{display:none}
+/* The pane and the overlay must share one box. Use the dynamic viewport unit
+   directly rather than a JS-tracked height: `100dvh` follows the URL bar and the
+   device rotation by itself, so a missed resize event cannot leave a
+   portrait-sized box on a landscape screen (which would strand the guide where
+   it was while the video re-fitted). */
+.mimic-shell.is-setting-up .camera-pane{position:fixed;top:0;left:0;right:0;height:100vh;height:100dvh;z-index:21;border-radius:0;background:#0a1411}
+.mimic-shell.is-setting-up .camera-pane .camera-tag,
+.mimic-shell.is-setting-up .camera-pane .hand-label,
+.mimic-shell.is-setting-up .camera-pane canvas{display:none}
+.mimic-shell.is-setting-up .reference-pane{visibility:hidden}
+
+.camera-setup{position:fixed;top:0;left:0;right:0;height:100vh;height:100dvh;z-index:22;pointer-events:none;color:#f2f7ef;font-size:1rem;touch-action:manipulation}
+.camera-setup-top{position:absolute;left:0;right:0;top:0;display:grid;gap:4px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 28px max(16px,env(safe-area-inset-left));background:linear-gradient(180deg,#04100ae0 0,#04100a00 100%)}
+.camera-setup-eyebrow{margin:0;font-size:10px;letter-spacing:2px;font-weight:600;color:#d8ed9b;text-transform:uppercase}
+.camera-setup-top h1{margin:0;font-size:clamp(17px,4.4vw,22px);font-weight:600;letter-spacing:-.3px;line-height:1.3}
+.camera-setup-instruction{margin:2px 0 0;font-size:clamp(18px,5vw,28px);font-weight:600;line-height:1.22;letter-spacing:-.5px;max-width:24ch}
+.camera-setup-bottom{position:absolute;left:0;right:0;bottom:0;display:grid;gap:12px;padding:32px max(16px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));background:linear-gradient(0deg,#04100ae8 0,#04100a00 100%)}
+.camera-setup-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.camera-setup-action{pointer-events:auto;min-height:48px;padding:11px 20px;border-radius:26px;border:1px solid #ffffff2e;background:#162b22d9;color:#f2f7ef;font-size:14px;font-weight:600;line-height:1.2}
+.camera-setup-action.primary{background:#d8ed9b;color:#1b3126;border-color:#d8ed9b}
+.camera-setup-action.secondary{background:#ffffff12}
+.camera-setup-action:focus-visible{outline:2px solid #d8ed9b;outline-offset:3px}
+.camera-setup-meta{margin:0;font-size:12px;line-height:1.5;color:#c3d2c6}
+.camera-setup-checklist{display:flex;gap:8px;flex-wrap:wrap;margin:0;padding:0;list-style:none}
+.camera-setup-checklist li{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;border:1px solid #ffffff24;background:#0e211ab3;font-size:12px;color:#c3d2c6}
+.camera-setup-checklist li[data-state=ok]{border-color:#d8ed9b66;color:#eaf5d8}
+.camera-setup-checklist li[data-state=ok] .camera-setup-tick{color:#d8ed9b}
+.camera-setup-tick{font-size:12px;font-weight:700}
+.camera-setup-progress{display:flex;align-items:center;gap:10px;font-size:12px;color:#cfdccf;font-variant-numeric:tabular-nums}
+.camera-setup-progress progress{flex:1;min-width:0;height:6px;border:0;border-radius:6px;overflow:hidden;background:#ffffff26;accent-color:#d8ed9b}
+.camera-setup-progress progress::-webkit-progress-bar{background:#ffffff26}
+.camera-setup-progress progress::-webkit-progress-value{background:#d8ed9b}
+.camera-setup-guide{position:absolute;left:0;top:0;width:0;height:0;overflow:visible;pointer-events:none;filter:drop-shadow(0 2px 10px #0006)}
+.camera-setup-guide .setup-outline{fill:#ffffff10;stroke:#eaf3e2;stroke-width:1.4;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.camera-setup-guide[data-accepted=true] .setup-outline{stroke-width:2;fill:#d8ed9b1f}
+.camera-setup-guide .setup-region{fill:none;stroke:#eaf3e2;stroke-width:1.2;stroke-dasharray:3 4;vector-effect:non-scaling-stroke}
+.camera-setup-guide .setup-region[data-state=ok]{stroke:#d8ed9b;stroke-dasharray:none;fill:#d8ed9b26}
+.camera-setup-guide .setup-region[data-state=missing]{stroke:#ffffff80}
+.camera-setup-guide .setup-fill{fill:#d8ed9b2e;stroke:none}
+.camera-setup-guide .setup-axis{stroke:#eaf3e255;stroke-width:1;stroke-dasharray:6 8;vector-effect:non-scaling-stroke}
+.camera-setup-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;display:grid;gap:14px;padding:22px;border-radius:22px;background:#12261ef2;border:1px solid #ffffff26;box-shadow:0 30px 90px #0006;pointer-events:auto}
+.camera-setup-card h2{margin:0;font-size:20px;font-weight:600;line-height:1.3}
+.camera-setup-card p{margin:0;font-size:14px;line-height:1.55;color:#c9d7cb}
+.camera-setup-card label{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;color:#dbe7dc;min-height:44px}
+.camera-setup-card input[type=checkbox]{width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:#9dbe5a}
+.camera-setup-ready{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;justify-items:center;gap:10px;text-align:center;pointer-events:none}
+.camera-setup-check{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;background:#d8ed9b;color:#1b3126}
+.camera-setup-ready strong{font-size:clamp(24px,7vw,34px);font-weight:600;letter-spacing:-.6px;text-shadow:0 2px 14px #000a}
+@media(max-width:520px){
+ .camera-setup-top{padding-top:max(12px,env(safe-area-inset-top))}
+ .camera-setup-instruction{max-width:20ch}
+ .camera-setup-action{flex:1 1 auto;min-height:50px}
+}
+@media(max-height:430px){
+ .camera-setup-top{padding-bottom:10px}
+ .camera-setup-instruction{font-size:16px;max-width:32ch}
+ .camera-setup-bottom{padding-top:14px}
+ .camera-setup-eyebrow{display:none}
+}
+/* Landscape phone: the video fills the short viewport, so the guide's head and
+   feet sit close to the screen edges. The chrome has to stay inside the free
+   strips above and below the 70% figure instead of covering it. */
+@media(max-height:520px){
+ .camera-setup-top{gap:0;padding:max(6px,env(safe-area-inset-top)) 44% 10px max(14px,env(safe-area-inset-left));background:linear-gradient(180deg,#04100ad9 0,#04100a00 100%)}
+ .camera-setup-eyebrow{display:none}
+ .camera-setup-instruction{margin:0;font-size:16px;line-height:1.25;max-width:none}
+ .camera-setup-bottom{gap:6px;padding:10px max(14px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+ .camera-setup-checklist{position:absolute;right:max(14px,env(safe-area-inset-right));top:max(6px,env(safe-area-inset-top));margin:0;gap:6px}
+ .camera-setup-checklist li{padding:2px 8px;font-size:11px;background:#0e211ad9}
+ .camera-setup-meta{display:none}
+ .camera-setup-action{min-height:40px;padding:8px 16px;font-size:13px}
+ .camera-setup-actions{justify-content:flex-end}
+ .camera-setup-card{width:min(560px,calc(100vw - 32px));max-height:calc(100% - 24px);padding:16px;gap:10px}
+ .camera-setup-card h2{font-size:17px}
+ .camera-setup-card p{font-size:13px;line-height:1.45}
+ .camera-setup-check{width:54px;height:54px}
+ .camera-setup-ready{gap:6px}
+ .camera-setup-ready strong{font-size:22px}
+ .camera-setup-ready p{display:none}
+}
+@media(max-height:380px){
+ .camera-setup-top{padding-right:52%;padding-bottom:6px}
+ .camera-setup-instruction{font-size:14px}
+ .camera-setup-bottom{padding-top:6px}
+ .camera-setup-action{min-height:36px;padding:6px 14px;font-size:12px}
+ .camera-setup-progress span{display:none}
+ .camera-setup-progress progress{height:5px}
+}
+@media(prefers-reduced-motion:reduce){
+ .camera-setup-guide{filter:none}
+}
+
+.camera-setup-guide .setup-fill-shape{fill:#d8ed9b3d;stroke:none}
+
+/* Preparation stage inside guided setup: camera choice before positioning. */
+.camera-setup-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.camera-setup-choices .camera-setup-action{width:100%;justify-content:center}
+.camera-setup-card select{width:100%;max-width:100%;min-height:44px;padding:8px;border-radius:8px;border:1px solid #ffffff2e;background:#0e211ad9;color:#f2f7ef;font-size:inherit}
+.camera-setup-card .camera-setup-meta{color:#c9d7cb}
+@media(max-height:520px){.camera-setup-card{max-height:calc(100% - 20px);padding:14px;gap:10px}}
+
+/* Receiver: an adaptive comparison surface, measured from its own container. */
+.receiver-shell{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;gap:8px;background:#0d1b15;color:#f4f7f1;font-size:1.05rem}
+.receiver-header{display:flex;align-items:center;gap:12px;min-width:0}
+.receiver-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.receiver-title strong{font-size:1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.receiver-title span{font-size:.78rem;color:#b9cbb4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.receiver-stage{position:relative;min-height:0;min-width:0;overflow:hidden;border-radius:12px;background:#14241c}
+.receiver-compare{position:absolute;inset:0;display:grid;gap:8px;min-width:0;min-height:0}
+.receiver-pane{position:relative;min-width:0;min-height:0;overflow:hidden;border-radius:10px;background:#0b1712}
+.receiver-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center}
+.receiver-guide{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.receiver-guide rect{fill:#d8ed9b26;stroke:#d8ed9bcc;stroke-width:2;vector-effect:non-scaling-stroke}
+.receiver-instructor-pane .motion-host{position:absolute;inset:0;height:100%}
+.receiver-label{position:absolute;left:10px;top:10px;padding:5px 8px;border-radius:6px;background:#0b1712cc;font-size:.75rem;pointer-events:none}
+.receiver-media-placeholder{position:absolute;inset:0;display:grid;place-content:center;gap:8px;padding:20px;text-align:center;color:#dbe7dc;background:#08120ef2}
+.receiver-media-placeholder strong{font-size:clamp(16px,2.4vw,22px)}
+.receiver-media-placeholder p{margin:0;font-size:.85rem;line-height:1.5;max-width:52ch;color:#b9cbb4}
+.receiver-show-camera{position:absolute;left:50%;bottom:14px;transform:translateX(-50%)}
+.receiver-setup{position:absolute;left:0;right:0;bottom:0;display:grid;gap:8px;padding:20px;background:linear-gradient(180deg,#08120e00 0,#08120ee6 45%)}
+.receiver-setup-headline{margin:0;font-size:clamp(20px,3.2vw,34px);font-weight:650;line-height:1.2}
+.receiver-setup-hint{margin:0;font-size:clamp(14px,1.6vw,19px);color:#dbe7dc;max-width:52ch}
+.receiver-setup progress{width:min(520px,100%);height:8px;accent-color:#d8ed9b}
+.receiver-status{color:#c8d6c4}
+.receiver-dock{display:grid;gap:8px}
+.receiver-dock .mimic-transport{width:100%;max-width:720px;margin:auto}
+.receiver-recovery{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+@media(max-width:640px){.receiver-title span{display:none}.receiver-setup{padding:12px}.receiver-dock .mimic-transport{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}}
+
+/* Screen mirroring: the phone screen is the only display, so the phone's own
+   layout becomes the large-screen layout. Camera left / instructor right in
+   landscape, stacked in portrait, with phone chrome resting until tapped. */
+.mimic-shell.mimic-immersive.is-presenting{--mimic-stage-top:0px;--mimic-stage-bottom:0px;--mimic-stage-right:0px;padding:0;gap:0;background:#0b1712}
+.mimic-shell.is-presenting .mimic-stage{background:#0b1712}
+.mimic-shell.is-presenting .mimic-stage:after{display:none}
+.mimic-shell.is-presenting .mimic-header{display:none}
+.mimic-shell.is-presenting .practice-studio{height:100%}
+.mimic-shell.is-presenting .practice-stage-grid{height:100%;gap:6px}
+.mimic-shell.is-presenting .practice-stage-grid.camera-active{grid-template-columns:var(--present-columns,minmax(0,3fr) minmax(0,2fr));grid-template-rows:minmax(0,1fr)}
+.mimic-shell.is-presenting[data-present-axis=rows] .practice-stage-grid.camera-active{grid-template-columns:minmax(0,1fr);grid-template-rows:var(--present-rows,minmax(0,3fr) minmax(0,2fr))}
+.mimic-shell.is-presenting .camera-pane,
+.mimic-shell.is-presenting .reference-pane,
+.mimic-shell.is-presenting .motion-stage{height:100%;min-height:0;border-radius:0}
+.mimic-shell.is-presenting .practice-tracking,
+.mimic-shell.is-presenting .practice-reference-label,
+.mimic-shell.is-presenting .camera-tag,
+.mimic-shell.is-presenting .mimic-section-link,
+.mimic-shell.is-presenting .compete-preparation{display:none}
+.mimic-shell.is-presenting .mimic-context{position:absolute;z-index:5;top:max(10px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right));bottom:auto;pointer-events:none;text-shadow:0 2px 10px #000b}
+.mimic-shell.is-presenting .mimic-context h2{font-size:clamp(16px,3.4vw,26px);margin:0 0 2px}
+.mimic-shell.is-presenting .mimic-context .mimic-status{font-size:clamp(12px,2vw,16px);color:#dbe7dc;white-space:normal;overflow:visible;-webkit-line-clamp:unset}
+.mimic-shell.is-presenting .mimic-dock{transition:opacity .25s ease}
+.mimic-shell.is-presenting.controls-resting .mimic-dock{opacity:0;pointer-events:none}

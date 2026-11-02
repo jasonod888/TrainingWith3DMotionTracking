@@ -48,22 +48,69 @@ export function bestMatch(student,reference,time,mirror=false,playing=true) {
   }
   return best;
 }
+// Standing assessment. Returns a structured result so callers never have to
+// parse messages:
+//   {ok:true,  reason:'eligible', detail, message, height, floor, center, scale, edge:null}
+//   {ok:false, reason, detail, message, scale, edge}
+// The successful fields are unchanged from the original contract; the failure
+// cases are the same rules in the same order. Malformed input (short arrays,
+// missing points, non-finite coordinates or confidence) is rejected instead of
+// throwing or silently becoming eligible.
+export const STANDING_VISIBILITY=.65;
+export const STANDING_EDGE_MARGIN=.025;
+const STANDING_CORE=[0,11,12,23,24,25,26,27,28,29,30,31,32];
+const STANDING_FACE=[0,1,2,3,4,5,6,7,8];
+const STANDING_REQUIRED_VERTICES=[11,12,23,24,25,26,27,28];
+const standingFailure=(reason,detail,message,extra={})=>({ok:false,reason,detail,message,scale:null,edge:null,...extra});
+const standingEdge=(edge=null)=>({top:false,bottom:false,left:false,right:false,...edge??{}});
+const standingEdgeFired=edge=>edge.top||edge.bottom||edge.left||edge.right;
+const hasFiniteXY=point=>!!point&&Number.isFinite(point.x)&&Number.isFinite(point.y);
+const hasFiniteXYZ=point=>hasFiniteXY(point)&&Number.isFinite(point.z);
+function standingVisible(point) {
+  if(!hasFiniteXYZ(point))return false;
+  const visibility=point.visibility??0,presence=point.presence??1;
+  return Number.isFinite(visibility)&&Number.isFinite(presence)&&visibility>=STANDING_VISIBILITY&&presence>=STANDING_VISIBILITY;
+}
 export function assessStanding(image, world) {
-  if(!image?.length || !world?.length)return {ok:false,message:'Step into view with your whole body visible.'};
-  const core=[0,11,12,23,24,25,26,27,28,29,30,31,32];
-  if(core.some(i=>(image[i].visibility??0)<.65 || (image[i].presence??1)<.65))return {ok:false,message:'Keep your head, knees and both feet clearly visible.'};
-  if(core.some(i=>image[i].x<.025||image[i].x>.975||image[i].y<.025||image[i].y>.975))return {ok:false,message:'Step back so your entire body fits in the picture.'};
+  if(!Array.isArray(image)||!Array.isArray(world)||!image.length||!world.length)
+    return standingFailure('no_person','no_landmarks','Step into view with your whole body visible.');
+  if(image.length<33||world.length<33||
+     !STANDING_CORE.concat(STANDING_FACE).every(index=>hasFiniteXY(image[index]))||
+     !STANDING_REQUIRED_VERTICES.every(index=>hasFiniteXYZ(world[index])))
+    return standingFailure('invalid','malformed_landmarks','Waiting for a clear frame…');
+  if(STANDING_CORE.some(index=>!standingVisible(image[index])))
+    return standingFailure('occluded','core_visibility','Keep your head, knees and both feet clearly visible.');
+  const edge=standingEdge();
+  for(const index of STANDING_CORE) {
+    const point=image[index];
+    if(point.x<STANDING_EDGE_MARGIN)edge.left=true;
+    if(point.x>1-STANDING_EDGE_MARGIN)edge.right=true;
+    if(point.y<STANDING_EDGE_MARGIN)edge.top=true;
+    if(point.y>1-STANDING_EDGE_MARGIN)edge.bottom=true;
+  }
+  if(standingEdgeFired(edge))
+    return standingFailure('out_of_frame','source_edge','Step back so your entire body fits in the picture.',{edge});
   const p=i=>[world[i].x,world[i].y,world[i].z];
-  if(angle(p(23),p(25),p(27))<155||angle(p(24),p(26),p(28))<155||angle(p(11),p(23),p(25))<155||angle(p(12),p(24),p(26))<155)return {ok:false,message:'Stand upright with straight legs to match your height.'};
+  if(angle(p(23),p(25),p(27))<155||angle(p(24),p(26),p(28))<155||angle(p(11),p(23),p(25))<155||angle(p(12),p(24),p(26))<155)
+    return standingFailure('not_standing','posture_knees','Stand upright with straight legs to match your height.');
   const shoulders=(image[11].y+image[12].y)/2,hips=(image[23].y+image[24].y)/2;
   const shoulderX=(image[11].x+image[12].x)/2,hipX=(image[23].x+image[24].x)/2;
-  if(hips<=shoulders||Math.abs(shoulderX-hipX)>(hips-shoulders)*.35)return {ok:false,message:'Face the camera and stand upright.'};
-  const face=Math.min(...[0,1,2,3,4,5,6,7,8].map(i=>image[i].y));
+  if(hips<=shoulders||Math.abs(shoulderX-hipX)>(hips-shoulders)*.35)
+    return standingFailure('not_standing','facing','Face the camera and stand upright.');
+  const face=Math.min(...STANDING_FACE.map(index=>image[index].y));
   const crown=face-Math.max(0,shoulders-face)*.35;
-  const floor=Math.max(...[27,28,29,30,31,32].map(i=>image[i].y));
+  const floor=Math.max(...[27,28,29,30,31,32].map(index=>image[index].y));
   const height=floor-crown;
-  if(crown<.015 || height<.32 || height>.94)return {ok:false,message:'Keep your full body in view and step a little closer if needed.'};
-  return {ok:true,height,floor,center:(shoulderX+hipX)/2,message:'Hold still. Matching your standing height…'};
+  // The crown estimate can go negative while the face is still inside the
+  // margin. That means the head is at the top of the picture, so the person
+  // must step back or raise the camera — never step closer.
+  if(crown<.015)
+    return standingFailure('out_of_frame','crown_clipped','Step back so your head and both feet are visible.',{scale:height,edge:{top:true,bottom:false,left:false,right:false}});
+  if(height<.32)
+    return standingFailure('too_small','scale_small','Keep your full body in view and step a little closer if needed.',{scale:height});
+  if(height>.94)
+    return standingFailure('too_large','scale_large','Step back so your head and both feet are visible.',{scale:height});
+  return {ok:true,reason:'eligible',detail:'eligible',message:'Hold still. Matching your standing height…',height,floor,center:(shoulderX+hipX)/2,scale:height,edge:null};
 }
 export class HeightCalibration {
   constructor(){this.reset();}

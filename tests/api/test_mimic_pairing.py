@@ -55,3 +55,91 @@ def test_pairing_is_account_bound_and_code_is_single_use(system):
     assert client.post('/api/mimic-pairs/claim',json={'code':capture['code']}).status_code==404
     stranger=TestClient(system[1]);stranger.headers.update({'Origin':'http://testserver','X-Form-Request':'1'});register(stranger,system[3],'other@example.test');login(stranger,'other@example.test')
     assert stranger.get('/api/mimic-pairs/'+capture['id'],headers=headers(capture)).status_code==404
+
+
+def approved(system):
+    client,lesson,capture,receiver=setup_pair(system)
+    path='/api/mimic-pairs/'+capture['id']
+    assert client.post(path+'/approve',headers=headers(capture),json={}).status_code==200
+    return client,lesson,capture,receiver,path
+
+
+def base_state(sequence,lesson,time=0):
+    return {'sequence':sequence,'time':time,'speed':1,'index':0,'end':lesson.duration}
+
+
+def test_presentation_fields_round_trip_and_older_capture_devices_stay_safe(system):
+    client,lesson,capture,receiver,path=approved(system)
+    state={**base_state(1,lesson),'source_generation':7,'camera_status':'live','camera_facing':'rear',
+           'lens_status':'wide-requested-unverified','source_width':1920,'source_height':1080,
+           'setup_phase':'measuring','setup_hint_code':'feet_missing','setup_progress':0.35,
+           'guide':{'left':0.2,'top':0.1,'right':0.8,'bottom':0.95}}
+    response=client.put(path+'/state',headers=headers(capture),json=state)
+    assert response.status_code==200,response.text
+    snapshot=client.get(path,headers=headers(receiver)).json()['snapshot']
+    assert snapshot['source_generation']==7
+    assert snapshot['camera_status']=='live'
+    assert snapshot['camera_facing']=='rear'
+    assert snapshot['lens_status']=='wide-requested-unverified'
+    assert snapshot['source_width']==1920 and snapshot['source_height']==1080
+    assert snapshot['setup_phase']=='measuring' and snapshot['setup_hint_code']=='feet_missing'
+    assert abs(snapshot['setup_progress']-0.35)<1e-9
+    assert snapshot['guide']=={'left':0.2,'top':0.1,'right':0.8,'bottom':0.95}
+    # A capture device that predates these fields must not break the receiver.
+    assert client.put(path+'/state',headers=headers(capture),json=base_state(2,lesson,1)).status_code==200
+    snapshot=client.get(path,headers=headers(receiver)).json()['snapshot']
+    assert snapshot['source_generation']==0
+    assert snapshot['camera_status']=='off'
+    assert snapshot['camera_facing']=='unknown'
+    assert snapshot['lens_status']=='unknown'
+    assert snapshot['setup_phase'] is None and snapshot['guide'] is None
+    assert snapshot['setup_progress']==0 and snapshot['source_width']==0
+
+
+def test_presentation_fields_reject_unbounded_or_unknown_values(system):
+    client,lesson,capture,receiver,path=approved(system)
+    invalid=[
+        {'camera_status':'recording'},
+        {'camera_facing':'sideways'},
+        {'lens_status':'ultrawide'},
+        {'setup_phase':'dancing'},
+        {'setup_progress':1.5},
+        {'setup_progress':-0.1},
+        {'source_width':99999},
+        {'source_generation':-1},
+        {'setup_hint_code':'x'*41},
+        {'guide':{'left':-0.1,'top':0,'right':1,'bottom':1}},
+        {'guide':{'left':0,'top':0,'right':1}},
+    ]
+    for offset,field in enumerate(invalid):
+        assert client.put(path+'/state',headers=headers(capture),json={**base_state(offset+1,lesson),**field}).status_code==422,field
+    nan_body='{"sequence":99,"time":0,"index":0,"end":1,"setup_progress":NaN}'
+    assert client.put(path+'/state',headers={**headers(capture),'Content-Type':'application/json'},content=nan_body).status_code==422
+
+
+def test_signal_generations_reject_stale_offers_and_answers(system):
+    client,lesson,capture,receiver,path=approved(system)
+    def offer(generation):return client.put(path+'/signal',headers=headers(capture),json={'description':f'offer-{generation}','generation':generation})
+    def answer(generation):return client.put(path+'/signal',headers=headers(receiver),json={'description':f'answer-{generation}','generation':generation})
+    status=lambda role:client.get(path,headers=headers(role)).json()
+    assert offer(2).status_code==200
+    assert status(capture)['signal_generation']==2
+    # An answer for an older offer must not overwrite the newer negotiation.
+    assert answer(1).status_code==409
+    assert answer(2).status_code==200
+    assert status(capture)['signal']=='answer-2' and status(capture)['answer_generation']==2
+    # A new offer clears the answer that was waiting for the previous one.
+    assert offer(3).status_code==200
+    assert not status(capture)['signal'] and status(capture)['answer_generation']==0
+    assert status(receiver)['signal']=='offer-3' and status(receiver)['signal_generation']==3
+    # A superseded offer cannot be posted again.
+    assert offer(2).status_code==409
+
+
+def test_signal_generations_are_optional_for_older_clients(system):
+    client,lesson,capture,receiver,path=approved(system)
+    assert client.put(path+'/signal',headers=headers(capture),json={'description':'offer-legacy'}).status_code==200
+    assert client.put(path+'/signal',headers=headers(receiver),json={'description':'answer-legacy'}).status_code==200
+    status=client.get(path,headers=headers(capture)).json()
+    assert status['signal']=='answer-legacy'
+    assert status['signal_generation']==0 and status['answer_generation']==0

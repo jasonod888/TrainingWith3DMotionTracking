@@ -1,10 +1,10 @@
 /**
- * Developer harness for the prepared instructor avatars.
+ * Experiment harness for avatar retargeting.
  *
- * Not part of the app bundle: open /avatar-lab.html from the Vite dev server. It
- * exists so the assets can be inspected in the same renderer and lighting as the
- * lesson viewer, from four angles, with the rig overlay on demand. The acceptance
- * gate for Phase A is a human look at this page, not an offline render.
+ * Not part of the app bundle: open /avatar-lab.html from the Vite dev server. It loads a
+ * prepared avatar plus a converted clip, and can put the canonical MHR reference beside it
+ * at the same time, so a retarget can be judged against the motion it came from. Upload a
+ * clip GLB to try any animation without rebuilding.
  */
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -13,6 +13,8 @@ import {
   AVATAR_IDS, AVATAR_PROFILES, avatarAssetUrl, validateProfile,
   type AvatarId, type AvatarProfile,
 } from '../../../packages/avatar-rigs/index';
+import {styleInstructor} from './instructor';
+import {measureStandingRig} from './rig';
 
 const host = document.getElementById('stage') as HTMLDivElement;
 const status = document.getElementById('status') as HTMLParagraphElement;
@@ -46,6 +48,10 @@ controls.maxDistance = 12;
 
 const anchor = new THREE.Group();
 scene.add(anchor);
+const refAnchor = new THREE.Group();
+refAnchor.position.x = 0;
+refAnchor.visible = false;
+scene.add(refAnchor);
 
 const loader = new GLTFLoader();
 let model: THREE.Object3D | null = null;
@@ -57,7 +63,10 @@ let loadToken = 0;
 
 const ANGLES: Record<string, number> = {front: 0, left: Math.PI / 2, back: Math.PI, right: -Math.PI / 2};
 
+let currentView = 'front';
+
 function placeCamera(view: string, distance = 4, targetY = 0.9) {
+  currentView = view;
   // Same framing rule as the lesson viewer: orbit at eye level around a target.
   const yaw = ANGLES[view] ?? 0;
   camera.position.set(Math.sin(yaw) * distance, targetY + 0.2, Math.cos(yaw) * distance);
@@ -123,6 +132,37 @@ let mixer: THREE.AnimationMixer | null = null;
 let clip: THREE.AnimationClip | null = null;
 let clipTime = 0;
 
+// The canonical MHR reference, loaded on demand so the retarget can be judged against the
+// motion it came from at the same timestamp.
+let referenceScene: THREE.Group | null = null;
+let referenceMixer: THREE.AnimationMixer | null = null;
+let showReference = false;
+let pinToOrigin = true;
+let referenceUrl = '/api/demo/assets/reference.glb';
+
+async function ensureReference() {
+  if (referenceScene) return;
+  const loaded = await loader.loadAsync(referenceUrl);
+  const reference = loaded.scene;
+  const bounds = measureStandingRig(refAnchor, reference);
+  refAnchor.scale.setScalar(1.8 / bounds.height);
+  refAnchor.position.y = -bounds.baseFoot * refAnchor.scale.y;
+  styleInstructor(reference, false);
+  reference.traverse(node => { if (node instanceof THREE.Mesh) node.frustumCulled = false; });
+  refAnchor.add(reference);
+  refAnchor.updateMatrixWorld(true);
+
+  const animation = loaded.animations[0];
+  if (!animation) throw new Error('the reference GLB carries no animation');
+  referenceMixer = new THREE.AnimationMixer(reference);
+  const action = referenceMixer.clipAction(animation);
+  action.setLoop(THREE.LoopOnce, 1);
+  action.clampWhenFinished = true;
+  action.play();
+  referenceMixer.setTime(clipTime);
+  referenceScene = reference;
+}
+
 /** Load the converted clip and park it at clipTime. Tracks bind to the avatar by name. */
 async function applyClip() {
   if (mixer) {
@@ -143,6 +183,7 @@ async function applyClip() {
   action.clampWhenFinished = true;
   action.play();
   mixer.setTime(clipTime);
+  if (referenceMixer) referenceMixer.setTime(clipTime);
   model.updateMatrixWorld(true);
   status.textContent += ` · clip ${animation.duration.toFixed(3)} s at ${clipTime.toFixed(2)} s`;
 }
@@ -169,7 +210,9 @@ function renderScrubber() {
   input.oninput = () => {
     clipTime = Number(input.value);
     mixer?.setTime(clipTime);
+    referenceMixer?.setTime(clipTime);
     model?.updateMatrixWorld(true);
+    referenceScene?.updateMatrixWorld(true);
     label.textContent = `Clip time ${clipTime.toFixed(2)} s / ${animation.duration.toFixed(2)} s`;
   };
   host.replaceChildren(label, input);
@@ -270,7 +313,68 @@ function renderControls() {
       if (jointsMesh) jointsMesh.visible = showJoints;
       renderControls();
     }),
+    button(`Reference ${showReference ? 'on' : 'off'}`, showReference, async () => {
+      showReference = !showReference;
+      if (showReference) {
+        try {
+          await ensureReference();
+        } catch (error) {
+          showReference = false;
+          status.textContent = `Reference unavailable: ${(error as Error).message}`;
+        }
+      }
+      refAnchor.visible = showReference;
+      // Side by side, so the segment directions can be compared directly.
+      anchor.position.x = showReference ? -0.9 : 0;
+      refAnchor.position.x = showReference ? 0.9 : 0;
+      placeCamera(currentView, showReference ? 6.2 : 4, 0.9);
+      renderControls();
+    }),
+    button(`Pin to origin ${pinToOrigin ? 'on' : 'off'}`, pinToOrigin, () => {
+      pinToOrigin = !pinToOrigin;
+      renderControls();
+    }),
+    uploadButton(),
   );
+}
+
+/** Pick any clip GLB from disk and retarget-test it without rebuilding. */
+function uploadButton() {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'upload';
+  wrapper.textContent = 'Upload clip';
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.glb,.gltf';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    clipUrl = URL.createObjectURL(file);
+    clip = null;
+    status.textContent = `Uploaded ${file.name} (${Math.round(file.size / 1024)} KiB)`;
+    await load(current);
+    renderScrubber();
+    // The reference keeps its own animation; only the avatar clip changed.
+    referenceMixer?.setTime(clipTime);
+  };
+  wrapper.append(input);
+  return wrapper;
+}
+
+/** Pin a group horizontally, the way the lesson viewer keeps the instructor in frame. */
+function pinGroup(group: THREE.Group, scene: THREE.Object3D | null, baseX: number) {
+  const root = scene?.getObjectByName('Hips') ?? scene?.getObjectByName('body_world') ?? null;
+  if (!scene || !root) {
+    group.position.x = baseX;
+    return;
+  }
+  // Same rule as MotionStage: resolve the root in the model's own space, which is metres for
+  // both rigs, so the anchor cancels travel without touching vertical motion.
+  scene.updateWorldMatrix(true, true);
+  const inverse = new THREE.Matrix4().copy(scene.matrixWorld).invert();
+  const point = new THREE.Vector3().setFromMatrixPosition(root.matrixWorld).applyMatrix4(inverse);
+  group.position.x = baseX - point.x * group.scale.x;
+  group.position.z = -point.z * group.scale.z;
 }
 
 const observer = new ResizeObserver(() => {
@@ -292,16 +396,42 @@ showSkeleton = params.get('skeleton') === '1';
 showJoints = params.get('joints') !== '0';
 clipUrl = params.get('clip') ?? '';
 clipTime = Number(params.get('t') ?? 0) || 0;
+showReference = params.get('ref') === '1';
+pinToOrigin = params.get('pin') !== '0';
+if (params.get('refurl')) referenceUrl = params.get('refurl') as string;
 const focus = params.get('focus');
 const requested = params.get('avatar');
 const initialAvatar: AvatarId = requested === 'female' || requested === 'male' ? requested : 'male';
 renderControls();
-void load(initialAvatar).then(() => {
+void load(initialAvatar).then(async () => {
   renderScrubber();
+  if (showReference) {
+    try {
+      await ensureReference();
+      refAnchor.visible = true;
+      anchor.position.x = -0.9;
+      refAnchor.position.x = 0.9;
+      placeCamera(currentView, 6.2, 0.9);
+      renderControls();
+    } catch (error) {
+      showReference = false;
+      status.textContent = `Reference unavailable: ${(error as Error).message}`;
+    }
+  }
   if (focus) focusBone(focus, Number(params.get('fd') ?? 1.0) || 1.0);
 });
 
 renderer.setAnimationLoop(() => {
   controls.update();
+  if (pinToOrigin) {
+    pinGroup(anchor, model, showReference ? -0.9 : 0);
+    pinGroup(refAnchor, referenceScene, showReference ? 0.9 : 0);
+  } else {
+    // Unpinned shows the clip's real root travel, which the lesson viewer cancels.
+    anchor.position.x = showReference ? -0.9 : 0;
+    anchor.position.z = 0;
+    refAnchor.position.x = showReference ? 0.9 : 0;
+    refAnchor.position.z = 0;
+  }
   renderer.render(scene, camera);
 });

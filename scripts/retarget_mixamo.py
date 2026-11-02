@@ -36,6 +36,7 @@ reviewed static preset instead, so the hands never sit at the flat, splayed bind
 import argparse
 import hashlib
 import json
+import math
 import os
 import sys
 import time
@@ -61,6 +62,14 @@ TIMESTAMP_TOLERANCE = 1e-6
 LENGTH_TOLERANCE = 1e-6
 IDENTITY_TOLERANCE = 1e-6
 MAX_ROOT_TRAVEL_M = 10.0
+
+# Bones whose rest segment is a limb axis worth aligning. The pelvis and spine are excluded:
+# their bone-to-child direction is not a limb axis, and rotating them rotates every child.
+ALIGNED_BONES = {
+    'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm',
+    'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg',
+    'LeftFoot', 'RightFoot',
+}
 
 
 class RetargetError(Exception):
@@ -298,6 +307,12 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
         raise RetargetError('; '.join(failures))
 
     mapped = {name: src for name, src in rig.MIXAMO_FROM_MHR.items()}
+    source_rest_local = {bone['name']: np.asarray(bone['q'], float) for bone in motion.bones}
+    source_parent_of = {bone['name']: bone['parent'] for bone in motion.bones}
+    aligned_rest, alignment = aligned_rest_quats(
+        profile, source_rest, mapped, motion.bones)
+    max_alignment = max((rig.quat_angle_degrees(q, np.array([0.0, 0.0, 0.0, 1.0]))
+                         for q in alignment.values()), default=0.0)
     tracked = sorted(set(mapped) | set(preset))
     frames = motion.frame_count
     rotations = {name: np.zeros((frames, 4)) for name in tracked}
@@ -311,9 +326,23 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
         rest_lengths[bone['name']] = float(np.linalg.norm(
             rest_worlds[bone['name']][:3, 3] - rest_worlds[parent][:3, 3]))
     length_error = 0.0
+    previous_source, previous_target = {}, {}
+    source_steps, target_steps = {}, {}
+    worst_direction = (0.0, None)
+    source_travel = 0.0
+    direction_total, direction_count = 0.0, 0
+    target_children, source_children = {}, {}
+    for bone in bones:
+        if bone['parent'] is not None:
+            target_children.setdefault(bone['parent'], []).append(bone['name'])
+    for bone in motion.bones:
+        if bone['parent'] is not None:
+            source_children.setdefault(bone['parent'], []).append(bone['name'])
 
     for frame in range(frames):
         worlds, source_quats = motion.pose_at(frame)
+        source_travel = max(source_travel,
+                            float(np.linalg.norm(worlds[SOURCE_ROOT][:3, 3] - source_root_rest)))
         target_worlds, target_quats = {}, {}
         for bone in bones:
             name, parent = bone['name'], bone['parent']
@@ -322,10 +351,36 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
 
             source_name = mapped.get(name)
             if source_name is not None:
-                delta = rig.quat_multiply(source_quats[source_name],
-                                          rig.quat_conjugate(source_rest_quats[source_name]))
-                world_q = rig.quat_multiply(delta, target_rest_quats[name])
-                quaternion = rig.quat_multiply(rig.quat_conjugate(parent_q), world_q)
+                if parent in ALIGNED_BONES and name not in ALIGNED_BONES:
+                    # The parent is aligned but this bone is not (the hands). Copying an
+                    # absolute world delta here would keep the rig's own T-pose wrist angle
+                    # against an aligned forearm, which reads as a twisted wrist. Apply the
+                    # source's *relative* wrist motion to the hand's own rest angle instead.
+                    source_parent = source_parent_of.get(source_name)
+                    rest_relative = rig.quat_multiply(
+                        rig.quat_conjugate(source_rest_quats[source_parent]),
+                        source_rest_quats[source_name])
+                    posed_relative = rig.quat_multiply(
+                        rig.quat_conjugate(source_quats[source_parent]),
+                        source_quats[source_name])
+                    relative = rig.quat_multiply(rig.quat_conjugate(rest_relative),
+                                                 posed_relative)
+                    frame_map = rig.quat_multiply(
+                        rig.quat_conjugate(target_rest_quats[name]),
+                        source_rest_quats[source_name])
+                    relative = rig.quat_multiply(rig.quat_multiply(frame_map, relative),
+                                                 rig.quat_conjugate(frame_map))
+                    quaternion = rig.quat_multiply(np.asarray(bone['r'], float), relative)
+                else:
+                    # Copy the bone's world rotation change onto its rest pose *aligned to the
+                    # source rest*. Without the alignment the A-pose/T-pose difference (48 deg
+                    # in the upper arm) survives every frame; with it, the target segment
+                    # points where the source segment points.
+                    delta_world = rig.quat_multiply(
+                        source_quats[source_name],
+                        rig.quat_conjugate(source_rest_quats[source_name]))
+                    world_q = rig.quat_multiply(delta_world, aligned_rest[name])
+                    quaternion = rig.quat_multiply(rig.quat_conjugate(parent_q), world_q)
             else:
                 quaternion = np.asarray(bone['r'], float)
                 world_q = rig.quat_multiply(parent_q, quaternion)
@@ -349,6 +404,27 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
             elif np.max(np.abs(quaternion - np.asarray(bone['r'], float))) > IDENTITY_TOLERANCE:
                 failures.append(f'{name} is neither mapped nor preset but changed')
 
+            # Track the bone's own local step. This is a fidelity check: a large step is
+            # nearly always upstream tracking noise, which the clip reproduces rather than
+            # invents.
+            if frame:
+                if source_name is not None:
+                    track = motion.tracks.get(source_name, {})
+                    posed_local = (track['rotation'][frame] if 'rotation' in track
+                                   else source_rest_local[source_name])
+                    previous_local = previous_source.get(source_name)
+                    if previous_local is not None:
+                        source_steps[source_name] = max(
+                            source_steps.get(source_name, 0.0),
+                            rig.quat_angle_degrees(previous_local, posed_local))
+                    previous_source[source_name] = np.asarray(posed_local, float)
+                previous_target_local = previous_target.get(name)
+                if previous_target_local is not None:
+                    target_steps[name] = max(
+                        target_steps.get(name, 0.0),
+                        rig.quat_angle_degrees(previous_target_local, quaternion))
+                previous_target[name] = quaternion
+
             target_worlds[name] = parent_world @ rig.matrix_from_trs(
                 translation, quaternion, np.asarray(bone['s'], float))
 
@@ -356,6 +432,32 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
                 length = float(np.linalg.norm(target_worlds[name][:3, 3]
                                               - target_worlds[parent][:3, 3]))
                 length_error = max(length_error, abs(length - rest_lengths[name]))
+
+        # Fidelity of the mapping: does each target segment point where the source's does?
+        # This is the property the rest alignment exists to guarantee.
+        for target_name, source_name in mapped.items():
+            if target_name not in ALIGNED_BONES:
+                continue
+            target_child = next(iter(target_children.get(target_name, [])), None)
+            source_child = next(iter(source_children.get(source_name, [])), None)
+            if target_child is None or source_child is None:
+                continue
+            target_vector = (target_worlds[target_child][:3, 3]
+                             - target_worlds[target_name][:3, 3])
+            source_vector = worlds[source_child][:3, 3] - worlds[source_name][:3, 3]
+            target_length = float(np.linalg.norm(target_vector))
+            source_length = float(np.linalg.norm(source_vector))
+            if target_length < 1e-9 or source_length < 1e-9:
+                continue
+            cosine = float(np.clip(np.dot(target_vector / target_length,
+                                         source_vector / source_length), -1.0, 1.0))
+            error = math.degrees(math.acos(cosine))
+            direction_total += error
+            direction_count += 1
+            if error > worst_direction[0]:
+                worst_direction = (error, target_name)
+
+    mean_direction = direction_total / direction_count if direction_count else 0.0
 
     for name in rotations:
         rotations[name] = _quat_continuity(rotations[name])
@@ -369,9 +471,15 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
 
     hips_rest = np.asarray(next(bone for bone in bones if bone['name'] == 'Hips')['t'], float)
     travel = float(np.abs(translations['Hips'] - hips_rest).max()) * armature_scale
-    if travel > MAX_ROOT_TRAVEL_M:
-        failures.append(f'root translation travels {travel:.2f} m, which is implausible; '
-                        'the node-space conversion is probably wrong')
+    # Check that the conversion preserved the source's travel rather than that travel is
+    # small: handheld footage legitimately reconstructs several metres of root motion.
+    expected_travel = source_travel * translation_scale
+    if abs(travel - expected_travel) > max(0.02, 0.01 * expected_travel):
+        failures.append(
+            f'root travel is {travel:.2f} m but the source implies {expected_travel:.2f} m; '
+            'the node-space conversion is probably wrong')
+    if travel > 200.0:
+        failures.append(f'root travel is {travel:.0f} m, which cannot be a real movement')
 
     norms = {name: float(np.abs(np.linalg.norm(values, axis=1) - 1).max())
              for name, values in rotations.items()}
@@ -382,6 +490,19 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
     continuity = _continuity_floor(rotations)
     if continuity < 0.0:
         failures.append('quaternion signs are discontinuous')
+
+    worst_step = (0.0, None)
+    worst_local_error = (0.0, None)
+    for target_name, source_name in mapped.items():
+        step = target_steps.get(target_name, 0.0)
+        if step > worst_step[0]:
+            worst_step = (step, target_name)
+        # Conjugation preserves the rotation angle, so these must agree.
+        error = abs(step - source_steps.get(source_name, 0.0))
+        if error > worst_local_error[0]:
+            worst_local_error = (error, target_name)
+    worst_source_step = max(
+        ((value, name) for name, value in source_steps.items()), default=(0.0, None))
 
     unmapped_targets = [name for name in bone_by_name if name not in rotations]
     hands = sorted(name for name in preset if name in bone_by_name)
@@ -416,6 +537,7 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
             'translation_scale': round(translation_scale, 6),
             'axes_preserved': ['x', 'y', 'z'],
             'travel_m': round(travel, 4),
+            'source_travel_m': round(source_travel, 4),
             'note': 'display centring is the viewer\'s responsibility, not the clip\'s',
         },
         'mapping': {
@@ -423,6 +545,9 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
             'compound': {name: chain for name, chain in rig.COMPOUND_CHAINS.items()
                          if name in bone_by_name},
             'unmapped_target_bones': unmapped_targets,
+            'rest_alignment_bones': len(alignment),
+            'rest_alignment_missing': sorted(set(mapped) - set(alignment)),
+            'max_rest_alignment_degrees': round(max_alignment, 3),
             'fingers': {'bones': hands, 'preset': finger_preset},
         },
         'checks': {
@@ -432,11 +557,34 @@ def convert(motion, profile, finger_preset='relaxed', retargeter_version=RETARGE
             'max_quaternion_norm_error': worst_norm,
             'min_consecutive_quaternion_dot': round(continuity, 6),
             'max_bone_length_error_m': round(length_error, 9),
+            'max_step_rotation_source_degrees': round(worst_source_step[0], 3),
+            'max_step_rotation_source_bone': worst_source_step[1],
+            'max_step_rotation_target_degrees': round(worst_step[0], 3),
+            'max_step_rotation_target_bone': worst_step[1],
+            'max_step_local_error_degrees': round(worst_local_error[0], 6),
+            'mean_segment_direction_error_degrees': round(mean_direction, 4),
+            'max_segment_direction_error_degrees': round(worst_direction[0], 4),
+            'max_segment_direction_error_bone': worst_direction[1],
         },
         'elapsed_seconds': round(time.perf_counter() - started, 3),
     }
     if finger_preset == 'none':
         warnings.append('fingers are at the bind pose; review before showing this clip')
+    if worst_local_error[0] > 0.01:
+        # Informational only: with world deltas the local step need not equal the source's.
+        pass
+    if worst_direction[0] > 10.0:
+        failures.append(
+            f'{worst_direction[1]} points {worst_direction[0]:.1f} deg away from the source '
+            'segment; the rest alignment is wrong')
+    elif worst_direction[0] > 2.0:
+        warnings.append(
+            f'{worst_direction[1]} points {worst_direction[0]:.1f} deg away from the source '
+            'segment')
+    if worst_source_step[0] > 60.0:
+        warnings.append(
+            f'source joint {worst_source_step[1]} turns {worst_source_step[0]:.0f} deg in one '
+            'frame; the clip reproduces that jump rather than inventing it')
     return clip, report
 
 
@@ -476,6 +624,96 @@ def _rest_world_quats(profile):
         parent_q = quats[parent] if parent else ancestors_q
         quats[bone['name']] = rig.quat_multiply(parent_q, np.asarray(bone['r'], float))
     return quats
+
+
+def _shortest_arc(source, target):
+    """Rotation taking direction `source` onto direction `target`."""
+    source = np.asarray(source, dtype=np.float64)
+    target = np.asarray(target, dtype=np.float64)
+    source = source / (np.linalg.norm(source) or 1.0)
+    target = target / (np.linalg.norm(target) or 1.0)
+    dot = float(np.clip(np.dot(source, target), -1.0, 1.0))
+    if dot > 1.0 - 1e-12:
+        return np.array([0.0, 0.0, 0.0, 1.0])
+    if dot < -1.0 + 1e-9:
+        axis = np.cross(source, np.array([1.0, 0.0, 0.0]))
+        if np.linalg.norm(axis) < 1e-6:
+            axis = np.cross(source, np.array([0.0, 1.0, 0.0]))
+        axis = axis / np.linalg.norm(axis)
+        return np.array([axis[0], axis[1], axis[2], 0.0])
+    axis = np.cross(source, target)
+    return rig.quat_from_axis_angle(axis, math.degrees(math.acos(dot)))
+
+
+def rest_alignment(profile, source_rest, mapped, source_bones):
+    """Per-bone rotation that points the target's rest segment where the source's points.
+
+    The MHR reference rests in an A-pose (upper arm about 48 degrees below horizontal) while
+    Mixamo rests in a T-pose. Copying rotation deltas alone preserves that 48-degree offset
+    for the whole clip, so every arm pose is wrong by it. Aligning the rest segments first
+    makes the target's segment direction equal the source's at every frame:
+
+        target_world = delta_source * (align * target_rest)
+
+    Returns {target bone: quaternion}, plus the angle applied for the report.
+    """
+    target_rest = rig.profile_rest_world(profile)
+    target_positions = {name: matrix[:3, 3] for name, matrix in target_rest.items()}
+    source_positions = {name: rest[:3, 3] for name, rest in source_rest.items()}
+    parent_of = {bone['name']: bone['parent'] for bone in profile['rig']['bones']}
+    target_children = {}
+    for bone in profile['rig']['bones']:
+        if bone['parent'] is not None:
+            target_children.setdefault(bone['parent'], []).append(bone['name'])
+    source_children = {}
+    for bone in source_bones:
+        if bone['parent'] is not None:
+            source_children.setdefault(bone['parent'], []).append(bone['name'])
+
+    def direction(positions, name, parent, child):
+        base = positions.get(name)
+        if base is None:
+            return None
+        if child is not None and child in positions:
+            vector = positions[child] - base
+        elif parent is not None and parent in positions:
+            vector = base - positions[parent]
+        else:
+            return None
+        length = float(np.linalg.norm(vector))
+        return vector / length if length > 1e-9 else None
+
+    alignment = {}
+    for target_name, source_name in mapped.items():
+        if target_name not in ALIGNED_BONES:
+            # Only limb segments are aligned. The pelvis and spine are excluded because a
+            # bone-to-child direction is not a limb axis there: aligning the pelvis rotated
+            # it 103 degrees and folded the whole torso.
+            continue
+        # Use each rig's own first child: the segment being aligned is bone -> child, and a
+        # compound mapping (LeftFoot <- the tarsal chain) would otherwise measure the whole
+        # foot instead of the shin.
+        target_child = next(iter(target_children.get(target_name, [])), None)
+        source_child = next(iter(source_children.get(source_name, [])), None)
+        source_parent = next((bone['parent'] for bone in source_bones
+                              if bone['name'] == source_name), None)
+        target_dir = direction(target_positions, target_name,
+                               parent_of.get(target_name), target_child)
+        source_dir = direction(source_positions, source_name, source_parent, source_child)
+        if target_dir is None or source_dir is None:
+            continue
+        alignment[target_name] = _shortest_arc(target_dir, source_dir)
+    return alignment
+
+
+def aligned_rest_quats(profile, source_rest, mapped, source_bones):
+    """Target rest orientations after aligning each segment to the source's rest direction."""
+    target_rest = _rest_world_quats(profile)
+    alignment = rest_alignment(profile, source_rest, mapped, source_bones)
+    aligned = {name: (rig.quat_multiply(alignment[name], target_rest[name])
+                      if name in alignment else target_rest[name])
+               for name in target_rest}
+    return aligned, alignment
 
 
 def _quat_continuity(values):
@@ -598,20 +836,28 @@ def verify_written(path, clip, profile, report):
             unresolved.append(name)
         tracks += 1
 
-    clocks, nonfinite = set(), False
+    expected_times = np.asarray(clip['times'], dtype=np.float64).reshape(-1)
+    clocks, nonfinite, drifted, non_monotonic = set(), False, 0, 0
     for sampler in animation.samplers:
-        values = rig.read_accessor(gltf, sampler.input).reshape(-1)
-        clocks.add((round(float(values[0]), 6), round(float(values[-1]), 6), len(values)))
+        values = rig.read_accessor(gltf, sampler.input).reshape(-1).astype(np.float64)
+        clocks.add(len(values))
+        if values.shape != expected_times.shape or \
+                float(np.abs(values - expected_times).max()) > TIMESTAMP_TOLERANCE:
+            # Comparing only the first and last sample would accept a clock that is wrong
+            # in the middle, which would move section boundaries.
+            drifted += 1
+        if np.any(np.diff(values) <= 0):
+            non_monotonic += 1
         if not np.isfinite(rig.read_accessor(gltf, sampler.output)).all():
             nonfinite = True
     if len(clocks) != 1:
         failures.append('written clip channels disagree on their timestamps')
-    start, end, count = clocks.pop() if clocks else (0.0, 0.0, 0)
-    if count != int(clip['times'].shape[0]):
-        failures.append('written clip frame count differs from the source')
-    if (abs(start - float(clip['times'][0])) > TIMESTAMP_TOLERANCE
-            or abs(end - float(clip['times'][-1])) > TIMESTAMP_TOLERANCE):
-        failures.append('written clip duration differs from the source')
+    if drifted:
+        failures.append(f'{drifted} samplers have timestamps that differ from the source clock')
+    if non_monotonic:
+        failures.append(f'{non_monotonic} samplers have non-increasing timestamps')
+    start, end, count = (float(expected_times[0]), float(expected_times[-1]),
+                         int(expected_times.shape[0]))
     if nonfinite:
         failures.append('written clip has non-finite sample data')
     if unresolved:
@@ -627,18 +873,48 @@ def verify_written(path, clip, profile, report):
         'duration_seconds': round(end - start, 6),
     }
     report['checks']['written_tracks_resolve'] = not unresolved
-    report['checks']['written_timestamps_match'] = not nonfinite and count == int(
-        clip['times'].shape[0])
+    report['checks']['written_timestamps_match'] = not (drifted or non_monotonic or len(clocks) != 1)
     report['status'] = 'failed' if failures else 'ok'
     report['failures'] = failures
     return report
 
 
+def _empty_report(source_path, profile_path, error, retargeter_version, finger_preset):
+    """A report for input failures, so a refusal is never silent."""
+    def digest(path):
+        try:
+            return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        except OSError:
+            return None
+
+    return {
+        'schema': CLIP_SCHEMA,
+        'status': 'failed',
+        'failures': [str(error)],
+        'warnings': [],
+        'retargeter': {'version': retargeter_version, 'finger_preset': finger_preset},
+        'source': {'file': Path(source_path).name, 'sha256': digest(source_path)},
+        'target': {'profile_file': Path(profile_path).name,
+                   'profile_sha256': digest(profile_path)},
+        'mapping': {},
+        'checks': {},
+        'output': {'file': None},
+    }
+
+
 def retarget(source_path, profile_path, output_path, report_path,
              finger_preset='relaxed', retargeter_version=RETARGETER_VERSION):
     """Read, convert, write and verify. Returns the report; raises on a failed conversion."""
-    profile = rig.load_profile(profile_path)
-    motion = load_motion(source_path)
+    try:
+        profile = rig.load_profile(profile_path)
+        rig.validate_profile(profile)
+        motion = load_motion(source_path)
+    except (RetargetError, ValueError, OSError) as error:
+        report = _empty_report(source_path, profile_path, error, retargeter_version,
+                               finger_preset)
+        _write_report(report_path, report)
+        raise RetargetError(f'input rejected: {error}') from error
+
     clip, report = convert(motion, profile, finger_preset=finger_preset,
                            retargeter_version=retargeter_version)
     report['source']['file'] = Path(source_path).name

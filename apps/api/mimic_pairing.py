@@ -21,6 +21,12 @@ class Create(BaseModel):
     revision_id:str=Field(min_length=1,max_length=80)
 class Claim(BaseModel):
     code:str=Field(pattern=r'^[A-Fa-f0-9]{12}$')
+class Guide(BaseModel):
+    """Normalised source-space box. The receiver maps it through its own fit."""
+    left:float=Field(ge=0,le=1,allow_inf_nan=False)
+    top:float=Field(ge=0,le=1,allow_inf_nan=False)
+    right:float=Field(ge=0,le=1,allow_inf_nan=False)
+    bottom:float=Field(ge=0,le=1,allow_inf_nan=False)
 class Snapshot(BaseModel):
     epoch:Literal[1]=1
     sequence:int=Field(ge=1)
@@ -35,6 +41,18 @@ class Snapshot(BaseModel):
     angle:float=Field(default=0,ge=-3.15,le=3.15,allow_inf_nan=False)
     model_mirror:bool=False
     camera_mirror:bool=False
+    # Optional presentation fields. Older capture devices omit them entirely, so
+    # every one has a safe default; values that are present are strictly bounded.
+    source_generation:int=Field(default=0,ge=0,le=2147483647)
+    camera_status:Literal['off','starting','live','interrupted','failed']='off'
+    camera_facing:Literal['front','rear','unknown']='unknown'
+    lens_status:Literal['wide-confirmed','wide-requested-unverified','standard','unknown']='unknown'
+    source_width:int=Field(default=0,ge=0,le=16384)
+    source_height:int=Field(default=0,ge=0,le=16384)
+    setup_phase:Literal['prepare','starting','positioning','measuring','ready','handoff','help','error','cancelled']|None=None
+    setup_hint_code:str|None=Field(default=None,max_length=40)
+    setup_progress:float=Field(default=0,ge=0,le=1,allow_inf_nan=False)
+    guide:Guide|None=None
 class Control(BaseModel):
     id:str=Field(pattern=r'^[a-f0-9-]{36}$')
     sequence:int=Field(ge=1)
@@ -42,6 +60,8 @@ class Control(BaseModel):
     action:Literal['resume','pause','next','back','again','slower','faster','loop']
 class Signal(BaseModel):
     description:str=Field(max_length=32000)
+    # Associates an offer, its answer and any replacement with one negotiation.
+    generation:int=Field(default=0,ge=0,le=2147483647)
 
 def aware(value):
     return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
@@ -85,7 +105,8 @@ def install_mimic_pairing(app,settings,identity,db):
         if role=='receiver':row.receiver_seen=now();session.commit()
         return {'approved':row.approved,'pending':bool(row.receiver_hash),'receiver_online':bool(row.receiver_seen and (now()-aware(row.receiver_seen)).total_seconds()<5),
                 'sequence':row.sequence,'snapshot':row.snapshot if row.approved else {},'commands':row.commands if role=='capture' and row.approved else [],
-                'manifest':visible_manifest(session,session.get(Lesson,row.lesson_id),revision,account.id) if role=='receiver' and row.approved else None,'signal':row.signals.get('receiver' if role=='capture' else 'capture') if row.approved else None,'server_time':now().timestamp()*1000}
+                'manifest':visible_manifest(session,session.get(Lesson,row.lesson_id),revision,account.id) if role=='receiver' and row.approved else None,'signal':row.signals.get('receiver' if role=='capture' else 'capture') if row.approved else None,
+                'signal_generation':int(row.signals.get('capture_generation',0) or 0),'answer_generation':int(row.signals.get('answer_generation',0) or 0),'server_time':now().timestamp()*1000}
 
     @router.post('/{id}/approve')
     def approve(id:str,x_mimic_token:str=Header(default=''),account=Depends(identity),session:Session=Depends(db)):
@@ -116,7 +137,18 @@ def install_mimic_pairing(app,settings,identity,db):
     def signal(id:str,body:Signal,x_mimic_token:str=Header(default=''),account=Depends(identity),session:Session=Depends(db)):
         row,role,_=get(session,id,account,x_mimic_token)
         if not row.approved:raise HTTPException(403,'Approve this screen first.')
-        row.signals={**row.signals,role:body.description,**({'receiver':''} if role=='capture' else {})};session.commit();return {'ok':True}
+        stored=row.signals or {}
+        if role=='capture':
+            # A new offer supersedes any answer that was waiting for an older one.
+            current=int(stored.get('capture_generation',0) or 0)
+            if body.generation and body.generation<current:raise HTTPException(409,'An older connection offer was rejected.')
+            generation=body.generation or current
+            row.signals={**stored,'capture':body.description,'capture_generation':generation,'receiver':'','answer_generation':0}
+        else:
+            offer=int(stored.get('capture_generation',0) or 0)
+            if body.generation and body.generation!=offer:raise HTTPException(409,'This answer belongs to an older connection offer.')
+            row.signals={**stored,'receiver':body.description,'answer_generation':body.generation or offer}
+        session.commit();return {'ok':True}
 
     @router.delete('/{id}')
     def revoke(id:str,x_mimic_token:str=Header(default=''),account=Depends(identity),session:Session=Depends(db)):

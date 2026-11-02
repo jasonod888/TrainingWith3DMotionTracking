@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     remote_conversion_concurrency: int = 1
     upload_temp_dir: Path = ROOT / '.local/upload-tmp'
     silhouettes_enabled: bool = False
+    # Temporary operator switch for testing: skips guided camera setup and uses
+    # the default instructor alignment. On by default; set
+    # CAMERA_CALIBRATION_ENABLED=false to bypass height matching.
+    camera_calibration_enabled: bool = True
 
     @model_validator(mode='after')
     def deployment_security(self):

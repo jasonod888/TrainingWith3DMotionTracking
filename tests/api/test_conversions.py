@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from test_accounts import system,register,login,FakeStorage
 from apps.api.auth import digest,now
 from apps.api.config import ROOT
-from apps.api.database import Conversion,Lesson,LessonRevision,WorkerCredential
+from apps.api.database import Conversion,Lesson,LessonAsset,LessonRevision,WorkerCredential
 from apps.api.lessons import import_fixture
 from apps.api.processing import ENGINE_VERSION
 
@@ -142,6 +142,73 @@ def test_verified_finalisation_is_idempotent_and_stale_attempt_cannot_publish(co
     assert len(lesson['section_set']['sections'])==1
     assert client.post(base+'/heartbeat',headers=headers,json={'stage':'verifying'}).status_code==409
     with Session(app.state.engine) as session:assert len(session.scalars(select(LessonRevision)).all())==1
+
+
+def test_avatar_derivatives_attach_to_the_lesson_without_touching_the_manifest(conversion):
+    """The worker publishes avatar clips around finish; the lesson manifest stays immutable."""
+    client,app,store,headers,_=conversion
+    job,path=uploaded(client);claim=client.post('/api/worker/claim',headers=headers,json={}).json()
+    headers={**headers,'X-Job-Lease':claim['attempt_token']};base='/api/worker/jobs/'+job['id']
+    for stage in ('processing','exporting','verifying'):
+        assert client.post(base+'/heartbeat',headers=headers,json={'stage':stage}).status_code==200
+    manifest=json.loads((ROOT/'packages/lesson-schema/fixture.json').read_text())
+    manifest['engine']='sam-3d-body';manifest['engine_version']=ENGINE_VERSION
+    manifest['section_set']['sections']=[{'id':'whole','label':'Full movement','start':0,'end':2}]
+    for field,name,data in [('animation','reference.glb',(ROOT/'packages/lesson-schema/synthetic.glb').read_bytes()),
+                            ('landmarks','reference.json',b'{}'),('source_video','preview.mp4',b'preview'),
+                            ('thumbnail','thumbnail.jpg',b'image')]:
+        result=client.put(base+'/files/'+name,headers=headers,content=data)
+        assert result.status_code==200,result.text
+        manifest[field]=result.json()
+
+    # Clips upload while the lease is live, then finish releases it.
+    refs={}
+    for name,data in (('avatar-male.glb',b'glb-male'),('avatar-female.glb',b'glb-female'),
+                      ('avatar-report.json',b'{"schema":1}')):
+        result=client.put(base+'/files/'+name,headers=headers,content=data)
+        assert result.status_code==200,result.text
+        refs[name]=result.json()
+    finished=client.post(base+'/finish',headers=headers,json=manifest)
+    assert finished.status_code==200,finished.text
+    lesson_id=finished.json()['lesson_id']
+
+    body={'male':refs['avatar-male.glb'],'female':refs['avatar-female.glb'],'report':refs['avatar-report.json']}
+    assert client.post(base+'/derivatives',headers=headers,json=body).status_code==200
+    # Re-publishing the same clips must not duplicate their asset rows.
+    assert client.post(base+'/derivatives',headers=headers,json=body).status_code==200
+    with Session(app.state.engine) as session:
+        rows=[a.key for a in session.scalars(select(LessonAsset).where(LessonAsset.lesson_id==lesson_id))]
+    assert f'lessons/{lesson_id}/avatar-male.glb' in rows
+    assert len([key for key in rows if 'avatar-male' in key])==1
+
+    # The immutable manifest still describes only the canonical assets.
+    lesson=client.get('/api/lessons/'+lesson_id).json()
+    assert lesson['animation']['key'].endswith('reference.glb')
+    assert 'avatar' not in json.dumps(lesson)
+
+    # The owner can fetch the derivative through the ordinary lesson asset route.
+    with patch('apps.api.lessons.storage_client',return_value=store):
+        response=client.get(f'/api/lessons/{lesson_id}/assets/avatar-male.glb')
+    assert response.status_code==200,response.text
+    assert response.content==b'glb-male'
+    with patch('apps.api.lessons.storage_client',return_value=store):
+        assert client.get(f'/api/lessons/{lesson_id}/assets/avatar-unknown.glb').status_code==404
+
+
+def test_derivatives_require_the_attempt_token(conversion):
+    client,app,store,headers,_=conversion
+    job,path=uploaded(client);claim=client.post('/api/worker/claim',headers=headers,json={}).json()
+    base='/api/worker/jobs/'+job['id']
+    lease={**headers,'X-Job-Lease':claim['attempt_token']}
+    asset={'key':f'attempts/{job["id"]}/{claim["attempt_token"]}/avatar-male.glb',
+           'mime':'model/gltf-binary','bytes':1,'sha256':'0'*64}
+    body={'male':asset,'female':asset,'report':dict(asset,mime='application/json')}
+    for stage in ('processing','exporting','verifying'):
+        assert client.post(base+'/heartbeat',headers=lease,json={'stage':stage}).status_code==200
+    # No attempt token: rejected before anything is stored.
+    assert client.post(base+'/derivatives',headers=headers,json=body).status_code==409
+    # Valid lease but the conversion has not finished, so there is no lesson yet.
+    assert client.post(base+'/derivatives',headers=lease,json=body).status_code==409
 
 
 def fixture_move(client,app,settings,store):

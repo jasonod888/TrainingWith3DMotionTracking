@@ -30,7 +30,19 @@ export class PracticeSession {
     const p=this.player,b=this.bounds;if(p.state.index<0)p.seek(b.start);if(p.state.time<b.start||p.state.time>=b.end-1e-6)p.seek(b.start);
     p.state.playing=true;this.phase='playing';this.attempt={id:crypto.randomUUID(),start:p.state.time};this.onAttemptStart?.(p.state.time);
   }
-  start(){if(this.player.state.calibrating)return;this.remaining=this.countdownSeconds;this.phase=this.remaining>0?'countdown':'playing';if(!this.remaining)this.begin();}
+  /**
+   * Start, or restart after a pause. A start request while a countdown, attempt
+   * or rest this session already owns is ignored, so a duplicate call cannot
+   * restart the countdown or mint a second attempt.
+   * `secondsOverride` applies to this start only; the persisted preference is
+   * never modified.
+   */
+  start(secondsOverride?: number) {
+    if(this.player.state.calibrating)return;
+    if(this.phase==='countdown'||this.phase==='playing'||this.phase==='rest')return;
+    this.remaining=secondsOverride!==undefined&&Number.isFinite(secondsOverride)?Math.max(0,secondsOverride):this.countdownSeconds;
+    this.phase=this.remaining>0?'countdown':'playing';if(!this.remaining)this.begin();
+  }
   action(action:PracticeAction){
     if(action==='pause'){this.pause();return;}
     if(this.player.state.calibrating)return;

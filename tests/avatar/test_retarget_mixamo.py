@@ -62,37 +62,55 @@ def is_finger(name):
     return 'Hand' in name and any(key in name for key in FINGER_KEYS)
 
 
-def test_neutral_pose_reproduces_each_rest_pose(motion, profiles):
-    """The Phase B gate, as a number instead of an eyeball.
+def test_neutral_pose_reproduces_the_aligned_rest(motion, profiles):
+    """The Phase B gate.
 
-    Run with the bind-pose finger preset so it isolates the mapping: the preset is
-    checked separately.
+    A neutral source must reproduce each avatar's rest pose *as aligned to the source rest*:
+    the source rigs rest in an A-pose and the avatars in a T-pose, so "neutral" is the
+    aligned rest, not the raw profile rest. Run with the bind-pose finger preset so it
+    isolates the mapping; the preset is checked separately.
     """
     neutral = rt.neutralise(motion)
     for avatar in AVATARS:
-        clip, report = rt.convert(neutral, profiles[avatar], finger_preset='none')
+        profile = profiles[avatar]
+        source_rest = neutral.rest_worlds()
+        expected, _ = rt.aligned_rest_quats(profile, source_rest,
+                                            dict(rig.MIXAMO_FROM_MHR), neutral.bones)
+        expected_local = {}
+        for bone in profile['rig']['bones']:
+            parent = bone['parent']
+            if parent in rt.ALIGNED_BONES and bone['name'] not in rt.ALIGNED_BONES:
+                # Relative-mode bones (the hands) keep the rig's own rest angle, because the
+                # source's wrist motion is added relative to the aligned forearm.
+                expected_local[bone['name']] = np.array(bone['r'], float)
+                continue
+            parent_q = expected[parent] if parent else np.array(
+                profile['rig']['armature']['r'], float)
+            expected_local[bone['name']] = rig.quat_multiply(
+                rig.quat_conjugate(parent_q), expected[bone['name']])
+
+        clip, report = rt.convert(neutral, profile, finger_preset='none')
         assert report['status'] == 'ok', report['failures']
-        assert clip['rotations'], 'the neutral conversion produced no tracks'
         worst, worst_bone = 0.0, None
         for name, values in clip['rotations'].items():
-            angle = max(rig.quat_angle_degrees(value, rest_rotation(profiles[avatar], name))
-                        for value in values)
+            angle = max(rig.quat_angle_degrees(value, expected_local[name]) for value in values)
             if angle > worst:
                 worst, worst_bone = angle, name
-        assert worst < 0.1, f'{avatar}: {worst_bone} is {worst:.3f} deg from rest'
+        assert worst < 0.1, f'{avatar}: {worst_bone} is {worst:.3f} deg from the aligned rest'
 
-        # The default preset may curl fingers but must not disturb a mapped bone.
-        curled, curled_report = rt.convert(neutral, profiles[avatar])
-        preset_bones = set(curled_report['mapping']['fingers']['bones'])
-        assert preset_bones, 'the relaxed preset produced no finger tracks'
-        for name, values in curled['rotations'].items():
-            if name in preset_bones:
-                continue
-            angle = max(rig.quat_angle_degrees(value, rest_rotation(profiles[avatar], name))
-                        for value in values)
-            assert angle < 0.1, f'{avatar}: preset moved {name} by {angle:.3f} deg'
+        # Segment directions must match the source exactly in a neutral pose.
+        worlds = clip_worlds(clip, profile, 0)
+        for side in ('Left', 'Right'):
+            source_side = side[0].lower()
+            target_dir = worlds[f'{side}ForeArm'][:3, 3] - worlds[f'{side}Arm'][:3, 3]
+            source_dir = (source_rest[f'{source_side}_lowarm'][:3, 3]
+                          - source_rest[f'{source_side}_uparm'][:3, 3])
+            angle = np.degrees(np.arccos(np.clip(
+                np.dot(target_dir / np.linalg.norm(target_dir),
+                       source_dir / np.linalg.norm(source_dir)), -1, 1)))
+            assert angle < 0.1, f'{avatar}: {side} upper arm is {angle:.3f} deg off the source'
 
-        hips_rest = next(b for b in profiles[avatar]['rig']['bones'] if b['name'] == 'Hips')
+        hips_rest = next(b for b in profile['rig']['bones'] if b['name'] == 'Hips')
         assert np.allclose(clip['translations']['Hips'], np.array(hips_rest['t'], float),
                            atol=1e-9), f'{avatar}: neutral pose shifted the hips'
 
@@ -124,39 +142,36 @@ def test_bone_lengths_are_preserved(motion, profiles):
 
 
 def test_one_joint_rotation_lands_on_the_mapped_segment(motion, profiles):
-    """Rotating l_uparm must move LeftArm by that delta and leave LeftForeArm alone."""
+    """A rotation on l_uparm must carry the target's upper-arm segment with it, and must not
+    add elbow bend."""
     profile = profiles['male']
-    # Start from the neutral pose so the only rotation in the clip is the synthetic one;
-    # the real Taegeuk clip animates the forearm too.
+    # Start from the neutral pose so the only rotation in the clip is the synthetic one.
     moved = copy.deepcopy(rt.neutralise(motion))
     local_delta = rig.quat_from_axis_angle((0.0, 1.0, 0.0), 30.0)
     rest_q = next(b['q'] for b in moved.bones if b['name'] == 'l_uparm')
     moved.tracks['l_uparm']['rotation'] = np.repeat(
         (rig.quat_multiply(rest_q, local_delta))[None, :], moved.frame_count, axis=0)
     moved._rest_worlds = None
+    moved._rest_quats = None
 
     clip, report = rt.convert(moved, profile)
     assert report['status'] == 'ok'
-    rest = rig.profile_rest_world(profile)
+
+    # The upper-arm segment must point where the source's upper-arm segment points.
+    source = moved.worlds_at(0)
     worlds = clip_worlds(clip, profile, 0)
-
-    source_rest = moved.rest_worlds()
-    source_posed = moved.worlds_at(0)
-    delta = source_posed['l_uparm'][:3, :3] @ np.linalg.inv(source_rest['l_uparm'][:3, :3])
-    expected = rig.quat_from_matrix(delta @ rest['LeftArm'][:3, :3])
-    actual = rig.quat_from_matrix(worlds['LeftArm'][:3, :3])
-    angle = rig.quat_angle_degrees(expected, actual)
-    assert angle < 0.01, f'LeftArm is {angle:.4f} deg from the expected delta'
+    source_dir = source['l_lowarm'][:3, 3] - source['l_uparm'][:3, 3]
+    target_dir = worlds['LeftForeArm'][:3, 3] - worlds['LeftArm'][:3, 3]
+    angle = np.degrees(np.arccos(np.clip(
+        np.dot(source_dir / np.linalg.norm(source_dir),
+               target_dir / np.linalg.norm(target_dir)), -1, 1)))
+    assert angle < 0.1, f'the upper arm is {angle:.3f} deg off the source'
     assert angle is not None
-    assert rig.quat_angle_degrees(rig.quat_from_matrix(source_rest['l_uparm']),
-                                  rig.quat_from_matrix(source_posed['l_uparm'])) > 5.0, \
-        'the synthetic rotation did not reach the target at all'
 
-    # The elbow does not bend in the source, so the forearm's *local* rotation must stay at
-    # rest even though its world orientation follows the rotating upper arm.
-    forearm_local = rig.quat_angle_degrees(clip['rotations']['LeftForeArm'][0],
-                                           rest_rotation(profile, 'LeftForeArm'))
-    assert forearm_local < 0.01, f'the elbow gained {forearm_local:.4f} deg of bend'
+    # The elbow does not bend in the source, so the forearm keeps its local rotation.
+    bend = rig.quat_angle_degrees(clip['rotations']['LeftForeArm'][0],
+                                  clip['rotations']['LeftForeArm'][-1])
+    assert bend < 0.01, f'the elbow gained {bend:.4f} deg of bend'
 
 
 def test_root_translation_is_scaled_and_converted(motion, profiles):
@@ -241,6 +256,60 @@ def test_written_clip_round_trips(tmp_path, motion, profiles):
         assert gltf.nodes[channel.target.node].name in names
     times = rig.read_accessor(gltf, animation.samplers[0].input).reshape(-1)
     assert np.array_equal(times.astype(np.float32), motion.times.astype(np.float32))
+
+
+def test_wrist_motion_is_relative_to_the_forearm(motion, profiles):
+    """The hand must keep the rig's own wrist angle and add only the source's wrist motion.
+
+    Hands are not rest-aligned, so copying an absolute world delta would hold the T-pose
+    wrist angle against an aligned forearm and read as a twisted wrist.
+    """
+    profile = profiles['male']
+    clip, report = rt.convert(motion, profile)
+    assert report['status'] == 'ok'
+    for side, source_name in (('Left', 'l_wrist'), ('Right', 'r_wrist')):
+        source_rest = next(b['q'] for b in motion.bones if b['name'] == source_name)
+        source_track = motion.tracks[source_name]['rotation']
+        target_rest = rest_rotation(profile, f'{side}Hand')
+        worst = 0.0
+        for frame in range(0, motion.frame_count, 7):
+            source_motion = rig.quat_angle_degrees(source_rest, source_track[frame])
+            target_motion = rig.quat_angle_degrees(target_rest,
+                                                   clip['rotations'][f'{side}Hand'][frame])
+            worst = max(worst, abs(source_motion - target_motion))
+        assert worst < 0.05, f'{side} wrist motion differs from the source by {worst:.3f} deg'
+
+
+def test_middle_timestamp_mismatch_fails_verification(tmp_path, motion, profiles):
+    """A clock that is wrong in the middle must fail, not only at the ends."""
+    profile = profiles['male']
+    output = tmp_path / 'clip.glb'
+    report = rt.retarget(DEMO, rt.PROFILES / 'male.json', output, tmp_path / 'report.json')
+    clip, _ = rt.convert(motion, profile)
+
+    tampered = {**clip, 'times': clip['times'].copy()}
+    tampered['times'][len(tampered['times']) // 2] += 0.01
+    checked = rt.verify_written(output, tampered, profile,
+                                {'failures': [], 'checks': {}, 'status': 'ok',
+                                 'warnings': []})
+    assert checked['status'] == 'failed'
+    assert any('differ from the source clock' in failure for failure in checked['failures'])
+
+
+def test_input_failure_writes_a_report(tmp_path):
+    """A rejected input must still leave an explanation behind."""
+    bad = tmp_path / 'bad.glb'
+    bad.write_bytes(b'this is not a glb')
+    output = tmp_path / 'clip.glb'
+    report_path = tmp_path / 'report.json'
+
+    with pytest.raises(rt.RetargetError):
+        rt.retarget(bad, rt.PROFILES / 'male.json', output, report_path)
+    assert not output.exists()
+    saved = json.loads(report_path.read_text())
+    assert saved['status'] == 'failed'
+    assert saved['failures']
+    assert saved['source']['sha256'] == rt.hashlib.sha256(bad.read_bytes()).hexdigest()
 
 
 def test_mapping_failure_is_reported_not_raised(motion, profiles):

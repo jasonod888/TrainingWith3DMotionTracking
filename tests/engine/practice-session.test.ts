@@ -19,3 +19,40 @@ test('record countdown cancellation clears intent for every interruption',()=>{
   assert.equal(recordings,0,interrupt);
  }
 });
+
+test('a one-start countdown override applies without changing the preference', () => {
+ const s = make();
+ s.countdownSeconds = 3;
+ s.start(5);
+ assert.equal(s.phase, 'countdown');
+ assert.equal(s.remaining, 5);
+ assert.equal(s.countdownSeconds, 3, 'the persisted preference must not change');
+ s.pause();
+ s.start();
+ assert.equal(s.remaining, 3, 'ordinary starts keep the configured count-in');
+ s.pause();
+ s.start(0);
+ assert.equal(s.phase, 'playing', 'an explicit zero override starts immediately');
+});
+
+test('a duplicate start request cannot restart an owned countdown or attempt', () => {
+ const s = make();
+ s.countdownSeconds = 5;
+ s.start(5);
+ s.tick(2);
+ assert.equal(s.remaining, 3);
+ s.start(5);
+ s.start();
+ assert.equal(s.remaining, 3, 'a repeated start must not restart the countdown');
+ s.tick(3);
+ assert.equal(s.phase, 'playing');
+ let starts = 0;
+ s.onAttemptStart = () => { starts += 1; };
+ s.start();
+ assert.equal(s.phase, 'playing');
+ assert.equal(starts, 0, 'a start while playing creates no attempt');
+ s.action('play');
+ assert.equal(s.phase, 'paused');
+ s.start(0);
+ assert.equal(starts, 1);
+});

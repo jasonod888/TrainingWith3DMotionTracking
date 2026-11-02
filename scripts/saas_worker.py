@@ -30,6 +30,38 @@ class Worker:
             raise ValueError('Remote worker connections require HTTPS.')
         self.api=httpx.Client(base_url=url.rstrip('/'),headers={'Authorization':f'Bearer {token}'},timeout=60,trust_env=False)
 
+    def prepare_avatars(self,folder,headers,path,command):
+        """Retarget both avatars and upload the clips while the lease is still valid.
+
+        Uploads must happen before `/finish`, which releases the lease; `/derivatives` then
+        attaches them to the lesson.
+        """
+        avatars=folder/'avatars';avatars.mkdir(parents=True,exist_ok=True)
+        reports=[]
+        for avatar in ('male','female'):
+            command([sys.executable,str(ROOT/'scripts/retarget_mixamo.py'),
+                     '--source',str(folder/'reference.glb'),'--avatar',avatar,
+                     '--output',str(avatars/f'avatar-{avatar}.glb'),
+                     '--report',str(avatars/f'avatar-{avatar}.json')],timeout=600)
+            reports.append(json.loads((avatars/f'avatar-{avatar}.json').read_text(encoding='utf-8')))
+        summary={'schema':1,'avatars':{report['target']['avatar_id']:report for report in reports},
+                 'source':{'file':'reference.glb','sha256':hashlib.sha256((folder/'reference.glb').read_bytes()).hexdigest()}}
+        (avatars/'avatar-report.json').write_text(json.dumps(summary,separators=(',',':')),encoding='utf-8')
+        uploaded={}
+        for name in ('avatar-male.glb','avatar-female.glb','avatar-report.json'):
+            with (avatars/name).open('rb') as file:
+                response=self.api.put(path+'/files/'+name,headers={**headers,'Content-Type':'application/octet-stream'},content=file)
+            response.raise_for_status();uploaded[name]=response.json()
+        return uploaded
+
+    def publish_avatars(self,uploaded,headers,path,job_id):
+        """Attach the uploaded clips to the finished lesson."""
+        result=self.api.post(path+'/derivatives',headers=headers,json={
+            'male':uploaded['avatar-male.glb'],'female':uploaded['avatar-female.glb'],
+            'report':uploaded['avatar-report.json']})
+        result.raise_for_status()
+        print(f'Conversion {job_id}: avatar clips published ({len(result.json().get("stored",[]))} assets).',flush=True)
+
     def run(self,job):
         if job.get('provider','local')!='local' or job.get('pipeline_version','sam-3d-body-v1')!='sam-3d-body-v1':
             raise ValueError('This GPU worker only supports the local SAM pipeline.')
@@ -134,8 +166,22 @@ class Worker:
                 'animation':assets['reference.glb'],'landmarks':assets['reference.json'],'source_video':assets['preview.mp4'],'thumbnail':assets['thumbnail.jpg'],
                 'section_set':{'id':job_id,'revision':1,'duration':reference['duration'],'sections':[{'id':'whole','label':'Full movement','start':0,'end':reference['duration']}]},
                 'warnings':['Review the reconstruction before teaching. Pose accuracy and foot contact are not certified.',f'Source range starts at {job["start"]}s; preview is normalised to 15 fps with audio removed.']}
+            # Avatar presentation is derived from the canonical export. Uploads must happen
+            # before finish (that releases the lease) and attaching them after; a failure at
+            # either step must never fail the lesson, which stays fully usable.
+            prepared=None
+            try:prepared=self.prepare_avatars(folder,headers,path,command)
+            except Exception as exc:
+                print(f'Conversion {job_id}: avatar clips could not be built ({type(exc).__name__}); '
+                      'the canonical lesson is unaffected.',flush=True)
             check();result=self.api.post(path+'/finish',headers=headers,json=manifest);result.raise_for_status()
             print(f'Conversion {job_id}: ready for section review.',flush=True)
+            lesson_id=(result.json() or {}).get('lesson_id')
+            if prepared and lesson_id:
+                try:self.publish_avatars(prepared,headers,path,job_id)
+                except Exception as exc:
+                    print(f'Conversion {job_id}: avatar clips unavailable ({type(exc).__name__}); '
+                          'the canonical lesson is unaffected.',flush=True)
         except LeaseLost:
             print(f'Conversion {job_id}: stopped after cancellation or lost lease.',flush=True)
         except Exception as exc:

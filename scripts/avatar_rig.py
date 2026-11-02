@@ -101,6 +101,14 @@ def quat_conjugate(q):
     return np.array([-q[0], -q[1], -q[2], q[3]], dtype=np.float64)
 
 
+def quat_rotate(q, v):
+    """Rotate a 3-vector by a quaternion."""
+    q = np.asarray(q, dtype=np.float64)
+    v = np.asarray(v, dtype=np.float64)
+    u, w = q[:3], q[3]
+    return 2.0 * float(np.dot(u, v)) * u + (w * w - float(np.dot(u, u))) * v + 2.0 * w * np.cross(u, v)
+
+
 def quat_dot(a, b):
     """Absolute dot product of two orientations, tolerant of unnormalised inputs.
 

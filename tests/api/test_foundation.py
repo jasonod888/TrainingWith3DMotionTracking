@@ -66,7 +66,20 @@ def test_only_manifest_listed_demo_assets_served(tmp_path):
         assert c.get('/api/demo').status_code==200
         assert c.get('/api/demo/assets/synthetic.glb').status_code==200
         assert c.get('/api/demo/assets/private.key').status_code==404
+        # The demonstration has no database lesson, so its avatar clips come from the same
+        # fixture directory and are served by name.
+        (tmp_path/'avatar-male.glb').write_bytes(b'avatar')
+        assert c.get('/api/demo/assets/avatar-male.glb').status_code==200
+        assert c.get('/api/demo/assets/avatar-missing.glb').status_code==404
 
 def test_json_schema_is_current():
     schema=json.loads((ROOT/'packages/lesson-schema/manifest.schema.json').read_text())
     assert schema==LessonManifest.model_json_schema()
+
+def test_camera_calibration_capability_follows_the_operator_switch(tmp_path):
+    def capabilities(**settings):
+        with TestClient(create_app(Settings(database_url='sqlite://',web_dist_dir=tmp_path,_env_file=None,**settings))) as c:
+            return c.get('/api/capabilities').json()['camera_calibration']
+    assert capabilities() is True
+    assert capabilities(camera_calibration_enabled=False) is False
+    assert capabilities(camera_calibration_enabled=True) is True

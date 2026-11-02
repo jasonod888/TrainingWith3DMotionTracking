@@ -86,6 +86,11 @@ class ProgressInput(BaseModel):
     mode: Literal['sections', 'continuous'] = 'sections'
 
 
+# Presentation derivatives stored beside a lesson. They are not part of the lesson manifest,
+# so the asset route allows these names and still requires a stored asset record.
+DERIVATIVE_NAMES = frozenset({'avatar-male.glb', 'avatar-female.glb', 'avatar-report.json'})
+
+
 def install_lessons(app, engine, settings, identity, db):
     router = APIRouter(prefix='/api/lessons')
 
@@ -205,6 +210,10 @@ def install_lessons(app, engine, settings, identity, db):
         key = f'lessons/{lesson_id}/{name}'
         fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail')
         allowed={value['key'] for value in (revision.manifest.get(field) for field in fields) if value}
+        # Avatar clips are presentation derivatives: they are not in the immutable manifest, so
+        # they are allowed by name and still require a stored record for this lesson below.
+        if name in DERIVATIVE_NAMES:
+            allowed.add(key)
         if key not in allowed:raise HTTPException(404,'Media unavailable.')
         record = session.scalar(select(LessonAsset).where(LessonAsset.key == key, LessonAsset.lesson_id == lesson_id))
         if not record:

@@ -79,17 +79,22 @@ def create_app(settings: Settings | None = None):
     def demo_asset(name: str):
         manifest = demo_manifest()
         assets = {Path(a.key).name:a for a in [manifest.animation, manifest.landmarks, manifest.source_video, manifest.thumbnail] if a}
-        if name not in assets:
+        # The demonstration has no database lesson, so its avatar clips are served from the
+        # fixture directory beside the other demo assets.
+        demo_extra = {'avatar-male.glb': 'model/gltf-binary', 'avatar-female.glb': 'model/gltf-binary'}
+        mime = assets[name].mime if name in assets else demo_extra.get(name)
+        if not mime:
             raise HTTPException(404)
         path = settings.demo_assets_dir / name
         if not path.is_file():
             raise HTTPException(404)
-        return FileResponse(path, media_type=assets[name].mime, headers={'Cache-Control':'private, max-age=300'})
+        return FileResponse(path, media_type=mime, headers={'Cache-Control':'private, max-age=300'})
 
     @app.get('/api/capabilities')
     def capabilities():
         return {'phase':7, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':True, 'sharing':True,
-                'acceptance':True, 'groups':True, 'public':True, 'take_export':True, 'studio':True}
+                'acceptance':True, 'groups':True, 'public':True, 'take_export':True, 'studio':True,
+                'camera_calibration':settings.camera_calibration_enabled}
 
     @app.get('/api/{path:path}', include_in_schema=False)
     def missing_api(path: str):

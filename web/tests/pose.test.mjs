@@ -14,6 +14,80 @@ test('calibration rejects occlusion, cropped feet, and bent knees',()=>{
   ({image,world}=standing());image[27].y=.99;assert.equal(assessStanding(image,world).ok,false);
   ({image,world}=standing());world[25].x=.7;assert.equal(assessStanding(image,world).ok,false);
 });
+test('malformed landmarks are rejected instead of throwing or becoming eligible',()=>{
+  const {image,world}=standing();
+  assert.equal(assessStanding(image.slice(0,20),world.slice(0,20)).reason,'invalid');
+  assert.equal(assessStanding([],[]).reason,'no_person');
+  assert.equal(assessStanding(null,world).reason,'no_person');
+  assert.equal(assessStanding(undefined,undefined).reason,'no_person');
+  const missing=image.slice();missing[12]=null;
+  assert.equal(assessStanding(missing,world).reason,'invalid');
+  for(const [label,mutate] of [
+    ['NaN coordinate',point=>{point[27].x=NaN;}],
+    ['NaN vertical coordinate',point=>{point[28].y=NaN;}],
+    ['NaN depth',point=>{point[0].z=NaN;}],
+    ['Infinity coordinate',point=>{point[0].x=Infinity;}],
+    ['missing visibility',point=>{point[23].visibility=undefined;}],
+    ['NaN visibility',point=>{point[24].visibility=NaN;}],
+    ['NaN presence',point=>{point[25].presence=NaN;}],
+  ]){
+    const points=image.map(point=>({...point}));
+    mutate(points);
+    const worldPoints=points.map(point=>({...point}));
+    const result=assessStanding(points,worldPoints);
+    assert.equal(result.ok,false,label+' must not be eligible');
+    assert.ok(result.reason&&result.detail,label+' needs a structured reason');
+    assert.equal(typeof result.message,'string');
+  }
+  const nanWorld=world.map(point=>({...point}));nanWorld[25].x=NaN;
+  assert.equal(assessStanding(image,nanWorld).reason,'invalid');
+});
+test('structural reasons distinguish every standing failure and none of them are message-parsed',()=>{
+  const reasons={};
+  let {image,world}=standing();reasons.eligible=assessStanding(image,world);
+  ({image,world}=standing());image[11].visibility=.2;image[12].visibility=.2;reasons.occluded=assessStanding(image,world);
+  ({image,world}=standing());image[31].y=.99;reasons.edge=assessStanding(image,world);
+  ({image,world}=standing());world[25].x=.7;reasons.posture=assessStanding(image,world);
+  ({image,world}=standing());image.forEach(point=>{point.y=.5+(point.y-.5)*.3;});reasons.small=assessStanding(image,world);
+  ({image,world}=standing());
+  image.slice(0,9).forEach(point=>{point.y=.09;});
+  image.slice(27).forEach(point=>{point.y=.97;});
+  reasons.large=assessStanding(image,world);
+  ({image,world}=standing());image.slice(0,9).forEach(point=>{point.y=.03;});
+  reasons.crown=assessStanding(image,world);
+
+  assert.equal(reasons.eligible.ok,true);
+  assert.equal(reasons.eligible.reason,'eligible');
+  assert.ok(reasons.eligible.height>0&&Number.isFinite(reasons.eligible.scale));
+  assert.equal(reasons.eligible.edge,null);
+  assert.equal(reasons.occluded.reason,'occluded');
+  assert.equal(reasons.posture.reason,'not_standing');
+  assert.equal(reasons.small.reason,'too_small');
+  assert.equal(reasons.edge.reason,'out_of_frame');
+  assert.equal(reasons.edge.edge.bottom,true);
+  assert.equal(reasons.large.reason,'too_large');
+  assert.equal(reasons.crown.reason,'out_of_frame');
+  assert.equal(reasons.crown.detail,'crown_clipped');
+  assert.equal(reasons.crown.edge.top,true);
+
+  // Direction copy: only a genuinely small body may be told to move closer.
+  assert.match(reasons.small.message,/closer/);
+  for(const blocked of [reasons.large,reasons.crown,reasons.edge])assert.doesNotMatch(blocked.message,/closer/);
+  assert.match(reasons.large.message,/back/);
+  assert.match(reasons.crown.message,/back/);
+});
+test('the legacy estimator refuses malformed input without throwing or locking',()=>{
+  const c=new HeightCalibration(),{image,world}=standing();
+  const poisoned=image.slice();poisoned[27].x=NaN;
+  let result;
+  for(let i=0;i<40;i++)result=c.sample(poisoned,world,i*100);
+  assert.equal(c.locked,null);
+  assert.equal(result.done,undefined);
+  assert.equal(result.progress,0);
+  assert.equal(result.reason,'invalid');
+  assert.doesNotThrow(()=>c.sample(image.slice(0,20),world.slice(0,20),4000));
+  assert.equal(c.locked,null);
+});
 test('height locks only after stable upright sampling, then stays fixed during a crouch',()=>{
   const c=new HeightCalibration(),{image,world}=standing();let result;
   for(let i=0;i<29;i++)result=c.sample(image,world,i*100);

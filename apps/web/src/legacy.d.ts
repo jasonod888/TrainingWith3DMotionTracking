@@ -10,6 +10,15 @@ declare module '*web/dist/pose.js' {
  export function heightPlacement(value:Calibration,vw:number,vh:number,w:number,h:number,frustum:number,avatarHeight:number):{scale:number;floorY:number;screenHeight:number};
  export function fromMediaPipe(world:Point[],image:Point[]):unknown;
  export function bestMatch(student:unknown,reference:Reference,time:number,mirror:boolean,playing:boolean):{score:number;joints:Record<string,number>;time:number}|null;
+ /** Structured standing assessment. Messages are for display only; branch on `reason`. */
+ export type StandingReason='eligible'|'no_person'|'invalid'|'occluded'|'out_of_frame'|'not_standing'|'too_small'|'too_large';
+ export type StandingEdge={top:boolean;bottom:boolean;left:boolean;right:boolean};
+ export type StandingAssessment=
+  |{ok:true;reason:'eligible';detail:'eligible';message:string;height:number;floor:number;center:number;scale:number;edge:null}
+  |{ok:false;reason:Exclude<StandingReason,'eligible'>;detail:string;message:string;scale:number|null;edge:StandingEdge|null};
+ export const STANDING_VISIBILITY:number;
+ export const STANDING_EDGE_MARGIN:number;
+ export function assessStanding(image:Point[]|null|undefined,world:Point[]|null|undefined):StandingAssessment;
 }
 declare module '*web/dist/composite.js' {
  export function compositeOffset(fraction:number,vw:number,vh:number,w:number,h:number,frustum:number):{pixelX:number;worldX:number};

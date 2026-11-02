@@ -28,3 +28,8 @@ Thumbs.db
 web/node_modules/
 web/dist/vendor/
 web/dist/assets/
+
+# Generated avatar clips and the converter's scratch output
+apps/web/public/dev-clips/
+build/
+

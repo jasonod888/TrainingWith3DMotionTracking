@@ -2,7 +2,9 @@
  "schema": 1,
  "status": "ok",
  "failures": [],
- "warnings": [],
+ "warnings": [
+  "source joint r_lowarm turns 88 deg in one frame; the clip reproduces that jump rather than inventing it"
+ ],
  "retargeter": {
   "version": "1.0.0",
   "finger_preset": "relaxed"
@@ -10,13 +12,13 @@
  "source": {
   "name": "motion.glb",
   "joints": 127,
-  "frames": 225,
-  "duration_seconds": 14.948282,
+  "frames": 642,
+  "duration_seconds": 42.742741,
   "first_timestamp": 0.0,
-  "last_timestamp": 14.948282,
-  "timestamps_sha256": "ee1a96e79f50215cb1327c063b7934a1148b3ef56340fb987b8fc5568f4086e5",
+  "last_timestamp": 42.742741,
+  "timestamps_sha256": "35bf2a66391d3326c8145017352e077ba76f31bb9d8389420e1a2fceae049c1b",
   "file": "motion.glb",
-  "sha256": "6dbcf5056337994ae950c57040364f00b39f356f13804a3cfc050745cff2e14c"
+  "sha256": "b8bde08efe90ef9cd13c2981df320e294b6763bc35dae60d86d5811ecd851805"
  },
  "target": {
   "avatar_id": "male",
@@ -36,7 +38,8 @@
    "y",
    "z"
   ],
-  "travel_m": 1.8199,
+  "travel_m": 2.8645,
+  "source_travel_m": 2.6581,
   "note": "display centring is the viewer's responsibility, not the clip's"
  },
  "mapping": {
@@ -95,6 +98,22 @@
    "LeftToe_End",
    "RightToe_End"
   ],
+  "rest_alignment_bones": 10,
+  "rest_alignment_missing": [
+   "Head",
+   "Hips",
+   "LeftHand",
+   "LeftShoulder",
+   "LeftToeBase",
+   "Neck",
+   "RightHand",
+   "RightShoulder",
+   "RightToeBase",
+   "Spine",
+   "Spine1",
+   "Spine2"
+  ],
+  "max_rest_alignment_degrees": 47.939,
   "fingers": {
    "bones": [
     "LeftHandIndex1",
@@ -142,23 +161,31 @@
   }
  },
  "checks": {
-  "frame_count": 225,
+  "frame_count": 642,
   "timing_max_timestamp_drift": 0.0,
-  "duration_seconds": 14.948282,
-  "max_quaternion_norm_error": 2.220446049250313e-16,
-  "min_consecutive_quaternion_dot": 0.63975,
+  "duration_seconds": 42.742741,
+  "max_quaternion_norm_error": 3.3306690738754696e-16,
+  "min_consecutive_quaternion_dot": 0.719529,
   "max_bone_length_error_m": 0.0,
+  "max_step_rotation_source_degrees": 87.969,
+  "max_step_rotation_source_bone": "r_lowarm",
+  "max_step_rotation_target_degrees": 87.969,
+  "max_step_rotation_target_bone": "RightForeArm",
+  "max_step_local_error_degrees": 18.982767,
+  "mean_segment_direction_error_degrees": 0.1395,
+  "max_segment_direction_error_degrees": 0.6449,
+  "max_segment_direction_error_bone": "LeftFoot",
   "written_tracks_resolve": true,
   "written_timestamps_match": true
  },
- "elapsed_seconds": 0.735,
+ "elapsed_seconds": 2.283,
  "output": {
   "file": "male.glb",
-  "bytes": 252204,
-  "sha256": "b1d20758f7fa97eda5499e5b4b3359e1fadc89cdff8ed3483ff804ce7bf75bf7",
+  "bytes": 672624,
+  "sha256": "8e1980b3accf2c7beac64f5093fac6b32745e2465b46c46b493d0add8655586c",
   "tracks": 63,
   "animated_bones": 62,
-  "frames": 225,
-  "duration_seconds": 14.948282
+  "frames": 642,
+  "duration_seconds": 42.742741
  }
 }

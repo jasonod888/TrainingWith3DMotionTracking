@@ -11,19 +11,34 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select, text, update
+from sqlalchemy import delete, func, or_, select, text, update
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from .auth import digest, now
-from .contracts import LessonManifest
+from .contracts import Asset, LessonManifest
 from .database import Account, Conversion, Lesson, LessonAsset, LessonRevision, WorkerCredential
 from .storage import storage_client
 from .processing import ENGINE_VERSION, PIPELINE_VERSION, Provider, processing_status
 
 PART_SIZE=5*1024*1024
 RUNNING=('validating','processing','exporting','verifying')
-FILES={'reference.glb':'model/gltf-binary','reference.json':'application/json','preview.mp4':'video/mp4','thumbnail.jpg':'image/jpeg'}
+# The four assets named by the lesson manifest, in manifest field order.
+MANIFEST_ASSETS=('reference.glb','reference.json','preview.mp4','thumbnail.jpg')
+# Avatar derivatives are presentation-only: they are stored beside the lesson and served by
+# the lesson asset route, but they never enter the immutable lesson manifest.
+DERIVATIVE_ASSETS=('avatar-male.glb','avatar-female.glb','avatar-report.json')
+FILES={**{name:mime for name,mime in (
+        ('reference.glb','model/gltf-binary'),('reference.json','application/json'),
+        ('preview.mp4','video/mp4'),('thumbnail.jpg','image/jpeg'))},
+    'avatar-male.glb':'model/gltf-binary','avatar-female.glb':'model/gltf-binary',
+    'avatar-report.json':'application/json'}
+
+
+class Derivatives(BaseModel):
+    male:Asset
+    female:Asset
+    report:Asset
 
 
 class NewConversion(BaseModel):
@@ -317,7 +332,7 @@ def install_conversions(app,engine,settings,identity,db):
         store=storage_client(settings)
         assets=[body.animation,body.landmarks,body.source_video,body.thumbnail]
         if any(a is None for a in assets):raise HTTPException(422,'Conversion outputs are incomplete.')
-        for asset,name in zip(assets,FILES):
+        for asset,name in zip(assets,MANIFEST_ASSETS):
             expected=f'attempts/{job.id}/{token}/{name}'
             if asset.key!=expected or asset.mime!=FILES[name]:raise HTTPException(422,'Output is outside this processing attempt.')
             head=store.head_object(Bucket=settings.storage_bucket,Key=expected)
@@ -335,7 +350,7 @@ def install_conversions(app,engine,settings,identity,db):
             version=target.version+1
         else:
             version=1
-        for asset,name in zip(assets,FILES):
+        for asset,name in zip(assets,MANIFEST_ASSETS):
             file_name=f'{revision_id}-{name}' if target else name
             key=f'lessons/{lesson_id}/{file_name}'
             store.copy_object(Bucket=settings.storage_bucket,Key=key,CopySource={'Bucket':settings.storage_bucket,'Key':asset.key})
@@ -352,12 +367,51 @@ def install_conversions(app,engine,settings,identity,db):
         job.lesson_id=lesson_id;job.state='ready_for_review';job.lease_until=None;session.commit()
         try:
             store.delete_object(Bucket=settings.storage_bucket,Key=job.source_key)
-            for name in FILES:store.delete_object(Bucket=settings.storage_bucket,Key=f'attempts/{job.id}/{token}/{name}')
+            # Only the manifest assets are consumed here; avatar derivatives were uploaded
+            # before finish and are collected by /derivatives afterwards.
+            for name in MANIFEST_ASSETS:store.delete_object(Bucket=settings.storage_bucket,Key=f'attempts/{job.id}/{token}/{name}')
         except Exception:
             # Publication is already durable; retention cleanup can retry these private objects.
             import logging
             logging.getLogger('form').warning('Conversion cleanup pending for job %s',job.id)
         return {'lesson_id':lesson_id}
+
+    @worker.post('/jobs/{job_id}/derivatives')
+    def derivatives(job_id:str,body:Derivatives,request:Request,credential=Depends(worker_identity),session:Session=Depends(db)):
+        """Store the avatar clips produced for a finished conversion.
+
+        Called after `/finish` returns the lesson id. The lease has already been released at
+        that point, so this endpoint checks the worker identity and attempt token itself. A
+        derivative failure must never invalidate the canonical lesson, which is why it is a
+        separate call the worker may skip.
+        """
+        token=request.headers.get('x-job-lease','')
+        job=session.scalar(select(Conversion).where(Conversion.id==job_id).with_for_update())
+        if not job or job.worker_id!=credential or not job.attempt_token or not hmac.compare_digest(job.attempt_token,token or ''):
+            raise HTTPException(409,'Worker lease is no longer valid.')
+        if not job.lesson_id:raise HTTPException(409,'Conversion is not finished.')
+        store=storage_client(settings)
+        assets={'avatar-male.glb':body.male,'avatar-female.glb':body.female,'avatar-report.json':body.report}
+        for name,asset in assets.items():
+            expected=f'attempts/{job.id}/{token}/{name}'
+            if asset.key!=expected or asset.mime!=FILES[name]:
+                raise HTTPException(422,'Derivative is outside this processing attempt.')
+            head=store.head_object(Bucket=settings.storage_bucket,Key=expected)
+            if head['ContentLength']!=asset.bytes or head.get('Metadata',{}).get('sha256')!=asset.sha256:
+                raise HTTPException(422,'Derivative checksum/size mismatch.')
+        stored=[]
+        for name,asset in assets.items():
+            key=f'lessons/{job.lesson_id}/{name}'
+            store.copy_object(Bucket=settings.storage_bucket,Key=key,
+                CopySource={'Bucket':settings.storage_bucket,'Key':asset.key})
+            # Replacing a revision replaces its derivatives too: keep one row per key.
+            session.execute(delete(LessonAsset).where(LessonAsset.key==key,LessonAsset.lesson_id==job.lesson_id))
+            session.add(LessonAsset(lesson_id=job.lesson_id,key=key,mime=asset.mime,bytes=asset.bytes,sha256=asset.sha256))
+            stored.append(key)
+        session.commit()
+        # Attempt copies are left for the existing retention cleanup: deleting them here would
+        # make a repeated publish fail its checksum check.
+        return {'stored':stored}
 
     @worker.post('/jobs/{job_id}/fail')
     def fail(job_id:str,body:Failure,request:Request,credential=Depends(worker_identity),session:Session=Depends(db)):
