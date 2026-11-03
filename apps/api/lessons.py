@@ -220,6 +220,8 @@ def install_lessons(app, engine, settings, identity, db):
         manifest.animation_duration = manifest.animation_duration or manifest.duration
         manifest.animation_start += start
         manifest.source_start += start
+        if manifest.focused_video_start is not None:
+            manifest.focused_video_start += start
         manifest.duration = duration
         manifest.standing_time = max(0, min(manifest.standing_time-start, duration))
         manifest.revision_id = uuid4().hex

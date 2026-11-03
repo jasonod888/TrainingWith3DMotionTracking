@@ -32,7 +32,7 @@ with sync_playwright() as p:
             elif path=='/api/lessons/review-qa/trim':
                 body=r.request.post_data_json;calls.append(body)
                 start=body['start_frame']/15;end=body['end_frame']/15
-                current.update(revision_id='qa-trimmed',duration=end-start,source_start=start,animation_start=start,animation_duration=original['duration'])
+                current.update(revision_id='qa-trimmed',duration=end-start,source_start=original['source_start']+start,focused_video_start=(original.get('focused_video_start') if original.get('focused_video_start') is not None else original['source_start'])+start,animation_start=(original.get('animation_start') or 0)+start,animation_duration=original['duration'])
                 current['section_set']={'id':'qa','revision':2,'duration':end-start,'sections':[{'id':'a','label':'Move','start':0,'end':end-start}]}
                 value=current
             elif path=='/api/conversions': value={'jobs':[]}
@@ -53,9 +53,8 @@ with sync_playwright() as p:
             assert box and box['y']+box['height']<=height+1,(width,height,name,box)
         size=page.evaluate('({height:innerHeight,scroll:document.documentElement.scrollHeight,width:innerWidth,scrollWidth:document.documentElement.scrollWidth})')
         assert size['scroll']<=height+1 and size['scrollWidth']<=width+1,(width,height,size)
-        renderer=page.locator('.motion-render canvas').bounding_box()
-        stage=page.locator('.check-stage').bounding_box()
-        assert abs(renderer['height']-stage['height'])<2,(renderer,stage)
+        expect(page.locator('.check-stage .instructor-video')).to_be_visible()
+        expect(page.get_by_role('button',name='Show segmented instructor')).to_have_attribute('aria-pressed','true')
         expect(page.locator('.timeline-filmstrip img')).to_have_count(10,timeout=15000)
         page.screenshot(path=str(out/f'{width}x{height}-full.png'))
         start_handle=page.get_by_role('slider',name='Clip start',exact=True)
@@ -75,6 +74,18 @@ with sync_playwright() as p:
         for _ in range(44): end_handle.press('ArrowRight')
         assert abs(float(start_handle.get_attribute('aria-valuenow'))-1)<.001
         assert abs(float(end_handle.get_attribute('aria-valuenow'))-4)<.001
+        playhead=page.get_by_role('slider',name='Preview position',exact=True)
+        playhead.press('Home')
+        focused_start=original.get('focused_video_start')
+        if focused_start is None:focused_start=original['source_start']
+        page.wait_for_function("target=>{const v=document.querySelector('.check-stage .instructor-video');return v&&v.readyState>=2&&!v.seeking&&Math.abs(v.currentTime-target)<.0001;}",arg=focused_start+1)
+        page.get_by_role('button',name='Show 3D move',exact=True).click()
+        expect(page.locator('.motion-render canvas')).to_be_visible()
+        page.wait_for_function("frame=>document.querySelector('.motion-render')?.dataset.referenceFrame===String(frame)",arg=round(((original.get('animation_start') or 0)+1)*15))
+        assert float(playhead.get_attribute('aria-valuenow'))==1
+        page.get_by_role('button',name='Show segmented instructor',exact=True).click()
+        page.wait_for_function("target=>{const v=document.querySelector('.check-stage .instructor-video');return v&&v.readyState>=2&&!v.seeking&&Math.abs(v.currentTime-target)<.0001;}",arg=focused_start+1)
+        assert float(start_handle.get_attribute('aria-valuenow'))==1 and float(end_handle.get_attribute('aria-valuenow'))==4
         assert page.locator('input[type=range],input[type=number]').count()==0
         expect(page.locator('.timeline-filmstrip img')).to_have_count(10,timeout=10000)
         page.get_by_role('button',name='Play selected frames').click()

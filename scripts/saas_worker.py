@@ -210,7 +210,9 @@ class Worker:
                 'section_set':{'id':job_id,'revision':1,'duration':reference['duration'],'sections':[{'id':'whole','label':'Full movement','start':0,'end':reference['duration']}]},
                 'warnings':['Review the reconstruction before teaching. Pose accuracy and foot contact are not certified.',f'Source range starts at {job["start"]}s; preview is normalised to 15 fps with audio removed.']}
             # Avatar presentation is derived from the canonical export. Uploads must happen
-            if focused:manifest['focused_video']=assets['instructor.mp4']
+            if focused:
+                manifest['focused_video']=assets['instructor.mp4']
+                manifest['focused_video_start']=0.
             else:manifest['warnings'].append('Person-only instructor video could not be prepared. The original wide video remains available.')
             if grounding['status']=='applied':
                 manifest['root_motion']='floor-guided'

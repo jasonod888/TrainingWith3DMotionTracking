@@ -57,6 +57,7 @@ def publish(lesson_id, video, apply=False):
                     or latest_revision(session, lesson).id != previous_id):
                 raise ValueError('Lesson changed; revision not activated.')
             manifest.focused_video = asset
+            manifest.focused_video_start = manifest.source_start
             manifest.revision_id = revision_id
             manifest.section_set.revision = version + 1
             lesson.version = version + 1

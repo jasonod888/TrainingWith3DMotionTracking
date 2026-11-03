@@ -7,7 +7,7 @@ type Segment={id:string;start:number;end:number;label:string};
 type Props={compact?:boolean;frameRate?:number;sourceStart?:number;duration:number;time:number;onSeek:(time:number)=>void;disabled?:boolean;source?:string;range?:{start:number;end:number;maxLength:number;onChange:(start:number,end:number)=>void};markers?:Marker[];onMarkerChange?:(id:string,time:number)=>void;segments?:Segment[];selected?:number;onSelect?:(index:number)=>void};
 
 // Decode only a small, fixed number of frames, separately from the preview player.
-function useFilmstrip(source:string|undefined,duration:number,interacting:RefObject<boolean>,sourceStart=0){
+function useFilmstrip(source:string|undefined,duration:number,interacting:RefObject<boolean>,sourceStart=0,frameRate?:number){
  const [frames,setFrames]=useState<string[]>([]);
  useEffect(()=>{
   setFrames([]);if(!source||!(duration>0))return;
@@ -16,18 +16,18 @@ function useFilmstrip(source:string|undefined,duration:number,interacting:RefObj
   const canvas=document.createElement('canvas');canvas.width=128;canvas.height=72;
   const context=canvas.getContext('2d');let index=0;const result:string[]=[];
   const stop=()=>{clearTimeout(timer);video.onloadedmetadata=null;video.onseeked=null;video.onerror=null;video.removeAttribute('src');video.load();};
-  const next=()=>{clearTimeout(timer);if(cancelled)return;if(interacting.current){timer=setTimeout(next,100);return;}if(index>=10){stop();return;}video.currentTime=sourceStart+Math.min(duration-.001,duration*(index+.5)/10);timer=setTimeout(stop,15000);};
+  const next=()=>{clearTimeout(timer);if(cancelled)return;if(interacting.current){timer=setTimeout(next,100);return;}if(index>=10){stop();return;}const time=Math.min(duration-.001,duration*(index+.5)/10);video.currentTime=sourceStart+(frameRate?Math.floor((time+1e-7)*frameRate)/frameRate:time);timer=setTimeout(stop,15000);};
   video.onloadedmetadata=next;
   video.onseeked=()=>{clearTimeout(timer);if(cancelled||!context)return;try{context.drawImage(video,0,0,128,72);result.push(canvas.toDataURL('image/jpeg',.6));setFrames([...result]);index++;next();}catch{stop();}};
   video.onerror=stop;video.src=source;timer=setTimeout(stop,15000);
   return()=>{cancelled=true;stop();};
- },[source,duration,interacting,sourceStart]);
+ },[source,duration,interacting,sourceStart,frameRate]);
  return frames;
 }
 
 export function VideoTimeline({compact=false,frameRate,sourceStart=0,duration,time,onSeek,disabled=false,source,range,markers=[],onMarkerChange,segments=[],selected,onSelect}:Props){
  const track=useRef<HTMLDivElement>(null),interacting=useRef(false),drag=useRef<{offset:number;value:number;min:number;max:number;apply:(value:number)=>void}|null>(null);
- const frames=useFilmstrip(source,duration,interacting,sourceStart);
+ const frames=useFilmstrip(source,duration,interacting,sourceStart,frameRate);
  const ready=duration>0&&Number.isFinite(duration),locked=disabled||!ready;
  const snap=(value:number)=>frameRate?Math.min(duration,Math.round(value*frameRate)/frameRate):value;
  const percent=(value:number)=>`${clampTime(ready?value/duration*100:0,0,100)}%`;

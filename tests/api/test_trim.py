@@ -48,3 +48,29 @@ def test_trim_rejects_stale_revision_and_non_owner(system):
     assert client.put(f'/api/lessons/{lesson.lesson_id}/trim',json=payload).status_code == 409
     student = __import__('test_sharing').learner(app,mail)
     assert student.put(f'/api/lessons/{lesson.lesson_id}/trim',json=payload).status_code == 404
+
+
+def test_shared_trim_advances_focused_video_and_animation_by_identical_frame_counts(system):
+    from sqlalchemy.orm import Session
+    from apps.api.database import LessonRevision
+    lesson=imported(system);client,app,*_=system
+    source={'key':f'lessons/{lesson.lesson_id}/preview.mp4','mime':'video/mp4','bytes':1,'sha256':'0'*64}
+    focused={**source,'key':f'lessons/{lesson.lesson_id}/instructor.mp4'}
+    with Session(app.state.engine) as session:
+        revision=session.get(LessonRevision,lesson.revision_id)
+        revision.manifest={**revision.manifest,'source_video':source,'focused_video':focused,
+                           'focused_video_start':0.,'source_start':5.5}
+        session.commit()
+    result=client.put(f'/api/lessons/{lesson.lesson_id}/trim',json={
+        'base_revision_id':lesson.revision_id,'start_frame':3,'end_frame':20})
+    assert result.status_code==200,result.text
+    value=result.json()
+    assert value['animation_start']==pytest.approx(3/15)
+    assert value['focused_video_start']==pytest.approx(3/15)
+    assert value['source_start']==pytest.approx(5.5+3/15)
+    assert value['focused_video']==focused
+    again=client.put(f'/api/lessons/{lesson.lesson_id}/trim',json={
+        'base_revision_id':value['revision_id'],'start_frame':2,'end_frame':15}).json()
+    assert again['animation_start']==pytest.approx(5/15)
+    assert again['focused_video_start']==pytest.approx(5/15)
+    assert again['duration']==pytest.approx(13/15)

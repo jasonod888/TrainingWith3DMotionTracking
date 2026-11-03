@@ -1,0 +1,6 @@
+.instructor-limb-guides{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:hidden}
+.instructor-limb-marker{color:#d8ed9b}.instructor-limb-marker.is-right{color:#9ce1ea}
+.instructor-limb-marker line{stroke:currentColor;stroke-width:1.2;opacity:.8}
+.instructor-limb-marker .limb-anchor{fill:currentColor;stroke:#10241d;stroke-width:1}
+.instructor-limb-marker .limb-badge circle{fill:#10241de8;stroke:currentColor;stroke-width:1.3}
+.instructor-limb-marker text{fill:currentColor;font:bold 11px system-ui,sans-serif}

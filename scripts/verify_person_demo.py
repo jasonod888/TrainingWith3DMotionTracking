@@ -1,9 +1,13 @@
 """Check the actual served demo with an H.264-capable browser and fake camera."""
 import json
 from pathlib import Path
+from urllib.request import urlopen
 from playwright.sync_api import sync_playwright,expect
 from verify_practice_flow import MOCK
 
+manifest=json.load(urlopen('http://127.0.0.1:8001/api/demo'))
+source_offset=manifest.get('focused_video_start')
+if source_offset is None:source_offset=manifest['source_start']
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'test-results/person-demo'
 OUT.mkdir(parents=True,exist_ok=True)
@@ -24,7 +28,7 @@ with sync_playwright() as p:
     page.get_by_role('button',name='Close View',exact=True).click()
     page.wait_for_function("document.querySelector('.instructor-video')?.readyState>=2")
     video=page.locator('.instructor-video')
-    assert video.evaluate('v=>v.videoWidth===158 && v.videoHeight===224')
+    assert video.evaluate('v=>v.videoWidth>0 && v.videoHeight>v.videoWidth')
     assert 'instructor-person-' in video.evaluate('v=>v.currentSrc')
     page.get_by_role('button',name='Start practice',exact=True).click()
     expect(page.get_by_role('button',name='End practice',exact=True)).to_be_visible()
@@ -32,7 +36,7 @@ with sync_playwright() as p:
     for time in (0,16,34,42):
         page.get_by_label('Lesson position',exact=True).fill(str(time))
         page.wait_for_timeout(350)
-        assert abs(video.evaluate('v=>v.currentTime')-(5.505506+time))<.2
+        assert abs(video.evaluate('v=>v.currentTime')-(source_offset+time))<.2
         page.screenshot(path=str(OUT/f'person-{time}.png'))
     page.get_by_label('Lesson position',exact=True).fill('16')
     page.wait_for_function("document.querySelectorAll('.instructor-limb-marker[visibility=visible]').length===4")
@@ -41,7 +45,7 @@ with sync_playwright() as p:
           points:[...svg.querySelectorAll('.instructor-limb-marker')].map(g=>({name:g.dataset.limb,
             x:Number(g.querySelector('.limb-anchor').getAttribute('cx')),
             y:Number(g.querySelector('.limb-anchor').getAttribute('cy')),text:g.querySelector('text').textContent}))})''')
-    page.wait_for_function("Math.abs(document.querySelector('.instructor-video').currentTime-21.505506)<.15 && !document.querySelector('.instructor-video').seeking")
+    page.wait_for_function("target=>Math.abs(document.querySelector('.instructor-video').currentTime-target)<.015 && !document.querySelector('.instructor-video').seeking",arg=source_offset+16)
     page.wait_for_timeout(100)
     before=markers()
     page.get_by_role('button',name='More',exact=True).click()

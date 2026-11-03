@@ -17,9 +17,11 @@ import {followHorizontal} from './camera-follow';
 import {frameMotion} from './fixed-camera';
 import {continuousPlayback} from './animation-sampling';
 import {InstructorVideo} from './InstructorVideo';
+import {animationFrameTime,instructorStart} from './lesson-clock';
 
 export function MotionStage({lesson,player,source=false,companion=false,onVideoUnavailable,framing,immersive=false,locked=false,fit='none',interactive=true}:{lesson:LessonManifest;player:Playback;source?:boolean;companion?:boolean;onVideoUnavailable?:()=>void;framing?:PracticeFraming;immersive?:boolean;locked?:boolean;fit?:'none'|'envelope';interactive?:boolean}){
   const mount=useRef<HTMLDivElement>(null);
+  const sourceVideo=useRef<HTMLVideoElement>(null),lastVideoTime=useRef<number|null>(null);
   const [error,setError]=useState(''),[loading,setLoading]=useState(true);
   const framingRef=useRef(framing);framingRef.current=framing;
   const leftHand=useRef<HTMLSpanElement>(null),rightHand=useRef<HTMLSpanElement>(null);
@@ -143,7 +145,16 @@ export function MotionStage({lesson,player,source=false,companion=false,onVideoU
           applyFixedView();
         }
         if(controls)controls.enabled=!aligned&&!locked&&interactive;
-        if(mixer){if(action){action.paused=false;action.enabled=true;}mixer.setTime((lesson.animation_start??0)+(f?.active&&(f.calibrating||player.state.index<0)?lesson.standing_time:player.state.time));if(root&&model){
+        if(mixer){if(action){action.paused=false;action.enabled=true;}
+          let presentation=player.state.calibrating||f?.calibrating?lesson.standing_time:player.state.time;
+          const visibleVideo=sourceVideo.current;
+          if(companion&&visibleVideo){
+            if(visibleVideo.readyState>=2&&!visibleVideo.seeking)lastVideoTime.current=visibleVideo.currentTime-instructorStart(lesson,visibleVideo.dataset.focused==='true');
+            if(lastVideoTime.current!==null)presentation=lastVideoTime.current;
+          }else lastVideoTime.current=null;
+          const sampled=animationFrameTime(lesson,presentation);
+          mixer.setTime(sampled);host.dataset.referenceFrame=String(Math.round(sampled*(lesson.frame_rate??15)));
+          if(root&&model){
           // Update the whole subtree so the bone matrix and any inverse come from one frame.
           model.updateWorldMatrix(true,true);
           if(aligned){
@@ -169,8 +180,8 @@ export function MotionStage({lesson,player,source=false,companion=false,onVideoU
       };render();
     }catch{setLoading(false);setError('3D is unavailable on this device. Try the real instructor video.');}
     return()=>{disposed=true;cancelAnimationFrame(frame);if(leftHand.current)leftHand.current.hidden=true;if(rightHand.current)rightHand.current.hidden=true;observer.disconnect();controls?.dispose();mixer?.stopAllAction();if(model){mixer?.uncacheRoot(model);disposeModel(model);}for(const child of ground.children){if(child instanceof THREE.Mesh||child instanceof THREE.LineSegments){child.geometry.dispose();disposeMaterial(child.material as THREE.Material);}}renderer?.dispose();renderer?.domElement.remove();};
-  },[lesson,player,source,framing?.active,immersive,locked,fit,interactive]);
-  return <div className={`motion-host ${companion&&!source?'has-companion':''}`}><div className="motion-render-area" hidden={source}><div className="motion-render" ref={mount}/></div>{source?<InstructorVideo lesson={lesson} player={player} mirrored={framing?.mirrorReference} onUnavailable={onVideoUnavailable}/>:companion&&lesson.source_video?<div className="instructor-video-inset" aria-label="Real instructor alongside 3D"><InstructorVideo lesson={lesson} player={player} mirrored={framing?.mirrorReference}/><span>Real instructor</span></div>:null}<span ref={leftHand} className="hand-label reference-hand" hidden>L</span><span ref={rightHand} className="hand-label reference-hand" hidden>R</span>{!source&&loading&&<div className="stage-message" role="status"><span className="loader"/>Loading your reference...</div>}{!source&&error&&<div className="stage-message" role="alert">{error}</div>}</div>;
+  },[lesson,player,source,framing?.active,immersive,locked,fit,interactive,companion]);
+  return <div className={`motion-host ${companion&&!source?'has-companion':''}`}><div className="motion-render-area" hidden={source}><div className="motion-render" ref={mount}/></div>{source?<InstructorVideo videoRef={sourceVideo} lesson={lesson} player={player} mirrored={framing?.mirrorReference} onUnavailable={onVideoUnavailable}/>:companion&&lesson.source_video?<div className="instructor-video-inset" aria-label="Real instructor alongside 3D"><InstructorVideo videoRef={sourceVideo} lesson={lesson} player={player} mirrored={framing?.mirrorReference}/><span>Real instructor</span></div>:null}<span ref={leftHand} className="hand-label reference-hand" hidden>L</span><span ref={rightHand} className="hand-label reference-hand" hidden>R</span>{!source&&loading&&<div className="stage-message" role="status"><span className="loader"/>Loading your reference...</div>}{!source&&error&&<div className="stage-message" role="alert">{error}</div>}</div>;
 }
 function meshesOf(model:THREE.Object3D){const meshes:THREE.Mesh[]=[];model.traverse(node=>{if(node instanceof THREE.Mesh)meshes.push(node);});return meshes;}
 function disposeMaterial(material:THREE.Material|THREE.Material[]){for(const m of Array.isArray(material)?material:[material])m.dispose();}

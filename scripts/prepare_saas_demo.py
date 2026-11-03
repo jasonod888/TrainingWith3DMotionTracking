@@ -41,6 +41,7 @@ def package_demo(folder=ROOT/'web/dist/assets'):
                 and hashlib.sha256(video.read_bytes()).hexdigest()==report.get('video_sha256')):
             from apps.api.contracts import Asset
             manifest.focused_video=Asset.model_validate(asset(video.name,'video/mp4'))
+            manifest.focused_video_start=report.get('demo_focused_video_start')
             if report.get('instructor_markers'):
                 reference['instructorMarkers']=report['instructor_markers']
                 (folder/'reference.json').write_text(json.dumps(reference,separators=(',',':')),encoding='utf-8')

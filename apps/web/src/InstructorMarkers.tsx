@@ -2,6 +2,7 @@ import {useEffect,useRef,type RefObject} from 'react';
 import type {LessonManifest} from '../../../packages/lesson-schema/index';
 import {assetUrl} from './api';
 import {MARKER_NAMES,markerTrack,sampleMarkers,markerBadges,markerPixel} from './instructor-markers';
+import './instructor-markers.css';
 
 export function InstructorMarkers({lesson,video,mirrored}:{lesson:LessonManifest;video:RefObject<HTMLVideoElement|null>;mirrored:boolean}){
  const svg=useRef<SVGSVGElement>(null),groups=useRef<(SVGGElement|null)[]>([]);

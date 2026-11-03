@@ -124,8 +124,10 @@ image may yield a wide or full-frame derivative. It cannot restore missing
 detail or body parts outside the original camera image. Multi-person selection
 quality remains the responsibility of the existing reconstruction/segmentation.
 
-`focused_video` is an optional manifest asset on the same source timeline as
-`source_video`. Conversion verification checks its attempt, MIME, size and hash
+`focused_video` is an optional manifest asset on the shared lesson frame clock.
+`focused_video_start` identifies its start offset; when omitted it defaults to
+the original `source_start` for older lessons. Trimming advances both offsets
+and the animation offset by the same frame count. Conversion verification checks its attempt, MIME, size and hash
 and stores it with the revision. Media retrieval uses existing lesson access and
 byte-range handling. Anonymous/public-only manifests and paired manifests omit
 the focused video along with private source footage; public asset routes do not

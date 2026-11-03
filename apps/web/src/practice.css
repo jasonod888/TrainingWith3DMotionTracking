@@ -288,9 +288,3 @@ body.in-practice .app>.header{display:none}
  .has-companion>.motion-render-area{top:calc(var(--mimic-stage-top,48px) + clamp(97.5px,30vw,195px) + 36px);right:var(--mimic-stage-right,0px);bottom:var(--mimic-stage-bottom,24px)}
  .has-companion .motion-render{--mimic-stage-top:0px;--mimic-stage-bottom:0px}
 }
-.instructor-limb-guides{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:hidden}
-.instructor-limb-marker{color:#d8ed9b}.instructor-limb-marker.is-right{color:#9ce1ea}
-.instructor-limb-marker line{stroke:currentColor;stroke-width:1.2;opacity:.8}
-.instructor-limb-marker .limb-anchor{fill:currentColor;stroke:#10241d;stroke-width:1}
-.instructor-limb-marker .limb-badge circle{fill:#10241de8;stroke:currentColor;stroke-width:1.3}
-.instructor-limb-marker text{fill:currentColor;font:bold 11px system-ui,sans-serif}

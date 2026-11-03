@@ -65,6 +65,7 @@ class LessonManifest(Contract):
     landmarks: Asset
     source_video: Asset | None = None
     focused_video: Asset | None = None
+    focused_video_start: float | None = Field(default=None,ge=0)
     thumbnail: Asset | None = None
     section_set: SectionSet
     warnings: list[str] = Field(default_factory=list)

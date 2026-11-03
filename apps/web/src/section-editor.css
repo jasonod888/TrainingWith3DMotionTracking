@@ -1,0 +1,1115 @@
+body.editing-markers {
+    overflow: hidden
+}
+.app.feed-app.editing-sections>.header {
+    display: none
+}
+.app.feed-app.editing-sections>main {
+    height: 100dvh;
+    max-width: none;
+    margin: 0;
+    padding: 16px 22px max(14px,env(safe-area-inset-bottom));
+    overflow: hidden;
+    min-height: 0
+}
+.section-studio button {
+    touch-action: manipulation
+}
+.section-studio button:focus-visible {
+    outline: 3px solid #8aab5d;
+    outline-offset: 3px
+}
+.section-studio input:focus-visible {
+    outline: 3px solid #8aab5d;
+    outline-offset: 3px
+}
+.section-studio select:focus-visible {
+    outline: 3px solid #8aab5d;
+    outline-offset: 3px
+}
+.section-studio button:disabled {
+    opacity: .45;
+    cursor: default
+}
+.section-studio-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0
+}
+.studio-icon {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--ink)
+}
+.section-title {
+    flex: 1;
+    min-width: 0;
+    max-width: 780px
+}
+.section-title>span {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 1.7px;
+    color: #74816c;
+    font-weight: 650
+}
+.section-title input {
+    display: block;
+    width: 100%;
+    padding: 3px 0;
+    border: 0;
+    background: transparent;
+    font-size: 20px;
+    line-height: 1.3;
+    font-weight: 600;
+    letter-spacing: -.5px;
+    color: var(--ink);
+    text-overflow: ellipsis
+}
+.section-save-state {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+    white-space: nowrap
+}
+.studio-save {
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border-radius: 10px;
+    font-size: 12px;
+    padding: 0 17px;
+    font-weight: 600;
+    white-space: nowrap;
+    background: #d8ed9b;
+    color: #263c23;
+    border: 1px solid #c6dba2;
+    min-width: 90px
+}
+.studio-save:hover:not(:disabled) {
+    background: #cae38b
+}
+.studio-practice {
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border-radius: 10px;
+    font-size: 12px;
+    padding: 0 17px;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid var(--line);
+    background: var(--surface)
+}
+.section-studio .section-preview {
+    height: 100%;
+    min-height: 0;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #142b21;
+    position: relative
+}
+.section-preview-top {
+    position: absolute;
+    top: 16px;
+    left: 18px;
+    right: 16px;
+    z-index: 6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    pointer-events: none
+}
+.section-preview-label {
+    font-size: 11px;
+    letter-spacing: .2px;
+    color: #e2e9dc;
+    background: #11271dcc;
+    padding: 8px 11px;
+    border: 1px solid #dbe6cf14;
+    border-radius: 20px;
+    white-space: nowrap
+}
+.section-preview-toggle {
+    display: flex;
+    gap: 3px;
+    padding: 4px;
+    border: 1px solid #99ae8a3b;
+    border-radius: 10px;
+    background: #102219e6;
+    pointer-events: auto;
+    flex-shrink: 0
+}
+.section-preview-toggle button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 66px;
+    min-height: 36px;
+    border-radius: 7px;
+    font-size: 11px;
+    color: #a3b49d
+}
+.section-preview-toggle button[aria-pressed=true] {
+    color: #eff5e5;
+    background: #405438
+}
+.section-speed {
+    position: absolute;
+    right: 18px;
+    bottom: 15px;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    color: #c6d2c1;
+    padding: 3px 4px 3px 10px;
+    border: 1px solid #dbe6cf25;
+    border-radius: 9px;
+    background: #102219d9
+}
+.section-speed select {
+    border: 0;
+    background: transparent;
+    color: #edf1e6;
+    min-height: 34px;
+    font-size: 12px;
+    padding: 0 5px;
+    cursor: pointer
+}
+.section-speed option {
+    background: #173024;
+    color: #fff
+}
+.marker-panel-heading {
+    padding: 17px 16px 12px;
+    border-bottom: 1px solid #edf0e8
+}
+.marker-panel-heading h2 {
+    font-size: 16px;
+    letter-spacing: -.3px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px
+}
+.marker-panel-heading h2>span {
+    font-size: 10px;
+    letter-spacing: 0;
+    font-weight: 500;
+    background: #eef2e7;
+    color: #65745e;
+    padding: 3px 7px;
+    border-radius: 10px
+}
+.marker-panel-heading p {
+    font-size: 10px;
+    color: var(--muted);
+    margin: 6px 0 0
+}
+.marker-list {
+    overflow: auto;
+    min-height: 0;
+    padding: 7px;
+    scrollbar-width: thin;
+    overscroll-behavior: contain
+}
+.marker-list>button {
+    display: flex;
+    align-items: center;
+    text-align: left;
+    width: 100%;
+    gap: 11px;
+    border: 1px solid transparent;
+    padding: 10px;
+    margin: 2px 0;
+    border-radius: 10px;
+    min-height: 56px
+}
+.marker-list>button:hover {
+    background: #f2f5ec
+}
+.marker-list>button[aria-pressed=true] {
+    border-color: #cbd9b5;
+    background: #edf3e2
+}
+.marker-number {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #ecf0e5;
+    color: #657456;
+    font-size: 12px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums
+}
+.marker-list>button[aria-pressed=true] .marker-number {
+    background: #30482c;
+    color: #f3f8e9
+}
+.marker-list-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px
+}
+.marker-list-copy strong {
+    font-weight: 550;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden
+}
+.marker-list-copy small {
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: #86917b
+}
+.marker-properties {
+    border-top: 1px solid #e6eadf;
+    padding: 12px 14px;
+    background: #f8faf3
+}
+.marker-properties-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 9px
+}
+.marker-properties-heading strong {
+    font-size: 12px;
+    font-weight: 600
+}
+.marker-delete {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 32px;
+    border-radius: 7px;
+    color: #8c6253
+}
+.marker-delete:hover:not(:disabled) {
+    background: #f6e7de
+}
+.marker-property-fields {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 95px;
+    gap: 10px
+}
+.marker-property-fields label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 0
+}
+.marker-property-fields label>span {
+    font-size: 9px;
+    font-weight: 400;
+    color: #8a9381;
+    margin-left: 3px
+}
+.marker-property-fields input {
+    width: 100%;
+    min-width: 0;
+    margin-top: 6px;
+    min-height: 38px;
+    border: 1px solid #dce3d1;
+    border-radius: 7px;
+    background: #fffefa;
+    padding: 7px 9px;
+    font-size: 14px;
+    color: var(--ink)
+}
+.marker-property-fields input:disabled {
+    color: #8b9584;
+    background: #edf0e6
+}
+.marker-property-hint {
+    font-size: 10px;
+    line-height: 1.5;
+    color: #899180;
+    margin: 10px 0 0
+}
+.marker-time-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 1px
+}
+.marker-heading-tools>span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #7f8b75;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1.5px
+}
+.marker-time-heading b {
+    letter-spacing: 0;
+    font-size: 10px;
+    color: #354e2c;
+    font-weight: 600
+}
+.marker-time-heading output {
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums
+}
+.marker-time-heading output>span {
+    color: #8c9584;
+    font-size: 10px;
+    font-weight: 400
+}
+.marker-pin:before {
+    content: '';
+    position: absolute;
+    inset: -5px -8px
+}
+.marker-pin.is-selected {
+    background: #30482c;
+    color: #fff;
+    border-color: #30482c;
+    z-index: 5;
+    box-shadow: 0 0 0 3px #dbe8c966
+}
+.marker-pin[aria-disabled=true] {
+    cursor: pointer
+}
+.marker-time-ruler {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #929b89;
+    font-variant-numeric: tabular-nums;
+    margin: -1px 0 0
+}
+.section-transport {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-top: 8px;
+    min-height: 44px
+}
+.section-editor-message {
+    flex: 1;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #85917b;
+    margin: 0;
+    max-width: 47%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+.section-play-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px
+}
+.section-play-controls .studio-icon {
+    border: 0;
+    background: transparent;
+    color: #7d8a70
+}
+.section-play-button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #eaf1dc;
+    border: 1px solid #d4dfc1;
+    color: #30482c
+}
+.section-add-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 9px;
+    background: #30482c;
+    color: #f4f8ed;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: auto;
+    white-space: nowrap
+}
+.section-add-marker:hover:not(:disabled) {
+    background: #405d37
+}
+.marker-shortcut {
+    font-size: 9px;
+    opacity: .65;
+    border: 1px solid #ffffff40;
+    border-radius: 3px;
+    padding: 1px 4px;
+    margin-left: 5px
+}
+.marker-heading-tools {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    min-width: 0
+}
+.marker-zoom {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    color: #87957b
+}
+.marker-zoom button {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border-radius: 6px
+}
+.marker-zoom button:hover:not(:disabled) {
+    background: #edf2e5;
+    color: #36502c
+}
+.marker-zoom>span {
+    font-size: 9px;
+    width: 23px;
+    text-align: center;
+    font-variant-numeric: tabular-nums
+}
+.marker-pin[hidden] {
+    display: none
+}
+.marker-pin.is-crowded>span {
+    visibility: hidden
+}
+.section-studio {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    gap: 14px;
+    max-width: 1900px;
+    margin: 0 auto;
+    color: var(--ink);
+    grid-template-rows: 52px minmax(0,1fr)
+}
+.section-studio-main {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 282px;
+    gap: 16px;
+    grid-template-rows: minmax(0,1fr) auto;
+    grid-template-areas: "preview inspector" "timeline inspector"
+}
+.section-preview {
+    grid-area: preview
+}
+.section-edit-dock {
+    padding: 13px 18px 12px;
+    border: 1px solid #e0e5d9;
+    border-radius: 15px;
+    background: #fffefa;
+    min-width: 0;
+    position: relative;
+    grid-area: timeline
+}
+.marker-inspector {
+    display: grid;
+    grid-template-rows: auto minmax(0,1fr) auto;
+    min-height: 0;
+    border: 1px solid #e0e5d9;
+    border-radius: 16px;
+    background: #fffefa;
+    overflow: hidden;
+    grid-area: inspector
+}
+.marker-clip-section:nth-child(even) {
+    background: repeating-linear-gradient(90deg,#d3ddc8 0,#d3ddc8 38px,#cbd8be 39px,#cbd8be 40px)
+}
+.marker-clip-section.is-active {
+    background: #a9c77b;
+    box-shadow: inset 0 0 0 2px #587c39
+}
+.marker-clip-section>span {
+    padding: 0 10px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #657858;
+    white-space: nowrap
+}
+.marker-clip-section.is-active>span {
+    color: #304c22
+}
+.marker-pin.is-selected:after {
+    width: 2px;
+    background: #38562b
+}
+.marker-playhead {
+    position: absolute;
+    top: calc(var(--clip-top) - 6px);
+    height: calc(var(--clip-height) + 15px);
+    width: 20px;
+    transform: translateX(-50%);
+    background: transparent;
+    border: 0;
+    z-index: 6;
+    cursor: ew-resize;
+    touch-action: none
+}
+.marker-playhead:before {
+    content: '';
+    position: absolute;
+    left: 9px;
+    top: 4px;
+    bottom: 0;
+    width: 2px;
+    background: #367fd0;
+    box-shadow: 0 0 0 1px #fff8;
+    pointer-events: none
+}
+.marker-playhead:after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 0;
+    width: 12px;
+    height: 9px;
+    background: #367fd0;
+    clip-path: polygon(0 0,100% 0,100% 50%,50% 100%,0 50%);
+    pointer-events: none
+}
+.marker-playhead>span {
+    position: absolute;
+    inset: -4px;
+    pointer-events: none
+}
+.marker-track-caption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 10px;
+    color: #53694a;
+    margin: 0 0 7px;
+    font-variant-numeric: tabular-nums
+}
+.marker-track-caption b {
+    font-weight: 400;
+    color: #87937c;
+    margin-left: 5px
+}
+.playhead-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    color: #3678b9
+}
+.playhead-legend:before {
+    content: '';
+    height: 10px;
+    width: 2px;
+    background: #367fd0
+}
+.marker-clip-section[hidden] {
+    display: none
+}
+.marker-clip-lane {
+    position: absolute;
+    inset: var(--clip-top) 0 auto;
+    height: var(--clip-height);
+    background: #dfe6d6;
+    border: 1px solid #b7c4a9;
+    border-radius: 4px;
+    overflow: hidden;
+    pointer-events: auto;
+    z-index: 2
+}
+.marker-clip-section {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: repeating-linear-gradient(90deg,#e2e8d9 0,#e2e8d9 38px,#dbe3d2 39px,#dbe3d2 40px);
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    border: 0;
+    border-right: 1px solid #a6b698;
+    border-radius: 0;
+    text-align: left;
+    cursor: pointer;
+    padding: 0
+}
+.section-studio .marker-clip-section:focus-visible {
+    outline-offset: -3px
+}
+.marker-track {
+    position: relative;
+    margin: 0 14px;
+    touch-action: none;
+    user-select: none;
+    cursor: crosshair;
+    --clip-height: 44px;
+    margin-inline: 14px;
+    --clip-top: 50px;
+    height: 110px
+}
+.marker-pin {
+    position: absolute;
+    background: #f2f5ea;
+    border: 1px solid #d1dac5;
+    color: #637653;
+    display: grid;
+    place-items: center;
+    transform: translateX(-50%);
+    z-index: 3;
+    font-size: 11px;
+    font-weight: 650;
+    cursor: ew-resize;
+    touch-action: none;
+    width: 26px;
+    height: 25px;
+    border-radius: 4px;
+    box-shadow: none;
+    top: 20px
+}
+.marker-pin:after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    top: 24px;
+    background: #6b8555;
+    width: 1px;
+    height: calc(var(--clip-top) + var(--clip-height) - 44px)
+}
+.marker-pin.is-crowded {
+    border-radius: 3px;
+    background: #a2b887;
+    border-color: #8ea473;
+    height: 12px;
+    width: 8px;
+    top: 32px
+}
+.marker-pin.is-crowded:after {
+    top: 11px;
+    height: calc(var(--clip-top) + var(--clip-height) - 43px)
+}
+.marker-seek-surface {
+    position: absolute;
+    width: 100%;
+    border: 0;
+    z-index: 1;
+    touch-action: none;
+    inset: 0 0 auto;
+    height: 14px;
+    border-bottom: 1px solid #dbe2d2;
+    border-radius: 0;
+    background: repeating-linear-gradient(90deg,transparent 0,transparent 43px,#dbe2d2 43px,#dbe2d2 44px);
+    cursor: crosshair
+}
+@media (max-width:900px) {
+    .section-save-state {
+        display: none
+    }
+    .marker-property-fields input {
+        padding-inline: 6px
+    }
+}
+@media (max-width:600px) {
+    .app.feed-app.editing-sections>main {
+        padding: 8px 10px max(10px,env(safe-area-inset-bottom))
+    }
+    .section-studio-header {
+        gap: 8px
+    }
+    .section-title input {
+        font-size: 16px
+    }
+    .section-title>span {
+        font-size: 8px;
+        letter-spacing: 1.3px
+    }
+    .studio-save {
+        padding: 0 12px;
+        min-width: 72px
+    }
+    .studio-practice {
+        display: none
+    }
+    .section-studio-header>.studio-icon {
+        width: 36px;
+        min-width: 36px;
+        height: 40px;
+        border-color: transparent;
+        background: transparent
+    }
+    .section-studio .section-preview {
+        border-radius: 12px
+    }
+    .section-preview-top {
+        top: 10px;
+        left: 10px;
+        right: 10px
+    }
+    .section-preview-label {
+        font-size: 9px;
+        padding: 6px 8px
+    }
+    .section-preview-toggle {
+        padding: 3px;
+        gap: 2px
+    }
+    .section-preview-toggle button {
+        min-width: 48px;
+        font-size: 10px;
+        gap: 5px
+    }
+    .section-preview-toggle button svg {
+        width: 14px;
+        height: 14px
+    }
+    .section-speed {
+        right: 10px;
+        bottom: 8px
+    }
+    .section-speed>select {
+        min-height: 28px
+    }
+    .marker-panel-heading {
+        display: none
+    }
+    .marker-list {
+        display: flex;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 4px 6px;
+        gap: 5px;
+        scrollbar-width: none
+    }
+    .marker-list>button {
+        width: auto;
+        flex-shrink: 0;
+        min-height: 34px;
+        height: 34px;
+        padding: 3px 8px 3px 4px;
+        gap: 6px;
+        margin: 0;
+        border-radius: 8px
+    }
+    .marker-number {
+        width: 26px;
+        height: 26px;
+        border-radius: 6px;
+        font-size: 11px
+    }
+    .marker-list-copy {
+        gap: 0
+    }
+    .marker-list-copy strong {
+        display: none
+    }
+    .marker-properties {
+        position: relative;
+        padding: 7px 46px 9px 10px
+    }
+    .marker-properties-heading {
+        position: absolute;
+        right: 7px;
+        margin: 0
+    }
+    .marker-properties-heading strong {
+        display: none
+    }
+    .marker-property-fields {
+        grid-template-columns: minmax(0,1fr) 98px;
+        gap: 12px
+    }
+    .marker-property-fields input {
+        font-size: 16px
+    }
+    .marker-property-hint {
+        display: none
+    }
+    .marker-time-heading output {
+        font-size: 11px
+    }
+    .marker-time-heading output>span {
+        font-size: 9px
+    }
+    .marker-time-ruler {
+        font-size: 8px
+    }
+    .marker-time-ruler span:nth-child(even) {
+        visibility: hidden
+    }
+    .section-transport {
+        gap: 10px
+    }
+    .section-editor-message {
+        display: none
+    }
+    .section-play-controls {
+        gap: 1px
+    }
+    .section-add-marker {
+        flex: 1;
+        max-width: 170px;
+        padding: 0 12px
+    }
+    .marker-shortcut {
+        display: none
+    }
+    .section-editor-message.has-message {
+        display: block;
+        position: absolute;
+        bottom: 62px;
+        left: 12px;
+        right: 12px;
+        max-width: none;
+        padding: 10px 12px;
+        white-space: normal;
+        border: 1px solid #cedabf;
+        border-radius: 8px;
+        background: #f3f7eaf5;
+        box-shadow: 0 3px 14px #20331d14;
+        z-index: 8;
+        color: #344c2d
+    }
+    .marker-heading-tools {
+        gap: 5px
+    }
+    .marker-zoom {
+        gap: 0
+    }
+    .marker-zoom>span {
+        width: 18px
+    }
+    .marker-zoom button {
+        width: 26px;
+        height: 26px
+    }
+    .section-edit-dock {
+        padding: 9px 12px 8px;
+        border-radius: 11px
+    }
+    .marker-inspector {
+        border-radius: 11px
+    }
+    .section-studio-main {
+        grid-template-columns: minmax(0,1fr);
+        grid-template-rows: minmax(0,1fr) auto auto;
+        grid-template-areas: "preview" "timeline" "inspector"
+    }
+    .marker-track-caption {
+        gap: 4px
+    }
+    .marker-track-caption b {
+        margin-left: 3px
+    }
+    .playhead-legend {
+        font-size: 8px
+    }
+    .marker-clip-section>span {
+        padding-inline: 5px;
+        font-size: 9px
+    }
+}
+@media (min-width:601px) and (max-height:520px) {
+    .app.feed-app.editing-sections>main {
+        padding: 6px 12px
+    }
+    .marker-panel-heading {
+        padding: 8px 10px
+    }
+    .marker-panel-heading p {
+        display: none
+    }
+    .marker-properties {
+        padding: 6px 10px
+    }
+    .marker-properties-heading {
+        margin: 0 0 3px
+    }
+    .marker-property-hint {
+        display: none
+    }
+    .marker-property-fields input {
+        min-height: 30px;
+        height: 30px;
+        margin-top: 3px
+    }
+    .marker-list>button {
+        padding: 3px 5px;
+        min-height: 36px
+    }
+    .marker-number {
+        width: 26px;
+        height: 26px
+    }
+    .section-transport {
+        margin-top: 3px
+    }
+    .section-preview-top {
+        top: 10px
+    }
+    .section-preview-toggle button {
+        min-height: 30px
+    }
+    .section-speed {
+        bottom: 8px
+    }
+    .section-studio-main {
+        grid-template-columns: minmax(0,1fr) 255px;
+        gap: 10px
+    }
+    .section-edit-dock {
+        padding: 6px 14px
+    }
+    .section-studio {
+        gap: 7px;
+        grid-template-rows: 42px minmax(0,1fr)
+    }
+    .marker-track-caption {
+        margin-bottom: 4px;
+        font-size: 9px
+    }
+    .marker-track {
+        --clip-height: 28px;
+        --clip-top: 46px;
+        height: 84px
+    }
+}
+@media (min-width:601px) and (max-width:900px) and (min-height:521px) {
+    .marker-properties {
+        padding: 10px
+    }
+    .marker-property-fields {
+        gap: 7px;
+        grid-template-columns: minmax(0,1fr) 84px
+    }
+    .section-studio-header {
+        gap: 9px
+    }
+    .section-studio-main {
+        grid-template-columns: minmax(0,1fr) 240px;
+        gap: 12px
+    }
+}
+@media (max-width:600px) and (min-height:651px) {
+    .section-preview-toggle button {
+        min-height: 34px
+    }
+    .marker-properties-heading {
+        top: 25px
+    }
+    .marker-property-fields input {
+        min-height: 34px;
+        height: 34px;
+        margin-top: 4px
+    }
+    .section-transport {
+        margin-top: 5px
+    }
+    .marker-inspector {
+        grid-template-rows: 44px auto
+    }
+    .section-studio {
+        gap: 8px;
+        grid-template-rows: 48px minmax(0,1fr)
+    }
+    .section-studio-main {
+        gap: 8px
+    }
+    .marker-track-caption {
+        font-size: 9px;
+        margin-bottom: 5px
+    }
+    .marker-track {
+        --clip-height: 34px;
+        --clip-top: 48px;
+        height: 94px
+    }
+}
+@media (min-width:601px) and (max-width:900px) and (max-height:520px) {
+    .marker-property-fields {
+        gap: 7px;
+        grid-template-columns: minmax(0,1fr) 84px
+    }
+    .section-studio-header {
+        gap: 9px
+    }
+}
+@media (max-width:600px) and (max-height:650px) {
+    .marker-list {
+        padding-block: 2px
+    }
+    .marker-properties {
+        padding-block: 4px 6px
+    }
+    .marker-property-fields input {
+        height: 32px;
+        min-height: 32px;
+        margin-top: 2px
+    }
+    .marker-properties-heading {
+        top: 21px
+    }
+    .section-transport {
+        margin-top: 3px
+    }
+    .section-preview-label {
+        display: none
+    }
+    .section-speed {
+        font-size: 0;
+        padding-left: 3px
+    }
+    .section-speed select {
+        font-size: 10px;
+        min-height: 26px
+    }
+    .section-preview-toggle button {
+        min-height: 30px
+    }
+    .section-edit-dock {
+        padding-block: 6px
+    }
+    .marker-inspector {
+        grid-template-rows: 38px auto
+    }
+    .section-studio-main {
+        gap: 6px
+    }
+    .section-studio {
+        gap: 6px;
+        grid-template-rows: 44px minmax(0,1fr)
+    }
+    .marker-track-caption {
+        font-size: 8px;
+        margin-bottom: 4px
+    }
+    .marker-track {
+        --clip-height: 28px;
+        --clip-top: 46px;
+        height: 84px
+    }
+}

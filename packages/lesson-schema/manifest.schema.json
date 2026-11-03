@@ -235,6 +235,19 @@
       ],
       "default": null
     },
+    "focused_video_start": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Focused Video Start"
+    },
     "thumbnail": {
       "anyOf": [
         {

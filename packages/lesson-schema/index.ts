@@ -11,6 +11,7 @@ export type LessonManifest = {
   confidence: 'unmeasured' | 'measured'; animation: Asset; landmarks: Asset;
   source_video: Asset | null; thumbnail: Asset | null; section_set: SectionSet; warnings: string[];
   focused_video?: Asset | null;
+  focused_video_start?: number | null;
   presentation?: Partial<Record<'male' | 'female' | 'report', Asset>>;
 };
 
