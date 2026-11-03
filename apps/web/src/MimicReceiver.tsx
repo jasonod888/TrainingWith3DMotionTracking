@@ -248,7 +248,7 @@ export function MimicReceiver({onBack}:{onBack:()=>void}){
       </div>}
      </div>
      {lesson&&player.current&&<div className="receiver-pane receiver-instructor-pane" hidden={takeover}>
-       <MotionStage lesson={lesson} player={player.current} framing={framing} fit="envelope" interactive={false}/>
+       <MotionStage lesson={lesson} player={player.current} source={remote?.reference==='video'} companion={remote?.reference==='both'} onVideoUnavailable={()=>void control('pause')} framing={framing} fit="envelope" interactive={false}/>
        <span className="receiver-label">3D instructor</span>
      </div>}
     </div>}

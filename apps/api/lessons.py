@@ -23,7 +23,7 @@ def import_fixture(engine, settings, owner_id, manifest_path, asset_dir):
     """Operator-controlled import; never accepts arbitrary uploaded paths from HTTP."""
     manifest = LessonManifest.model_validate_json(Path(manifest_path).read_text(encoding='utf-8'))
     lesson_id, revision_id = uuid4().hex, uuid4().hex
-    assets = [a for a in (manifest.animation, manifest.landmarks, manifest.source_video, manifest.thumbnail) if a]
+    assets = [a for a in (manifest.animation, manifest.landmarks, manifest.source_video, manifest.thumbnail, manifest.focused_video) if a]
     names = [Path(a.key).name for a in assets]
     if len(names) != len(set(names)):
         raise ValueError('Fixture assets must have unique filenames.')
@@ -78,6 +78,12 @@ class SaveSections(BaseModel):
 
 class RenameInput(BaseModel):
     title: str = Field(max_length=200)
+
+class TrimInput(BaseModel):
+    base_revision_id: str = Field(min_length=1, max_length=80)
+    start_frame: int = Field(ge=0, strict=True)
+    end_frame: int = Field(gt=0, strict=True)
+    accept: bool = False
 
 class ProgressInput(BaseModel):
     revision_id: str = Field(min_length=1, max_length=80)
@@ -182,6 +188,50 @@ def install_lessons(app, engine, settings, identity, db):
         session.commit()
         return manifest
 
+    @router.put('/{lesson_id}/trim', response_model=LessonManifest)
+    def trim(lesson_id: str, body: TrimInput, account=Depends(identity), session: Session = Depends(db)):
+        lesson = owned_lesson(session, lesson_id, account.id, True)
+        revision = latest(session, lesson)
+        if revision.id != body.base_revision_id:
+            raise HTTPException(409, 'This move changed. Reopen it before trimming.')
+        manifest = LessonManifest.model_validate(revision.manifest)
+        fps = manifest.frame_rate
+        from math import ceil
+        if body.end_frame > ceil(manifest.duration * fps) or body.end_frame - body.start_frame < max(1, ceil(.05 * fps)):
+            raise HTTPException(422, 'Choose a start and end within this move.')
+        start, end = body.start_frame / fps, min(body.end_frame / fps, manifest.duration)
+        duration = end - start
+        if duration < .05:
+            raise HTTPException(422, 'Keep at least one movement frame.')
+        sections = [Section(id=s.id, label=s.label, start=max(s.start, start)-start, end=min(s.end, end)-start)
+                    for s in manifest.section_set.sections if min(s.end, end)-max(s.start, start) > 1e-6]
+        # Absorb tiny boundary fragments into the neighbouring teaching section.
+        while len(sections) > 1 and any(s.end-s.start < .05 for s in sections):
+            index = next(i for i,s in enumerate(sections) if s.end-s.start < .05)
+            if index == 0:
+                sections[1].start = 0
+            else:
+                sections[index-1].end = sections[index].end
+            sections.pop(index)
+        updated = session.execute(update(Lesson).where(Lesson.id == lesson.id, Lesson.version == revision.version)
+                                  .values(version=revision.version+1))
+        if updated.rowcount != 1:
+            raise HTTPException(409, 'This move changed. Reopen it before trimming.')
+        manifest.animation_duration = manifest.animation_duration or manifest.duration
+        manifest.animation_start += start
+        manifest.source_start += start
+        manifest.duration = duration
+        manifest.standing_time = max(0, min(manifest.standing_time-start, duration))
+        manifest.revision_id = uuid4().hex
+        manifest.section_set = SectionSet(id=manifest.section_set.id, revision=revision.version+1, duration=duration, sections=sections)
+        trimmed = LessonRevision(id=manifest.revision_id, lesson_id=lesson.id, manifest=manifest.model_dump(), version=revision.version+1)
+        session.add(trimmed)
+        if body.accept:
+            from .permissions import accept_revision
+            accept_revision(session, lesson, trimmed, account.id, warnings=manifest.warnings, source='owner')
+        session.commit()
+        return manifest
+
     @router.patch('/{lesson_id}', response_model=LessonManifest)
     def rename(lesson_id: str, body: RenameInput, account=Depends(identity), session: Session = Depends(db)):
         lesson = owned_lesson(session, lesson_id, account.id, True)
@@ -208,7 +258,7 @@ def install_lessons(app, engine, settings, identity, db):
         if not lesson or not reasons:raise HTTPException(404,'Move unavailable.')
         _,revision=readable_lesson(session,lesson_id,account.id)
         key = f'lessons/{lesson_id}/{name}'
-        fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail')
+        fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail','focused_video')
         allowed={value['key'] for value in (revision.manifest.get(field) for field in fields) if value}
         allowed.update(value['key'] for kind,value in revision.manifest.get('presentation',{}).items()
                        if reasons!=['public'] or kind in ('male','female'))

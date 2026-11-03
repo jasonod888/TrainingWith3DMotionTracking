@@ -39,6 +39,7 @@ class Snapshot(BaseModel):
     end:float=Field(ge=0,allow_inf_nan=False)
     ack:int=Field(default=0,ge=0)
     angle:float=Field(default=0,ge=-3.15,le=3.15,allow_inf_nan=False)
+    reference:Literal['3d','video','both']='3d'
     model_mirror:bool=False
     camera_mirror:bool=False
     # Optional presentation fields. Older capture devices omit them entirely, so

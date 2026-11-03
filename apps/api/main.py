@@ -80,7 +80,7 @@ def create_app(settings: Settings | None = None):
     @app.get('/api/demo/assets/{name}')
     def demo_asset(name: str):
         manifest = demo_manifest()
-        assets = {Path(a.key).name:a for a in [manifest.animation, manifest.landmarks, manifest.source_video, manifest.thumbnail] if a}
+        assets = {Path(a.key).name:a for a in [manifest.animation, manifest.landmarks, manifest.source_video, manifest.thumbnail, manifest.focused_video] if a}
         # The demonstration has no database lesson, so its avatar clips are served from the
         # fixture directory beside the other demo assets.
         demo_extra = {'avatar-male.glb': 'model/gltf-binary', 'avatar-female.glb': 'model/gltf-binary',

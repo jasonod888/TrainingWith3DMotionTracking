@@ -133,3 +133,34 @@ def test_owner_can_save_progress_on_the_public_release_while_editing_a_private_d
         'revision_id': lesson.revision_id, 'time': 1, 'speed': 1, 'mode': 'continuous'}).status_code == 200
     assert owner.get(f'/api/lessons/{lesson.lesson_id}/progress?revision_id={lesson.revision_id}').json()['time'] == 1
     assert owner.post('/api/mimic-pairs', json={'lesson_id': lesson.lesson_id, 'revision_id': lesson.revision_id}).status_code == 201
+
+
+def test_focused_video_is_private_on_public_and_paired_manifests(system):
+    from sqlalchemy.orm import Session
+    from apps.api.database import Lesson, LessonRevision, LessonAsset
+    from apps.api.permissions import visible_manifest
+    from apps.api.public import public_keys
+    lesson = imported(system)
+    owner, app, _, _, store = system
+    asset = {'key':f'lessons/{lesson.lesson_id}/instructor.mp4', 'mime':'video/mp4',
+             'bytes':7, 'sha256':'0'*64}
+    with Session(app.state.engine) as session:
+        revision = session.get(LessonRevision, lesson.revision_id)
+        revision.manifest = {**revision.manifest, 'focused_video':asset}
+        session.add(LessonAsset(lesson_id=lesson.lesson_id, **asset))
+        session.commit()
+    store.objects[asset['key']] = b'focused'
+    owner.post(f'/api/workflow/lessons/{lesson.lesson_id}/accept', json={'revision_id':lesson.revision_id})
+    assert list_public(owner, lesson).status_code == 200
+    from fastapi.testclient import TestClient
+    with TestClient(app) as anonymous:
+        response = anonymous.get(f'/api/public/moves/{lesson.lesson_id}')
+        assert response.status_code == 200
+        assert response.json()['focused_video'] is None
+        assert anonymous.get(f'/api/public/moves/{lesson.lesson_id}/assets/instructor.mp4').status_code == 404
+    with Session(app.state.engine) as session:
+        value = visible_manifest(session, session.get(Lesson,lesson.lesson_id),
+                                 session.get(LessonRevision,lesson.revision_id), 'public-reader')
+        assert value['focused_video'] is None
+    assert public_keys({'focused_video':asset},lesson.lesson_id)['focused_video'] is None
+    assert owner.get(f'/api/lessons/{lesson.lesson_id}').json()['focused_video'] == asset

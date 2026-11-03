@@ -2,7 +2,7 @@
 
 Practice uses the published section boundaries, adjustable speed, repeats and optional live feedback. Watching works without a camera. Recording remains an explicit practice-only action.
 
-Compete is a private personal challenge. Preparation requires a live camera, height calibration, compatible reference landmarks and a recent readable pose. A five-second countdown leads into the full published sequence at 1x, with no stops at section boundaries. Natural holds in the source movement remain. Navigation, speed, loops, original-video switching and observation angles cannot alter an active run. The instructor view is fixed at Front. Ordinary practice settings and position are restored when leaving Compete.
+Compete is a private personal challenge. Preparation requires a live camera, height calibration, compatible reference landmarks and a recent readable pose. A five-second countdown leads into the full published sequence at 1x, with no stops at section boundaries. Natural holds in the source movement remain. Navigation, speed, loops, reference switching and observation angles cannot alter an active run. Choose 3D, real instructor video, or 3D with a companion video before starting; the 3D observation angle remains Front. Ordinary practice settings and position are restored when leaving Compete. See `focused-instructor-video.md` for crop generation and media availability.
 
 CompetitionSession owns run policy and results separately from practice history. Results are held in the open session only and are not posted to the practice-attempt API. No video recording starts in Compete.
 

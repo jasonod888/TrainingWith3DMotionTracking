@@ -150,6 +150,7 @@ def public_manifest(revision, publication, tags):
     """Remove private media and private identity from a manifest for public delivery."""
     value = dict(revision.manifest)
     value['source_video'] = None
+    value['focused_video'] = None
     # Conversion thumbnails contain frames from the private upload, not the 3D model.
     value['thumbnail'] = None
     value['presentation'] = {name:asset for name,asset in value.get('presentation',{}).items() if name in ('male','female')}
@@ -169,5 +170,5 @@ def visible_manifest(session, lesson, revision, account_id):
         if publication and publication.listed and not publication.moderation_hidden:
             from .public import public_keys
             return public_keys(public_manifest(revision, publication, tags), lesson.id)
-        return {**revision.manifest, 'source_video': None, 'thumbnail': None}
+        return {**revision.manifest, 'source_video': None, 'focused_video': None, 'thumbnail': None}
     return revision.manifest

@@ -129,10 +129,12 @@ def test_verified_finalisation_is_idempotent_and_stale_attempt_cannot_publish(co
     manifest=json.loads((ROOT/'packages/lesson-schema/fixture.json').read_text())
     from apps.api.processing import ENGINE_VERSION
     manifest['engine']='sam-3d-body';manifest['engine_version']=ENGINE_VERSION;manifest['section_set']['sections']=[{'id':'whole','label':'Full movement','start':0,'end':2}]
-    for field,name,data in [('animation','reference.glb',(ROOT/'packages/lesson-schema/synthetic.glb').read_bytes()),('landmarks','reference.json',b'{}'),('source_video','preview.mp4',b'preview'),('thumbnail','thumbnail.jpg',b'image')]:
+    for field,name,data in [('animation','reference.glb',(ROOT/'packages/lesson-schema/synthetic.glb').read_bytes()),('landmarks','reference.json',b'{}'),('source_video','preview.mp4',b'preview'),('thumbnail','thumbnail.jpg',b'image'),('focused_video','instructor.mp4',b'focused')]:
         result=client.put(base+'/files/'+name,headers=headers,content=data)
         assert result.status_code==200,result.text
         manifest[field]=result.json()
+    bad=json.loads(json.dumps(manifest));bad['focused_video']['key']='other/instructor.mp4'
+    assert client.post(base+'/finish',headers=headers,json=bad).status_code==422
     bad=json.loads(json.dumps(manifest));bad['animation']['key']='other/file.glb'
     assert client.post(base+'/finish',headers=headers,json=bad).status_code==422
     result=client.post(base+'/finish',headers=headers,json=manifest)
@@ -140,6 +142,10 @@ def test_verified_finalisation_is_idempotent_and_stale_attempt_cannot_publish(co
     assert client.post(base+'/finish',headers=headers,json=manifest).json()==result.json()
     lesson=client.get('/api/lessons/'+result.json()['lesson_id']).json()
     assert len(lesson['section_set']['sections'])==1
+    assert lesson['focused_video']['key'].endswith('/instructor.mp4')
+    with patch('apps.api.lessons.storage_client',return_value=store):
+        media=client.get('/api/lessons/'+result.json()['lesson_id']+'/assets/instructor.mp4')
+    assert media.status_code==200 and media.content==b'focused'
     assert client.post(base+'/heartbeat',headers=headers,json={'stage':'verifying'}).status_code==409
     with Session(app.state.engine) as session:assert len(session.scalars(select(LessonRevision)).all())==1
 

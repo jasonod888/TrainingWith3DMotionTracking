@@ -30,7 +30,7 @@ MANIFEST_ASSETS=('reference.glb','reference.json','preview.mp4','thumbnail.jpg')
 DERIVATIVE_ASSETS=('avatar-male.glb','avatar-female.glb','avatar-report.json')
 FILES={**{name:mime for name,mime in (
         ('reference.glb','model/gltf-binary'),('reference.json','application/json'),
-        ('preview.mp4','video/mp4'),('thumbnail.jpg','image/jpeg'))},
+        ('preview.mp4','video/mp4'),('thumbnail.jpg','image/jpeg'),('instructor.mp4','video/mp4'))},
     'avatar-male.glb':'model/gltf-binary','avatar-female.glb':'model/gltf-binary',
     'avatar-report.json':'application/json'}
 
@@ -334,7 +334,10 @@ def install_conversions(app,engine,settings,identity,db):
         store=storage_client(settings)
         assets=[body.animation,body.landmarks,body.source_video,body.thumbnail]
         if any(a is None for a in assets):raise HTTPException(422,'Conversion outputs are incomplete.')
-        for asset,name in zip(assets,MANIFEST_ASSETS):
+        asset_names=list(MANIFEST_ASSETS)
+        if body.focused_video:
+            assets.append(body.focused_video);asset_names.append('instructor.mp4')
+        for asset,name in zip(assets,asset_names):
             expected=f'attempts/{job.id}/{token}/{name}'
             if asset.key!=expected or asset.mime!=FILES[name]:raise HTTPException(422,'Output is outside this processing attempt.')
             head=store.head_object(Bucket=settings.storage_bucket,Key=expected)
@@ -352,7 +355,7 @@ def install_conversions(app,engine,settings,identity,db):
             version=target.version+1
         else:
             version=1
-        for asset,name in zip(assets,MANIFEST_ASSETS):
+        for asset,name in zip(assets,asset_names):
             file_name=f'{revision_id}-{name}' if target else name
             key=f'lessons/{lesson_id}/{file_name}'
             store.copy_object(Bucket=settings.storage_bucket,Key=key,CopySource={'Bucket':settings.storage_bucket,'Key':asset.key})
@@ -371,7 +374,7 @@ def install_conversions(app,engine,settings,identity,db):
             store.delete_object(Bucket=settings.storage_bucket,Key=job.source_key)
             # Only the manifest assets are consumed here; avatar derivatives were uploaded
             # before finish and are collected by /derivatives afterwards.
-            for name in MANIFEST_ASSETS:store.delete_object(Bucket=settings.storage_bucket,Key=f'attempts/{job.id}/{token}/{name}')
+            for name in asset_names:store.delete_object(Bucket=settings.storage_bucket,Key=f'attempts/{job.id}/{token}/{name}')
         except Exception:
             # Publication is already durable; retention cleanup can retry these private objects.
             import logging

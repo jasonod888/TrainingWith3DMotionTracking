@@ -14,10 +14,12 @@ import {measureStandingRig} from './rig';
 import {styleInstructor} from './instructor';
 import {avatarRequested,disposeAvatarStage,loadAvatarStage,pilotClipFor} from './avatar-stage';
 import {followHorizontal} from './camera-follow';
+import {frameMotion} from './fixed-camera';
 import {continuousPlayback} from './animation-sampling';
+import {InstructorVideo} from './InstructorVideo';
 
-export function MotionStage({lesson,player,source=false,framing,immersive=false,locked=false,fit='none',interactive=true}:{lesson:LessonManifest;player:Playback;source?:boolean;framing?:PracticeFraming;immersive?:boolean;locked?:boolean;fit?:'none'|'envelope';interactive?:boolean}){
-  const mount=useRef<HTMLDivElement>(null),video=useRef<HTMLVideoElement>(null);
+export function MotionStage({lesson,player,source=false,companion=false,onVideoUnavailable,framing,immersive=false,locked=false,fit='none',interactive=true}:{lesson:LessonManifest;player:Playback;source?:boolean;companion?:boolean;onVideoUnavailable?:()=>void;framing?:PracticeFraming;immersive?:boolean;locked?:boolean;fit?:'none'|'envelope';interactive?:boolean}){
+  const mount=useRef<HTMLDivElement>(null);
   const [error,setError]=useState(''),[loading,setLoading]=useState(true);
   const framingRef=useRef(framing);framingRef.current=framing;
   const leftHand=useRef<HTMLSpanElement>(null),rightHand=useRef<HTMLSpanElement>(null);
@@ -43,29 +45,31 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
     flat(new THREE.RingGeometry(.30,.38,40),0xa8d8bf,.65);        // where the instructor started
     for(const radius of [1,2,3])flat(new THREE.RingGeometry(radius-.012,radius,64),0x6f9585,.22);
     let fitDistance=4;
-    // Motion-inclusive envelope, measured once per loaded clip. Measuring every
-    // frame would make the instructor appear to change scale as it moves.
-    let envelope:{minX:number;maxX:number;minY:number;maxY:number;minZ:number;maxZ:number}|null=null;
-    let fitCentreY=.9;
+    // This box includes real travel as well as poses. It is independent of playback time.
+    let envelope:THREE.Box3|null=null;
+    const applyFixedView=()=>{
+      if(aligned||!fitEnvelope||!envelope||!controls||!(camera instanceof THREE.PerspectiveCamera))return;
+      fitDistance=frameMotion(camera,controls.target,envelope)??fitDistance;
+      controls.maxDistance=Math.max(9,fitDistance*3);controls.update();
+    };
     const measureEnvelope=()=>{
       if(!fitEnvelope||!mixer||!model)return;
-      const duration=action?.getClip().duration??0;
-      if(!(duration>0))return;
       const nodes:THREE.Object3D[]=[];
-      if(root)nodes.push(root);
-      model.traverse(node=>{if(/head|neck|foot|toe|knee|hand|wrist|elbow|shoulder|hip/i.test(node.name))nodes.push(node);});
+      model.traverse(node=>{if(node instanceof THREE.Bone||/head|neck|foot|toe|knee|hand|wrist|elbow|shoulder|hip|body_world/i.test(node.name))nodes.push(node);});
       if(!nodes.length)return;
-      const box=new THREE.Box3();const point=new THREE.Vector3();
-      const restore=mixer.time;
-      for(let sample=0;sample<=20;sample+=1){
-        mixer.setTime(duration*sample/20);
+      const box=new THREE.Box3(),point=new THREE.Vector3(),restore=mixer.time;
+      // Check every exported frame, including the end, so a brief kick isn't missed.
+      const samples=Math.ceil(lesson.duration*(lesson.frame_rate??15));
+      for(let sample=0;sample<=samples;sample++){
+        mixer.setTime((lesson.animation_start??0)+Math.min(lesson.duration,sample/(lesson.frame_rate??15)));
+        anchor.position.x=0;anchor.position.z=0;
         model.updateWorldMatrix(true,true);
         for(const node of nodes){node.getWorldPosition(point);box.expandByPoint(point);}
       }
-      mixer.setTime(restore);
+      mixer.setTime(restore);anchor.position.x=0;anchor.position.z=0;model.updateWorldMatrix(true,true);
       if(box.isEmpty()||!Number.isFinite(box.min.y))return;
-      envelope={minX:box.min.x,maxX:box.max.x,minY:box.min.y,maxY:box.max.y,minZ:box.min.z,maxZ:box.max.z};
-      fitCentreY=(box.min.y+box.max.y)/2;
+      envelope=box.expandByScalar(.12);
+      applyFixedView();
     };
     const observer=new ResizeObserver(()=>{if(renderer){const {width,height}=host.getBoundingClientRect();renderer.setSize(width,height,false);if(camera instanceof THREE.PerspectiveCamera){
       if(immersive){
@@ -76,7 +80,7 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
         const direction=camera.position.clone().sub(controls?.target??new THREE.Vector3(0,.9,0)).normalize();camera.position.copy(direction.multiplyScalar(fitDistance).add(controls?.target??new THREE.Vector3(0,.9,0)));
         camera.setViewOffset(usableWidth,usableHeight,0,-top,width,height);
       }else camera.aspect=width/Math.max(height,1);
-    }else{camera.left=-1.5*width/Math.max(height,1);camera.right=-camera.left;}camera.updateProjectionMatrix();}});
+    }else{camera.left=-1.5*width/Math.max(height,1);camera.right=-camera.left;}camera.updateProjectionMatrix();applyFixedView();}});
     let root:THREE.Object3D|undefined,action:THREE.AnimationAction|undefined;
     let avatarHeight=1.8,baseFoot=0;const hands:Record<string,THREE.Object3D>={};const handPoint=new THREE.Vector3();const materials:THREE.MeshStandardMaterial[]=[];
     const rootPoint=new THREE.Vector3(),rootInverse=new THREE.Matrix4();
@@ -86,7 +90,7 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
     try{
       renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
       renderer.domElement.setAttribute('aria-label','Interactive 3D movement reference. Drag to rotate; scroll or pinch to zoom.');renderer.domElement.setAttribute('role','img');
-      host.append(renderer.domElement);controls=new OrbitControls(camera,renderer.domElement);controls.target.set(0,aligned?0:.9,0);controls.enableDamping=true;controls.enablePan=false;controls.enabled=!aligned&&!locked&&interactive;controls.minDistance=2;controls.maxDistance=9;controls.maxPolarAngle=Math.PI*.53;controls.update();observer.observe(host);
+      host.append(renderer.domElement);controls=new OrbitControls(camera,renderer.domElement);controls.target.set(0,aligned?0:.9,0);controls.enableDamping=!fitEnvelope;controls.enablePan=false;controls.enabled=!aligned&&!locked&&interactive;controls.minDistance=2;controls.maxDistance=9;controls.maxPolarAngle=Math.PI*.53;controls.update();observer.observe(host);
       // A prepared avatar plus its converted clip replaces the canonical MHR reference when
       // the lesson has a recorded conversion of its own animation. Anything going wrong falls
       // back to the reference rather than leaving the stage empty, because the reference is
@@ -97,7 +101,7 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
       const attach=async()=>{
         if(clipUrl){
           try{
-            const stage=await loadAvatarStage(loader,avatarId,clipUrl,lesson.duration);
+            const stage=await loadAvatarStage(loader,avatarId,clipUrl,lesson.animation_duration??lesson.duration);
             if(disposed){disposeAvatarStage(stage);return;}
             const scene=stage.scene;
             model=scene;anchor.add(scene);
@@ -108,7 +112,7 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
             avatarHeight=stage.height;baseFoot=stage.baseFoot;
             anchor.scale.setScalar(1.8/avatarHeight);
             anchor.position.y=-baseFoot*anchor.scale.y;
-            mixer.setTime(lesson.standing_time);scene.updateMatrixWorld(true);
+            mixer.setTime((lesson.animation_start??0)+lesson.standing_time);scene.updateMatrixWorld(true);
             for(const node of meshesOf(scene)){const material=node.material as THREE.MeshStandardMaterial;if(material&&aligned){material.transparent=true;material.needsUpdate=true;}if(material)materials.push(material);node.frustumCulled=false;}
             measureEnvelope();
             setLoading(false);return;
@@ -117,22 +121,29 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
         loader.load(assetUrl(lesson.animation.key),gltf=>{
           if(disposed){disposeModel(gltf.scene);return;}
           if(!gltf.animations[0]){setError('This reference has no animation.');setLoading(false);return;}
-          model=gltf.scene;anchor.add(model);mixer=new THREE.AnimationMixer(model);action=mixer.clipAction(continuousPlayback(gltf.animations[0]));action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();mixer.setTime(lesson.standing_time);model.updateMatrixWorld(true);
+          model=gltf.scene;anchor.add(model);mixer=new THREE.AnimationMixer(model);action=mixer.clipAction(continuousPlayback(gltf.animations[0]));action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();mixer.setTime((lesson.animation_start??0)+lesson.standing_time);model.updateMatrixWorld(true);
           materials.push(...styleInstructor(model,aligned));
           model.traverse(node=>{if(node.name==='body_world')root=node;if(node.name==='l_wrist')hands.left=node;if(node.name==='r_wrist')hands.right=node;if(node instanceof THREE.Mesh)node.frustumCulled=false;});
-          try{const bounds=measureStandingRig(anchor,model);avatarHeight=bounds.height;baseFoot=bounds.baseFoot;anchor.scale.setScalar(1.8/avatarHeight);anchor.position.y=-baseFoot*anchor.scale.y;}catch{setError('The reference has invalid dimensions. Try the original video.');setLoading(false);return;}
+          try{const bounds=measureStandingRig(anchor,model);avatarHeight=bounds.height;baseFoot=bounds.baseFoot;anchor.scale.setScalar(1.8/avatarHeight);anchor.position.y=-baseFoot*anchor.scale.y;}catch{setError('The reference has invalid dimensions. Try the real instructor video.');setLoading(false);return;}
           measureEnvelope();
           setLoading(false);
-        },undefined,()=>{if(!disposed){setLoading(false);setError('The 3D reference could not load. Try the original video.');}});
+        },undefined,()=>{if(!disposed){setLoading(false);setError('The 3D reference could not load. Try the real instructor video.');}});
       };
       void attach();
       let lastAngle:number|undefined,lastReset:number|undefined;
       const render=()=>{frame=requestAnimationFrame(render);const f=framingRef.current;let offset=0;
         if(aligned&&f){const w=host.clientWidth,h=host.clientHeight;let scale=3*.68/avatarHeight,floorY=-3*.36;if(f.calibration){const display=f.display?.current;const samePane=!!display&&Math.abs(display.paneWidth-w)<2&&Math.abs(display.paneHeight-h)<2;const placement=display&&samePane&&display.sourceWidth===f.videoWidth&&display.sourceHeight===f.videoHeight?placementForTransform(f.calibration,display,h,3,avatarHeight):heightPlacement(f.calibration,f.videoWidth,f.videoHeight,w,h,3,avatarHeight);scale=placement.scale;floorY=placement.floorY;}anchor.scale.set(f.mirrored!==f.mirrorReference?-scale:scale,scale,scale);anchor.position.y=floorY-baseFoot*scale;if(f.composite)offset=compositeOffset(f.position,f.videoWidth,f.videoHeight,w,h,3).worldX;for(const material of materials)material.opacity=f.opacity;}
         if(!aligned&&f){const scale=anchor.scale.y;anchor.scale.x=f.mirrorReference?-scale:scale;}
-        if(!aligned&&fitEnvelope&&envelope&&camera instanceof THREE.PerspectiveCamera){const w=host.clientWidth||1,h=host.clientHeight||1,aspect=w/Math.max(h,1),tan=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));const halfHeight=Math.max((envelope.maxY-envelope.minY)/2*1.16,.3),halfWidth=Math.max((envelope.maxX-envelope.minX)/2*1.16,.3);fitDistance=Math.max(halfHeight/tan,halfWidth/(tan*aspect))+(envelope.maxZ-envelope.minZ)/2;}
-        if(f?.angle!==undefined&&(fitEnvelope||f.angle!==lastAngle||f.resetVersion!==lastReset)){lastAngle=f.angle;lastReset=f.resetVersion;const yaw=f.angle,distance=aligned?8:fitEnvelope||immersive?fitDistance:4;const follows=!aligned&&!fitEnvelope,centreX=follows?followPoint.x:0,centreZ=follows?followPoint.z:0,centreY=aligned?0:fitEnvelope?fitCentreY:.9;camera.position.set(centreX+Math.sin(yaw)*distance,aligned?0:fitEnvelope?fitCentreY:1,centreZ+Math.cos(yaw)*distance);camera.lookAt(centreX,centreY,centreZ);if(controls)controls.target.set(centreX,centreY,centreZ);}if(controls)controls.enabled=!aligned&&!locked&&interactive;
-        if(mixer){if(action){action.paused=false;action.enabled=true;}mixer.setTime(f?.active&&(f.calibrating||player.state.index<0)?lesson.standing_time:player.state.time);if(root&&model){
+        if(f?.angle!==undefined&&(f.angle!==lastAngle||f.resetVersion!==lastReset)){
+          lastAngle=f.angle;lastReset=f.resetVersion;
+          const centre=fitEnvelope?controls?.target??new THREE.Vector3(0,.9,0):new THREE.Vector3(aligned?0:followPoint.x,aligned?0:.9,aligned?0:followPoint.z);
+          const distance=aligned?8:fitEnvelope||immersive?fitDistance:4;
+          camera.position.set(centre.x+Math.sin(f.angle)*distance,aligned?0:centre.y,centre.z+Math.cos(f.angle)*distance);
+          camera.lookAt(centre);controls?.target.copy(centre);
+          applyFixedView();
+        }
+        if(controls)controls.enabled=!aligned&&!locked&&interactive;
+        if(mixer){if(action){action.paused=false;action.enabled=true;}mixer.setTime((lesson.animation_start??0)+(f?.active&&(f.calibrating||player.state.index<0)?lesson.standing_time:player.state.time));if(root&&model){
           // Update the whole subtree so the bone matrix and any inverse come from one frame.
           model.updateWorldMatrix(true,true);
           if(aligned){
@@ -156,14 +167,10 @@ export function MotionStage({lesson,player,source=false,framing,immersive=false,
         controls?.update();renderer?.render(scene,camera);
         if(aligned&&leftHand.current&&rightHand.current){const positions:Record<string,{x:number;y:number}|null>={left:null,right:null};for(const side of ['left','right']){if(hands[side]){hands[side].getWorldPosition(handPoint);handPoint.project(camera);if(Math.abs(handPoint.x)<=1&&Math.abs(handPoint.y)<=1&&Math.abs(handPoint.z)<=1)positions[side]={x:(handPoint.x+1)/2*host.clientWidth,y:(1-handPoint.y)/2*host.clientHeight};}}placeHandLabels({left:leftHand.current,right:rightHand.current},positions,host.clientWidth,host.clientHeight);}
       };render();
-    }catch{setLoading(false);setError('3D is unavailable on this device. Try the original video.');}
+    }catch{setLoading(false);setError('3D is unavailable on this device. Try the real instructor video.');}
     return()=>{disposed=true;cancelAnimationFrame(frame);if(leftHand.current)leftHand.current.hidden=true;if(rightHand.current)rightHand.current.hidden=true;observer.disconnect();controls?.dispose();mixer?.stopAllAction();if(model){mixer?.uncacheRoot(model);disposeModel(model);}for(const child of ground.children){if(child instanceof THREE.Mesh||child instanceof THREE.LineSegments){child.geometry.dispose();disposeMaterial(child.material as THREE.Material);}}renderer?.dispose();renderer?.domElement.remove();};
   },[lesson,player,source,framing?.active,immersive,locked,fit,interactive]);
-  useEffect(()=>{
-    if(!source)return;
-    let frame=0;const sync=()=>{const v=video.current;if(v && v.readyState>=2){const target=lesson.source_start+player.state.time;if(Math.abs(v.currentTime-target)>.15)v.currentTime=target;v.playbackRate=player.state.speed;if(player.state.playing && v.paused)void v.play().catch(()=>{});if(!player.state.playing && !v.paused)v.pause();}frame=requestAnimationFrame(sync);};sync();return()=>{cancelAnimationFrame(frame);video.current?.pause();};
-  },[source,player,lesson]);
-  return <div className="motion-host" ref={mount}>{source&&lesson.source_video?<video ref={video} src={assetUrl(lesson.source_video.key)} muted playsInline preload="metadata" onLoadedMetadata={()=>{if(video.current)video.current.currentTime=lesson.source_start;}}/>:null}<span ref={leftHand} className="hand-label reference-hand" hidden>L</span><span ref={rightHand} className="hand-label reference-hand" hidden>R</span>{!source&&loading&&<div className="stage-message" role="status"><span className="loader"/>Loading your reference...</div>}{!source&&error&&<div className="stage-message" role="alert">{error}</div>}</div>;
+  return <div className={`motion-host ${companion&&!source?'has-companion':''}`}><div className="motion-render-area" hidden={source}><div className="motion-render" ref={mount}/></div>{source?<InstructorVideo lesson={lesson} player={player} mirrored={framing?.mirrorReference} onUnavailable={onVideoUnavailable}/>:companion&&lesson.source_video?<div className="instructor-video-inset" aria-label="Real instructor alongside 3D"><InstructorVideo lesson={lesson} player={player} mirrored={framing?.mirrorReference}/><span>Real instructor</span></div>:null}<span ref={leftHand} className="hand-label reference-hand" hidden>L</span><span ref={rightHand} className="hand-label reference-hand" hidden>R</span>{!source&&loading&&<div className="stage-message" role="status"><span className="loader"/>Loading your reference...</div>}{!source&&error&&<div className="stage-message" role="alert">{error}</div>}</div>;
 }
 function meshesOf(model:THREE.Object3D){const meshes:THREE.Mesh[]=[];model.traverse(node=>{if(node instanceof THREE.Mesh)meshes.push(node);});return meshes;}
 function disposeMaterial(material:THREE.Material|THREE.Material[]){for(const m of Array.isArray(material)?material:[material])m.dispose();}

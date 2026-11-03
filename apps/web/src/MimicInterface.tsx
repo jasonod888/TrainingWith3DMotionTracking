@@ -268,7 +268,9 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
    const response=await fetch(assetUrl(lesson.landmarks.key));if(!response.ok)throw new Error('The movement comparison data could not load.');const reference=await response.json() as Reference;
    if(epoch!==r.epoch)return;
    if(!Array.isArray(reference.times)||!Array.isArray(reference.keypoints)||reference.times.length!==reference.keypoints.length||reference.keypoints.some(row=>row.length<63))throw new Error('This lesson has no compatible comparison data.');
-   r.reference=reference;
+   const offset=lesson.animation_start??0;
+   const indices=reference.times.map((t,i)=>t>=offset-1e-6&&t<=offset+lesson.duration+1e-6?i:-1).filter(i=>i>=0);
+   r.reference={duration:lesson.duration,times:indices.map(i=>reference.times[i]-offset),keypoints:indices.map(i=>reference.keypoints[i])};
    }else r.reference=null;
    if(next==='camera'){
     const result=await acquire(options.current.request);

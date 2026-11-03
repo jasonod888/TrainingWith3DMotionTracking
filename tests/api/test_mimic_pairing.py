@@ -34,8 +34,10 @@ def test_state_sequence_ack_and_replayed_commands(system):
     command={'id':str(uuid4()),'sequence':1,'action':'next'}
     client.post(path+'/commands',headers=headers(receiver),json=command)
     seq=client.get(path,headers=headers(capture)).json()['commands'][0]['sequence']
-    state={'sequence':2,'time':0,'speed':.5,'index':0,'end':lesson.duration,'ack':seq}
+    state={'sequence':2,'time':0,'speed':.5,'index':0,'end':lesson.duration,'ack':seq,'reference':'both'}
     assert client.put(path+'/state',headers=headers(capture),json=state).status_code==200
+    assert client.get(path,headers=headers(receiver)).json()['snapshot']['reference']=='both'
+    assert client.put(path+'/state',headers=headers(capture),json={**state,'sequence':3,'reference':'invalid'}).status_code==422
     assert client.put(path+'/state',headers=headers(capture),json=state).status_code==409
     assert client.post(path+'/commands',headers=headers(receiver),json=command).status_code==200
     assert client.get(path,headers=headers(capture)).json()['commands']==[]

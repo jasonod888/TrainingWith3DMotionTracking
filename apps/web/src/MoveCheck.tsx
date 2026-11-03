@@ -1,49 +1,56 @@
 import {useEffect,useRef,useState} from 'react';
-import {ArrowLeft,Check,Pause,Play,Plus,Scissors,SlidersHorizontal,Video,Box} from 'lucide-react';
+import {ArrowLeft,Check,Pause,Play,RotateCcw,Video,Box} from 'lucide-react';
 import type {LessonManifest} from '../../../packages/lesson-schema/index';
 import {Playback} from '../../../packages/learning-engine/playback';
 import {MotionStage} from './MotionStage';
-import {PreviewScrubber} from './PreviewScrubber';
-import {acceptMove} from './api';
+import {VideoTimeline} from './VideoTimeline';
+import {acceptMove,trimMove,assetUrl} from './api';
 
-export function MoveCheck({lesson,onBack,onAccepted,onAdjust,onChooseAnother,onMore}:{
- lesson:LessonManifest;onBack:()=>void;onAccepted:()=>void;onAdjust:()=>void;onChooseAnother:()=>void;onMore:()=>void;
+export function MoveCheck({lesson,onBack,onAccepted,onChooseAnother,onDirty}:{
+ lesson:LessonManifest;onBack:()=>void;onAccepted:(lesson:LessonManifest)=>void;onChooseAnother:()=>void;onDirty?:(dirty:boolean)=>void;
 }){
  const player=useRef(new Playback(lesson.section_set.sections,lesson.duration)).current;
- useEffect(()=>{player.mode('continuous');},[player]);
+ const fps=lesson.frame_rate??15,total=Math.ceil(lesson.duration*fps),minimum=Math.ceil(.05*fps);
+ const [start,setStart]=useState(0),[end,setEnd]=useState(total);
+ const range=useRef({start:0,end:lesson.duration});range.current={start:start/fps,end:Math.min(end/fps,lesson.duration)};
  const [state,setState]=useState(player.snapshot());
- const [source,setSource]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const notes=useRef<HTMLDialogElement>(null);
+ const [source,setSource]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[warnings,setWarnings]=useState(false);
+ const changed=start!==0||end!==total;
+ useEffect(()=>{if(warnings)notes.current?.showModal();else notes.current?.close();},[warnings]);
+ useEffect(()=>{player.mode('continuous');},[player]);
+ useEffect(()=>{onDirty?.(changed);const leave=(e:BeforeUnloadEvent)=>{if(changed){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',leave);return()=>{onDirty?.(false);window.removeEventListener('beforeunload',leave);};},[changed,onDirty]);
  useEffect(()=>{
   let frame=0,last=performance.now(),draw=last;
-  const tick=(now:number)=>{player.tick(Math.min((now-last)/1000,.25));last=now;if(now-draw>80){setState(player.snapshot());draw=now;}frame=requestAnimationFrame(tick);};
-  frame=requestAnimationFrame(tick);
-  return()=>cancelAnimationFrame(frame);
+  const tick=(now:number)=>{player.tick(Math.min((now-last)/1000,.25));last=now;if(player.state.time>=range.current.end)player.seek(range.current.end);if(now-draw>60){setState(player.snapshot());draw=now;}frame=requestAnimationFrame(tick);};
+  frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame);
  },[player]);
- const play=()=>{player.command(player.state.playing?'pause':'play');setState(player.snapshot());};
- const accept=async()=>{setBusy(true);setError('');try{await acceptMove(lesson.lesson_id,lesson.revision_id,lesson.warnings);onAccepted();}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
- return <section className="workflow-screen check-screen">
-  <div className="workflow-head">
-   <button className="back-link" onClick={onBack}><ArrowLeft size={16}/>My moves</button>
-   <p className="eyebrow">CHECK YOUR MOVE</p>
-   <h1>{lesson.title}</h1>
-   <p className="subtle">This is what you will practise. Accept it when the movement looks right.</p>
-  </div>
+ const seek=(time:number)=>{player.seek(Math.max(range.current.start,Math.min(time,range.current.end)));setState(player.snapshot());};
+ const adjust=(from:number,to:number)=>{
+  const nextStart=Math.max(0,Math.min(Math.round(from*fps),total-minimum));
+  const nextEnd=Math.max(nextStart+minimum,Math.min(to>=lesson.duration-1e-6?total:Math.round(to*fps),total));
+  const time=nextStart!==start?nextStart/fps:Math.min(nextEnd/fps,lesson.duration);
+  range.current={start:nextStart/fps,end:Math.min(nextEnd/fps,lesson.duration)};
+  setError('');setStart(nextStart);setEnd(nextEnd);player.seek(time);setState(player.snapshot());
+ };
+ const play=()=>{if(player.state.playing)player.command('pause');else{if(player.state.time<range.current.start||player.state.time>=range.current.end-1e-6)player.seek(range.current.start);player.command('play');}setState(player.snapshot());};
+ const accept=async()=>{setBusy(true);setError('');player.command('pause');try{const value=changed?await trimMove(lesson,start,end):lesson;if(!changed)await acceptMove(value.lesson_id,value.revision_id,value.warnings);onDirty?.(false);onAccepted(value);}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
+ const stamp=(time:number)=>`${Math.floor(time/60)}:${(time%60).toFixed(2).padStart(5,'0')}`;
+ return <section className="workflow-screen check-screen" aria-label="Review and trim your move">
+  <header className="check-heading"><button className="round" aria-label="Back to my moves" disabled={busy} onClick={onBack}><ArrowLeft size={20}/></button><div><p className="eyebrow">REVIEW & TRIM</p><h1 title={lesson.title}>{lesson.title}</h1></div><span className="check-instruction">Keep the movement you want to practise.</span></header>
   <div className="check-stage motion-stage">
    <div className="stage-top"><span className="stage-pill"><i/>{source?'Original video':'3D move'}</span>
     {lesson.source_video&&<div className="view-switch" aria-label="Preview source"><button aria-label="Show 3D move" aria-pressed={!source} className={!source?'selected':''} onClick={()=>setSource(false)}><Box size={17}/></button><button aria-label="Show original video" aria-pressed={source} className={source?'selected':''} onClick={()=>setSource(true)}><Video size={17}/></button></div>}
    </div>
-   <MotionStage lesson={lesson} player={player} source={source}/>
-   <div className="stage-bottom"><button className="check-play" onClick={play} aria-label={state.playing?'Pause preview':'Play preview'}>{state.playing?<Pause size={18}/>:<Play size={18} fill="currentColor"/>}{state.playing?'Pause':'Play'}</button><span>{(state.time).toFixed(1)}s · {lesson.section_set.sections.length===1?'One move':`${lesson.section_set.sections.length} parts`}</span></div>
+   <MotionStage lesson={lesson} player={player} source={source} fit="envelope"/>
+   <div className="stage-bottom"><button className="check-play" disabled={busy} onClick={play} aria-label={state.playing?'Pause preview':'Play selected frames'}>{state.playing?<Pause size={18}/>:<Play size={18} fill="currentColor"/>}{state.playing?'Pause':'Play selection'}</button><span>{stamp(state.time)} / {stamp(lesson.duration)}</span></div>
   </div>
-  <PreviewScrubber player={player}/>
-  {lesson.warnings.length>0&&<div className="check-warnings" role="note"><strong>Worth a look</strong><ul>{lesson.warnings.map(warning=><li key={warning}>{warning}</li>)}</ul></div>}
-  {error&&<p className="inline-notice error-notice" role="alert">{error}</p>}
-  <div className="check-actions">
-   <button className="primary" disabled={busy} onClick={()=>void accept()}><Check size={18}/>{busy?'Saving…':'Looks good'}</button>
-   <button className="secondary" disabled={busy} onClick={onAdjust}><Scissors size={16}/>Adjust clip</button>
-   <button className="secondary" disabled={busy} onClick={onChooseAnother}><Plus size={16}/>Choose another video</button>
-   <button className="back-link" disabled={busy} onClick={onMore}><SlidersHorizontal size={15}/>More adjustments</button>
+  <div className="check-trim" aria-label="Trim movement frames">
+   <div className="check-trim-heading"><strong>Trim clip <span>· {stamp(range.current.end-range.current.start)} kept</span></strong><button className="back-link" disabled={busy||!changed} onClick={()=>{setStart(0);setEnd(total);player.seek(0);setState(player.snapshot());}}><RotateCcw size={14}/>Reset</button></div>
+   <VideoTimeline compact frameRate={fps} source={lesson.source_video?assetUrl(lesson.source_video.key):undefined} sourceStart={lesson.source_start} duration={lesson.duration} time={state.time} disabled={busy} onSeek={seek} range={{start:range.current.start,end:range.current.end,maxLength:lesson.duration,onChange:adjust}}/>
+
   </div>
-  <p className="small muted check-note">Timing tools can split the movement into parts. They cannot repair the reconstructed body; if the pose is wrong, adjust the clip or choose another video.</p>
+  <footer className="check-footer"><div className="check-feedback">{error?<p role="alert">{error}</p>:<span>Preview the selection, then keep it. {lesson.warnings.length>0&&<button onClick={()=>setWarnings(true)}>Review notes ({lesson.warnings.length})</button>}</span>}</div><div className="check-actions"><button className="secondary" disabled={busy} onClick={onChooseAnother}>Choose another video</button><button className="primary" disabled={busy} onClick={()=>void accept()}><Check size={18}/>{busy?'Saving…':'Looks good'}</button></div></footer>
+  <dialog ref={notes} className="check-notes" aria-label="Review notes" onClose={()=>setWarnings(false)}><strong>Review notes</strong><ul>{lesson.warnings.map(w=><li key={w}>{w}</li>)}</ul><button className="primary" autoFocus onClick={()=>setWarnings(false)}>Got it</button></dialog>
  </section>;
 }

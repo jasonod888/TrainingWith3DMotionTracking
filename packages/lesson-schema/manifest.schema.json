@@ -133,6 +133,32 @@
       "title": "Source Start",
       "type": "number"
     },
+    "animation_start": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Animation Start",
+      "type": "number"
+    },
+    "animation_duration": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Animation Duration"
+    },
+    "frame_rate": {
+      "default": 15,
+      "maximum": 240,
+      "minimum": 1,
+      "title": "Frame Rate",
+      "type": "integer"
+    },
     "engine": {
       "enum": [
         "sam-3d-body",
@@ -188,6 +214,17 @@
       "$ref": "#/$defs/Asset"
     },
     "source_video": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "focused_video": {
       "anyOf": [
         {
           "$ref": "#/$defs/Asset"

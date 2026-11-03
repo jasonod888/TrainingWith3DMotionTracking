@@ -51,6 +51,9 @@ class LessonManifest(Contract):
     title: str
     duration: float = Field(gt=0)
     source_start: float = Field(ge=0)
+    animation_start: float = Field(default=0, ge=0)
+    animation_duration: float | None = Field(default=None, gt=0)
+    frame_rate: int = Field(default=15, ge=1, le=240)
     engine: Literal['sam-3d-body', 'mediapipe', 'synthetic']
     engine_version: str
     units: Literal['metres'] = 'metres'
@@ -61,6 +64,7 @@ class LessonManifest(Contract):
     animation: Asset
     landmarks: Asset
     source_video: Asset | None = None
+    focused_video: Asset | None = None
     thumbnail: Asset | None = None
     section_set: SectionSet
     warnings: list[str] = Field(default_factory=list)
@@ -68,6 +72,10 @@ class LessonManifest(Contract):
 
     @model_validator(mode='after')
     def timeline(self):
+        if self.animation_duration is not None and self.animation_start + self.duration > self.animation_duration + 1e-6:
+            raise ValueError('Trim must remain inside the original animation.')
+        if self.focused_video and (not self.source_video or self.focused_video.mime != 'video/mp4'):
+            raise ValueError('A focused instructor video needs its source video and MP4 encoding.')
         if self.standing_time > self.duration or abs(self.section_set.duration-self.duration) > 1e-6:
             raise ValueError('Reference and sections must use the animation timeline.')
         return self

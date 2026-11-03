@@ -63,6 +63,7 @@ def public_keys(manifest, lesson_id):
         if asset:
             value[field] = {**asset, 'key': f"public/{lesson_id}/{Path(asset['key']).name}"}
     value['source_video'] = None
+    value['focused_video'] = None
     value['presentation'] = {name:{**asset,'key':f"public/{lesson_id}/{Path(asset['key']).name}"}
                              for name,asset in value.get('presentation',{}).items() if name in ('male','female')}
     return value

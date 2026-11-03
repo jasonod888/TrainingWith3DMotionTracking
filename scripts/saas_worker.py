@@ -157,6 +157,16 @@ class Worker:
                 except Exception:
                     check();grounding={'status':'skipped','reason':'correction-failed'}
             advance('verifying')
+            # Every local project gets the approved presentation, even if floor
+            # correction is disabled, unavailable or outside its duration scope.
+            # Reuse its masks when valid; otherwise segment independently.
+            focused=None
+            try:
+                from instructor_pipeline import prepare_instructor
+                focused=prepare_instructor(folder,command,job['duration'])
+            except Exception as exc:
+                check()
+                print(f'Focused instructor video unavailable ({type(exc).__name__}).',flush=True)
             import numpy as np
             from pygltflib import GLTF2
             with np.load(folder/'motion/motion.npz',allow_pickle=False) as data:
@@ -165,6 +175,9 @@ class Worker:
                 heights=np.max(points[:,[13,14,15,18],1],axis=1)-points[:,0,1];standing=int(np.argmax(heights))
                 reference={'duration':float(times[-1]),'times':times.round(6).tolist(),'keypoints':points.round(6).tolist(),'standingTime':float(times[standing]),'sourceStart':0,'sourceTimestampMap':{'start':job['start'],'normalised_fps':15},'axes':'x-right/y-down/z-forward'}
                 stage['frames']=len(times)
+            if focused:
+                instructor_report=json.loads(focused.with_suffix('.json').read_text(encoding='utf-8'))
+                if instructor_report.get('instructor_markers'):reference['instructorMarkers']=instructor_report['instructor_markers']
             gltf=GLTF2().load(str(folder/'reference.glb'))
             if not gltf.skins or not gltf.meshes or not gltf.animations:raise InvalidVideo('Animation export is incomplete.')
             for animation in gltf.animations:
@@ -183,12 +196,22 @@ class Worker:
                 with (folder/name).open('rb') as file:
                     response=self.api.put(path+'/files/'+name,headers={**headers,'Content-Type':'application/octet-stream'},content=file)
                 response.raise_for_status();assets[name]=response.json()
+            if focused:
+                try:
+                    with focused.open('rb') as file:
+                        response=self.api.put(path+'/files/instructor.mp4',headers={**headers,'Content-Type':'application/octet-stream'},content=file)
+                    response.raise_for_status();assets['instructor.mp4']=response.json()
+                except Exception as exc:
+                    check();focused=None
+                    print(f'Focused instructor upload unavailable ({type(exc).__name__}).',flush=True)
             manifest={'schema_version':1,'lesson_id':job_id,'revision_id':lease,'title':job['title'],'duration':reference['duration'],'source_start':0,
                 'engine':'sam-3d-body','engine_version':'b5c765a0d89d789985e186d396315e7590887b94','units':'metres','landmark_axes':'x-right/y-down/z-forward','root_motion':'estimated-camera-relative','confidence':'unmeasured','standing_time':reference['standingTime'],
                 'animation':assets['reference.glb'],'landmarks':assets['reference.json'],'source_video':assets['preview.mp4'],'thumbnail':assets['thumbnail.jpg'],
                 'section_set':{'id':job_id,'revision':1,'duration':reference['duration'],'sections':[{'id':'whole','label':'Full movement','start':0,'end':reference['duration']}]},
                 'warnings':['Review the reconstruction before teaching. Pose accuracy and foot contact are not certified.',f'Source range starts at {job["start"]}s; preview is normalised to 15 fps with audio removed.']}
             # Avatar presentation is derived from the canonical export. Uploads must happen
+            if focused:manifest['focused_video']=assets['instructor.mp4']
+            else:manifest['warnings'].append('Person-only instructor video could not be prepared. The original wide video remains available.')
             if grounding['status']=='applied':
                 manifest['root_motion']='floor-guided'
                 manifest['warnings'].append('Floor movement was corrected using a fixed-camera estimate; review tracking and foot placement.')

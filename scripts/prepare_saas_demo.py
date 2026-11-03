@@ -32,6 +32,20 @@ def package_demo(folder=ROOT/'web/dist/assets'):
              'label':'Opening & ready' if i==0 else 'Finish & bow' if i==len(boundaries)-2 else f'Move {i:02}'}
             for i,start in enumerate(boundaries[:-1])]},
         'warnings':['Prototype reference. Similarity is not expert technique assessment.','Source demonstration is for local development; confirm rights before hosted distribution.']})
+    # Preserve only verified person-only footage generated from this exact demo.
+    for report_path in sorted(folder.glob('instructor-person-*.json'),key=lambda path:path.stat().st_mtime,reverse=True):
+        report=json.loads(report_path.read_text(encoding='utf-8'))
+        video=report_path.with_suffix('.mp4')
+        if (report.get('version')=='focused-instructor-v2' and video.is_file()
+                and report.get('demo_source_sha256')==manifest.source_video.sha256
+                and hashlib.sha256(video.read_bytes()).hexdigest()==report.get('video_sha256')):
+            from apps.api.contracts import Asset
+            manifest.focused_video=Asset.model_validate(asset(video.name,'video/mp4'))
+            if report.get('instructor_markers'):
+                reference['instructorMarkers']=report['instructor_markers']
+                (folder/'reference.json').write_text(json.dumps(reference,separators=(',',':')),encoding='utf-8')
+                manifest.landmarks=Asset.model_validate(asset('reference.json','application/json'))
+            break
     (folder/'manifest.json').write_text(manifest.model_dump_json(indent=2),encoding='utf-8')
     print('Prepared local demonstration manifest and thumbnail.')
 

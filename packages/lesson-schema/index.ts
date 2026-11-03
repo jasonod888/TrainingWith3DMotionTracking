@@ -4,11 +4,13 @@ export type Asset = { key: string; mime: string; bytes: number; sha256: string }
 export type LessonManifest = {
   schema_version: 1; lesson_id: string; revision_id: string; title: string;
   duration: number; source_start: number; standing_time: number;
+  animation_start?: number; animation_duration?: number | null; frame_rate?: number;
   engine: 'sam-3d-body' | 'mediapipe' | 'synthetic'; engine_version: string;
   units: 'metres'; landmark_axes: 'x-right/y-down/z-forward';
   root_motion: 'estimated-camera-relative' | 'hip-relative' | 'in-place' | 'floor-guided';
   confidence: 'unmeasured' | 'measured'; animation: Asset; landmarks: Asset;
   source_video: Asset | null; thumbnail: Asset | null; section_set: SectionSet; warnings: string[];
+  focused_video?: Asset | null;
   presentation?: Partial<Record<'male' | 'female' | 'report', Asset>>;
 };
 

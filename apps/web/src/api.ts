@@ -28,6 +28,7 @@ export const loadLibrary=()=>request<LessonManifest[]>('/lessons');
 export const loadLesson=(id:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`);
 export const copyDemo=()=>request<LessonManifest>('/lessons/from-demo','POST');
 export const saveSections=(lesson:LessonManifest,sections:LessonManifest['section_set']['sections'],title:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/sections`,'PUT',{base_revision_id:lesson.revision_id,sections,title});
+export const trimMove=(lesson:LessonManifest,start_frame:number,end_frame:number)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/trim`,'PUT',{base_revision_id:lesson.revision_id,start_frame,end_frame,accept:true});
 export const renameMove=(id:string,title:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`,'PATCH',{title});
 
 export type MoveAudiences={direct:number;groups:number;public:boolean};
