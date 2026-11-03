@@ -9,6 +9,29 @@ test('calibration and navigation cancel countdown; resume is idempotent',()=>{co
 test('selecting a section clears a temporary range and never edits boundaries',()=>{const s=make();s.setRange(.2,.7);s.select(1);assert.equal(s.range,null);assert.equal(s.player.state.time,2);assert.equal(s.player.sections[0].end,2);assert.throws(()=>s.setRange(3,2));});
 test('repeated remote start cannot restart a countdown and range scrubbing stays bounded',()=>{const s=make();s.action('resume');s.tick(1);s.action('resume');assert.equal(s.remaining,2);s.setRange(.5,1.5);s.seek(3);assert.equal(s.player.state.time,1.5);});
 
+test('only the first practice start counts in; next, back, replay and resume are immediate',()=>{
+ const s=make();let starts=0;s.onAttemptStart=()=>starts++;
+ s.action('play');assert.equal(s.phase,'countdown');s.tick(3);
+ assert.equal(starts,1);
+ s.tick(2);assert.equal(s.phase,'paused');
+ s.action('next');assert.equal(s.player.state.index,1);
+ assert.equal(s.phase,'playing');assert.equal(s.remaining,0);
+ s.tick(.25);assert.equal(s.player.state.time,2.25);
+ for(const action of ['back','again','next'] as const){
+  s.action(action);assert.equal(s.phase,'playing',action);assert.equal(s.remaining,0,action);
+ }
+ s.pause('settings');s.action('resume');assert.equal(s.phase,'playing');
+ s.select(0);s.action('play');assert.equal(s.phase,'playing');
+ assert.equal(s.countdownSeconds,3,'the preparation preference is unchanged');
+});
+
+test('navigation skips a pending count-in and explicit new-start countdowns remain available',()=>{
+ const s=make();s.select(0);s.start();s.tick(1);s.action('next');
+ assert.equal(s.phase,'playing');assert.equal(s.player.state.time,2);
+ s.pause();s.start(5);assert.equal(s.phase,'countdown');assert.equal(s.remaining,5);
+ s.tick(5);s.pause();s.start();assert.equal(s.phase,'playing');
+});
+
 test('record countdown cancellation clears intent for every interruption',()=>{
  for(const interrupt of ['cancel','settings','seek','section','background','exit']){
   const s=make();let recordNext=true,recordings=0;

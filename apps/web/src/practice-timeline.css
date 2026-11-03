@@ -1,0 +1,51 @@
+/* A chapter rail below the movement stage, with one accessible seek control. */
+.practice-timeline-host{position:absolute;z-index:8;left:max(18px,env(safe-area-inset-left));right:max(18px,env(safe-area-inset-right));bottom:calc(72px + env(safe-area-inset-bottom));height:88px}
+.practice-timeline{height:100%;min-width:0;color:#e8f0e6;font-variant-numeric:tabular-nums}
+.practice-timeline-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;height:36px}
+.mimic-shell.mimic-immersive .practice-timeline-browse{display:flex;align-items:center;gap:8px;min-width:0;min-height:44px;border:0;border-radius:8px;padding:0 2px;background:transparent;text-align:left;white-space:nowrap;font-size:12px;overflow:hidden}
+.practice-timeline-browse>svg{flex-shrink:0;color:#d8ed9b}
+.practice-timeline-count{flex-shrink:0;font-weight:600;color:#d8ed9b}
+.practice-timeline-count>span{font-weight:400;color:#a9bcae}
+.practice-timeline-name{overflow:hidden;text-overflow:ellipsis;color:#c4d2c6;font-size:11px}
+.practice-timeline-times{display:flex;gap:6px;align-items:center;flex-shrink:0;font-size:11px;color:#9eafa3}
+.practice-timeline-times strong{font-weight:500;color:#eff5e9}
+.practice-timeline-track.mimic-scrub{position:relative;display:block;height:36px;margin:0 7px;touch-action:none;cursor:pointer}
+.practice-timeline-rail{position:absolute;left:0;right:0;top:14px;height:8px;border-radius:4px;background:#31483b}
+.practice-timeline-segment{position:absolute;top:0;bottom:0;box-sizing:border-box;border-right:2px solid #102219;background:linear-gradient(to right,#94b980 var(--section-fill),#31483b 0);border-radius:3px}
+.practice-timeline-segment:last-child{border-right:0}
+.practice-timeline-segment.is-current{background:linear-gradient(to right,#d8ed9b var(--section-fill),#647b47 0)}
+.practice-timeline-segment.is-current:after{content:'';position:absolute;inset:-3px 0;border:1px solid #d8ed9b55;border-radius:5px;pointer-events:none}
+.practice-timeline-playhead{position:absolute;top:10px;width:16px;height:16px;box-sizing:border-box;border:3px solid #f4f8ef;border-radius:50%;background:#203c2c;transform:translateX(-50%);box-shadow:0 1px 6px #0007;pointer-events:none;z-index:2}
+.mimic-immersive .practice-timeline-track input[type=range]{position:absolute;inset:0;width:100%;height:44px;min-height:44px;margin:-4px 0 0;opacity:0;cursor:ew-resize;touch-action:none;padding:0}
+.practice-timeline-track:focus-within .practice-timeline-playhead{outline:2px solid #d8ed9b;outline-offset:4px}
+.practice-timeline-track:has(input:focus-visible){outline:1px solid #d8ed9b55;outline-offset:5px;border-radius:8px}
+.practice-timeline-tooltip{position:absolute;z-index:4;bottom:38px;transform:translateX(-50%);width:max-content;max-width:min(230px,100%);min-width:146px;box-sizing:border-box;padding:10px 12px;border:1px solid #ffffff24;border-radius:10px;background:#213c2ff5;box-shadow:0 4px 16px #0004;pointer-events:none;font-size:11px}
+.practice-timeline-tooltip strong{display:flex;justify-content:space-between;gap:20px;font-size:11px;color:#e5f1cd;font-weight:600}
+.practice-timeline-tooltip strong>span{font-weight:400;color:#bfcebc}
+.practice-timeline-tooltip>span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:5px;color:#c9d7c9}
+.practice-timeline-hint{display:block;margin:0 7px;color:#91a899;font-size:10px;line-height:16px}
+.mimic-shell.mode-practice:not(.settings-open):not(.is-setting-up) .mimic-stage{bottom:calc(160px + env(safe-area-inset-bottom));--mimic-stage-bottom:128px}
+.mimic-shell.mode-practice.settings-open .practice-timeline-host,.mimic-shell.is-setting-up .practice-timeline-host{visibility:hidden;pointer-events:none}
+.mimic-shell.mode-practice .mimic-dock{gap:8px}
+@media(min-width:1000px){
+ .practice-timeline-host{left:28px;right:348px;bottom:20px}
+ .mimic-shell.mode-practice:not(.settings-open):not(.is-setting-up) .mimic-stage{bottom:120px;--mimic-stage-bottom:24px}
+ .mimic-shell.mode-practice.is-presenting .practice-timeline-host{right:28px}
+}
+@media(max-width:999px) and (min-height:501px),(max-width:599px){
+ .mimic-shell.mode-practice:not(.settings-open):not(.is-setting-up) .mimic-dock{bottom:max(12px,env(safe-area-inset-bottom))}
+ .practice-timeline-keyboard-hint{display:none}
+ .practice-timeline-name{display:none}
+}
+@media(min-width:600px) and (max-width:999px) and (max-height:500px){
+ .practice-timeline-host{left:20px;right:260px;bottom:12px}
+ .practice-timeline-keyboard-hint{display:none}
+ .mimic-shell.mode-practice:not(.settings-open):not(.is-setting-up) .mimic-stage{right:240px;bottom:108px;--mimic-stage-bottom:12px;--mimic-stage-right:0px}
+ .mimic-shell.mode-practice:not(.settings-open) .mimic-context{left:auto;right:14px;top:14px;bottom:auto;width:220px}
+ .mimic-shell.mode-practice:not(.settings-open) .mimic-dock{top:130px;overflow-y:auto}
+ .mimic-shell.mode-practice.is-presenting .practice-timeline-host{right:20px}
+ .mimic-shell.mode-practice.instructor-only.is-presenting:not(.settings-open) .mimic-stage{right:0}
+}
+.mimic-shell.is-presenting.controls-resting .practice-timeline-host{opacity:0;pointer-events:none}
+.mimic-shell.is-presenting .practice-timeline-host:focus-within{opacity:1;pointer-events:auto}
+@media(prefers-reduced-motion:no-preference){.practice-timeline-host{transition:opacity .2s}}

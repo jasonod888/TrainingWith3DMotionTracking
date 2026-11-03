@@ -59,27 +59,55 @@ def run():
   page.route('**/api/**',api)
   page.goto(os.environ.get('PRACTICE_TEST_URL','http://127.0.0.1:5173')+'/?page=practice&id=synthetic-lesson&source=demo')
   expect(page.get_by_role('button',name='Start practice',exact=True)).to_be_visible()
+  expect(page.get_by_role('button',name='Use camera feedback',exact=True)).to_have_count(0)
+  expect(page.locator('.mimic-transport')).to_have_count(0)
   # Mobile uses the entire viewport; settings remain contained and keyboard dismissible.
   page.set_viewport_size({'width':390,'height':844})
   expect(page.locator('.mimic-stage')).to_have_css('width','390px')
   stage=page.locator('.mimic-stage').bounding_box()
-  assert stage and stage['x']==0 and stage['y']==0 and stage['height']==844, stage
-  speed=page.get_by_role('button',name='1× Speed',exact=True)
+  timeline=page.locator('.practice-timeline').bounding_box()
+  assert stage and timeline and stage['x']==0 and stage['y']==0 and stage['y']+stage['height']<=timeline['y'], (stage,timeline)
+  speed=page.get_by_role('button',name='Playback speed 1×',exact=True)
   speed.click()
-  sheet=page.get_by_role('dialog',name='Speed',exact=True)
+  sheet=page.get_by_role('dialog',name='Practice settings',exact=True)
   expect(sheet).to_be_visible()
+  expect(sheet.get_by_role('button',name='Playback speed 1×',exact=True)).to_have_attribute('aria-expanded','true')
+  expect(sheet.get_by_role('button',name='0.5×',exact=True)).to_be_visible()
   bounds=sheet.bounding_box()
   assert bounds and bounds['y']>=0 and bounds['y']+bounds['height']<=844, bounds
   page.keyboard.press('Escape')
   expect(sheet).to_have_count(0)
   expect(speed).to_be_focused()
-  # Quiet secondary overlays must never hide Pause; touching the stage restores them.
-  page.get_by_role('button',name='Play',exact=True).click()
+  # Instructor-only practice must never request a camera, including when cast.
+  expect(page.locator('.mimic-shell')).to_have_class(re.compile(r'instructor-only'))
+  expect(page.get_by_role('button',name='Start practice',exact=True)).to_be_visible()
+  assert page.evaluate('window.captureCounts.streams.length')==0
+  page.get_by_role('button',name='Instructor',exact=True).click()
+  expect(sheet.get_by_role('region',name='Camera & feedback',exact=True)).to_have_count(0)
+  expect(sheet.get_by_role('button',name='3D',exact=True)).to_be_visible()
+  expect(sheet.get_by_role('button',name='Both',exact=True)).to_have_count(0)
+  page.keyboard.press('Escape')
+  page.get_by_role('button',name='Practice settings',exact=True).click()
+  page.get_by_role('button',name='TV presentation Off',exact=True).click()
+  page.get_by_role('button',name='Enable TV presentation',exact=True).click()
+  assert page.evaluate('window.captureCounts.streams.length')==0
+  page.get_by_role('button',name='Practice settings',exact=True).click()
+  page.get_by_role('button',name='TV presentation On',exact=True).click()
+  page.get_by_role('button',name='Turn off TV presentation',exact=True).click()
+  page.get_by_role('button',name='Practice settings',exact=True).click()
+  page.get_by_role('button',name='Practice mode Instructor only',exact=True).click()
+  page.get_by_role('group',name='Practice mode',exact=True).get_by_role('button',name='Camera feedback',exact=True).click()
+  page.keyboard.press('Escape')
+  expect(page.get_by_role('button',name='Start practice',exact=True)).to_be_visible()
+  # Playback remains available by keyboard; touching the stage restores overlays.
+  page.locator('.mimic-stage').click(position={'x':20,'y':200})
+  page.keyboard.press('Space')
   page.wait_for_function("document.querySelector('.mimic-shell').classList.contains('controls-resting')")
-  expect(page.get_by_role('button',name='Pause',exact=True)).to_be_visible()
+  expect(page.locator('.mimic-shell')).to_have_class(re.compile(r'is-playing'))
   page.locator('.mimic-stage').click(position={'x':20,'y':200})
   expect(page.locator('.mimic-shell')).not_to_have_class(re.compile(r'controls-resting'))
-  page.get_by_role('button',name='Pause',exact=True).click()
+  page.locator('.mimic-stage').click(position={'x':20,'y':200})
+  page.keyboard.press('p')
   page.set_viewport_size({'width':1280,'height':800})
   assert page.get_by_role('button',name='Record practice',exact=True).count()==0
   page.get_by_role('button',name='Start practice',exact=True).click()
@@ -92,8 +120,9 @@ def run():
    raise
   assert page.evaluate('captureCounts.starts')==0, 'Live preview must never start recording'
   # Recording starts during playback without resetting its position.
-  page.get_by_role('button',name='Play',exact=True).click()
-  expect(page.get_by_role('button',name='Pause',exact=True)).to_be_visible()
+  page.locator('.mimic-stage').click(position={'x':20,'y':200})
+  page.keyboard.press('Space')
+  expect(page.locator('.mimic-shell')).to_have_class(re.compile(r'is-playing'))
   page.wait_for_function("document.querySelector('.mimic-scrub input').value > 1")
   before=float(page.locator('.mimic-scrub input').input_value())
   record.click()
@@ -104,7 +133,7 @@ def run():
   page.get_by_role('button',name='Stop recording',exact=True).click()
   expect(page.get_by_role('button',name='Review take · not saved',exact=True)).to_be_visible()
   assert page.get_by_role('dialog').count()==0, 'Stopping recording must not interrupt practice'
-  expect(page.get_by_role('button',name='Pause',exact=True)).to_be_visible()
+  expect(page.locator('.mimic-shell')).to_have_class(re.compile(r'is-playing'))
   assert page.evaluate("captureCounts.streams.at(-1).active")
   page.get_by_role('button',name='End practice',exact=True).click()
   expect(page.get_by_role('button',name='Start practice',exact=True)).to_be_visible()

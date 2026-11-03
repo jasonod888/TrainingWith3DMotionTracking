@@ -16,6 +16,7 @@ export class PracticeSession {
   onPause?:(reason:string)=>void;
   onAttemptStart?:(time:number)=>void;
   private attempt:{id:string;start:number}|null=null;
+  private hasBegun=false;
   constructor(readonly player:Playback){}
   get bounds(){return this.range??(this.player.state.mode==='sections'?(this.player.current??this.player.sections[0]):{start:0,end:this.player.duration});}
   private finish(completed:boolean,reason:string){if(this.attempt){this.onAttempt?.({...this.attempt,end:this.player.state.time,completed,reason});this.attempt=null;}}
@@ -27,11 +28,13 @@ export class PracticeSession {
   seek(time:number){this.pause('position changed');this.player.seek(this.range?Math.max(this.range.start,Math.min(this.range.end,time)):time);}
   select(index:number){if(!this.player.sections[index])return;this.pause('section changed');this.range=null;this.player.mode('sections');this.player.seek(this.player.sections[index].start);this.completed=0;}
   private begin(){
+    this.hasBegun=true;
     const p=this.player,b=this.bounds;if(p.state.index<0)p.seek(b.start);if(p.state.time<b.start||p.state.time>=b.end-1e-6)p.seek(b.start);
     p.state.playing=true;this.phase='playing';this.attempt={id:crypto.randomUUID(),start:p.state.time};this.onAttemptStart?.(p.state.time);
   }
   /**
-   * Start, or restart after a pause. A start request while a countdown, attempt
+   * Count in once before practice begins; subsequent sections and resumes start
+   * immediately. A start request while a countdown, attempt
    * or rest this session already owns is ignored, so a duplicate call cannot
    * restart the countdown or mint a second attempt.
    * `secondsOverride` applies to this start only; the persisted preference is
@@ -40,7 +43,7 @@ export class PracticeSession {
   start(secondsOverride?: number) {
     if(this.player.state.calibrating)return;
     if(this.phase==='countdown'||this.phase==='playing'||this.phase==='rest')return;
-    this.remaining=secondsOverride!==undefined&&Number.isFinite(secondsOverride)?Math.max(0,secondsOverride):this.countdownSeconds;
+    this.remaining=secondsOverride!==undefined&&Number.isFinite(secondsOverride)?Math.max(0,secondsOverride):this.hasBegun?0:this.countdownSeconds;
     this.phase=this.remaining>0?'countdown':'playing';if(!this.remaining)this.begin();
   }
   action(action:PracticeAction){
@@ -56,7 +59,7 @@ export class PracticeSession {
       if(action==='again')this.player.seek(this.bounds.start);
       else {this.range=null;this.player.command(action);this.player.command('pause');if(action==='next'&&this.player.state.time>=this.player.duration)return;}
     }
-    this.start();
+    this.start(action==='next'||action==='back'||action==='again'?0:undefined);
   }
   tick(delta:number){
     if(!Number.isFinite(delta)||delta<0)return;
