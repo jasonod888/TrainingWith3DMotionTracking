@@ -60,7 +60,7 @@ def clean_person_mask(mask):
 
 
 def outlined_person(frame,mask,background,previous=None):
-    """Opaque person, a small foreground expansion, then a feathered white rim."""
+    """Keep source pixels in place; expand only the feathered white backing."""
     import cv2
     binary=(mask>127).astype(np.uint8)
     gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
@@ -72,10 +72,10 @@ def outlined_person(frame,mask,background,previous=None):
     border=max(.8,height*.0045)
     feather=max(2.5,height*.018)
     distance=cv2.distanceTransform(1-binary,cv2.DIST_L2,cv2.DIST_MASK_PRECISE)
-    # This fade lies entirely OUTSIDE the source mask. Every original body
-    # pixel stays fully opaque, including thin hands and clothing edges.
-    body_alpha=np.clip(expansion+.5-distance,0,1)
-    body_alpha[binary>0]=1
+    # Growing image colors as well as the matte duplicates clothing/face edges
+    # and amplifies any source-wall pixels near the segmentation boundary.
+    # Keep the entire original person opaque and expand only the white backing.
+    body_alpha=binary.astype(np.float32)
     transition=np.clip((expansion+border+feather-distance)/feather,0,1)
     rim_alpha=transition*transition*(3-2*transition)
     rim_alpha=cv2.GaussianBlur(rim_alpha,(5,5),.8)
@@ -87,15 +87,9 @@ def outlined_person(frame,mask,background,previous=None):
         agrees=(rim_alpha>.02)&(rim_alpha<.98)&(body_alpha==0)&(np.abs(warped-rim_alpha)<.18)
         rim_alpha=np.where(agrees,rim_alpha*.85+warped*.15,rim_alpha)
     rim_alpha=np.maximum(rim_alpha,body_alpha)
-    # Expansion uses the nearest actual person color, not the room outside them.
-    _,labels=cv2.distanceTransformWithLabels(1-binary,cv2.DIST_L2,5,labelType=cv2.DIST_LABEL_PIXEL)
-    colors=np.zeros((int(labels.max())+1,3),dtype=np.float32)
-    colors[labels[binary>0]]=frame[binary>0]
-    foreground=colors[labels]
-    foreground[binary>0]=frame[binary>0]
     white=np.array([242,245,240],dtype=np.float32)
     backing=white*rim_alpha[...,None]+background*(1-rim_alpha[...,None])
-    result=foreground*body_alpha[...,None]+backing*(1-body_alpha[...,None])
+    result=np.where(binary[...,None]>0,frame,backing)
     return np.clip(result,0,255).astype(np.uint8),{'gray':gray,'alpha':rim_alpha}
 
 
@@ -339,10 +333,10 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
     if track:
         report.update(composition='person-on-neutral-background',crop_mode='follow-person-fixed-scale',
                       video_size=[w,h],crop_track=[list(map(int,box)) for box in track],
-                      edge_treatment={'style':edge_style,'version':2 if edge_style=='outlined' else 1,'foreground_color_extension':edge_style!='clean',
+                      edge_treatment={'style':edge_style,'version':3 if edge_style=='outlined' else 1,'foreground_color_extension':edge_style in ('soft','extra-soft'),
                                       'motion_aligned_stabilization':edge_style!='clean'})
         if edge_style=='outlined':
-            report['edge_treatment'].update(body_opacity=1.,mask_expansion_px=max(1.,h*.0055),
+            report['edge_treatment'].update(body_opacity=1.,foreground_image_expansion=False,mask_expansion_px=max(1.,h*.0055),
                 white_border_px=max(.8,h*.0045),outer_feather_px=max(2.5,h*.018))
         if active_range:report['active_range']=list(map(float,active_range))
         if any(any(point is not None for point in row) for row in marker_frames):

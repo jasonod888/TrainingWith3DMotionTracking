@@ -179,6 +179,20 @@ def test_outlined_edge_keeps_all_original_body_pixels_opaque_and_adds_white_outs
     assert np.all(result[50,20]>bg) and np.all(result[50,20]<rim),'The rim should fade outward to the background.'
 
 
+def test_outline_expands_only_white_backing_without_copying_an_offset_person():
+    pytest.importorskip('cv2')
+    mask=np.zeros((240,160),dtype=np.uint8);mask[30:210,50:110]=255
+    frame=np.full((240,160,3),[0,0,255],dtype=np.uint8)
+    frame[mask>0]=[180,60,20]
+    bg=np.array([37,46,24],dtype=np.float32)
+    result,_=composite_person(frame,mask,bg)
+    assert np.array_equal(result[mask>0],frame[mask>0])
+    # The immediate exterior used to contain a second, expanded colored edge.
+    rim=result[80:160,48:50].astype(int)
+    assert rim.min()>200 and np.max(rim.max(axis=2)-rim.min(axis=2))<12
+    assert np.array_equal(result[0,0],bg.astype(np.uint8))
+
+
 def test_marker_identity_and_crop_mapping_use_anatomical_joints():
     points=np.full((70,2),[150.,100.]);points[62]=[180,80];points[41]=[120,85]
     points[15:18]=[170,180];points[18:21]=[130,185]

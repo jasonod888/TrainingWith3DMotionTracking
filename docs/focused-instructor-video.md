@@ -54,9 +54,8 @@ leaves an explicit lesson warning and the clearly labeled original wide video;
 it never labels that fallback as a successfully processed person-only asset.
 
 The default **outlined** treatment preserves every original body pixel at full
-opacity. It expands the foreground slightly using nearby person colors, adds a
-thin neutral-white border outside that expansion, and feathers the white border
-outward into the app background. Only the outer rim receives temporal
+opacity and its original location. It expands only the neutral-white backing,
+then feathers that border outward into the app background. Only the outer rim receives temporal
 stabilization; body colors and opacity are not filtered. Mask expansion, border
 width and feather width scale with the instructor canvas and are recorded in the
 report. This keeps fine hands/clothing from being dissolved by an inward fade.
