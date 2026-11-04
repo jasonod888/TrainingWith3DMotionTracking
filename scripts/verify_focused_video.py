@@ -110,7 +110,7 @@ with sync_playwright() as p:
     page.get_by_role('button', name='Instructor view', exact=True).click()
     page.get_by_label('Reference', exact=True).select_option('video')
     page.get_by_role('button', name='Close View', exact=True).click()
-    page.get_by_role('button', name='Prepare to compete', exact=True).click()
+    page.get_by_role('button', name='Prepare challenge', exact=True).click()
     start = page.get_by_role('button', name='Start scored run', exact=True)
     expect(start).to_be_enabled()
     start.click()

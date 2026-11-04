@@ -24,8 +24,8 @@ import type {CameraStatus} from './mimic-connection';
 type Mode='off'|'camera'|'recorded';
 type TrackerMessage={type:string;epoch?:number;landmarks?:Point[];world?:Point[];message?:string;timestamp?:number};
 export type CameraState='off'|'starting'|'live';
-export type MimicHandle={start:()=>Promise<void>;stop:()=>void;stream:()=>MediaStream|null;configuration:()=>string;display:()=>{model_mirror:boolean;camera_mirror:boolean};readiness:(remote:boolean)=>string;scoringIssue:()=>string;applyCalibration:(value:Calibration)=>void;confirmControls:()=>void;transform:()=>DisplayTransform|null;sourceIdentity:()=>SetupSourceIdentity;facing:()=>'user'|'environment';selection:()=>CameraSelection|null;cameraStatus:()=>CameraStatus;sourceGeneration:()=>number;cameras:()=>CameraDevice[];request:()=>CameraRequest;refreshCameras:()=>Promise<CameraDevice[]>;setCamera:(request:CameraRequest)=>Promise<void>};
-export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player:Playback;onCommand:(c:PracticeAction)=>void;renderReference:(framing:PracticeFraming)=>ReactNode;cameraEnabled?:boolean;setup?:CameraSetupController;onRequestSetup?:()=>void;onClose?:()=>void;layout?:'combined'|'separate'|'instructor';angle?:number;competition?:boolean;onCameraState?:(state:CameraState)=>void;onSummary?:(value:{score:number|null;cue:string;coverage:number})=>void}>(function MimicInterface({lesson,player,onCommand,renderReference,cameraEnabled=true,onClose=()=>{},layout='separate',angle=0,competition=false,onSummary,onCameraState,setup,onRequestSetup},ref){
+export type MimicHandle={startVoice:()=>void;stopVoice:()=>void;start:()=>Promise<void>;stop:()=>void;stream:()=>MediaStream|null;configuration:()=>string;display:()=>{model_mirror:boolean;camera_mirror:boolean};readiness:(remote:boolean)=>string;scoringIssue:()=>string;applyCalibration:(value:Calibration)=>void;confirmControls:()=>void;transform:()=>DisplayTransform|null;sourceIdentity:()=>SetupSourceIdentity;facing:()=>'user'|'environment';selection:()=>CameraSelection|null;cameraStatus:()=>CameraStatus;sourceGeneration:()=>number;cameras:()=>CameraDevice[];request:()=>CameraRequest;refreshCameras:()=>Promise<CameraDevice[]>;setCamera:(request:CameraRequest)=>Promise<void>};
+export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player:Playback;onCommand:(c:PracticeAction)=>void;renderReference:(framing:PracticeFraming)=>ReactNode;cameraEnabled?:boolean;setup?:CameraSetupController;onRequestSetup?:()=>void;onClose?:()=>void;onVoiceStatus?:(state:string,error?:string)=>void;layout?:'combined'|'separate'|'instructor';angle?:number;competition?:boolean;onCameraState?:(state:CameraState)=>void;onSummary?:(value:{score:number|null;cue:string;coverage:number})=>void}>(function MimicInterface({lesson,player,onCommand,renderReference,cameraEnabled=true,onClose=()=>{},onVoiceStatus,layout='separate',angle=0,competition=false,onSummary,onCameraState,setup,onRequestSetup},ref){
  const cameraAllowed=useRef(cameraEnabled);cameraAllowed.current=cameraEnabled;
  const video=useRef<HTMLVideoElement>(null),canvas=useRef<HTMLCanvasElement>(null),pane=useRef<HTMLDivElement>(null),frame=useRef<HTMLDivElement>(null),left=useRef<HTMLSpanElement>(null),right=useRef<HTMLSpanElement>(null);
  const framingController=useRef(new CameraFramingController()).current;
@@ -41,7 +41,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
  const options=useRef({request:loadPreference(preferenceStore()),mirrorPreview:true,mirrorReference:false,skeleton:true,composite:false,angle:0});options.current.angle=angle;
  const [,refreshUi]=useState(0);
  const [mode,setMode]=useState<Mode>('off'),[message,setMessage]=useState('Camera off'),[error,setError]=useState(''),[progress,setProgress]=useState(0),[score,setScore]=useState<number|null>(null),[voiceState,setVoiceState]=useState('off'),[voiceError,setVoiceError]=useState('');
- const [devices,setDevices]=useState<CameraDevice[]>([]),[lastCommand,setLastCommand]=useState(''),[cue,setCue]=useState(''),[feedback,setFeedback]=useState(true),[voiceConsent,setVoiceConsent]=useState(false);
+ const [devices,setDevices]=useState<CameraDevice[]>([]),[lastCommand,setLastCommand]=useState(''),[cue,setCue]=useState(''),[feedback,setFeedback]=useState(true);
  const [controlsConfirmed,setControlsConfirmed]=useState(false);
  const summaryCallback=useRef(onSummary);summaryCallback.current=onSummary;
  const cameraCallback=useRef(onCameraState);cameraCallback.current=onCameraState;
@@ -51,7 +51,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
  const [framing,setFraming]=useState<PracticeFraming>({active:false,calibrating:false,calibration:null,videoWidth:16,videoHeight:9,mirrored:true,mirrorReference:false,composite:matchMedia('(max-width:700px)').matches,position:.23,opacity:.85,display:displayHandle.current});
  const voice=useRef<VoiceCommands|null>(null);
  const [voiceSupported,setVoiceSupported]=useState(false);
- const voiceCallbacks=useRef({onCommand,onClose,stop:()=>{},clear:()=>{}});
+ const voiceCallbacks=useRef({onCommand,onVoiceStatus,stop:()=>{},clear:()=>{}});
  const currentFacing=()=>{const actual=resources.current.selection?.actualFacing;return (actual&&actual!=='unknown'?actual:facingModeFor(options.current.request.facing))==='environment'?'environment':'user';};
  const setupSource=():SetupSourceIdentity=>{const r=resources.current,v=video.current,s=r.selection;return {generation:r.epoch,deviceId:s?.actualDeviceId||options.current.request.deviceId||options.current.request.facing,width:v?.videoWidth??0,height:v?.videoHeight??0};};
  const applyCalibration=useCallback((value:Calibration)=>{
@@ -73,7 +73,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
   setFraming(state=>({...state,calibrating:false,calibration:value}));
  },[framingController,player]);
  const confirmControls=useCallback(()=>setControlsConfirmed(true),[]);
- useImperativeHandle(ref,()=>({start:()=>start('camera'),stop,stream:()=>resources.current.stream,display:()=>({model_mirror:resources.current.mode!=='off'?options.current.mirrorPreview!==options.current.mirrorReference:options.current.mirrorReference,camera_mirror:options.current.mirrorPreview}),scoringIssue:()=>resources.current.mode!=='camera'?'Use a live camera for a scored run.':!resources.current.reference?'This practice has no compatible scoring reference.':resources.current.lastScore===null||performance.now()-resources.current.lastPose>900?'Keep your whole body clearly visible before starting.':'',configuration:()=>`${resources.current.mode}:${currentFacing()}:${options.current.mirrorReference?'mirror':'same'}:${options.current.angle}:calibration=${calibrationEnabled()?'matched':'default'}`,readiness:remote=>resources.current.mode==='off'?'':!resources.current.locked&&calibrationEnabled()?'Finish height matching before starting.':currentFacing()==='environment'&&!remote&&!controlsConfirmed?'For the rear camera, confirm your visible display and controls in Camera setup.':'',applyCalibration,confirmControls,transform:()=>displayHandle.current.current,sourceIdentity:setupSource,facing:currentFacing,selection:()=>resources.current.selection,cameraStatus:()=>resources.current.status,sourceGeneration:()=>resources.current.epoch,cameras:()=>resources.current.devices,request:()=>options.current.request,refreshCameras:()=>refreshCameras(),setCamera:request=>setCamera(request)}));
+ useImperativeHandle(ref,()=>({startVoice,stopVoice:()=>voice.current?.stop(),start:()=>start('camera'),stop,stream:()=>resources.current.stream,display:()=>({model_mirror:resources.current.mode!=='off'?options.current.mirrorPreview!==options.current.mirrorReference:options.current.mirrorReference,camera_mirror:options.current.mirrorPreview}),scoringIssue:()=>resources.current.mode!=='camera'?'Use a live camera for a scored run.':!resources.current.reference?'This practice has no compatible scoring reference.':resources.current.lastScore===null||performance.now()-resources.current.lastPose>900?'Keep your whole body clearly visible before starting.':'',configuration:()=>`${resources.current.mode}:${currentFacing()}:${options.current.mirrorReference?'mirror':'same'}:${options.current.angle}:calibration=${calibrationEnabled()?'matched':'default'}`,readiness:remote=>resources.current.mode==='off'?'':!resources.current.locked&&calibrationEnabled()?'Finish height matching before starting.':currentFacing()==='environment'&&!remote&&!controlsConfirmed?'For the rear camera, confirm your visible display and controls in Camera setup.':'',applyCalibration,confirmControls,transform:()=>displayHandle.current.current,sourceIdentity:setupSource,facing:currentFacing,selection:()=>resources.current.selection,cameraStatus:()=>resources.current.status,sourceGeneration:()=>resources.current.epoch,cameras:()=>resources.current.devices,request:()=>options.current.request,refreshCameras:()=>refreshCameras(),setCamera:request=>setCamera(request)}));
  useEffect(()=>{setFraming(value=>({...value,composite:layout==='combined'}));},[layout]);
 
  const clear=useCallback(()=>{setScore(null);setCue('');resources.current.lastScore=null;},[]);
@@ -185,22 +185,52 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
  // Labels only become readable after a grant, and devices can arrive later.
  useEffect(()=>{if(!cameraEnabled)return;void refreshCameras();return watchCameras(cameraIO(),()=>{void refreshCameras();});},[cameraEnabled]);
 
- voiceCallbacks.current={onCommand,onClose,stop,clear};
+ const startVoice=()=>{
+  setVoiceError('');
+  if(voiceSupported&&voice.current)voice.current.start();
+  else voiceCallbacks.current.onVoiceStatus?.('unavailable','Voice recognition is unavailable. Try again or continue without voice.');
+ };
+ voiceCallbacks.current={onCommand,onVoiceStatus,stop,clear};
  useEffect(()=>{
   const Speech=(window as unknown as {SpeechRecognition?:unknown;webkitSpeechRecognition?:unknown}).SpeechRecognition??(window as unknown as {webkitSpeechRecognition?:unknown}).webkitSpeechRecognition;
   let disposed=false;
+  let hasListened=false;
+  let resumeVoice=false;
   const initialize=async()=>{
    const local=await request<{available:boolean}>('/voice/capability').catch(()=>({available:false}));
    if(disposed)return;
    const Recognition=local.available&&typeof navigator.mediaDevices?.getUserMedia==='function'&&typeof AudioWorkletNode!=='undefined'
     ?localRecognition(pcm=>request('/voice/recognize','POST',{pcm})):Speech;
    setVoiceSupported(!!Recognition);
-   voice.current=new VoiceCommands({Recognition,extended:true,onCommand:c=>{voiceCallbacks.current.clear();setLastCommand(c);voiceCallbacks.current.onCommand(c);},onState:state=>{setVoiceState(state);if(state==='listening')voiceCallbacks.current.onClose();},onError:setVoiceError});
+   voice.current=new VoiceCommands({Recognition,extended:true,onCommand:c=>{voiceCallbacks.current.clear();setLastCommand(c);voiceCallbacks.current.onCommand(c);},onState:state=>{
+    if(disposed)return;
+    if(state==='listening')hasListened=true;
+    if(state==='off')hasListened=false;
+    setVoiceState(state);
+    voiceCallbacks.current.onVoiceStatus?.(state);
+   },onError:error=>{setVoiceError(error);voiceCallbacks.current.onVoiceStatus?.('off',error);}});
+   voiceCallbacks.current.onVoiceStatus?.(Recognition?'off':'unavailable');
   };void initialize();
-  const suspend=()=>{if(document.hidden){voice.current?.stop();voiceCallbacks.current.stop();setMessage('Practice paused. Enable your camera again when ready.');}};
+  const handleVisibility=()=>{
+   if(!document.hidden){
+    if(resumeVoice){
+     resumeVoice=false;
+     setVoiceError('');
+     voice.current?.start();
+    }
+    return;
+   }
+   if(voice.current?.enabled){
+    resumeVoice=hasListened;
+    voice.current.stop();
+    if(!resumeVoice)voiceCallbacks.current.onVoiceStatus?.('off','Voice setup was interrupted.');
+   }
+   voiceCallbacks.current.stop();
+   setMessage('Practice paused. Enable your camera again when ready.');
+  };
   const leave=()=>{voice.current?.stop();voiceCallbacks.current.stop();};
-  document.addEventListener('visibilitychange',suspend);window.addEventListener('pagehide',leave);
-  return()=>{disposed=true;document.removeEventListener('visibilitychange',suspend);window.removeEventListener('pagehide',leave);voice.current?.stop();voiceCallbacks.current.stop();};
+  document.addEventListener('visibilitychange',handleVisibility);window.addEventListener('pagehide',leave);
+  return()=>{disposed=true;document.removeEventListener('visibilitychange',handleVisibility);window.removeEventListener('pagehide',leave);voice.current?.stop();voiceCallbacks.current.stop();};
  },[]);
 
  // Warm the pose tracker while the person is still on the practice screen. The
@@ -383,39 +413,34 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
     <SettingsChoices label="Follow direction" value={framing.mirrorReference?'mirror':'same'} options={[{value:'same',label:'Match left/right'},{value:'mirror',label:'Mirror instructor'}]} onChange={value=>{options.current.mirrorReference=value==='mirror';setFraming(previous=>({...previous,mirrorReference:options.current.mirrorReference}));clear();}}/>
    </SettingsRow>
   </SettingsPortal>
-  <SettingsPortal slot="layout">
-   {layout==='combined'&&<><SettingsRow id="instructor-opacity" label="Instructor opacity" value={`${Math.round(framing.opacity*100)}%`}><label>Instructor opacity<input type="range" min={.25} max={1} step={.05} value={framing.opacity} onChange={e=>setFraming(value=>({...value,opacity:Number(e.target.value)}))}/></label></SettingsRow>
-   <SettingsRow id="instructor-position" label="Instructor position" value={`${Math.round(framing.position*100)}%`}><label>Instructor position<input type="range" min={.05} max={.95} step={.01} value={framing.position} onChange={e=>setFraming(value=>({...value,position:Number(e.target.value)}))}/></label></SettingsRow></>}
+  <SettingsPortal slot="layout" disabledReason={!cameraEnabled?'Camera is off.':layout!=='combined'?'Requires Together arrangement with the 3D instructor.':undefined}>
+   <SettingsRow id="instructor-opacity" label="Instructor opacity" value={`${Math.round(framing.opacity*100)}%`}><label>Instructor opacity<input type="range" min={.25} max={1} step={.05} value={framing.opacity} onChange={event=>setFraming(value=>({...value,opacity:Number(event.target.value)}))}/></label></SettingsRow>
+   <SettingsRow id="instructor-position" label="Instructor position" value={`${Math.round(framing.position*100)}%`}><label>Instructor position<input type="range" min={.05} max={.95} step={.01} value={framing.position} onChange={event=>setFraming(value=>({...value,position:Number(event.target.value)}))}/></label></SettingsRow>
   </SettingsPortal>
-  <SettingsPortal slot="camera">
-   <SettingsRow id="camera-selection" label="Camera" value={options.current.request.deviceId?'Selected device':options.current.request.facing==='front'?'Front':'Rear'}>
-    <SettingsChoices label="Camera direction" value={options.current.request.deviceId?'device':options.current.request.facing} options={[{value:'front',label:'Front'},{value:'rear',label:'Rear'}]} onChange={value=>void setCamera({...options.current.request,deviceId:'',facing:value as 'front'|'rear'})}/>
-    {options.current.request.facing==='rear'&&!options.current.request.deviceId&&<label>Prefer wide view<input type="checkbox" role="switch" checked={options.current.request.lens==='prefer-wide'} onChange={e=>void setCamera({...options.current.request,lens:e.target.checked?'prefer-wide':'default'})}/></label>}
-    <label>Camera device<select value={options.current.request.deviceId} onChange={e=>void setCamera({...options.current.request,deviceId:e.target.value})}><option value="">Automatic</option>{devices.map((device,i)=><option key={device.deviceId} value={device.deviceId}>{deviceLabel(device,i)}</option>)}</select></label>
+  <SettingsPortal slot="camera" disabledReason={!cameraEnabled?'Camera is off.':undefined}>
+   <SettingsRow id="camera-selection" label="Camera device" value={options.current.request.deviceId?'Selected device':'Automatic'}>
+    <label>Prefer wide view<input type="checkbox" role="switch" disabled={options.current.request.facing!=='rear'||Boolean(options.current.request.deviceId)} checked={options.current.request.lens==='prefer-wide'} onChange={event=>void setCamera({...options.current.request,lens:event.target.checked?'prefer-wide':'default'})}/></label>
+    {(options.current.request.facing!=='rear'||options.current.request.deviceId)&&<p>Wide-view preference requires Automatic device selection and Rear camera.</p>}
+    <label>Device<select value={options.current.request.deviceId} onChange={event=>void setCamera({...options.current.request,deviceId:event.target.value})}><option value="">Automatic</option>{devices.map((device,index)=><option key={device.deviceId} value={device.deviceId}>{deviceLabel(device,index)}</option>)}</select></label>
     <button onClick={()=>void refreshCameras()}>Refresh camera list</button>
-    {resources.current.selection?<p>Using {describeCamera(resources.current.selection)}.</p>:<p>Allow camera access to list available devices.</p>}
+    {resources.current.selection?<p>Using {describeCamera(resources.current.selection)}.</p>:<p>Camera access is needed to list device names.</p>}
    </SettingsRow>
-   <SettingsRow id="selfie-preview" label="Selfie preview" value={options.current.mirrorPreview?'Mirrored':'Natural'}><label>Mirror my preview<input type="checkbox" role="switch" checked={options.current.mirrorPreview} onChange={e=>{options.current.mirrorPreview=e.target.checked;setFraming(value=>({...value,mirrored:e.target.checked}));clear();}}/></label></SettingsRow>
-   <SettingsRow id="auto-frame" label="Auto-frame me" value={autoFrameSupported?(autoFrame?'On':'Off'):'Unavailable'}><label>Auto-frame me<input type="checkbox" role="switch" disabled={!autoFrameSupported} checked={autoFrame} onChange={e=>{const next=e.target.checked;setAutoFrame(next);autoFrameRef.current=next;setMessage(next?'Auto-frame on.':'Auto-frame off.');clear();}}/></label><p>{autoFrameSupported?'Keeps you centred with room to move.':'Requires a front camera in side-by-side view.'}</p></SettingsRow>
-   <SettingsRow id="camera-setup" label="Position & height matching" value={!active?'Camera off':calibrationEnabled()?resources.current.locked?'Matched':'Not matched':'Default alignment'}>
-    <p>Keep your head and feet visible.</p><button onClick={()=>{if(onRequestSetup){close();onRequestSetup();}else if(active){beginCalibration();close();}else void start('camera');}}>Set up camera</button>
+   <SettingsRow id="selfie-preview" label="Selfie preview" value={options.current.mirrorPreview?'Mirrored':'Natural'}><label>Mirror my preview<input type="checkbox" role="switch" checked={options.current.mirrorPreview} onChange={event=>{options.current.mirrorPreview=event.target.checked;setFraming(value=>({...value,mirrored:event.target.checked}));clear();}}/></label></SettingsRow>
+   <SettingsRow id="auto-frame" label="Auto-frame me" value={autoFrame?'On':'Off'} disabledReason={!autoFrameSupported?'Requires Front camera and Side by side, without instructor emphasis.':undefined}>
+    <label>Auto-frame me<input type="checkbox" role="switch" checked={autoFrame} onChange={event=>{const next=event.target.checked;setAutoFrame(next);autoFrameRef.current=next;setMessage(next?'Auto-frame on.':'Auto-frame off.');clear();}}/></label><p>Keeps you centred with room to move.</p>
+   </SettingsRow>
+   <SettingsRow id="camera-setup" label="Position & height matching" value={!active?'Camera not started':calibrationEnabled()?resources.current.locked?'Matched':'Not matched':'Default alignment'} status={!active?'Not started':undefined}>
+    <button onClick={()=>{if(onRequestSetup){close();onRequestSetup();}else if(active){beginCalibration();close();}else void start('camera');}}>Set up camera</button>
     {active&&<button onClick={stop}>End practice</button>}
-    {currentFacing()==='environment'&&<label>I can see the instructor and operate controls<input type="checkbox" checked={controlsConfirmed} onChange={e=>setControlsConfirmed(e.target.checked)}/></label>}
-    {!calibrationEnabled()&&<p>Height matching is unavailable. Using default alignment.</p>}
+    <label>I can see the instructor and operate controls<input type="checkbox" disabled={currentFacing()!=='environment'} checked={controlsConfirmed} onChange={event=>setControlsConfirmed(event.target.checked)}/></label>
+    <p>{currentFacing()==='environment'?'Rear camera requires confirmation that controls are reachable.':'Control-reach confirmation is only required for Rear camera.'}</p>
+    {!calibrationEnabled()&&<p>Height matching is unavailable. Default alignment is used.</p>}
     {!competition&&import.meta.env.DEV&&new URLSearchParams(location.search).get('diagnostics')==='1'&&lesson.source_video&&<button onClick={()=>{void start('recorded');close();}}>Recorded source test</button>}
    </SettingsRow>
-   {!competition&&<><SettingsRow id="feedback" label="Similarity & cues" value={feedback?'On':'Off'}><label>Show similarity and cues<input type="checkbox" role="switch" checked={feedback} onChange={e=>setFeedback(e.target.checked)}/></label><p>Approximate movement similarity, not technique correctness.</p></SettingsRow>
-   <SettingsRow id="skeleton" label="Skeleton overlay" value={options.current.skeleton?'On':'Off'}><label>Show skeleton<input type="checkbox" role="switch" checked={options.current.skeleton} onChange={e=>{options.current.skeleton=e.target.checked;clear();}}/></label></SettingsRow></>}
-  </SettingsPortal>
-  <SettingsPortal slot="audio">
-   <SettingsRow id="voice-commands" label="Voice commands" value={voiceSupported?voiceState==='off'?'Off':voiceState:'Unavailable'}>
-    {!voiceSupported&&<p>Voice recognition is unavailable in this browser.</p>}
-    <label>Allow voice service<input type="checkbox" checked={voiceConsent} disabled={!voiceSupported} onChange={e=>{setVoiceConsent(e.target.checked);if(!e.target.checked)voice.current?.stop();}}/></label>
-    <p>Uses the app or browser speech service. Microphone audio is not saved by this app.</p>
-    <button disabled={!voiceSupported||!voiceConsent} onClick={()=>{setVoiceError('');if(voice.current?.enabled)voice.current.stop();else voice.current?.start();}}>{voiceState==='off'?'Enable voice commands':'Turn off voice commands'}</button>
-    {voiceError&&<p role="alert">{voiceError}</p>}
-    <details className="settings-help"><summary>Available commands</summary><p>Start, pause, next, back, again, slower, faster, loop.</p>{lastCommand&&<p>Heard: {lastCommand}</p>}</details>
+   <SettingsRow id="feedback" label="Similarity & cues" value={feedback?'On':'Off'} disabledReason={competition?'Challenge requires camera scoring.':angle!==0?'Comparison is paused at this angle. Choose Front above to resume.':undefined} status={competition?'Fixed':angle!==0?'Paused':undefined}>
+    <label>Show similarity and cues<input type="checkbox" role="switch" checked={feedback} onChange={event=>setFeedback(event.target.checked)}/></label><p>Approximate movement similarity, not technique correctness.</p>
    </SettingsRow>
+   <SettingsRow id="skeleton" label="Skeleton overlay" value={options.current.skeleton?'On':'Off'}><label>Show skeleton<input type="checkbox" role="switch" checked={options.current.skeleton} onChange={event=>{options.current.skeleton=event.target.checked;clear();}}/></label></SettingsRow>
   </SettingsPortal>
  </div>;
 });

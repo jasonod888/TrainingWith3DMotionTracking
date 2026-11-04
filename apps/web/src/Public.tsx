@@ -1,25 +1,38 @@
 import {useEffect,useRef,useState} from 'react';
-import {ArrowLeft,Flag,Globe,LoaderCircle,Pause,Play,Rotate3D,Search,Share2} from 'lucide-react';
+import {ArrowLeft,ChevronRight,Flag,Globe,LoaderCircle,Pause,Play,Share2} from 'lucide-react';
 import {Playback} from '../../../packages/learning-engine/playback';
 import type {LessonManifest} from '../../../packages/lesson-schema/index';
 import {MotionStage} from './MotionStage';
 import {PreviewScrubber} from './PreviewScrubber';
 import {addMoveToGroup,loadGroups,loadPublicMove,loadPublicMoves,loadPublicTags,request,type Account,type PublicDetail,type PublicMove,type GroupSummary} from './api';
 
-const stamp=(time:number)=>`${Math.floor(time/60)}:${Math.floor(time%60).toString().padStart(2,'0')}`;
+import {PublicFeedCard} from './FeedCard';
+import {FeedEmpty,FeedSkeleton} from './FeedStates';
 
-export function ExplorePage({onBack,onOpen}:{onBack:()=>void;onOpen:(id:string)=>void}){
- const [query,setQuery]=useState(''),[tag,setTag]=useState(''),[moves,setMoves]=useState<PublicMove[]>([]),[tags,setTags]=useState<{tag:string;count:number}[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[more,setMore]=useState(false),[moreBusy,setMoreBusy]=useState(false);
+export function ExplorePage({query,onQuery,onOpen}:{query:string;onQuery:(value:string)=>void;onOpen:(id:string)=>void}){
+ const [tag,setTag]=useState(''),[moves,setMoves]=useState<PublicMove[]>([]),[tags,setTags]=useState<{tag:string;count:number}[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[more,setMore]=useState(false),[moreBusy,setMoreBusy]=useState(false),[retry,setRetry]=useState(0);
+ const generation=useRef(0);
  useEffect(()=>{loadPublicTags().then(value=>setTags(value.tags)).catch(()=>{});},[]);
- useEffect(()=>{let stopped=false;setLoading(true);setError('');setMore(false);const timer=window.setTimeout(()=>{loadPublicMoves(query,tag).then(value=>{if(!stopped){setMoves(value.moves);setMore(value.moves.length===24);}}).catch(e=>{if(!stopped)setError(e.message);}).finally(()=>{if(!stopped)setLoading(false);});},220);return()=>{stopped=true;clearTimeout(timer);};},[query,tag]);
- return <section className="explore-screen">
-  <button className="back-link" onClick={onBack}><ArrowLeft size={16}/>My moves</button>
-  <div className="share-heading"><p className="eyebrow">EXPLORE</p><h1>Moves people shared.</h1><p className="subtle">Watch a move, then try it at your pace.</p></div>
-  <div className="explore-search"><Search size={17}/><input aria-label="Search public moves" placeholder="Search moves or people" value={query} onChange={e=>setQuery(e.target.value)}/></div>
-  {tags.length>0&&<div className="tag-row">{tags.map(item=><button key={item.tag} className={tag===item.tag?'selected':''} aria-pressed={tag===item.tag} onClick={()=>setTag(tag===item.tag?'':item.tag)}>{item.tag}</button>)}</div>}
-  {error&&<p className="inline-notice error-notice" role="alert">{error}</p>}
-  {loading?<div className="empty-state" role="status"><span className="loader dark"/>Finding moves…</div>:moves.length?<div className="public-grid">{moves.map(move=><button key={move.lesson_id} className="public-card" onClick={()=>onOpen(move.lesson_id)}>{move.thumbnail_url?<img src={move.thumbnail_url} alt=""/>:<span className="cover-placeholder"><Rotate3D size={38}/></span>}<span className="public-card-body"><strong>{move.title}</strong><small>{move.creator_name} · {stamp(move.duration)}</small><span className="tag-row small-tags">{move.tags.slice(0,3).map(value=><em key={value}>{value}</em>)}</span></span></button>)}</div>:<div className="empty-library"><Globe size={28} strokeWidth={1.2}/><div><h3>Nothing here yet.</h3><p className="subtle">{query||tag?'No public moves match this search.':'Public moves will appear here.'}</p></div></div>}
-  {more&&!loading&&<button className="secondary" disabled={moreBusy} onClick={()=>{setMoreBusy(true);setError('');loadPublicMoves(query,tag,moves.length).then(value=>{setMoves(previous=>[...previous,...value.moves.filter(item=>!previous.some(old=>old.lesson_id===item.lesson_id))]);setMore(value.moves.length===24);}).catch(e=>setError(e.message)).finally(()=>setMoreBusy(false));}}>{moreBusy?'Loading…':'Show more moves'}</button>}
+ useEffect(()=>{
+  const current=++generation.current;
+  setLoading(true);setError('');setMore(false);setMoreBusy(false);setMoves([]);
+  const timer=window.setTimeout(()=>{loadPublicMoves(query.trim(),tag).then(value=>{if(current===generation.current){setMoves(value.moves);setMore(value.moves.length===24);}}).catch(e=>{if(current===generation.current)setError(e.message);}).finally(()=>{if(current===generation.current)setLoading(false);});},200);
+  return()=>{clearTimeout(timer);generation.current++;};
+ },[query,tag,retry]);
+ const loadMore=async()=>{
+  const current=generation.current;
+  setMoreBusy(true);setError('');
+  try{const value=await loadPublicMoves(query.trim(),tag,moves.length);if(current===generation.current){setMoves(previous=>[...previous,...value.moves]);setMore(value.moves.length===24);}}
+  catch(e){if(current===generation.current)setError((e as Error).message);}
+  finally{if(current===generation.current)setMoreBusy(false);}
+ };
+ const filtered=!!(query.trim()||tag);
+ return <section className="explore-screen browse-page" aria-labelledby="explore-title">
+  <h1 className="feed-sr-only" id="explore-title">Explore public moves</h1>
+  {tags.length>0&&<div className="feed-filters" role="group" aria-label="Move topics"><button aria-pressed={!tag} onClick={()=>setTag('')}>All</button>{tags.map(item=><button key={item.tag} aria-pressed={tag===item.tag} onClick={()=>setTag(tag===item.tag?'':item.tag)}>{item.tag}</button>)}</div>}
+  {error&&<div className="feed-load-error" role="alert"><span>{error}</span>{!moves.length&&<button onClick={()=>setRetry(n=>n+1)}>Try again</button>}</div>}
+  {loading?<FeedSkeleton label="Loading public moves"/>:moves.length?<div className="feed-grid">{moves.map(move=><PublicFeedCard key={move.lesson_id} move={move} onOpen={()=>onOpen(move.lesson_id)}/>)}</div>:!error&&<FeedEmpty icon={<Globe size={28}/>} title={filtered?'No matching moves':'No public moves yet'} description={filtered?'Try a different search or topic.':'Moves shared publicly by creators will appear here.'}>{filtered&&<button className="secondary" onClick={()=>{onQuery('');setTag('');}}>Reset filters</button>}</FeedEmpty>}
+  {more&&!loading&&<div className="feed-more"><button className="secondary" disabled={moreBusy} onClick={()=>void loadMore()}>{moreBusy?'Loading…':'Show more moves'}<ChevronRight size={16}/></button></div>}
  </section>;
 }
 

@@ -11,6 +11,10 @@ from playwright.sync_api import sync_playwright, expect
 ROOT = Path(__file__).resolve().parents[1]
 MOCK = r"""
 window.captureCounts = {starts:0, streams:[]};
+window.SpeechRecognition = class {
+ start() { window.denyVoiceStart = () => this.onerror?.({error:'not-allowed'}); }
+ abort() {}
+};
 const NativeRecorder = window.MediaRecorder;
 window.MediaRecorder = class extends NativeRecorder {
  start(...args) { window.captureCounts.starts++; return super.start(...args); }
@@ -58,7 +62,17 @@ def run():
    else:route.fulfill(status=404,json={'detail':'Not found'})
   page.route('**/api/**',api)
   page.goto(os.environ.get('PRACTICE_TEST_URL','http://127.0.0.1:5173')+'/?page=practice&id=synthetic-lesson&source=demo')
-  expect(page.get_by_role('button',name='Start practice',exact=True)).to_be_visible()
+  expect(page.get_by_role('button',name='Without voice',exact=True)).to_be_visible()
+  page.get_by_role('button',name='Start practice',exact=True).click()
+  expect(page.get_by_role('button',name='Connecting…',exact=True)).to_be_visible()
+  expect(page.locator('.practice-countdown')).to_have_count(0)
+  page.evaluate('window.denyVoiceStart()')
+  voice_prompt=page.get_by_role('dialog',name='Practise with or without voice',exact=True)
+  voice_prompt.get_by_role('button',name='Continue without voice',exact=True).click()
+  expect(page.locator('.practice-countdown')).to_be_visible()
+  expect(page.get_by_role('button',name='Voice off',exact=True)).to_be_visible()
+  page.reload()
+  expect(page.get_by_role('button',name='Without voice',exact=True)).to_be_visible()
   expect(page.get_by_role('button',name='Use camera feedback',exact=True)).to_have_count(0)
   expect(page.locator('.mimic-transport')).to_have_count(0)
   # Mobile uses the entire viewport; settings remain contained and keyboard dismissible.
@@ -67,38 +81,36 @@ def run():
   stage=page.locator('.mimic-stage').bounding_box()
   timeline=page.locator('.practice-timeline').bounding_box()
   assert stage and timeline and stage['x']==0 and stage['y']==0 and stage['y']+stage['height']<=timeline['y'], (stage,timeline)
-  speed=page.get_by_role('button',name='Playback speed 1×',exact=True)
-  speed.click()
+  settings=page.get_by_role('button',name='Practice settings',exact=True)
+  settings.click()
   sheet=page.get_by_role('dialog',name='Practice settings',exact=True)
+  sheet.get_by_role('button',name=re.compile('^Playback & timing')).click()
   expect(sheet).to_be_visible()
-  expect(sheet.get_by_role('button',name='Playback speed 1×',exact=True)).to_have_attribute('aria-expanded','true')
+  expect(sheet.get_by_role('button',name=re.compile('^Playback & timing'))).to_have_attribute('aria-expanded','true')
   expect(sheet.get_by_role('button',name='0.5×',exact=True)).to_be_visible()
   bounds=sheet.bounding_box()
   assert bounds and bounds['y']>=0 and bounds['y']+bounds['height']<=844, bounds
   page.keyboard.press('Escape')
   expect(sheet).to_have_count(0)
-  expect(speed).to_be_focused()
+  expect(settings).to_be_focused()
   # Instructor-only practice must never request a camera, including when cast.
   expect(page.locator('.mimic-shell')).to_have_class(re.compile(r'instructor-only'))
-  expect(page.get_by_role('button',name='Start practice',exact=True)).to_be_visible()
+  expect(page.get_by_role('button',name='Without voice',exact=True)).to_be_visible()
   assert page.evaluate('window.captureCounts.streams.length')==0
-  page.get_by_role('button',name='Instructor',exact=True).click()
-  expect(sheet.get_by_role('region',name='Camera & feedback',exact=True)).to_have_count(0)
+  settings.click()
+  expect(sheet.get_by_role('group',name='Camera',exact=True).get_by_role('button',name='Off',exact=True)).to_have_attribute('aria-pressed','true')
   expect(sheet.get_by_role('button',name='3D',exact=True)).to_be_visible()
-  expect(sheet.get_by_role('button',name='Both',exact=True)).to_have_count(0)
+  expect(sheet.get_by_role('button',name='Real + 3D',exact=True)).to_be_disabled()
   page.keyboard.press('Escape')
   page.get_by_role('button',name='Practice settings',exact=True).click()
-  page.get_by_role('button',name='TV presentation Off',exact=True).click()
   page.get_by_role('button',name='Enable TV presentation',exact=True).click()
   assert page.evaluate('window.captureCounts.streams.length')==0
-  page.get_by_role('button',name='Practice settings',exact=True).click()
-  page.get_by_role('button',name='TV presentation On',exact=True).click()
   page.get_by_role('button',name='Turn off TV presentation',exact=True).click()
-  page.get_by_role('button',name='Practice settings',exact=True).click()
-  page.get_by_role('button',name='Practice mode Instructor only',exact=True).click()
-  page.get_by_role('group',name='Practice mode',exact=True).get_by_role('button',name='Camera feedback',exact=True).click()
+  page.get_by_role('group',name='Camera',exact=True).get_by_role('button',name='Front',exact=True).click()
+  # Choosing a feed opens that camera at once, so the person sees the real arrangement.
+  expect(page.locator('.camera-pane')).to_be_visible(timeout=30000)
   page.keyboard.press('Escape')
-  expect(page.get_by_role('button',name='Start practice',exact=True)).to_be_visible()
+  expect(page.get_by_role('button',name='End practice',exact=True)).to_be_visible()
   # Playback remains available by keyboard; touching the stage restores overlays.
   page.locator('.mimic-stage').click(position={'x':20,'y':200})
   page.keyboard.press('Space')
@@ -110,7 +122,6 @@ def run():
   page.keyboard.press('p')
   page.set_viewport_size({'width':1280,'height':800})
   assert page.get_by_role('button',name='Record practice',exact=True).count()==0
-  page.get_by_role('button',name='Start practice',exact=True).click()
   expect(page.locator('.camera-pane')).to_be_visible()
   record=page.get_by_role('button',name='Record practice',exact=True)
   try:expect(record).to_be_enabled(timeout=15000)
@@ -136,13 +147,13 @@ def run():
   expect(page.locator('.mimic-shell')).to_have_class(re.compile(r'is-playing'))
   assert page.evaluate("captureCounts.streams.at(-1).active")
   page.get_by_role('button',name='End practice',exact=True).click()
-  expect(page.get_by_role('button',name='Start practice',exact=True)).to_be_visible()
+  expect(page.get_by_role('button',name='Start camera practice',exact=True)).to_be_visible()
   assert not page.evaluate('captureCounts.streams.at(-1).active')
   page.get_by_role('button',name='Review take · not saved',exact=True).click()
   expect(page.get_by_role('dialog',name='Your take',exact=True)).to_be_visible()
   expect(page.get_by_role('button',name='Record another',exact=True)).to_be_disabled()
   page.get_by_role('button',name='Close Your take',exact=True).click()
-  page.get_by_role('button',name='Start practice',exact=True).click()
+  page.get_by_role('button',name='Start camera practice',exact=True).click()
   expect(page.get_by_role('button',name='End practice',exact=True)).to_be_visible()
   page.get_by_role('button',name='Review take · not saved',exact=True).click()
   page.once('dialog',lambda dialog:dialog.accept())
@@ -161,7 +172,7 @@ def run():
    assert page.evaluate('document.documentElement.scrollHeight <= innerHeight')
    (ROOT/'test-results').mkdir(exist_ok=True)
    page.screenshot(path=str(ROOT/f'test-results/practice-live-{width}.png'))
-   for selector in ['.practice-session-toggle','.record-take']:
+   for selector in ['.practice-player-primary','.record-take']:
     box=page.locator(selector).bounding_box()
     assert box and box['y']>=0 and box['y']+box['height']<=height, (width,height,box)
   record.click()

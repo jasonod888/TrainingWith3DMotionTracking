@@ -101,6 +101,27 @@ export function hasLabelledDevices(devices: readonly CameraDevice[]): boolean {
   return devices.some((device) => device.label.trim().length > 0);
 }
 
+export type FacingAvailability = {
+  front: boolean;
+  rear: boolean;
+  /** One camera with no facing evidence: describe it neutrally instead of "Front". */
+  single: boolean;
+  count: number;
+};
+
+/**
+ * Which of the self/rear choices this device can prove it has. Only a device label
+ * or a live track may claim a direction: counting cameras is not evidence, because a
+ * desktop can expose several video inputs that are all the same physical self camera
+ * (a virtual camera, an IR camera, a capture card). Anything unproven is offered as a
+ * neutral "Camera" instead of a direction the device may not have.
+ */
+export function facingAvailability(devices: readonly CameraDevice[], actualFacing: ActualFacing = 'unknown'): FacingAvailability {
+  const front = devices.some((device) => labelFacing(device.label) === 'user') || actualFacing === 'user';
+  const rear = devices.some((device) => labelFacing(device.label) === 'environment') || actualFacing === 'environment';
+  return {front, rear, single: !front && !rear, count: devices.length};
+}
+
 /**
  * Best-first device order. Evidence ranks first; label text is a deterministic
  * tiebreaker so the order never depends on enumeration order.

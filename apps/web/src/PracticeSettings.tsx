@@ -2,44 +2,53 @@ import {createContext,useCallback,useContext,useEffect,useId,useRef,useState,typ
 import {createPortal} from 'react-dom';
 import {ChevronDown} from 'lucide-react';
 
-type Slot='instructor'|'layout'|'camera'|'audio';
+type Slot='instructor'|'layout'|'camera';
+type Family='setup'|'playback'|'display';
+const familyFor=(id:string):Family=>['speed','repeat','countdown','metronome'].includes(id)?'playback':['fullscreen','large-text'].includes(id)?'display':'setup';
+const Availability=createContext<{reason?:string;status?:string}>({});
 const SettingsContext=createContext<{
- row:string|null;setRow:(row:string|null)=>void;
- slots:Partial<Record<Slot,HTMLElement>>;
- register:(slot:Slot,node:HTMLElement|null)=>void;
+ row:string|null;groups:ReadonlySet<Family>;openGroup:(id:Family)=>void;toggleGroup:(id:Family)=>void;
+ slots:Partial<Record<Slot,HTMLElement>>;register:(slot:Slot,node:HTMLElement|null)=>void;
 }|null>(null);
 
-/** Keep camera-owned settings in their existing component, in one shared drawer. */
-export function PracticeSettingsProvider({row,setRow,children}:{row:string|null;setRow:(row:string|null)=>void;children:ReactNode}){
+export function PracticeSettingsProvider({row,children}:{row:string|null;setRow:(row:string|null)=>void;children:ReactNode}){
  const [slots,setSlots]=useState<Partial<Record<Slot,HTMLElement>>>({});
- const register=useCallback((slot:Slot,node:HTMLElement|null)=>setSlots(previous=>{
-  if(previous[slot]===(node??undefined))return previous;
-  return {...previous,[slot]:node??undefined};
- }),[]);
- return <SettingsContext.Provider value={{row,setRow,slots,register}}>{children}</SettingsContext.Provider>;
+ const [groups,setGroups]=useState<ReadonlySet<Family>>(()=>new Set(['setup']));
+ const openGroup=useCallback((id:Family)=>setGroups(previous=>previous.has(id)?previous:new Set([...previous,id])),[]);
+ const toggleGroup=useCallback((id:Family)=>setGroups(previous=>{const next=new Set(previous);if(next.has(id))next.delete(id);else next.add(id);return next;}),[]);
+ const register=useCallback((slot:Slot,node:HTMLElement|null)=>setSlots(previous=>previous[slot]===(node??undefined)?previous:{...previous,[slot]:node??undefined}),[]);
+ return <SettingsContext.Provider value={{row,groups,openGroup,toggleGroup,slots,register}}>{children}</SettingsContext.Provider>;
 }
 
-export function SettingsGroup({title,slot,children}:{title:string;slot?:Slot;children?:ReactNode}){
- const context=useContext(SettingsContext)!;
- const register=context.register;
- const mount=useCallback((node:HTMLDivElement|null)=>{if(slot)register(slot,node);},[register,slot]);
- return <section className="settings-group" aria-label={title}><h3>{title}</h3>{children}{slot&&<div ref={mount}/>}</section>;
+/** One accordion per dependency family; individual controls never collapse. */
+export function SettingsGroup({id,title,summary,children,disabledReason,status}:{id:Family;title:string;summary?:string;children?:ReactNode;disabledReason?:string;status?:string}){
+ const context=useContext(SettingsContext)!,contentId=useId(),expanded=context.groups.has(id),openGroup=context.openGroup;
+ useEffect(()=>{if(context.row&&familyFor(context.row)===id)openGroup(id);},[context.row,id,openGroup]);
+ return <section className="settings-group settings-family" aria-label={title}>
+  <h3><button type="button" className="settings-family-trigger" aria-expanded={expanded} aria-controls={contentId} onClick={()=>context.toggleGroup(id)}><span>{title}{summary&&<small>{summary}</small>}</span><ChevronDown size={17} aria-hidden="true"/></button></h3>
+  <div id={contentId} className="settings-family-content" hidden={!expanded}><Availability.Provider value={{reason:disabledReason,status}}>{children}</Availability.Provider></div>
+ </section>;
 }
 
-export function SettingsPortal({slot,children}:{slot:Slot;children:ReactNode}){
+export function SettingsMount({slot}:{slot:Slot}){
+ const register=useContext(SettingsContext)!.register;
+ const mount=useCallback((node:HTMLDivElement|null)=>register(slot,node),[register,slot]);
+ return <div ref={mount}/>;
+}
+export function SettingsPortal({slot,children,disabledReason,status}:{slot:Slot;children:ReactNode;disabledReason?:string;status?:string}){
  const target=useContext(SettingsContext)?.slots[slot];
- return target?createPortal(children,target):null;
+ return target?createPortal(<Availability.Provider value={{reason:disabledReason,status}}>{children}</Availability.Provider>,target):null;
 }
 
-export function SettingsRow({id,label,value,children}:{id:string;label:string;value:ReactNode;children:ReactNode}){
- const context=useContext(SettingsContext)!;
- const expanded=context.row===id,contentId=useId(),ref=useRef<HTMLDivElement>(null);
- useEffect(()=>{if(expanded)ref.current?.scrollIntoView({block:'nearest'});},[expanded]);
- return <div className={`settings-row ${expanded?'is-expanded':''}`} ref={ref}>
-  <button type="button" className="settings-row-trigger" aria-expanded={expanded} aria-controls={contentId} onClick={()=>context.setRow(expanded?null:id)}>
-   <span className="settings-row-label">{label}</span><span className="settings-row-value">{value}</span><ChevronDown size={16} aria-hidden="true"/>
-  </button>
-  <div id={contentId} className="settings-row-content" hidden={!expanded}>{children}</div>
+export function SettingsRow({id,label,value,children,disabledReason,status}:{id:string;label:string;value:ReactNode;children:ReactNode;disabledReason?:string;status?:string}){
+ const context=useContext(SettingsContext)!,inherited=useContext(Availability),reason=inherited.reason||disabledReason;
+ const stateLabel=inherited.reason?(inherited.status||'Unavailable'):(status||(reason?'Unavailable':undefined));
+ const visible=context.groups.has(familyFor(id)),labelId=useId(),reasonId=useId(),ref=useRef<HTMLDivElement>(null);
+ useEffect(()=>{if(context.row===id&&visible)ref.current?.scrollIntoView({block:'nearest'});},[context.row,id,visible]);
+ return <div className={`settings-row settings-control ${reason?'is-unavailable':''}`} ref={ref}>
+  <div className="settings-control-heading"><span id={labelId} className="settings-row-label">{label}</span><span className="settings-control-state">{stateLabel&&<small>{stateLabel}</small>}<span className="settings-row-value">{value}</span></span></div>
+  <fieldset className="settings-row-content" aria-label={`${label} controls`} aria-describedby={reason?reasonId:undefined} disabled={Boolean(reason)}>{children}</fieldset>
+  {reason&&<p id={reasonId} className="settings-disabled-reason">{reason}</p>}
  </div>;
 }
 

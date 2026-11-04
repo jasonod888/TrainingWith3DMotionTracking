@@ -1,4 +1,4 @@
-"""Looping publisher preview and navigation checks. Local media, no real camera."""
+"""Watch-first lesson playback and mode navigation checks. Local media, no real camera."""
 import json,os,re,subprocess
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
@@ -33,52 +33,50 @@ with sync_playwright() as p:
  page.route('**/api/**',api)
  url=os.environ.get('PRACTICE_TEST_URL','http://127.0.0.1:5195')+'/?page=preview&id=synthetic-lesson&source=demo'
  page.goto(url,wait_until='domcontentloaded')
- expect(page.get_by_role('button',name='Lets Practice',exact=True)).to_be_visible()
- page.wait_for_function("document.querySelector('.preview-media video')?.readyState>=2 && !document.querySelector('.preview-media video').paused")
- expect(page.locator('.preview-media video')).to_have_class('is-ready')
+ expect(page.get_by_role('button',name='Practice',exact=True)).to_be_visible()
+ page.wait_for_function("document.querySelector('.preview-media video')?.readyState>=2")
  expect(page.locator('.preview-media video')).to_have_css('opacity','1')
  assert not any(name.endswith('.glb') for name in requests)
  assert page.evaluate('cameraStarts')==0
- for selector in ['.mimic-transport','.mimic-shortcuts','.mimic-scrub','.mimic-section-link','canvas']:
-  expect(page.locator(selector)).to_have_count(0)
- assert page.locator('video').evaluate('v=>v.muted')
- page.locator('video').evaluate('v=>v.currentTime=4.98')
- page.wait_for_function("document.querySelector('video').currentTime>=3 && document.querySelector('video').currentTime<3.5")
- page.get_by_role('button',name='Pause preview',exact=True).click()
- expect(page.get_by_role('button',name='Play preview',exact=True)).to_be_visible()
- t=page.locator('video').evaluate('v=>v.currentTime');page.wait_for_timeout(200)
- assert abs(page.locator('video').evaluate('v=>v.currentTime')-t)<.05
- page.get_by_role('button',name='Unmute preview',exact=True).click()
+ expect(page.get_by_label('Lesson position',exact=True)).to_be_visible()
+ expect(page.get_by_role('button',name='Lets Compete',exact=True)).to_have_count(0)
+ # Watching crosses section boundaries continuously, then stops at the lesson end.
+ page.locator('video').evaluate('v=>{v.currentTime=3.8;v.play();}')
+ page.wait_for_function("document.querySelector('video').currentTime>4.1 && !document.querySelector('video').paused")
+ page.wait_for_function("document.querySelector('video').paused && document.querySelector('video').currentTime>=5")
+ page.get_by_role('button',name='Play video',exact=True).click()
+ page.wait_for_function("document.querySelector('video').currentTime<4 && !document.querySelector('video').paused")
+ page.get_by_role('button',name='Pause video',exact=True).click()
+ page.get_by_role('button',name='Unmute video',exact=True).click()
  assert not page.locator('video').evaluate('v=>v.muted')
  for w,h in [(390,844),(320,480),(812,375),(1280,800)]:
-  page.set_viewport_size({'width':w,'height':h});page.wait_for_timeout(150)
+  page.set_viewport_size({'width':w,'height':h})
   assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-  for label in ['Lets Practice','Lets Compete']:
-   box=page.get_by_role('button',name=label,exact=True).bounding_box();assert box and box['y']>=0 and box['y']+box['height']<=h,(w,label,box)
-  page.screenshot(path=str(ROOT/f'test-results/publisher-preview-{w}.png'))
+  expect(page.get_by_role('button',name='Practice',exact=True)).to_be_visible()
+  page.screenshot(path=str(ROOT/f'test-results/watch-lesson-{w}.png'))
  page.set_viewport_size({'width':390,'height':844})
- page.get_by_role('button',name='Lets Practice',exact=True).click()
- expect(page.get_by_role('button',name='Start practice',exact=True)).to_be_visible()
+ # A watched position must never become a practice position.
+ page.locator('video').evaluate('v=>v.currentTime=4.25')
+ page.wait_for_function("Number(document.querySelector('input[aria-label=\"Lesson position\"]').value)>1")
+ page.get_by_role('button',name='Practice',exact=True).click()
+ expect(page.get_by_role('button',name='Without voice',exact=True)).to_be_visible()
+ expect(page.get_by_label('Lesson position',exact=True)).to_have_value('0')
  expect(page.locator('.preview-media video')).to_have_count(0)
  assert page.evaluate('cameraStarts')==0
- expect(page.locator('.motion-host canvas')).to_be_visible()
- page.get_by_role('button',name='Exit',exact=True).click()
- expect(page.get_by_role('button',name='Lets Compete',exact=True)).to_be_visible()
- page.wait_for_function("document.querySelector('video')?.readyState>=2 && document.querySelector('video').currentTime>=3")
- assert page.locator('video').evaluate('v=>v.currentTime')>=3
- page.get_by_role('button',name='Lets Compete',exact=True).click()
- expect(page.get_by_role('button',name='Prepare to compete',exact=True)).to_be_visible()
+ page.get_by_label('Lesson mode',exact=True).select_option('compete')
+ expect(page.get_by_role('button',name='Prepare challenge',exact=True)).to_be_visible()
  assert page.evaluate('cameraStarts')==0
  expect(page.locator('.mimic-shell')).to_have_class(re.compile('mode-compete'))
- page.go_back()
- expect(page.get_by_role('button',name='Lets Practice',exact=True)).to_be_visible()
+ page.get_by_label('Lesson mode',exact=True).select_option('practice')
+ expect(page.get_by_role('button',name='Without voice',exact=True)).to_be_visible()
+ page.get_by_label('Lesson mode',exact=True).select_option('watch')
+ page.wait_for_function("document.querySelector('video')?.readyState>=2 && document.querySelector('video').currentTime>=4")
  mode['missing']=True;page.goto(url,wait_until='domcontentloaded')
- expect(page.get_by_text('Video preview unavailable',exact=True)).to_be_visible()
- expect(page.get_by_role('button',name='Lets Practice',exact=True)).to_be_visible()
+ expect(page.get_by_text('Original video unavailable',exact=True)).to_be_visible()
+ expect(page.get_by_role('button',name='Practice',exact=True)).to_be_visible()
  expect(page.locator('canvas')).to_have_count(0)
  mode['missing']=False;mode['broken']=True;page.goto(url,wait_until='domcontentloaded')
- expect(page.get_by_text('Video preview unavailable',exact=True)).to_be_visible()
+ expect(page.get_by_text('Original video unavailable',exact=True)).to_be_visible()
  assert not errors,errors
  browser.close()
-print('PASS: original video only; bounded continuous loop; pause/mute; no camera or 3D on preview; separate session routes; preview return; unavailable/broken media; mobile/desktop layout.')
-
+print('PASS: original continuous video; section seeking; playback and mute; isolated watch/practice progress; mode switching without camera requests; unavailable media; responsive layout.')

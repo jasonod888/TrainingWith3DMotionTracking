@@ -49,3 +49,22 @@
 .mimic-shell.is-presenting.controls-resting .practice-timeline-host{opacity:0;pointer-events:none}
 .mimic-shell.is-presenting .practice-timeline-host:focus-within{opacity:1;pointer-events:auto}
 @media(prefers-reduced-motion:no-preference){.practice-timeline-host{transition:opacity .2s}}
+
+.mimic-shell.instructor-focus .mimic-context,
+.mimic-shell.instructor-focus .mimic-dock,
+.mimic-shell.instructor-focus .practice-reference-label{display:none}
+.mimic-shell.instructor-focus .mimic-header{
+ left:auto;right:max(12px,env(safe-area-inset-right));top:max(10px,env(safe-area-inset-top));
+ gap:8px;opacity:1;pointer-events:auto;
+}
+.mimic-shell.instructor-focus .mimic-header > :not(.instructor-focus-toggle):not(.focus-timeline-toggle):not(.focus-next-section){display:none}
+.mimic-shell.instructor-focus .practice-timeline-host{
+ left:max(18px,env(safe-area-inset-left));right:max(18px,env(safe-area-inset-right));
+ bottom:max(12px,env(safe-area-inset-bottom));opacity:1;pointer-events:auto;
+}
+.mimic-shell.mode-practice.instructor-focus:not(.settings-open):not(.is-setting-up) .mimic-stage{
+ right:0;bottom:calc(100px + env(safe-area-inset-bottom));
+ --mimic-stage-top:60px;--mimic-stage-right:0px;--mimic-stage-bottom:0px;
+}
+.mimic-shell.mode-practice.instructor-focus.focus-timeline-hidden:not(.settings-open):not(.is-setting-up) .mimic-stage{bottom:0}
+.mimic-shell.instructor-focus .practice-timeline-host[hidden]{display:none}

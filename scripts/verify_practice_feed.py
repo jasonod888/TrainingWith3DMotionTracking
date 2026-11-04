@@ -2,6 +2,7 @@
 import copy
 import json
 import os
+import re
 from pathlib import Path
 from urllib.parse import urlparse,parse_qs
 from playwright.sync_api import sync_playwright,expect
@@ -32,6 +33,15 @@ with sync_playwright() as p:
   elif path=='shared-lessons':route.fulfill(json=[] if mode['empty'] else shared)
   elif path=='workflow/lessons':route.fulfill(json={'lessons':[{'lesson_id':v['lesson_id'],'accepted_revision_id':v['revision_id'] if i==0 else None,'latest_revision_id':v['revision_id'],'audiences':{'direct':0,'groups':0,'public':i==0}} for i,v in enumerate(own)]})
   elif path=='conversions':route.fulfill(json={'jobs':mode['jobs'],'worker_online':True})
+  elif path=='groups':
+   if route.request.method=='POST':
+    new_group={'id':'test-group','role':'owner','members':1,'moves':0,**route.request.post_data_json}
+    mode.setdefault('groups',[]).append(new_group)
+    route.fulfill(json=new_group)
+   else:route.fulfill(json={'groups':mode.get('groups',[])})
+  elif path=='groups/test-group':
+   route.fulfill(json={**mode['groups'][0],'can_manage':True,'contribution_policy':'members','members':[],'moves':[],'invitations':[]})
+  elif path=='public/tags':route.fulfill(json={'tags':[{'tag':'Foundations','count':25}]})
   elif path=='public/moves':
    if mode['public_error']:route.fulfill(status=503,json={'detail':'Public unavailable'});return
    q=query.get('q',[''])[0].lower();offset=int(query.get('offset',['0'])[0]);items=[] if mode['empty'] else [v for v in public if q in (v['title']+' '+v['creator_name']).lower()]
@@ -51,22 +61,74 @@ with sync_playwright() as p:
  expect(page.locator('.feed-card-own')).to_have_count(2)
  expect(page.locator('.feed-card-shared')).to_have_count(1)
  expect(page.get_by_role('button',name='Open Taegeuk 1 · Full sequence',exact=True)).to_have_count(1)
- for w,h in [(390,844),(320,568),(768,1024),(1440,900)]:
+ for w,h in [(390,844),(320,568),(550,844),(760,844),(768,1024),(1100,800),(1280,800),(1440,900),(1920,1080)]:
   page.set_viewport_size({'width':w,'height':h});page.wait_for_timeout(150)
   assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),(w,'horizontal overflow')
-  first=page.locator('.feed-thumbnail').first.bounding_box();assert first and first['y']<300,(w,first)
+  first=page.locator('.feed-thumbnail').first.bounding_box();assert first and first['y']<150,(w,first)
   nav=page.get_by_role('navigation',name='Main navigation').bounding_box();assert nav and nav['y']>=0 and nav['y']+nav['height']<=h+1,(w,nav)
   page.screenshot(path=str(ROOT/f'test-results/practice-feed-{w}.png'))
+ # The browse pages share the shell and keep results close to the header.
+ for width,height in [(1440,900),(900,800),(390,844)]:
+  page.set_viewport_size({'width':width,'height':height})
+  page.get_by_role('navigation',name='Main navigation').get_by_role('button',name='Explore',exact=True).click()
+  expect(page.locator('.explore-screen')).to_be_visible()
+  expect(page.locator('.explore-screen .feed-card')).to_have_count(24)
+  first=page.locator('.explore-screen .feed-thumbnail').first.bounding_box()
+  assert first['y']<150 and first['x']==page.locator('.explore-screen').bounding_box()['x']
+  page.screenshot(path=str(ROOT/f'test-results/explore-{width}.png'))
+  if width<=760:
+   page.get_by_role('button',name='Open search',exact=True).click()
+   expect(page.get_by_role('searchbox',name='Search public moves')).to_be_focused()
+  search=page.get_by_role('searchbox',name='Search public moves')
+  search.fill('Maya')
+  expect(page.locator('.explore-screen .feed-card')).to_have_count(9)
+  search.fill('no matching creator')
+  expect(page.get_by_role('heading',name='No matching moves')).to_be_visible()
+  page.get_by_role('button',name='Reset filters').click()
+  expect(page.locator('.explore-screen .feed-card')).to_have_count(24)
+  if width<=760:page.get_by_role('button',name='Close search',exact=True).click()
+  page.get_by_role('button',name='Foundations',exact=True).click()
+  expect(page.get_by_role('button',name='Foundations',exact=True)).to_have_attribute('aria-pressed','true')
+  page.get_by_role('button',name='Groups',exact=True).click()
+  expect(page.get_by_role('heading',name='No groups yet')).to_be_visible()
+  page.screenshot(path=str(ROOT/f'test-results/groups-{width}.png'))
+  page.get_by_role('button',name='Create a group',exact=True).click()
+  expect(page.get_by_label('Group name')).to_be_focused()
+  page.get_by_label('Group name').fill('Tuesday practice')
+  if width<=760:
+   page.get_by_role('button',name='Create group',exact=True).click()
+   expect(page.get_by_role('heading',name='Tuesday practice')).to_be_visible()
+   page.get_by_role('button',name='Groups',exact=True).last.click()
+   expect(page.locator('.group-card')).to_contain_text('Tuesday practice')
+  else:page.get_by_role('button',name='Cancel',exact=True).click()
+  assert page.locator('.header').bounding_box()['height']==(56 if width<=760 else 60)
+  assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+  page.get_by_role('button',name='Your account',exact=True).click()
+  expect(page.locator('.account-card')).to_be_visible()
+  assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+  if width<=760: page.get_by_role('navigation',name='Main navigation').get_by_role('button',name='Create',exact=True).click()
+  else: page.get_by_role('button',name='Create a practice',exact=True).click()
+  expect(page.locator('.create-screen')).to_be_visible()
+  assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+  page.get_by_role('navigation',name='Main navigation').get_by_role('button',name='Home',exact=True).click()
+  expect(page.locator('.feed-header-search')).to_be_visible()
+ # The desktop rail can expand without covering content or changing search.
+ page.set_viewport_size({'width':1440,'height':900})
+ page.get_by_role('button',name='Collapse sidebar',exact=True).click()
+ expect(page.locator('.feed-app')).to_have_class(re.compile('sidebar-compact'))
+ assert page.locator('main').bounding_box()['x']==80
+ page.get_by_role('button',name='Expand sidebar',exact=True).click()
+ assert page.locator('main').bounding_box()['x']==200
  page.set_viewport_size({'width':390,'height':844})
  page.get_by_role('button',name='Shared with me',exact=True).click()
  expect(page.locator('.feed-card')).to_have_count(1)
  page.get_by_role('button',name='Open Balance and control',exact=True).click()
- expect(page.get_by_role('button',name='Lets Practice',exact=True)).to_be_visible()
+ expect(page.get_by_role('button',name='Practice',exact=True)).to_be_visible()
  page.get_by_role('button',name='Back to feed',exact=True).click()
  expect(page.get_by_role('button',name='Shared with me',exact=True)).to_have_attribute('aria-pressed','true')
  page.get_by_role('button',name='My practices',exact=True).click()
  page.get_by_role('button',name='Open Taegeuk 1 · Full sequence',exact=True).click()
- expect(page.get_by_role('button',name='Lets Practice',exact=True)).to_be_visible()
+ expect(page.get_by_role('button',name='Practice',exact=True)).to_be_visible()
  page.get_by_role('button',name='Back to feed',exact=True).click()
  page.get_by_label('Options for Footwork · First steps').click()
  expect(page.get_by_role('button',name='Adjust practice',exact=True)).to_be_visible()
@@ -76,16 +138,25 @@ with sync_playwright() as p:
  expect(page.locator('.feed-card-public')).to_have_count(24)
  page.get_by_role('button',name='More practices',exact=True).click()
  expect(page.locator('.feed-card-public')).to_have_count(25)
+ page.get_by_role('button',name='Open search',exact=True).click()
+ expect(page.get_by_label('Search practices',exact=True)).to_be_focused()
+ page.screenshot(path=str(ROOT/'test-results/practice-feed-mobile-search.png'))
  page.get_by_label('Search practices',exact=True).fill('Maya')
  expect(page.locator('.feed-card-public')).to_have_count(9)
+ page.keyboard.press('Escape')
+ expect(page.get_by_label('Search practices',exact=True)).not_to_be_visible()
+ expect(page.get_by_role('button',name='Open search',exact=True)).to_be_focused()
+ expect(page.locator('.feed-card-public')).to_have_count(9)
+ page.get_by_role('button',name='Open search',exact=True).click()
  page.get_by_label('Clear search',exact=True).click()
  expect(page.locator('.feed-card-public')).to_have_count(24)
+ page.get_by_role('button',name='Close search',exact=True).click()
  # Returning from a card keeps source, query, loaded page and scroll position.
  page.get_by_role('button',name='More practices',exact=True).click()
  page.locator('.feed-card-public').nth(12).scroll_into_view_if_needed()
  saved_scroll=page.evaluate('scrollY')
  page.locator('.feed-card-public').nth(12).locator('.feed-thumbnail').click()
- expect(page.get_by_role('button',name='Lets Practice',exact=True)).to_be_visible()
+ expect(page.get_by_role('button',name='Practice',exact=True)).to_be_visible()
  page.get_by_role('button',name='Back to feed',exact=True).click()
  expect(page.locator('.feed-card-public')).to_have_count(25)
  page.wait_for_function('expected=>Math.abs(scrollY-expected)<30',arg=saved_scroll)

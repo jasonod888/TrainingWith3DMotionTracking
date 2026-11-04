@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CAMERA_REQUEST_DEFAULTS,CAMERA_PREFERENCE_KEY,acquisitionPlan,applyRequest,buildVideoConstraints,
-  classifyLens,describeCamera,describeLens,deviceLabel,hasLabelledDevices,labelFacing,loadPreference,
+  classifyLens,describeCamera,describeLens,deviceLabel,facingAvailability,hasLabelledDevices,labelFacing,loadPreference,
   needsDiscoveryProbe,normalizeDevices,parsePreference,protocolFacing,rankDevices,savePreference,
   wantsWide,wideCandidate,wideEvidence,
 } from '../src/camera-policy.ts';
@@ -27,6 +27,24 @@ test('facing is read from labels, including localised ones, and stays unknown ot
   assert.equal(labelFacing(''), 'unknown');
   // A label naming both directions is not evidence of either.
   assert.equal(labelFacing('Front-Back Camera'), 'unknown');
+});
+
+test('facing availability needs a label or a live track, never a camera count', () => {
+  // A single unlabelled webcam is one neutral camera, never a rear camera.
+  assert.deepEqual(facingAvailability([device('a', 'HD Pro Webcam C920')]), {front: false, rear: false, single: true, count: 1});
+  assert.deepEqual(facingAvailability([device('a', '')]), {front: false, rear: false, single: true, count: 1});
+  // Desktops report extra video inputs (virtual, IR, capture) that are all the self camera.
+  assert.deepEqual(facingAvailability([device('a', 'HD Webcam'), device('b', 'Virtual Camera')]), {front: false, rear: false, single: true, count: 2});
+  assert.deepEqual(facingAvailability([]), {front: false, rear: false, single: true, count: 0});
+  // Labelled phone pairs are the only thing that offers both directions.
+  assert.deepEqual(facingAvailability([device('f', 'Front Camera'), device('b', 'Back Camera')]), {front: true, rear: true, single: false, count: 2});
+  // A rear-only device keeps its rear choice and does not invent a front one.
+  assert.deepEqual(facingAvailability([device('a', 'camera2 0, facing back')]), {front: false, rear: true, single: false, count: 1});
+  // An unlabelled second camera does not turn a labelled front camera into a pair.
+  assert.deepEqual(facingAvailability([device('f', 'Front Camera'), device('x', 'Camera 2')]), {front: true, rear: false, single: false, count: 2});
+  // A live track is direct evidence.
+  assert.equal(facingAvailability([device('a', 'Camera')], 'environment').rear, true);
+  assert.equal(facingAvailability([device('a', 'Camera')], 'user').front, true);
 });
 
 test('wide evidence separates ultra-wide from ambiguous wide wording', () => {

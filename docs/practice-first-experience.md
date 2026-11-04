@@ -5,7 +5,7 @@ The primary task is to practise with a live self view beside or over the instruc
 ## Interaction
 
 1. Opening a move shows the instructor. Play works without a camera.
-2. **Start practice** requests the camera and displays the live self view. No recorder is created and no video is stored. The user can frame themselves and complete height matching before playing.
+2. **Start practice** requests the camera and displays the live self view. No recorder is created and no video is stored. The user can frame themselves and complete height matching before playing. Choosing Front or Rear in Practice settings opens that camera at once, so the arrangement can be checked while settings are adjusted; practice stays paused until Play. The voice-command offer still belongs to the start action, and the microphone is reachable from the dock afterwards.
 3. **Record practice** becomes available once the live camera and existing preparation requirements are ready. During playback, capture starts at the current position without restarting the movement. From paused practice, capture starts after the normal count-in.
 4. **Stop recording** finalizes the take while the live practice session continues. A **Review take** action appears; a review dialog does not interrupt the session automatically. Recording status and its remaining time are explicit.
 5. **Review take** pauses playback for review, saving, discarding or deliberately replacing the take. Only one bounded take is held at a time. An unsaved take remains protected from accidental replacement or navigation.

@@ -10,6 +10,7 @@ export function localRecognition(transcribe:(pcm:string)=>Promise<Transcript>){
   start(){this.stopped=false;void this.open();}
   private async open(){try{
    this.context=new AudioContext({sampleRate:16000});await this.context.resume();
+   if(this.stopped)return;
    const stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true},video:false});
    if(this.stopped){stream.getTracks().forEach(t=>t.stop());return;}this.stream=stream;
    await this.context.audioWorklet.addModule('/voice-capture.js');if(this.stopped)return;

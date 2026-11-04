@@ -1,0 +1,194 @@
+/* Playback sits beneath the instructor at every viewport size. */
+.mimic-shell.minimal-practice {
+ --practice-dock-height: 138px;
+ background: #0e2018;
+}
+
+.mimic-shell.mode-practice.minimal-practice:not(.settings-open):not(.is-setting-up) .mimic-stage {
+ right: 0;
+ bottom: var(--practice-dock-height);
+ --mimic-stage-top: 64px;
+ --mimic-stage-right: 0px;
+ --mimic-stage-bottom: 12px;
+}
+
+.minimal-practice .mimic-stage:after {
+ background: linear-gradient(180deg, #06140e70, transparent 18%, transparent 85%, #07150d50);
+}
+
+.mimic-shell.minimal-practice .mimic-header {
+ top: max(12px, env(safe-area-inset-top));
+ left: max(20px, env(safe-area-inset-left));
+ right: max(20px, env(safe-area-inset-right));
+ gap: 10px;
+}
+
+.minimal-practice .mimic-header > div > span,
+.minimal-practice .mimic-header .practice-settings-button,
+.minimal-practice .mimic-header .instructor-focus-toggle,
+.minimal-practice .practice-reference-label {
+ display: none;
+}
+
+.minimal-practice .mimic-header strong {
+ font-size: 14px;
+ font-weight: 500;
+ color: #dde7de;
+}
+
+.mimic-shell.minimal-practice .mimic-header > .mimic-icon-button:first-child {
+ width: 38px;
+ min-height: 38px;
+ background: #10271d55;
+ border-color: transparent;
+}
+
+.practice-player-dock {
+ position: absolute;
+ z-index: 8;
+ bottom: 0;
+ left: 0;
+ right: 0;
+ padding: 10px max(28px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(28px, env(safe-area-inset-left));
+ background: #10241d;
+ border-top: 1px solid #ffffff0a;
+}
+
+.practice-player-dock .practice-timeline {
+ display: flex;
+ flex-direction: column;
+ height: auto;
+}
+
+.practice-player-dock .practice-timeline-heading { height: 28px; }
+.practice-player-dock .practice-timeline-track { height: 32px; }
+.practice-player-dock .practice-timeline-rail { top: 13px; height: 6px; }
+.practice-player-dock .practice-timeline-playhead { top: 9px; width: 14px; height: 14px; border-width: 2px; }
+.practice-player-dock .practice-timeline-hint {
+ position: absolute;
+ width: 1px;
+ height: 1px;
+ padding: 0;
+ margin: -1px;
+ overflow: hidden;
+ clip-path: inset(50%);
+ white-space: nowrap;
+}
+
+.practice-player-toolbar,
+.practice-player-actions,
+.practice-player-tools {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ min-width: 0;
+}
+
+.practice-player-toolbar { justify-content: space-between; flex-wrap: wrap; row-gap: 2px; }
+.practice-player-actions { flex-wrap: wrap; }
+.practice-player-tools { margin-left: auto; gap: 2px; flex-shrink: 0; }
+
+.mimic-shell.mimic-immersive .practice-player-primary {
+ display: inline-flex;
+ align-items: center;
+ justify-content: center;
+ gap: 8px;
+ min-height: 40px;
+ padding: 8px 14px;
+ border: 0;
+ border-radius: 9px;
+ background: #d8ed9b;
+ color: #203525;
+ font-size: 13px;
+ font-weight: 600;
+}
+
+.practice-player-primary > svg,
+.player-text-action > svg { flex-shrink: 0; }
+
+.mimic-shell.mimic-immersive .player-tool,
+.mimic-shell.mimic-immersive .player-text-action {
+ display: inline-flex;
+ align-items: center;
+ justify-content: center;
+ gap: 6px;
+ min-height: 44px;
+ padding: 8px 10px;
+ border: 0;
+ border-radius: 8px;
+ background: transparent;
+ color: #c6d4c9;
+ font-size: 12px;
+ font-weight: 400;
+}
+
+.mimic-shell.mimic-immersive .player-tool { min-width: 44px; }
+.mimic-shell.mimic-immersive .player-tool:hover,
+.mimic-shell.mimic-immersive .player-text-action:hover { background: #ffffff0a; color: #eff5e8; }
+.practice-player-dock .practice-voice-status { margin: 0; }
+.practice-player-dock .practice-voice-status > svg { color: #a6baac; }
+.practice-player-camera-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
+.practice-player-status { font-size: 11px; line-height: 1.5; color: #adbeaf; margin: 4px 0 0 2px; }
+.practice-player-status:empty { display: none; }
+.mimic-shell.is-setting-up .practice-player-dock,
+.mimic-shell.settings-open .practice-player-dock { visibility: hidden; pointer-events: none; }
+.practice-player-dock[hidden] { display: none; }
+
+/* Fullscreen keeps the same dock and adds a quiet recovery control. */
+.mimic-shell.minimal-practice.instructor-focus .mimic-header {
+ left: auto;
+ right: max(14px, env(safe-area-inset-right));
+}
+.mimic-shell.minimal-practice.instructor-focus .mimic-header .instructor-focus-toggle { display: grid; }
+.mimic-shell.minimal-practice .focus-timeline-toggle { font-size: 12px; }
+.mimic-shell.mode-practice.minimal-practice.instructor-focus.focus-timeline-hidden:not(.settings-open):not(.is-setting-up) .mimic-stage { bottom: 0; }
+.mimic-shell.minimal-practice.instructor-focus .focus-next-section { display: none; }
+.mimic-shell.minimal-practice.instructor-focus.focus-timeline-hidden .focus-next-section { display: inline-flex; }
+
+@media(max-width: 599px) {
+ .practice-player-dock {
+  padding: 8px max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+ }
+ .mimic-shell.minimal-practice .mimic-header { left: 12px; right: 12px; top: max(8px, env(safe-area-inset-top)); }
+ .minimal-practice .mimic-header strong { font-size: 12px; }
+ .practice-player-dock .practice-timeline-name { display: none; }
+ .practice-player-dock .practice-timeline-browse { font-size: 11px; gap: 6px; }
+ .practice-player-actions { gap: 2px; }
+ .practice-player-tools { gap: 0; }
+ .practice-player-dock .player-voice-label { display: none; }
+ .mimic-shell.mimic-immersive .practice-player-dock .player-speed { display: none; }
+ .mimic-shell.mimic-immersive .practice-player-primary { font-size: 12px; padding: 8px 10px; }
+ .mimic-shell.mimic-immersive .player-text-action { padding: 8px 7px; font-size: 11px; }
+ .mimic-shell.mimic-immersive .player-tool { padding: 8px; }
+}
+
+@media(max-height: 500px) and (min-width: 600px) {
+ .practice-player-dock { padding-top: 4px; padding-bottom: max(4px, env(safe-area-inset-bottom)); }
+ .practice-player-dock .practice-timeline-heading { height: 26px; }
+ .minimal-practice .mimic-header strong { font-size: 12px; }
+ .mimic-shell.mode-practice.minimal-practice:not(.settings-open):not(.is-setting-up) .mimic-stage { --mimic-stage-top: 50px; }
+}
+/* A single compact mode switch keeps the lesson in context. */
+.mimic-shell .lesson-mode-control{display:flex;align-items:center;margin:0 6px 0 0}
+.mimic-shell .lesson-mode-control select{width:auto;min-height:40px;max-width:120px;margin:0;padding:0 24px 0 10px;border:1px solid #ffffff1c;border-radius:8px;background:#173124;color:#e6efdc;font:inherit;font-size:12px;cursor:pointer}
+.mimic-shell .lesson-mode-control select:focus-visible{outline:2px solid #d8ed9b;outline-offset:2px}
+.compete-preparation .lesson-mode-control{margin-bottom:16px}
+@media(max-width:600px){.mimic-shell .lesson-mode-control{margin-right:0}.mimic-shell .lesson-mode-control select{max-width:105px;padding-left:7px;font-size:11px}}
+.settings-setup-notice{padding:10px 12px;color:#d8ed9b;font-size:12px;line-height:1.5}
+/* Dependency families expand together; values and unavailable reasons stay visible. */
+.mimic-immersive .settings-family{margin-bottom:12px;border:1px solid #ffffff15;border-radius:12px;overflow:hidden}
+.mimic-immersive .settings-family h3{margin:0;letter-spacing:0;text-transform:none}
+.mimic-shell.mimic-immersive .settings-family-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:60px;padding:14px 12px;text-align:left;background:#ffffff05;border:0;border-radius:0;font-size:15px;color:#ecf3e5}
+.settings-family-trigger>span{display:flex;flex-direction:column;gap:5px}.settings-family-trigger small{font-size:11px;line-height:1.4;font-weight:400;color:#aec1ad}.settings-family-trigger[aria-expanded=true]>svg{transform:rotate(180deg)}
+.settings-family-content[hidden]{display:none}.settings-family-content{padding:0 6px}
+.mimic-immersive .settings-control{padding:12px 4px 4px;scroll-margin-block:12px}
+.settings-control-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:2px 6px 10px;font-size:13px;line-height:1.5}
+.settings-control-state{display:flex;flex-direction:column;align-items:flex-end;gap:3px;max-width:48%;text-align:right}.settings-control-state>small{color:#c4cbb6;font-size:10px}.settings-control .settings-row-value{font-size:11px}
+.mimic-immersive fieldset.settings-row-content{border:0;margin:0;min-width:0;padding:0 6px 12px;animation:none}
+.mimic-immersive fieldset.settings-row-content button:disabled,.mimic-immersive fieldset.settings-row-content input:disabled,.mimic-immersive fieldset.settings-row-content select:disabled{opacity:.45;cursor:not-allowed}
+.mimic-immersive .settings-disabled-reason{margin:0;padding:0 6px 12px;color:#bccbb8;font-size:11px;line-height:1.5}
+.mimic-immersive .settings-subheading{margin:20px 6px 10px;font-size:11px;line-height:1.5;letter-spacing:.6px;text-transform:uppercase;color:#c2d5a5}
+.mimic-immersive .settings-challenge-rules{padding:12px;background:#d8ed9b10;border:1px solid #d8ed9b30;border-radius:10px;margin:0 0 14px;font-size:12px;line-height:1.6;color:#dbe7ce}
+/* Keep the family title reachable while scrolling its related controls. */
+.mimic-immersive .settings-family{overflow:visible}
+.mimic-immersive .settings-family>h3{position:sticky;top:0;z-index:3;background:#173025;border-radius:12px}

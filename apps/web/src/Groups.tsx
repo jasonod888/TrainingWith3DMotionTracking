@@ -2,17 +2,26 @@ import {useEffect,useState} from 'react';
 import {ArrowLeft,ArrowRight,Plus,Share2,Trash2,UserPlus,Users} from 'lucide-react';
 import {request,createGroup,inspectGroupInvite,inviteToGroup,joinGroup,loadGroup,loadGroups,removeGroupMember,removeGroupMove,transferGroup,type GroupDetail,type GroupSummary} from './api';
 
-export function GroupsPage({onBack,onOpen}:{onBack:()=>void;onOpen:(id:string)=>void}){
- const [groups,setGroups]=useState<GroupSummary[]>([]),[name,setName]=useState(''),[description,setDescription]=useState(''),[creating,setCreating]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const load=()=>loadGroups().then(value=>setGroups(value.groups)).catch(e=>setError(e.message));
- useEffect(()=>{void load();},[]);
- const create=async()=>{setBusy(true);setError('');try{const value=await createGroup(name,description);setName('');setDescription('');setCreating(false);await load();onOpen(value.id);}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
- return <section className="groups-screen">
-  <button className="back-link" onClick={onBack}><ArrowLeft size={16}/>My moves</button>
-  <div className="share-heading"><p className="eyebrow">GROUPS</p><h1>Practise together.</h1><p className="subtle">A group is a small shared collection of moves. No chat, no live room.</p></div>
-  {creating?<div className="group-create"><label>Group name<input value={name} maxLength={80} placeholder="Tuesday practice" onChange={e=>setName(e.target.value)}/></label><label>Description <span className="small muted">(optional)</span><textarea value={description} maxLength={500} rows={2} onChange={e=>setDescription(e.target.value)}/></label><div className="inline-actions"><button className="primary" disabled={busy||!name.trim()} onClick={()=>void create()}>{busy?'Creating…':'Create group'}</button><button className="back-link" disabled={busy} onClick={()=>setCreating(false)}>Cancel</button></div></div>:<button className="primary" onClick={()=>setCreating(true)}><Plus size={17}/>Create a group</button>}
-  {groups.length?<div className="group-list">{groups.map(group=><button key={group.id} className="group-card" onClick={()=>onOpen(group.id)}><span className="group-icon"><Users size={20}/></span><div><strong>{group.name}</strong><p>{group.members} {group.members===1?'member':'members'} · {group.moves} {group.moves===1?'move':'moves'}</p></div><span className="role-tag">{group.role}</span></button>)}</div>:<div className="empty-library"><Users size={28} strokeWidth={1.2}/><div><h3>No groups yet.</h3><p className="subtle">Create one for a class, team or a few friends.</p></div></div>}
-  {error&&<p className="inline-notice error-notice" role="alert">{error}</p>}
+import {FeedEmpty} from './FeedStates';
+
+export function GroupsPage({onOpen}:{onOpen:(id:string)=>void}){
+ const [groups,setGroups]=useState<GroupSummary[]>([]),[name,setName]=useState(''),[description,setDescription]=useState(''),[creating,setCreating]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState(''),[retry,setRetry]=useState(0);
+ useEffect(()=>{
+  let active=true;
+  setLoading(true);setLoadError('');
+  loadGroups().then(value=>{if(active)setGroups(value.groups);}).catch(e=>{if(active)setLoadError(e.message);}).finally(()=>{if(active)setLoading(false);});
+  return()=>{active=false;};
+ },[retry]);
+ const create=async()=>{setBusy(true);setError('');try{const value=await createGroup(name,description);onOpen(value.id);}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
+ return <section className="groups-screen browse-page" aria-labelledby="groups-title">
+  <div className="browse-toolbar"><h1 id="groups-title">Groups</h1>{!creating&&<button className="primary" onClick={()=>{setError('');setCreating(true);}}><Plus size={17}/>Create a group</button>}</div>
+  {creating&&<form className="group-create" aria-label="Create a group" onSubmit={e=>{e.preventDefault();if(!busy&&name.trim())void create();}}>
+   <label>Group name<input autoFocus value={name} required maxLength={80} placeholder="Tuesday practice" onChange={e=>setName(e.target.value)}/></label>
+   <label>Description (optional)<textarea value={description} maxLength={500} rows={2} onChange={e=>setDescription(e.target.value)}/></label>
+   {error&&<p className="inline-notice error-notice" role="alert">{error}</p>}
+   <div className="inline-actions"><button type="submit" className="primary" disabled={busy||!name.trim()}>{busy?'Creating…':'Create group'}</button><button type="button" className="secondary" disabled={busy} onClick={()=>setCreating(false)}>Cancel</button></div>
+  </form>}
+  {loading?<p className="browse-status subtle" role="status">Loading groups…</p>:loadError?<div className="feed-load-error" role="alert"><span>{loadError}</span><button onClick={()=>setRetry(n=>n+1)}>Try again</button></div>:groups.length?<div className="group-list">{groups.map(group=><button key={group.id} className="group-card" onClick={()=>onOpen(group.id)}><span className="group-icon" aria-hidden="true"><Users size={20}/></span><div className="group-card-copy"><strong>{group.name}</strong><p>{group.members} {group.members===1?'member':'members'} · {group.moves} {group.moves===1?'move':'moves'}</p></div><span className="role-tag">{group.role}</span></button>)}</div>:!creating&&<FeedEmpty icon={<Users size={28}/>} title="No groups yet" description="Create a group to share practices with a class, team, or friends."/>}
  </section>;
 }
 

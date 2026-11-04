@@ -35,6 +35,12 @@ body.in-practice .app>.header{display:none}
 .mimic-immersive .mimic-status{font-size:12px;line-height:1.5;color:#d1dbd3;max-width:400px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .mimic-immersive .mimic-dock{position:absolute;z-index:6;left:max(18px,env(safe-area-inset-left));right:max(18px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));width:auto;max-width:none;margin:0;gap:8px}
 .mimic-immersive .mimic-record-bar{padding:0;gap:8px;flex-wrap:wrap}
+.mimic-shell.mimic-immersive .practice-voice-status{font-size:12px;pointer-events:auto}
+.mimic-shell.mimic-immersive .mimic-context .practice-voice-status{margin-inline-start:8px;padding:6px 10px;border-radius:20px}
+@media(max-width:599px){
+ .mimic-immersive .voice-start-options{flex-wrap:nowrap}
+ .mimic-shell.mimic-immersive .voice-start-options button{min-width:0;flex:1;padding-inline:8px}
+}
 .mimic-shell.mimic-immersive .practice-session-toggle{background:#d8ed9b;color:#203525;border:0;border-radius:30px;min-height:44px;font-size:12px;flex:1}.mimic-shell.mimic-immersive .practice-session-toggle[aria-pressed=true]{background:#ffffff14;border:1px solid #ffffff30;color:#eff5eb}
 .mimic-shell.mimic-immersive .record-take,.mimic-shell.mimic-immersive .take-review-button{border-radius:30px;min-height:44px;background:#ffffff14;border-color:#ffffff30;color:#f7f9f3;font-size:11px;padding:8px 12px;flex:1}.mimic-shell.mimic-immersive .record-take.active{background:#762e35;border-color:#eb7b7b;color:#fff}
 .mimic-immersive .mimic-shortcuts{position:fixed;right:max(12px,env(safe-area-inset-right));top:calc(var(--practice-top,0px) + var(--practice-height,100dvh)*.43);display:flex;flex-direction:column;gap:12px;transform:translateY(-50%)}
@@ -44,6 +50,21 @@ body.in-practice .app>.header{display:none}
 .mimic-immersive .practice-reference-label{top:112px;left:22px;background:transparent;color:#c6d4c9;font-size:10px;letter-spacing:.4px;padding:0;z-index:4}
 .mimic-immersive .practice-tracking{position:absolute;z-index:4;left:22px;right:82px;bottom:300px;padding:0;background:transparent;font-size:11px;line-height:1.5;color:#d8ed9b;pointer-events:none}.mimic-immersive.is-watching .practice-tracking:not([role=alert]){display:none}.mimic-immersive .practice-tracking[role=alert]{background:#572a2ae6;color:#fff0ed;border-radius:12px;padding:12px;pointer-events:auto}
 .mimic-immersive .practice-review{z-index:8;bottom:170px;left:16px;right:80px;background:#142c24f5;color:#f5f8f0;border:1px solid #ffffff28;box-shadow:0 12px 40px #0005}.mimic-immersive .practice-countdown{z-index:8;backdrop-filter:blur(5px)}.mimic-immersive .practice-beat{top:112px;right:80px;z-index:4}
+/* Viewing angle sits on the stage, beside the instructor it rotates, so the
+   change is visible while it is made instead of behind the settings drawer. */
+.mimic-immersive .motion-stage{position:relative}
+.mimic-immersive .view-angle-control{position:absolute;z-index:6;right:max(14px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:4px;padding:4px;border:1px solid #ffffff1f;border-radius:16px;background:#10271dc7;backdrop-filter:blur(14px);pointer-events:auto}
+.mimic-shell.mimic-immersive .view-angle-control button{min-height:44px;padding:8px 13px;border:0;border-radius:12px;background:transparent;color:#dce7da;font-size:11px;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+.mimic-shell.mimic-immersive .view-angle-control button:hover:not(:disabled){background:#355443}
+/* Keep the chosen angle lime while it is also hovered or focused: the pressed look
+   must not be overridden by the generic hover fill. */
+.mimic-shell.mimic-immersive .view-angle-control button[aria-pressed=true],
+.mimic-shell.mimic-immersive .view-angle-control button[aria-pressed=true]:hover:not(:disabled){background:#d8ed9b;color:#203525}
+@media(max-width:700px){.mimic-immersive .view-angle-control{left:50%;right:auto;transform:translateX(-50%)}.mimic-shell.mimic-immersive .view-angle-control button{padding:8px 10px}}
+/* The settings drawer is a side panel, not a modal: its scrim must not swallow the
+   stage, so the angle control and the 3D view stay usable while settings are open. */
+.mimic-immersive .settings-backdrop{pointer-events:none}
+.mimic-immersive .settings-drawer{pointer-events:auto}
 .mimic-immersive .camera-tag{top:110px}.mimic-immersive .calibration-card{bottom:300px;left:20px;right:80px;background:#10271de8;color:#f2f6ed;border:1px solid #ffffff30;backdrop-filter:blur(12px)}.mimic-immersive .layout-instructor .camera-pane:not([hidden]){top:150px;bottom:auto;right:80px;width:26%;height:25%;border-radius:16px}
 .mimic-immersive.is-watching .motion-host>video{object-fit:contain;padding:var(--mimic-stage-top) var(--mimic-stage-right) var(--mimic-stage-bottom) 0}
 .mimic-immersive .practice-modal-backdrop{align-items:flex-end;padding:0;background:#04100ab3;backdrop-filter:blur(8px)}.mimic-immersive .practice-modal{position:relative;width:100%;max-height:calc(100% - max(24px,env(safe-area-inset-top)));border-radius:24px 24px 0 0;padding:26px 22px max(22px,env(safe-area-inset-bottom));background:#172c23;color:#f5f8f0;border:1px solid #ffffff20;gap:18px;box-shadow:0 -20px 80px #0004}.mimic-immersive .practice-modal:before{content:'';position:absolute;top:9px;left:calc(50% - 18px);height:3px;width:36px;border-radius:3px;background:#ffffff40}
