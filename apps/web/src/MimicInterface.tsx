@@ -465,14 +465,16 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
     <button onClick={()=>void refreshCameras()}>Refresh camera list</button>
     {resources.current.selection?<p>Using {describeCamera(resources.current.selection)}.</p>:<p>Camera access is needed to list device names.</p>}
    </SettingsRow>
-   <SettingsRow id="camera-setup" label="Position & height matching" value={!active?'Camera not started':calibrationEnabled()?resources.current.locked?'Matched':'Not matched':'Default alignment'} status={!active?'Not started':undefined}>
+   {/* Position and height matching belong to the setup that runs before practice,
+       so this row only appears when it has a job left: a calibration this server
+       actually performs, or the reachability confirmation a rear camera requires. */}
+   {(!calibrationEnabled()&&currentFacing()!=='environment')?null:<SettingsRow id="camera-setup" label="Position & height matching" value={!active?'Camera not started':calibrationEnabled()?resources.current.locked?'Matched':'Not matched':'Default alignment'} status={!active?'Not started':undefined}>
     <button onClick={()=>{if(onRequestSetup){close();onRequestSetup();}else if(active){beginCalibration();close();}else void start('camera');}}>Set up camera</button>
-    {active&&<button onClick={stop}>End practice</button>}
     <label>I can see the instructor and operate controls<input type="checkbox" disabled={currentFacing()!=='environment'} checked={controlsConfirmed} onChange={event=>setControlsConfirmed(event.target.checked)}/></label>
     <p>{currentFacing()==='environment'?'Rear camera requires confirmation that controls are reachable.':'Control-reach confirmation is only required for Rear camera.'}</p>
     {!calibrationEnabled()&&<p>Height matching is unavailable. Default alignment is used.</p>}
     {!competition&&import.meta.env.DEV&&new URLSearchParams(location.search).get('diagnostics')==='1'&&lesson.source_video&&<button onClick={()=>{void start('recorded');close();}}>Recorded source test</button>}
-   </SettingsRow>
+   </SettingsRow>}
    <SettingsRow id="feedback" label="Similarity & cues" value={feedback?'On':'Off'} disabledReason={competition?'Challenge requires camera scoring.':angle!==0?'Comparison is paused at this angle. Choose Front above to resume.':undefined} status={competition?'Fixed':angle!==0?'Paused':undefined}>
     <label>Show similarity and cues<input type="checkbox" role="switch" checked={feedback} onChange={event=>setFeedback(event.target.checked)}/></label><p>Approximate movement similarity, not technique correctness.</p>
    </SettingsRow>
