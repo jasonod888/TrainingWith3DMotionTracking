@@ -1,4 +1,5 @@
 import type {LessonManifest,LessonSummary} from '../../../packages/lesson-schema/index';
+import {publicMovesPath} from './feed-subject';
 import {clearClips} from './clipCache';
 export async function loadDemo(signal?:AbortSignal):Promise<LessonManifest|null>{
   const response=await fetch('/api/demo',{signal});
@@ -67,7 +68,11 @@ export const transferGroup=(id:string,accountId:string)=>request(`/groups/${enco
 
 export type PublicMove={lesson_id:string;title:string;creator_name:string;description:string;tags:string[];duration:number;thumbnail_url:string|null;subject?:string;subject_label?:string;experience_family?:'body'|'music';instrument?:'piano'|'guitar'|null};
 export type PublicDetail=LessonManifest&{creator_name:string;description:string;tags:string[]};
-export const loadPublicMoves=(query='',tag='',offset=0)=>request<{moves:PublicMove[]}>(`/public/moves?q=${encodeURIComponent(query)}&tag=${encodeURIComponent(tag)}&offset=${offset}`);
+export const loadPublicMoves=(query='',tag='',offset=0,subject='')=>{
+ const path=publicMovesPath(query,subject,offset);
+ const separator=path.includes('?')?'&':'?';
+ return request<{moves:PublicMove[]}>(tag?`${path}${separator}tag=${encodeURIComponent(tag)}`:path);
+};
 export const loadPublicTags=()=>request<{tags:{tag:string;count:number}[]}>('/public/tags');
 export const loadPublicMove=(id:string)=>request<PublicDetail>(`/public/moves/${encodeURIComponent(id)}`);
 export const updatePublic=(lessonId:string,body:{listed:boolean;title?:string;description?:string;creator_name?:string;tags?:string[];rights_acknowledged?:boolean;release_revision_id?:string})=>

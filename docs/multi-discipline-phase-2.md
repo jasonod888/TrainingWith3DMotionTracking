@@ -27,12 +27,34 @@ freeze for a recipient, group projection, public filter before pagination.
 
 ### Discovery UI (first, deliberately dormant slice)
 
-- The feed has a secondary **subject filter** row that renders only when the account can
-  see more than one subject. A movement-only library keeps exactly the current controls,
-  so no existing screen changes until multi-subject data exists.
-- Card detail already shows the subject label from the workflow projection.
+- The feed has a secondary **subject filter** row that renders only when at least two
+  subjects are available. Options come from the owned workflow states and the **shared
+  summaries** — sources that exist before the feed is filtered — never from the already
+  filtered public page, so selecting a subject cannot shrink the options that produced it.
+- A hidden filter never filters: a selection that is no longer offered (deleted or
+  relabelled subject, or a movement-only account) resolves to `all`, and the stored
+  selection is reset.
+- Shared cards and filters use the released subject from `/shared-lessons/summaries`, not
+  the owner-only workflow states, so a recipient-only subject is visible and selectable.
+- Public results are filtered **by the server**: the subject is a query parameter on every
+  page (including "More"), and the page identity includes the subject so switching while a
+  request is in flight cannot let the stale response win. The client no longer filters
+  public results by subject after the page has been cut.
 - Client helpers `loadLessonSummaries(subject?)` / `loadSharedSummaries(subject?)` accept
   a filter for the forthcoming summary-state migration.
+
+### Feed correctness follow-up
+
+| # | Finding | Fix | Coverage |
+| --- | --- | --- | --- |
+| 1 | The subject filter was not actually dormant | Options are gated to the pre-filter sources; the control renders only with two or more subjects; a stale or removed selection resolves to `all` instead of filtering invisibly | `apps/web/tests/feed-subject.test.mjs` |
+| 2 | Shared lessons used the owner workflow states for subject metadata | Shared lessons and filters read `sharedSummaries` from `/shared-lessons/summaries`; `LibraryApp` fetches them with the shared list and on join/sign-in | same file (recipient-only subject case) |
+| 3 | Public filtering still happened after pagination in the client | Subject is sent to `/api/public/moves` on every page; page key includes the subject; client-side subject filtering removed | `apps/web/tests/feed-subject.test.mjs`, `tests/api/test_public_pagination.py` (30 matches across two pages) |
+
+Known limitation for the next slice: a subject that exists **only** in public results is
+not offered as an option, because options come from owned and shared sources. A facet
+endpoint (`GET /api/public/subjects`, counts over unfiltered listings) is the clean fix
+and belongs with P2.1 rather than being bolted onto the dormant control.
 
 ## Remaining Phase 2 work
 
@@ -53,9 +75,9 @@ freeze for a recipient, group projection, public filter before pagination.
 | Check | Result |
 | --- | --- |
 | `npx tsc --noEmit` | Clean |
-| `npm --prefix apps/web test` | 223 passed |
+| `npm --prefix apps/web test` | **230 passed** (Phase 1: 223; +7 feed-subject) |
 | `npm --prefix apps/web run build` | Passes |
-| API suite | **259 passed, 13 skipped** (Phase 1: 255/13; +4 discovery tests) |
+| API suite | **262 passed, 13 skipped** (Phase 1: 255/13; +4 discovery, +3 pagination) |
 | Movement browser scripts | **Not run.** Playwright and its Chromium build are now installed, but the scripts need a seeded Vite + API stack with a database; that stack was not started. |
 | Music screen visual check | Not run |
 | PostgreSQL migration of 0015/0016 | Still pending; offline SQL only |
