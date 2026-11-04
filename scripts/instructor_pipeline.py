@@ -44,8 +44,8 @@ def prepare_instructor(folder,command,duration):
     # silently change the treatment of newly created projects.
     command([sys.executable,str(ROOT/'scripts/focus_instructor_video.py'),
              '--video',str(video),'--motion',str(motion),'--output',str(output),
-             '--masks',str(masks),'--mode','person','--edge-style',DEFAULT_EDGE_STYLE],
-            timeout=max(600,duration*3))
+             '--masks',str(masks),'--mode','person','--edge-style',DEFAULT_EDGE_STYLE,'--alpha'],
+            timeout=max(900,duration*5))
     report=json.loads(output.with_suffix('.json').read_text(encoding='utf-8'))
     edge=report.get('edge_treatment',{})
     if (edge.get('style')!=DEFAULT_EDGE_STYLE or edge.get('body_opacity')!=1

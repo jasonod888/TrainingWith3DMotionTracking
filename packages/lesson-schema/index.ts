@@ -12,6 +12,8 @@ export type LessonManifest = {
   source_video: Asset | null; thumbnail: Asset | null; section_set: SectionSet; warnings: string[];
   focused_video?: Asset | null;
   focused_video_start?: number | null;
+  /** Transparent VP9 companion to `focused_video`, for camera compositing only. */
+  focused_video_alpha?: Asset | null;
   presentation?: Partial<Record<'male' | 'female' | 'report', Asset>>;
 };
 

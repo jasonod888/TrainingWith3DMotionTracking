@@ -4,6 +4,7 @@ import {HeightCalibration,fromMediaPipe,bestMatch,MP,LINKS,type Point,type Refer
 import {placeHandLabels} from '../../../web/dist/hand-labels.js';
 import {CameraFramingController,FRAMING_DEFAULTS,handPositionsForTransform,mapSourcePoint,type DisplayTransform} from './camera-framing';
 import {suggestedAvatarPosition} from '../../../web/dist/composite.js';
+import {videoFit} from '../../../web/dist/pose.js';
 import {VoiceCommands} from '../../../web/dist/voice.js';
 import type {CameraSetupController,SetupFailure,SetupSourceIdentity} from './camera-setup-controller';
 import {DEFAULT_CALIBRATION,calibrationEnabled} from './camera-setup-policy';
@@ -24,7 +25,7 @@ import type {CameraStatus} from './mimic-connection';
 type Mode='off'|'camera'|'recorded';
 type TrackerMessage={type:string;epoch?:number;landmarks?:Point[];world?:Point[];message?:string;timestamp?:number};
 export type CameraState='off'|'starting'|'live';
-export type MimicHandle={startVoice:()=>void;stopVoice:()=>void;start:()=>Promise<void>;stop:()=>void;stream:()=>MediaStream|null;configuration:()=>string;display:()=>{model_mirror:boolean;camera_mirror:boolean};readiness:(remote:boolean)=>string;scoringIssue:()=>string;applyCalibration:(value:Calibration)=>void;confirmControls:()=>void;transform:()=>DisplayTransform|null;sourceIdentity:()=>SetupSourceIdentity;facing:()=>'user'|'environment';selection:()=>CameraSelection|null;cameraStatus:()=>CameraStatus;sourceGeneration:()=>number;cameras:()=>CameraDevice[];request:()=>CameraRequest;refreshCameras:()=>Promise<CameraDevice[]>;setCamera:(request:CameraRequest)=>Promise<void>};
+export type MimicHandle={setMirrorReference:(value:boolean)=>void;setInstructorOpacity:(value:number)=>void;startVoice:()=>void;stopVoice:()=>void;start:()=>Promise<void>;stop:()=>void;stream:()=>MediaStream|null;configuration:()=>string;display:()=>{model_mirror:boolean;camera_mirror:boolean};readiness:(remote:boolean)=>string;scoringIssue:()=>string;applyCalibration:(value:Calibration)=>void;confirmControls:()=>void;transform:()=>DisplayTransform|null;sourceIdentity:()=>SetupSourceIdentity;facing:()=>'user'|'environment';selection:()=>CameraSelection|null;cameraStatus:()=>CameraStatus;sourceGeneration:()=>number;cameras:()=>CameraDevice[];request:()=>CameraRequest;refreshCameras:()=>Promise<CameraDevice[]>;setCamera:(request:CameraRequest)=>Promise<void>};
 export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player:Playback;onCommand:(c:PracticeAction)=>void;renderReference:(framing:PracticeFraming)=>ReactNode;cameraEnabled?:boolean;setup?:CameraSetupController;onRequestSetup?:()=>void;onClose?:()=>void;onVoiceStatus?:(state:string,error?:string)=>void;layout?:'combined'|'separate'|'instructor';angle?:number;competition?:boolean;onCameraState?:(state:CameraState)=>void;onSummary?:(value:{score:number|null;cue:string;coverage:number})=>void}>(function MimicInterface({lesson,player,onCommand,renderReference,cameraEnabled=true,onClose=()=>{},onVoiceStatus,layout='separate',angle=0,competition=false,onSummary,onCameraState,setup,onRequestSetup},ref){
  const cameraAllowed=useRef(cameraEnabled);cameraAllowed.current=cameraEnabled;
  const video=useRef<HTMLVideoElement>(null),canvas=useRef<HTMLCanvasElement>(null),pane=useRef<HTMLDivElement>(null),frame=useRef<HTMLDivElement>(null),left=useRef<HTMLSpanElement>(null),right=useRef<HTMLSpanElement>(null);
@@ -73,7 +74,15 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
   setFraming(state=>({...state,calibrating:false,calibration:value}));
  },[framingController,player]);
  const confirmControls=useCallback(()=>setControlsConfirmed(true),[]);
- useImperativeHandle(ref,()=>({startVoice,stopVoice:()=>voice.current?.stop(),start:()=>start('camera'),stop,stream:()=>resources.current.stream,display:()=>({model_mirror:resources.current.mode!=='off'?options.current.mirrorPreview!==options.current.mirrorReference:options.current.mirrorReference,camera_mirror:options.current.mirrorPreview}),scoringIssue:()=>resources.current.mode!=='camera'?'Use a live camera for a scored run.':!resources.current.reference?'This practice has no compatible scoring reference.':resources.current.lastScore===null||performance.now()-resources.current.lastPose>900?'Keep your whole body clearly visible before starting.':'',configuration:()=>`${resources.current.mode}:${currentFacing()}:${options.current.mirrorReference?'mirror':'same'}:${options.current.angle}:calibration=${calibrationEnabled()?'matched':'default'}`,readiness:remote=>resources.current.mode==='off'?'':!resources.current.locked&&calibrationEnabled()?'Finish height matching before starting.':currentFacing()==='environment'&&!remote&&!controlsConfirmed?'For the rear camera, confirm your visible display and controls in Camera setup.':'',applyCalibration,confirmControls,transform:()=>displayHandle.current.current,sourceIdentity:setupSource,facing:currentFacing,selection:()=>resources.current.selection,cameraStatus:()=>resources.current.status,sourceGeneration:()=>resources.current.epoch,cameras:()=>resources.current.devices,request:()=>options.current.request,refreshCameras:()=>refreshCameras(),setCamera:request=>setCamera(request)}));
+ // Follow direction is a stage control now; the handle keeps it reachable from the host.
+ const setMirrorReference=(value:boolean)=>{
+  options.current.mirrorReference=value;
+  setFraming(previous=>({...previous,mirrorReference:value}));
+  clear();
+ };
+ // Opacity is a stage control beside the arrangement it belongs to.
+ const setInstructorOpacity=(value:number)=>setFraming(previous=>({...previous,opacity:value}));
+ useImperativeHandle(ref,()=>({setMirrorReference,setInstructorOpacity,startVoice,stopVoice:()=>voice.current?.stop(),start:()=>start('camera'),stop,stream:()=>resources.current.stream,display:()=>({model_mirror:resources.current.mode!=='off'?options.current.mirrorPreview!==options.current.mirrorReference:options.current.mirrorReference,camera_mirror:options.current.mirrorPreview}),scoringIssue:()=>resources.current.mode!=='camera'?'Use a live camera for a scored run.':!resources.current.reference?'This practice has no compatible scoring reference.':resources.current.lastScore===null||performance.now()-resources.current.lastPose>900?'Keep your whole body clearly visible before starting.':'',configuration:()=>`${resources.current.mode}:${currentFacing()}:${options.current.mirrorReference?'mirror':'same'}:${options.current.angle}:calibration=${calibrationEnabled()?'matched':'default'}`,readiness:remote=>resources.current.mode==='off'?'':!resources.current.locked&&calibrationEnabled()?'Finish height matching before starting.':currentFacing()==='environment'&&!remote&&!controlsConfirmed?'For the rear camera, confirm your visible display and controls in Camera setup.':'',applyCalibration,confirmControls,transform:()=>displayHandle.current.current,sourceIdentity:setupSource,facing:currentFacing,selection:()=>resources.current.selection,cameraStatus:()=>resources.current.status,sourceGeneration:()=>resources.current.epoch,cameras:()=>resources.current.devices,request:()=>options.current.request,refreshCameras:()=>refreshCameras(),setCamera:request=>setCamera(request)}));
  useEffect(()=>{setFraming(value=>({...value,composite:layout==='combined'}));},[layout]);
 
  const clear=useCallback(()=>{setScore(null);setCue('');resources.current.lastScore=null;},[]);
@@ -401,22 +410,53 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
  const autoFrameSupported=layout==='separate'&&mode!=='recorded'&&currentFacing()==='user';
  const active=mode!=='off';
  const close=onClose;
+ // Dragging the reference across the camera image writes the same position the slider
+ // writes: one value for the 3D rig and the real instructor. Vertical placement stays
+ // with the calibrated floor line, so only the horizontal axis follows the pointer.
+ const positionFromPointer=(clientX:number)=>{
+  const host=pane.current,feed=video.current;
+  if(!host||!feed?.videoWidth||!feed.videoHeight)return null;
+  const rect=host.getBoundingClientRect(),fit=videoFit(feed.videoWidth,feed.videoHeight,rect.width,rect.height);
+  if(fit.width<1)return null;
+  return Math.min(.95,Math.max(.05,(clientX-rect.left-fit.x)/fit.width));
+ };
+ const dragPosition=(event:React.PointerEvent<HTMLDivElement>)=>{
+  if(!active||!framing.composite)return;
+  if((event.target as HTMLElement).closest('button,input,select,a,[role=button]'))return;
+  event.currentTarget.setPointerCapture(event.pointerId);
+  const next=positionFromPointer(event.clientX);
+  if(next!==null)setFraming(value=>({...value,position:next}));
+ };
+ const moveDrag=(event:React.PointerEvent<HTMLDivElement>)=>{
+  if(!event.currentTarget.hasPointerCapture(event.pointerId))return;
+  const next=positionFromPointer(event.clientX);
+  if(next!==null)setFraming(value=>({...value,position:next}));
+ };
+ const endDrag=(event:React.PointerEvent<HTMLDivElement>)=>{
+  if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
+ };
+ // Dragging is the mouse and touch path; the stage itself is focusable so the same
+ // placement stays reachable from a keyboard without a second control.
+ const nudgePosition=(event:React.KeyboardEvent<HTMLDivElement>)=>{
+  if(!active||!framing.composite)return;
+  const step=event.shiftKey?.1:.02,current=framing.position;
+  const next=event.key==='ArrowLeft'?current-step:event.key==='ArrowRight'?current+step
+   :event.key==='Home'?.05:event.key==='End'?.95:null;
+  if(next===null)return;
+  event.preventDefault();
+  setFraming(value=>({...value,position:Math.min(.95,Math.max(.05,next))}));
+ };
  return <div className={`practice-studio layout-${layout}`} aria-label="Mimic interface">
   <div className={`practice-stage-grid ${active?'camera-active':''} ${active&&layout==='combined'?'is-composite':''}`}>
-   <div className="camera-pane" ref={pane} hidden={!active}><div className="camera-frame" ref={frame}><video ref={video} muted playsInline/></div><canvas ref={canvas} aria-hidden="true"/><span ref={left} className="hand-label" hidden>L</span><span ref={right} className="hand-label" hidden>R</span><span className="camera-tag">{mode==='recorded'?'RECORDED TEST':'YOU'}</span>{framing.calibrating&&<div className="calibration-card" role="status"><span>{message}</span><progress aria-label="Height calibration" value={progress} max={1}/></div>}</div>
-   <div className="reference-pane">{renderReference(framing)}</div>
+   <div className="camera-pane" ref={pane} hidden={!active}><div className="camera-frame" ref={frame}><video ref={video} muted playsInline/></div><canvas ref={canvas} aria-hidden="true"/><span ref={left} className="hand-label" hidden>L</span><span ref={right} className="hand-label" hidden>R</span><span className="camera-tag">{mode==='recorded'?'RECORDED TEST':'YOU'}</span>{framing.calibrating&&<div className="calibration-card" role="status"><span>{message}</span><progress aria-label="Height calibration" value={progress} max={1}/></div>}{active&&!competition&&!framing.calibrating&&<div className="camera-preview-controls"><div className="stage-control-group" role="group" aria-label="Camera preview">
+    <button type="button" aria-pressed={options.current.mirrorPreview} aria-label="Mirror my preview" title="Mirror my preview" onClick={()=>{options.current.mirrorPreview=!options.current.mirrorPreview;setFraming(value=>({...value,mirrored:options.current.mirrorPreview}));clear();refreshUi(n=>n+1);}}>Mirror</button>
+    <button type="button" aria-pressed={options.current.skeleton} aria-label="Show skeleton" title="Show skeleton" onClick={()=>{options.current.skeleton=!options.current.skeleton;clear();refreshUi(n=>n+1);}}>Skeleton</button>
+    <button type="button" aria-pressed={autoFrame} aria-label="Auto-frame me" title={autoFrameSupported?'Auto-frame me':'Auto-frame requires the front camera and Side by side'} disabled={!autoFrameSupported} onClick={()=>{const next=!autoFrame;setAutoFrame(next);autoFrameRef.current=next;setMessage(next?'Auto-frame on.':'Auto-frame off.');clear();refreshUi(n=>n+1);}}>Auto-frame</button>
+   </div></div>}</div>
+   <div className="reference-pane" data-draggable={active&&framing.composite?'instructor':undefined} tabIndex={active&&framing.composite?0:undefined} role={active&&framing.composite?'group':undefined} aria-label={active&&framing.composite?'Reference placement. Drag it, or use the arrow keys, to move it across the camera image.':undefined} onPointerDown={dragPosition} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={nudgePosition}>{renderReference(framing)}</div>
   </div>
   <div className="practice-tracking" role={error||voiceError?'alert':undefined} aria-live={error||voiceError?'assertive':'off'}>{error||voiceError|| (active?angle!==0?'Observation angle · comparison paused':message:'Camera off · watch freely')}{!competition&&feedback&&active&&score!==null&&<span> · {score}% similarity</span>}{!competition&&feedback&&active&&cue&&<span> · {cue}</span>}</div>
   {voiceState!=='off'&&<p className="small" role="status">Voice {voiceState}{lastCommand&&` · heard “${lastCommand}”`}</p>}
-  <SettingsPortal slot="instructor">
-   <SettingsRow id="follow-direction" label="Follow direction" value={framing.mirrorReference?'Mirror instructor':'Match left/right'}>
-    <SettingsChoices label="Follow direction" value={framing.mirrorReference?'mirror':'same'} options={[{value:'same',label:'Match left/right'},{value:'mirror',label:'Mirror instructor'}]} onChange={value=>{options.current.mirrorReference=value==='mirror';setFraming(previous=>({...previous,mirrorReference:options.current.mirrorReference}));clear();}}/>
-   </SettingsRow>
-  </SettingsPortal>
-  <SettingsPortal slot="layout" disabledReason={!cameraEnabled?'Camera is off.':layout!=='combined'?'Requires Together arrangement with the 3D instructor.':undefined}>
-   <SettingsRow id="instructor-opacity" label="Instructor opacity" value={`${Math.round(framing.opacity*100)}%`}><label>Instructor opacity<input type="range" min={.25} max={1} step={.05} value={framing.opacity} onChange={event=>setFraming(value=>({...value,opacity:Number(event.target.value)}))}/></label></SettingsRow>
-   <SettingsRow id="instructor-position" label="Instructor position" value={`${Math.round(framing.position*100)}%`}><label>Instructor position<input type="range" min={.05} max={.95} step={.01} value={framing.position} onChange={event=>setFraming(value=>({...value,position:Number(event.target.value)}))}/></label></SettingsRow>
-  </SettingsPortal>
   <SettingsPortal slot="camera" disabledReason={!cameraEnabled?'Camera is off.':undefined}>
    <SettingsRow id="camera-selection" label="Camera device" value={options.current.request.deviceId?'Selected device':'Automatic'}>
     <label>Prefer wide view<input type="checkbox" role="switch" disabled={options.current.request.facing!=='rear'||Boolean(options.current.request.deviceId)} checked={options.current.request.lens==='prefer-wide'} onChange={event=>void setCamera({...options.current.request,lens:event.target.checked?'prefer-wide':'default'})}/></label>
@@ -424,10 +464,6 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
     <label>Device<select value={options.current.request.deviceId} onChange={event=>void setCamera({...options.current.request,deviceId:event.target.value})}><option value="">Automatic</option>{devices.map((device,index)=><option key={device.deviceId} value={device.deviceId}>{deviceLabel(device,index)}</option>)}</select></label>
     <button onClick={()=>void refreshCameras()}>Refresh camera list</button>
     {resources.current.selection?<p>Using {describeCamera(resources.current.selection)}.</p>:<p>Camera access is needed to list device names.</p>}
-   </SettingsRow>
-   <SettingsRow id="selfie-preview" label="Selfie preview" value={options.current.mirrorPreview?'Mirrored':'Natural'}><label>Mirror my preview<input type="checkbox" role="switch" checked={options.current.mirrorPreview} onChange={event=>{options.current.mirrorPreview=event.target.checked;setFraming(value=>({...value,mirrored:event.target.checked}));clear();}}/></label></SettingsRow>
-   <SettingsRow id="auto-frame" label="Auto-frame me" value={autoFrame?'On':'Off'} disabledReason={!autoFrameSupported?'Requires Front camera and Side by side, without instructor emphasis.':undefined}>
-    <label>Auto-frame me<input type="checkbox" role="switch" checked={autoFrame} onChange={event=>{const next=event.target.checked;setAutoFrame(next);autoFrameRef.current=next;setMessage(next?'Auto-frame on.':'Auto-frame off.');clear();}}/></label><p>Keeps you centred with room to move.</p>
    </SettingsRow>
    <SettingsRow id="camera-setup" label="Position & height matching" value={!active?'Camera not started':calibrationEnabled()?resources.current.locked?'Matched':'Not matched':'Default alignment'} status={!active?'Not started':undefined}>
     <button onClick={()=>{if(onRequestSetup){close();onRequestSetup();}else if(active){beginCalibration();close();}else void start('camera');}}>Set up camera</button>
@@ -440,7 +476,6 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
    <SettingsRow id="feedback" label="Similarity & cues" value={feedback?'On':'Off'} disabledReason={competition?'Challenge requires camera scoring.':angle!==0?'Comparison is paused at this angle. Choose Front above to resume.':undefined} status={competition?'Fixed':angle!==0?'Paused':undefined}>
     <label>Show similarity and cues<input type="checkbox" role="switch" checked={feedback} onChange={event=>setFeedback(event.target.checked)}/></label><p>Approximate movement similarity, not technique correctness.</p>
    </SettingsRow>
-   <SettingsRow id="skeleton" label="Skeleton overlay" value={options.current.skeleton?'On':'Off'}><label>Show skeleton<input type="checkbox" role="switch" checked={options.current.skeleton} onChange={event=>{options.current.skeleton=event.target.checked;clear();}}/></label></SettingsRow>
   </SettingsPortal>
  </div>;
 });

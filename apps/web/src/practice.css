@@ -50,17 +50,28 @@ body.in-practice .app>.header{display:none}
 .mimic-immersive .practice-reference-label{top:112px;left:22px;background:transparent;color:#c6d4c9;font-size:10px;letter-spacing:.4px;padding:0;z-index:4}
 .mimic-immersive .practice-tracking{position:absolute;z-index:4;left:22px;right:82px;bottom:300px;padding:0;background:transparent;font-size:11px;line-height:1.5;color:#d8ed9b;pointer-events:none}.mimic-immersive.is-watching .practice-tracking:not([role=alert]){display:none}.mimic-immersive .practice-tracking[role=alert]{background:#572a2ae6;color:#fff0ed;border-radius:12px;padding:12px;pointer-events:auto}
 .mimic-immersive .practice-review{z-index:8;bottom:170px;left:16px;right:80px;background:#142c24f5;color:#f5f8f0;border:1px solid #ffffff28;box-shadow:0 12px 40px #0005}.mimic-immersive .practice-countdown{z-index:8;backdrop-filter:blur(5px)}.mimic-immersive .practice-beat{top:112px;right:80px;z-index:4}
-/* Viewing angle sits on the stage, beside the instructor it rotates, so the
-   change is visible while it is made instead of behind the settings drawer. */
+/* Controls that change how the reference looks sit on the stage beside it: arrangement,
+   follow direction and viewing angle. Each group is its own pill so narrow screens can
+   wrap them above the dock instead of shrinking the labels. */
 .mimic-immersive .motion-stage{position:relative}
-.mimic-immersive .view-angle-control{position:absolute;z-index:6;right:max(14px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:4px;padding:4px;border:1px solid #ffffff1f;border-radius:16px;background:#10271dc7;backdrop-filter:blur(14px);pointer-events:auto}
-.mimic-shell.mimic-immersive .view-angle-control button{min-height:44px;padding:8px 13px;border:0;border-radius:12px;background:transparent;color:#dce7da;font-size:11px;font-weight:600;letter-spacing:.3px;white-space:nowrap}
-.mimic-shell.mimic-immersive .view-angle-control button:hover:not(:disabled){background:#355443}
-/* Keep the chosen angle lime while it is also hovered or focused: the pressed look
+.mimic-immersive .stage-controls{position:absolute;z-index:6;right:max(14px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;width:max-content;max-width:calc(100% - 28px);pointer-events:none}
+.mimic-immersive .stage-control-group{display:flex;gap:4px;padding:4px;border:1px solid #ffffff1f;border-radius:16px;background:#10271dc7;backdrop-filter:blur(14px);pointer-events:auto}
+.mimic-shell.mimic-immersive .stage-control-group button{min-height:44px;padding:8px 13px;border:0;border-radius:12px;background:transparent;color:#dce7da;font-size:11px;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+.mimic-shell.mimic-immersive .stage-control-group button:hover:not(:disabled){background:#355443}
+/* Keep the chosen option lime while it is also hovered: the pressed look
    must not be overridden by the generic hover fill. */
-.mimic-shell.mimic-immersive .view-angle-control button[aria-pressed=true],
-.mimic-shell.mimic-immersive .view-angle-control button[aria-pressed=true]:hover:not(:disabled){background:#d8ed9b;color:#203525}
-@media(max-width:700px){.mimic-immersive .view-angle-control{left:50%;right:auto;transform:translateX(-50%)}.mimic-shell.mimic-immersive .view-angle-control button{padding:8px 10px}}
+.mimic-shell.mimic-immersive .stage-control-group button[aria-pressed=true],
+.mimic-shell.mimic-immersive .stage-control-group button[aria-pressed=true]:hover:not(:disabled){background:#d8ed9b;color:#203525}
+/* Opacity is a range in the same pill language as the buttons beside it. */
+.mimic-shell.mimic-immersive .stage-control-group .stage-opacity{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 10px;color:#dce7da;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.mimic-shell.mimic-immersive .stage-control-group .stage-opacity input[type=range]{width:92px;min-height:24px;margin:0;accent-color:#d8ed9b}
+/* Camera preview options live under the live feed they affect, not in the panel.
+   Raised above the tracking line so the two never overlap. */
+.mimic-immersive .camera-preview-controls{position:absolute;z-index:4;left:12px;bottom:56px;display:flex}
+@media(max-width:700px){
+ .mimic-immersive .stage-controls{left:50%;right:auto;transform:translateX(-50%);justify-content:center;max-width:calc(100% - 16px);gap:4px}
+ .mimic-shell.mimic-immersive .stage-control-group button{padding:8px 10px}
+}
 /* The settings drawer is a side panel, not a modal: its scrim must not swallow the
    stage, so the angle control and the 3D view stay usable while settings are open. */
 .mimic-immersive .settings-backdrop{pointer-events:none}
@@ -87,7 +98,25 @@ body.in-practice .app>.header{display:none}
 @media(prefers-reduced-motion:reduce){.mimic-shell.mimic-immersive button{transition:none}}
 /* Keep playback and recording reachable while secondary overlays rest. */
 .mimic-immersive .mimic-header,.mimic-immersive .mimic-shortcuts{transition:opacity .25s}
-@media(max-width:999px){.mimic-immersive.controls-resting .mimic-header,.mimic-immersive.controls-resting .mimic-shortcuts{opacity:0;pointer-events:none}.mimic-immersive.controls-resting .mimic-header:focus-within,.mimic-immersive.controls-resting .mimic-shortcuts:focus-within{opacity:1;pointer-events:auto}}
+@media(max-width:999px){
+ .mimic-immersive.controls-resting .mimic-header,.mimic-immersive.controls-resting .mimic-shortcuts{opacity:0;pointer-events:none}
+ .mimic-immersive.controls-resting .mimic-header:focus-within,.mimic-immersive.controls-resting .mimic-shortcuts:focus-within{opacity:1;pointer-events:auto}
+ /* The stage bar rests with the chrome so it never hides the feet during a rep; any tap
+    on the stage wakes it, and the groups stop taking clicks while hidden. */
+ .mimic-immersive.controls-resting .stage-controls{opacity:0}
+ .mimic-immersive.controls-resting .stage-controls .stage-control-group{pointer-events:none}
+ .mimic-immersive.controls-resting .stage-controls:focus-within{opacity:1}
+ .mimic-immersive.controls-resting .stage-controls:focus-within .stage-control-group{pointer-events:auto}
+}
+/* A phone cannot hold two full-body panes in half the width each, so the camera and
+   the reference stack top to bottom instead of side by side. Each pane then reserves
+   only the space its own overlays need: the old full-stage reserves would leave the
+   model a sliver of a 336px pane. */
+@media(max-width:700px){
+ .mimic-stage .practice-stage-grid.camera-active:not(.is-composite){grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,2fr) minmax(0,3fr)}
+ .mimic-immersive .practice-stage-grid.camera-active:not(.is-composite) .camera-pane{--mimic-stage-top:8px;--mimic-stage-bottom:8px;--mimic-stage-right:0px}
+ .mimic-immersive .practice-stage-grid.camera-active:not(.is-composite) .reference-pane{--mimic-stage-top:30px;--mimic-stage-bottom:118px;--mimic-stage-right:0px}
+}
 @media(prefers-reduced-motion:reduce){.mimic-immersive .mimic-header,.mimic-immersive .mimic-shortcuts{transition:none}}
 /* Session mode is a deliberate choice made before an attempt. */
 .mimic-shell.mimic-immersive{--mimic-stage-top:100px}
@@ -294,6 +323,14 @@ body.in-practice .app>.header{display:none}
 
 /* The companion stays inside the clear instructor area; it never crops limbs. */
 .instructor-video{width:100%;height:100%;object-fit:contain;background:#10241d}
+/* Real instructor drawn over the camera at the 3D reference's scale and floor line. */
+.instructor-ghost-host{position:absolute;inset:0;z-index:3;pointer-events:none}
+.instructor-ghost{position:absolute;will-change:left,top,width,height}
+.instructor-ghost .instructor-video{width:100%;height:100%;object-fit:fill;background:transparent}
+/* In Together the reference is placed by dragging it, so the pane takes the pointer
+   instead of letting it fall through to the camera image. */
+.mimic-stage .is-composite .reference-pane{pointer-events:auto;cursor:ew-resize;touch-action:none}
+.mimic-stage .is-composite .reference-pane:focus-visible{outline:2px solid #d8ed9b;outline-offset:-6px}
 .instructor-video-inset{position:absolute;z-index:3;top:calc(var(--mimic-stage-top,48px) + 24px);right:calc(var(--mimic-stage-right,0px) + 12px);width:clamp(130px,40%,260px);height:auto;aspect-ratio:4/3;max-height:calc(100% - var(--mimic-stage-top,48px) - var(--mimic-stage-bottom,24px) - 36px);min-height:60px;border:1px solid #75917d;border-radius:10px;overflow:hidden;background:#10241d;pointer-events:none}
 .instructor-video-inset .instructor-video{display:block;object-fit:contain;padding:0!important}
 .instructor-video-inset>span{position:absolute;left:0;bottom:0;right:0;text-align:center;font-size:10px;padding:4px;background:#10241dcc}

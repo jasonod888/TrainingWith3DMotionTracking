@@ -248,6 +248,17 @@
       "default": null,
       "title": "Focused Video Start"
     },
+    "focused_video_alpha": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "thumbnail": {
       "anyOf": [
         {

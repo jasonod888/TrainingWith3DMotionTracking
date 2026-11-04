@@ -6,10 +6,12 @@ import {InstructorMarkers} from './InstructorMarkers';
 import {instructorStart,lessonFrameTime} from './lesson-clock';
 
 /** A presentation of the shared lesson clock; never an independent player. */
-export function InstructorVideo({lesson,player,mirrored=false,onUnavailable,videoRef}:{lesson:LessonManifest;player:Playback;mirrored?:boolean;onUnavailable?:()=>void;videoRef?:RefObject<HTMLVideoElement|null>}){
+export function InstructorVideo({lesson,player,mirrored=false,onUnavailable,videoRef,alpha=false}:{alpha?:boolean;lesson:LessonManifest;player:Playback;mirrored?:boolean;onUnavailable?:()=>void;videoRef?:RefObject<HTMLVideoElement|null>}){
  const localVideo=useRef<HTMLVideoElement>(null),video=videoRef??localVideo,callback=useRef(onUnavailable);callback.current=onUnavailable;
  const [fallback,setFallback]=useState(false),[failed,setFailed]=useState(false);
- const asset=(!fallback&&lesson.focused_video)||lesson.source_video;
+ // The transparent companion is the same clock and framing; it is only preferred when the
+ // caller is drawing over the camera, because the opaque MP4 still plays everywhere.
+ const asset=(alpha&&lesson.focused_video_alpha)||(!fallback&&lesson.focused_video)||lesson.source_video;
  useEffect(()=>{setFallback(false);setFailed(false);},[lesson]);
  useEffect(()=>{
   let frame=0,blockedAt=0,notified=false,pendingPlay=false;

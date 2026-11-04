@@ -12,7 +12,7 @@ import {MotionStage} from './MotionStage';
 import {PracticePanel} from './PracticePanel';
 import {PracticeTimeline} from './PracticeTimeline';
 import {PracticeSettingsProvider,SettingsGroup,SettingsMount,SettingsRow,SettingsChoices} from './PracticeSettings';
-import {ViewAngleControl} from './ViewAngleControl';
+import {StageControls} from './StageControls';
 import type {PracticeFraming,PracticePreferences} from './practice-types';
 import './practice.css';
 import './practice-player.css';
@@ -80,8 +80,12 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
   setSetupNotice('');
   if(value!=='3d'){
    if(!wasVideo)threeDView.current={layout,angle};
-   if(!instructorOnly&&layout!=='separate')setSetupNotice('Switched to Side by side.');
-   setLayout('separate');setAngle(0);
+   // A real instructor can stay Together when the transparent companion exists; the
+   // companion mode (3D + real) and lessons without one still need Side by side.
+   const keepTogether=value==='video'&&layout==='combined'&&Boolean(lesson.focused_video_alpha);
+   if(!instructorOnly&&!keepTogether&&layout!=='separate')setSetupNotice('Switched to Side by side.');
+   if(!keepTogether)setLayout('separate');
+   setAngle(0);
   }else if(wasVideo){
    setLayout(threeDView.current.layout);setAngle(threeDView.current.angle);
    if(!instructorOnly&&threeDView.current.layout!=='separate')setSetupNotice('Previous 3D arrangement restored.');
@@ -544,10 +548,18 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
   ...(frontAvailable?[{value:'front' as const,label:cameraFacings.single?'Camera':'Front'}]:[]),
   ...(rearAvailable?[{value:'rear' as const,label:'Rear'}]:[]),
  ];
- const layoutName=layout==='combined'?'Together':layout==='instructor'?'Side by side · Emphasised':'Side by side';
- // Viewing angle is a viewport control, so it stays with the instructor it rotates.
+ // Viewing angle, arrangement and follow direction change how the reference looks, so
+ // they live on the stage next to it. Modes that fix those choices hide the groups.
  const showAngleControl=!source&&!companion&&!compete&&!presenting&&!setupIntent;
- const reference=(framing:PracticeFraming)=><div className="motion-stage"><MotionStage lesson={lesson} player={player} source={source} companion={companion} onVideoUnavailable={()=>{if(competition.running)session.pause('instructor video interrupted');}} locked={compete} immersive={companion||!framing.active} fit={presenting&&!framing.active?'envelope':'none'} interactive={!presenting&&!instructorFocus} framing={{...framing,active:companion?false:framing.active,angle,resetVersion:viewReset}}/><span className="practice-reference-label">{source?lesson.focused_video?'Real instructor':'Original video':'3D instructor'}</span>{showAngleControl&&<ViewAngleControl angle={angle} onAngle={setAngle} onRecentre={()=>setViewReset(n=>n+1)}/>}</div>;
+ const showArrangementControl=!compete&&!presenting&&!setupIntent&&!instructorOnly&&!companion&&!(source&&!lesson.focused_video_alpha);
+ const showMirrorControl=!compete&&!presenting&&!setupIntent;
+ const stageControls=(framing:PracticeFraming)=><StageControls
+  angle={angle} onAngle={setAngle} onRecentre={()=>setViewReset(n=>n+1)} showAngle={showAngleControl}
+  mirror={Boolean(framing.mirrorReference)} onMirror={value=>camera.current?.setMirrorReference(value)} showMirror={showMirrorControl}
+  arrange={layout==='combined'?'together':'separate'} onArrange={value=>{setLayout(value==='together'?'combined':'separate');setSetupNotice('');}} showArrange={showArrangementControl}
+  opacity={framing.opacity} onOpacity={value=>camera.current?.setInstructorOpacity(value)} showOpacity={showArrangementControl&&layout==='combined'}
+ />;
+ const reference=(framing:PracticeFraming)=><div className="motion-stage"><MotionStage lesson={lesson} player={player} source={source} companion={companion} onVideoUnavailable={()=>{if(competition.running)session.pause('instructor video interrupted');}} onAlphaUnavailable={()=>{setLayout('separate');setHint('This browser cannot draw transparent video. Using Side by side.');redraw(n=>n+1);}} locked={compete} immersive={companion||!framing.active} fit={presenting&&!framing.active?'envelope':'none'} interactive={!presenting&&!instructorFocus} framing={{...framing,active:companion?false:framing.active,angle,resetVersion:viewReset}}/><span className="practice-reference-label">{source?lesson.focused_video?'Real instructor':'Original video':'3D instructor'}</span>{stageControls(framing)}</div>;
  const voiceEnabled=voiceStatus==='starting'||voiceStatus==='listening'||voiceStatus==='reconnecting';
  const voiceLabel=voiceStatus==='listening'?'Voice on':voiceStatus==='starting'?'Voice starting':voiceStatus==='reconnecting'?'Voice reconnecting':'Voice off';
  const voiceControl=(
@@ -570,7 +582,7 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
   {/* The settings drawer is a side panel on desktop, so the stage stays live: an
       angle change or preview is visible while the settings are being adjusted.
       Every other panel covers the stage and keeps it inert. */}
-  <main className="mimic-stage" inert={Boolean(setupIntent)||(panel!==null&&panel!=='settings')||voicePrompt==='fallback'||undefined}><div className="live-practice-layer" hidden={replayMode}><MimicInterface ref={camera} lesson={lesson} player={player} onCommand={action} onVoiceStatus={receiveVoiceStatus} renderReference={reference} onClose={close} cameraEnabled={!instructorOnly} layout={instructorOnly||presenting||source?'separate':layout} angle={angle} onSummary={receiveSummary} onCameraState={receiveCameraState} competition={compete} setup={setupIntent?setupController:undefined} onRequestSetup={()=>startSetup('setup_only')}/></div>{replayMode&&recording.url&&<ReplayStage lesson={lesson} player={player} url={recording.url} start={recording.startTime.current} rate={recording.speed.current} onClose={()=>setReplayMode(false)}/>}
+  <main className="mimic-stage" inert={Boolean(setupIntent)||(panel!==null&&panel!=='settings')||voicePrompt==='fallback'||undefined}><div className="live-practice-layer" hidden={replayMode}><MimicInterface ref={camera} lesson={lesson} player={player} onCommand={action} onVoiceStatus={receiveVoiceStatus} renderReference={reference} onClose={close} cameraEnabled={!instructorOnly} layout={instructorOnly||presenting||companion||(source&&!lesson.focused_video_alpha)?'separate':layout} angle={angle} onSummary={receiveSummary} onCameraState={receiveCameraState} competition={compete} setup={setupIntent?setupController:undefined} onRequestSetup={()=>startSetup('setup_only')}/></div>{replayMode&&recording.url&&<ReplayStage lesson={lesson} player={player} url={recording.url} start={recording.startTime.current} rate={recording.speed.current} onClose={()=>setReplayMode(false)}/>}
    {rhythm&&session.phase==='playing'&&<span className="practice-beat">Count {Math.floor(s.time*bpm/60)%8+1} / 8</span>}
    {(session.phase==='countdown'||session.phase==='rest')&&<div className="practice-countdown" role="status"><strong>{Math.ceil(session.remaining)}</strong><span>{session.phase==='rest'?'Rest · next repetition':'Get ready'}</span><button onClick={()=>action('pause')}>Cancel</button></div>}
    {!compete&&review&&session.phase==='paused'&&!panel&&<div className="practice-review"><strong>Section complete</strong><p>{reviewSummary.score===null?'No reliable comparison for this attempt.':`${reviewSummary.score}% approximate similarity. `}{reviewSummary.cue||'Try again or continue.'}</p><button onClick={()=>action('again')}>Repeat</button><button onClick={()=>action('next')}>Next</button><button onClick={()=>setReview(null)}>Dismiss</button></div>}
@@ -678,24 +690,18 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
     <SettingsRow id="practice-mode" label="Camera" value={instructorOnly?'Off':`${cameraName}${cameraState==='live'?' · live':''}`} disabledReason={compete?'Camera scoring is required in Challenge.':undefined} status={compete?'Fixed':undefined}>
      <SettingsChoices label="Camera" value={cameraChoice} options={cameraOptions} onChange={chooseCamera}/>
     </SettingsRow>
+    {instructorOnly&&<p className="settings-disabled-reason">Camera controls keep your saved preferences.</p>}
+    <SettingsMount slot="camera"/>
     <SettingsRow id="instructor-type" label="Instructor" value={instructorName} disabledReason={runActive?'Finish or stop your Challenge run before changing the instructor.':undefined}>
      <SettingsChoices label="Instructor" value={source?'video':companion?'both':'3d'} options={[{value:'3d',label:'3D'},{value:'video',label:'Real',disabled:!lesson.source_video},{value:'both',label:'Real + 3D',disabled:!lesson.source_video||instructorOnly}]} onChange={changeInstructor}/>
      {!lesson.source_video?<p>Real requires an instructor video for this lesson.</p>:instructorOnly&&<p>Real + 3D requires the camera.</p>}
     </SettingsRow>
-    <SettingsRow id="layout" label="Arrangement" value={presenting?'Side by side · TV':layoutName} disabledReason={instructorOnly?'Camera is off. Your arrangement is remembered.':runActive?'Finish or stop your Challenge run before changing the arrangement.':presenting?'TV presentation uses Side by side. Turn it off below to use your remembered arrangement.':undefined} status={presenting?'Fixed':undefined}>
-     <SettingsChoices label="Arrangement" value={presenting?'separate':layout==='instructor'?'separate':layout} options={[{value:'combined',label:'Together',disabled:source||companion},{value:'separate',label:'Side by side'}]} onChange={value=>{setLayout(value as 'combined'|'separate');setSetupNotice('');}}/>
-     {(source||companion)&&<p>Real video requires Side by side. Your 3D arrangement is remembered.</p>}
-    </SettingsRow>
-    <SettingsRow id="instructor-emphasis" label="Emphasise instructor" value={layout==='instructor'?'On':'Off'} disabledReason={instructorOnly?'Turn the camera on above.':source||companion?'Requires the 3D instructor.':presenting?'Turn off TV presentation below.':layout==='combined'?'Choose Side by side above.':runActive?'Stop the Challenge run before changing emphasis.':undefined}>
+    <SettingsRow id="instructor-emphasis" label="Emphasise instructor" value={layout==='instructor'?'On':'Off'} disabledReason={instructorOnly?'Turn the camera on above.':source||companion?'Requires the 3D instructor.':presenting?'Turn off TV presentation below.':layout==='combined'?'Choose Side by side on the stage.':runActive?'Stop the Challenge run before changing emphasis.':undefined}>
      <label>Emphasise instructor<input type="checkbox" role="switch" checked={layout==='instructor'} onChange={event=>{setLayout(event.target.checked?'instructor':'separate');setSetupNotice('');}}/></label>
      <p>Uses a smaller camera preview. Auto-frame is unavailable while emphasis is On.</p>
     </SettingsRow>
-    <SettingsMount slot="instructor"/>
-    <SettingsMount slot="layout"/>
     {setupNotice&&<p className="settings-setup-notice" role="status">{setupNotice}</p>}
-    <h4 className="settings-subheading">Camera & movement feedback</h4>
-    {instructorOnly&&<p className="settings-disabled-reason">Disabled controls keep your saved preferences.</p>}
-    <SettingsMount slot="camera"/>
+    <h4 className="settings-subheading">Practice & feedback</h4>
     <SettingsRow id="recording" label="Practice recording" value={recording.recording?'Recording':recording.url?'Take ready':'Off'}>
      <button disabled={instructorOnly||compete||cameraState!=='live'||Boolean(cameraIssue)||recording.recording||Boolean(recording.url)} onClick={startTake}>Record practice</button>
      {(recording.recording||recordNext.current)&&<button onClick={stopTake}>Stop recording</button>}

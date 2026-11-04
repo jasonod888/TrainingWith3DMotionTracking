@@ -204,6 +204,15 @@ class Worker:
                 except Exception as exc:
                     check();focused=None
                     print(f'Focused instructor upload unavailable ({type(exc).__name__}).',flush=True)
+            # The transparent variant is optional: compositing falls back to side by side.
+            alpha=focused.with_name(focused.stem+'-alpha.webm') if focused else None
+            if alpha and alpha.is_file():
+                try:
+                    with alpha.open('rb') as file:
+                        response=self.api.put(path+'/files/instructor-alpha.webm',headers={**headers,'Content-Type':'application/octet-stream'},content=file)
+                    response.raise_for_status();assets['instructor-alpha.webm']=response.json()
+                except Exception as exc:
+                    check();print(f'Transparent instructor upload unavailable ({type(exc).__name__}).',flush=True)
             manifest={'schema_version':1,'lesson_id':job_id,'revision_id':lease,'title':job['title'],'duration':reference['duration'],'source_start':0,
                 'engine':'sam-3d-body','engine_version':'b5c765a0d89d789985e186d396315e7590887b94','units':'metres','landmark_axes':'x-right/y-down/z-forward','root_motion':'estimated-camera-relative','confidence':'unmeasured','standing_time':reference['standingTime'],
                 'animation':assets['reference.glb'],'landmarks':assets['reference.json'],'source_video':assets['preview.mp4'],'thumbnail':assets['thumbnail.jpg'],
@@ -213,6 +222,7 @@ class Worker:
             if focused:
                 manifest['focused_video']=assets['instructor.mp4']
                 manifest['focused_video_start']=0.
+                if 'instructor-alpha.webm' in assets:manifest['focused_video_alpha']=assets['instructor-alpha.webm']
             else:manifest['warnings'].append('Person-only instructor video could not be prepared. The original wide video remains available.')
             if grounding['status']=='applied':
                 manifest['root_motion']='floor-guided'

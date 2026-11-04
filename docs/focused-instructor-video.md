@@ -82,8 +82,39 @@ segmentation specks are removed while nearby disconnected body pieces remain.
 Person-only output requires matching segmentation for at least 95% of source
 frames. An empty mask renders neutral background instead of exposing the room.
 Missing segmentation skips this derivative. The UI labels the fallback
-**Original video (wide)** and displays a visible notice. The older fixed crop is
-available explicitly with `--mode envelope`; it retains background and must not
+**Original video (wide)** and displays a visible notice.
+
+## Transparent companion for camera compositing
+
+`--alpha` writes a second encode beside the MP4: `<name>-alpha.webm`, VP9 with
+`yuva420p`, carrying the same matte as real transparency instead of baking the
+neutral background. WebM stores VP9 alpha out of band, so the stream still
+reports `yuv420p` and is flagged `alpha_mode=1`; that flag is what the pipeline
+test asserts. The MP4 remains the default presentation and the only asset used
+for Side by side, so lessons without the companion behave exactly as before.
+
+The app uses the companion only for **Together**, where it draws the instructor
+over the live camera at the scale and floor line computed by `heightPlacement` —
+the same placement the 3D reference uses, so Instructor opacity and Instructor
+position mean the same thing for both references. Whether a decoder honours the
+alpha plane is checked by drawing one frame and reading its alpha; an opaque
+frame (for example a browser without VP9 alpha) falls back to Side by side
+rather than drawing an opaque rectangle over the learner.
+
+The companion is roughly 2–3× the MP4 at CRF 28. It is skipped silently when the
+encoder is unavailable or the upload fails, and Together is then unavailable for
+that lesson.
+
+Lessons converted before the companion existed can gain one with
+`python scripts/backfill_instructor_alpha.py --lesson <lesson-id> [--dry-run]`.
+It downloads the opaque render, keys the known neutral background out, uploads
+`lessons/<lesson>/instructor-alpha.webm`, records the manifest field and the
+`LessonAsset` row, and leaves the opaque MP4 untouched. That matte is an
+approximation of the original segmentation; a reconversion produces the exact
+one. The lesson asset route allows `focused_video_alpha` by name, so the new
+file is served only when the manifest names it.
+
+The older fixed crop is available explicitly with `--mode envelope`; it retains background and must not
 be confused with person isolation. Upscaling the displayed person does not add
 source detail.
 

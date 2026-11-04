@@ -30,7 +30,8 @@ MANIFEST_ASSETS=('reference.glb','reference.json','preview.mp4','thumbnail.jpg')
 DERIVATIVE_ASSETS=('avatar-male.glb','avatar-female.glb','avatar-report.json')
 FILES={**{name:mime for name,mime in (
         ('reference.glb','model/gltf-binary'),('reference.json','application/json'),
-        ('preview.mp4','video/mp4'),('thumbnail.jpg','image/jpeg'),('instructor.mp4','video/mp4'))},
+        ('preview.mp4','video/mp4'),('thumbnail.jpg','image/jpeg'),('instructor.mp4','video/mp4'),
+        ('instructor-alpha.webm','video/webm'))},
     'avatar-male.glb':'model/gltf-binary','avatar-female.glb':'model/gltf-binary',
     'avatar-report.json':'application/json'}
 
@@ -337,6 +338,8 @@ def install_conversions(app,engine,settings,identity,db):
         asset_names=list(MANIFEST_ASSETS)
         if body.focused_video:
             assets.append(body.focused_video);asset_names.append('instructor.mp4')
+        if body.focused_video_alpha:
+            assets.append(body.focused_video_alpha);asset_names.append('instructor-alpha.webm')
         for asset,name in zip(assets,asset_names):
             expected=f'attempts/{job.id}/{token}/{name}'
             if asset.key!=expected or asset.mime!=FILES[name]:raise HTTPException(422,'Output is outside this processing attempt.')

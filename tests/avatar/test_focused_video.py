@@ -74,6 +74,27 @@ def test_matching_masks_reused_and_empty_frame_falls_back_to_landmarks(source):
         export(video, motion, output, root, mode='envelope')
 
 
+def test_person_export_can_carry_its_matte_as_alpha(source):
+    cv2 = pytest.importorskip('cv2')
+    video, motion, output = source
+    root = video.parent / 'grounding'
+    (root / 'masks').mkdir(parents=True)
+    (root / 'data.json').write_text(json.dumps({'video_sha256': digest(video), 'motion_sha256':digest(motion),
+        'width': 320, 'height': 240, 'times': (np.arange(15) / 15).tolist()}))
+    for i in range(15):
+        mask = np.zeros((240, 320), dtype=np.uint8); mask[40:200, 120:200] = 255
+        cv2.imwrite(str(root / 'masks' / f'{i:06d}.png'), mask)
+    report = export(video, motion, output, root, mode='person', alpha=True)
+    alpha = video.parent / 'instructor-alpha.webm'
+    assert report['alpha_video']['name'] == alpha.name
+    assert alpha.is_file() and alpha.stat().st_size > 0
+    assert report['alpha_video']['sha256'] == digest(alpha)
+    # WebM carries VP9 alpha out of band, so the stream keeps yuv420p and flags AlphaMode.
+    probe = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+        '-show_entries', 'stream_tags=alpha_mode', '-of', 'json', str(alpha)]))['streams'][0]['tags']
+    assert probe.get('alpha_mode') == '1'
+
+
 def test_nonmatching_frame_clock_cannot_produce_derivative(source):
     video, motion, output = source
     np.savez(motion, timestamps=np.arange(15) / 30, frame_indices=np.arange(15),

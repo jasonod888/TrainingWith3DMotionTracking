@@ -66,6 +66,7 @@ class LessonManifest(Contract):
     source_video: Asset | None = None
     focused_video: Asset | None = None
     focused_video_start: float | None = Field(default=None,ge=0)
+    focused_video_alpha: Asset | None = None
     thumbnail: Asset | None = None
     section_set: SectionSet
     warnings: list[str] = Field(default_factory=list)
@@ -77,6 +78,8 @@ class LessonManifest(Contract):
             raise ValueError('Trim must remain inside the original animation.')
         if self.focused_video and (not self.source_video or self.focused_video.mime != 'video/mp4'):
             raise ValueError('A focused instructor video needs its source video and MP4 encoding.')
+        if self.focused_video_alpha and (not self.focused_video or self.focused_video_alpha.mime != 'video/webm'):
+            raise ValueError('A transparent instructor video needs the focused video and WebM encoding.')
         if self.standing_time > self.duration or abs(self.section_set.duration-self.duration) > 1e-6:
             raise ValueError('Reference and sections must use the animation timeline.')
         return self

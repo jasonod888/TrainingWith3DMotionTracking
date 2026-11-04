@@ -1,0 +1,11 @@
+This file was a duplicate of the multi discipline implementation plan.
+
+Canonical plan: docs/multi-discipline-implementation-plan.md
+
+It is not maintained here. Do not copy requirements into this file, because two copies drift.
+This placeholder remains only so existing links and the historical filename keep working (the
+filename spelling "mutli" is preserved deliberately).
+
+Status of the plan: revised revision 2, dated 4 November 2026. All phases are planned, not
+completed. The canonical file carries the decision log, the subject catalogue, the Phase 1
+slices with acceptance checks, and the remaining blockers.

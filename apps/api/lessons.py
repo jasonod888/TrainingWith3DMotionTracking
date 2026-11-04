@@ -260,7 +260,7 @@ def install_lessons(app, engine, settings, identity, db):
         if not lesson or not reasons:raise HTTPException(404,'Move unavailable.')
         _,revision=readable_lesson(session,lesson_id,account.id)
         key = f'lessons/{lesson_id}/{name}'
-        fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail','focused_video')
+        fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail','focused_video','focused_video_alpha')
         allowed={value['key'] for value in (revision.manifest.get(field) for field in fields) if value}
         allowed.update(value['key'] for kind,value in revision.manifest.get('presentation',{}).items()
                        if reasons!=['public'] or kind in ('male','female'))

@@ -195,7 +195,7 @@ def limb_markers(points,crop,mask):
     return result
 
 
-def export(video, motion, output, masks=None, command=None, mode='person', active_range=None, edge_style='outlined'):
+def export(video, motion, output, masks=None, command=None, mode='person', active_range=None, edge_style='outlined', alpha=False):
     import cv2
     video, motion, output = map(Path, (video, motion, output))
     if output.resolve() == video.resolve():
@@ -292,6 +292,17 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
             if not writer.isOpened():
                 raise ValueError('Lossless person-video encoder unavailable.')
             background = np.array([37,46,24], dtype=np.float32)
+            # The composite variant keeps the same matte as real transparency, so it can be
+            # drawn over a live camera. VP9/WebM is the only widely decodable alpha video.
+            alpha_output = output.with_name(output.stem + '-alpha.webm') if alpha else None
+            alpha_pipe = None
+            if alpha_output:
+                alpha_pipe = subprocess.Popen(
+                    ['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgba',
+                     '-s', f'{w}x{h}', '-r', str(fps), '-i', '-', '-an', '-sn', '-dn', '-map_metadata', '-1',
+                     '-c:v', 'libvpx-vp9', '-pix_fmt', 'yuva420p', '-b:v', '0', '-crf', '28',
+                     '-row-mt', '1', '-cpu-used', '3', '-fps_mode', 'passthrough', str(alpha_output)],
+                    stdin=subprocess.PIPE)
             previous=None
             for index, (left,top,cw,ch) in enumerate(track):
                 ok, frame = reader.read()
@@ -303,11 +314,23 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
                     mask = np.zeros((height,width),dtype=np.uint8)
                 else:mask=clean_person_mask(mask)
                 marker_frames.append(limb_markers(points[index],(left,top,cw,ch),mask))
-                composed,previous=composite_person(frame[top:top+ch,left:left+cw],mask[top:top+ch,left:left+cw],
+                crop_frame=frame[top:top+ch,left:left+cw];crop_mask=mask[top:top+ch,left:left+cw]
+                composed,previous=composite_person(crop_frame,crop_mask,
                                                    background,edge_style,previous)
                 writer.write(composed)
+                if alpha_pipe:
+                    rgba=np.empty((ch,cw,4),dtype=np.uint8)
+                    # Straight alpha: body pixels keep their colour, the rim keeps its white.
+                    rgba[...,:3]=np.where(crop_mask[...,None]>0,crop_frame[...,::-1],255)
+                    rgba[...,3]=np.clip(previous['alpha']*255,0,255).astype(np.uint8)
+                    try:alpha_pipe.stdin.write(rgba.tobytes())
+                    except (BrokenPipeError,OSError):alpha_pipe=None
         finally:
             reader.release();writer.release()
+            if alpha_pipe:
+                try:alpha_pipe.stdin.close()
+                except (BrokenPipeError,OSError):pass
+                if alpha_pipe.wait()!=0:alpha_output.unlink(missing_ok=True)
         encode_source, filters = intermediate, []
     elif mode == 'envelope':
         encode_source, filters = video, ['-vf', f'crop={w}:{h}:{x}:{y}']
@@ -331,6 +354,9 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
               'landmark_frames': landmark_frames, 'held_frames': held_frames, 'padding': .08 if track else padding,
               'video_sha256': digest(output)}
     if track:
+        if alpha_output and alpha_output.is_file():
+            report['alpha_video']={'name':alpha_output.name,'mime':'video/webm',
+                                   'bytes':alpha_output.stat().st_size,'sha256':digest(alpha_output)}
         report.update(composition='person-on-neutral-background',crop_mode='follow-person-fixed-scale',
                       video_size=[w,h],crop_track=[list(map(int,box)) for box in track],
                       edge_treatment={'style':edge_style,'version':3 if edge_style=='outlined' else 1,'foreground_color_extension':edge_style in ('soft','extra-soft'),
@@ -355,6 +381,7 @@ if __name__ == '__main__':
     parser.add_argument('--masks', type=Path)
     parser.add_argument('--mode', choices=('person','envelope'), default='person')
     parser.add_argument('--edge-style', choices=('clean','soft','extra-soft','outlined'), default='outlined')
+    parser.add_argument('--alpha', action='store_true', help='Also write a transparent WebM for camera compositing.')
     args = parser.parse_args()
-    result=export(args.video, args.motion, args.output, args.masks, mode=args.mode,edge_style=args.edge_style)
+    result=export(args.video, args.motion, args.output, args.masks, mode=args.mode,edge_style=args.edge_style,alpha=args.alpha)
     print(json.dumps({key:value for key,value in result.items() if key not in ('crop_track','instructor_markers')}, indent=2))
