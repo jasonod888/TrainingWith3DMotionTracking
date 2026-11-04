@@ -2,8 +2,9 @@
 
 Started 4 November 2026. Status: **in progress.** Music processing stays disabled
 (`music_piano_conversion_provider` and `music_guitar_conversion_provider` default to
-`disabled`). Phase 2 interface changes are **not accepted yet**: the movement browser
-checks have not run against this build.
+`disabled`). Phase 2 interface changes are **not accepted yet**: the four movement browser
+scripts were run against this build and each stops on a script/UI drift that still needs
+triage (see the outcomes table).
 
 Checkpoint for Phase 0 and Phase 1: commit `a6a91ff`.
 
@@ -22,48 +23,78 @@ Checkpoint for Phase 0 and Phase 1: commit `a6a91ff`.
   page can no longer omit matching lessons because filtering happened afterwards.
 - `PublicMove` and `GroupMoveView` client types carry the subject fields.
 
-Tests: `tests/api/test_discovery_filters.py` (4 tests) — owned filter, released-label
-freeze for a recipient, group projection, public filter before pagination.
+Tests: `tests/api/test_discovery_filters.py` (4 tests) and
+`tests/api/test_public_pagination.py` (3 tests).
 
-### Discovery UI (first, deliberately dormant slice)
+### Discovery UI (gated, not accepted)
 
-- The feed has a secondary **subject filter** row that renders only when at least two
-  subjects are available. Options come from the owned workflow states and the **shared
-  summaries** — sources that exist before the feed is filtered — never from the already
-  filtered public page, so selecting a subject cannot shrink the options that produced it.
-- A hidden filter never filters: a selection that is no longer offered (deleted or
-  relabelled subject, or a movement-only account) resolves to `all`, and the stored
-  selection is reset.
-- Shared cards and filters use the released subject from `/shared-lessons/summaries`, not
-  the owner-only workflow states, so a recipient-only subject is visible and selectable.
-- Public results are filtered **by the server**: the subject is a query parameter on every
-  page (including "More"), and the page identity includes the subject so switching while a
-  request is in flight cannot let the stale response win. The client no longer filters
-  public results by subject after the page has been cut.
-- Client helpers `loadLessonSummaries(subject?)` / `loadSharedSummaries(subject?)` accept
-  a filter for the forthcoming summary-state migration.
+- The subject filter is behind a **server rollout capability**: `subject_filter` in
+  `/api/capabilities`, default `false` (`SUBJECT_FILTER_ENABLED`). When it is off the
+  control is not rendered at all, so an existing movement library keeps exactly its
+  current controls. When it is on, the row still requires at least two subjects.
+- Options come from the owned workflow states and the **shared summaries** — sources that
+  exist before the feed is filtered — never from the already filtered public page.
+- A hidden filter never filters: a selection that is no longer offered resolves to `all`,
+  and the stored selection is reset.
+- Shared cards and filters use the released subject from `/shared-lessons/summaries`, never
+  the owner-only workflow states.
+- Public results are filtered **by the server**; the subject travels as a query parameter
+  on every page and the page identity includes it, so a subject switch invalidates an
+  in-flight response.
+- Retry is explicit: a first-page failure re-requests page 0, while a failed "More" keeps
+  the loaded pages and retries the same next page.
 
 ### Feed correctness follow-up
 
 | # | Finding | Fix | Coverage |
 | --- | --- | --- | --- |
-| 1 | The subject filter was not actually dormant | Options are gated to the pre-filter sources; the control renders only with two or more subjects; a stale or removed selection resolves to `all` instead of filtering invisibly | `apps/web/tests/feed-subject.test.mjs` |
-| 2 | Shared lessons used the owner workflow states for subject metadata | Shared lessons and filters read `sharedSummaries` from `/shared-lessons/summaries`; `LibraryApp` fetches them with the shared list and on join/sign-in | same file (recipient-only subject case) |
-| 3 | Public filtering still happened after pagination in the client | Subject is sent to `/api/public/moves` on every page; page key includes the subject; client-side subject filtering removed | `apps/web/tests/feed-subject.test.mjs`, `tests/api/test_public_pagination.py` (30 matches across two pages) |
+| 1 | The subject filter was not actually dormant | The render condition was missing the rollout capability; it is now `subjectFilterEnabled && options > 1`, and options are gated to pre-filter sources | rendered gating tests (hidden by default, shown when enabled) |
+| 2 | Shared card labels still read owned workflow state | The card label resolver uses `states` for owned lessons and `sharedSummaries` for shared ones | rendered label test |
+| 3 | Public filtering still happened after pagination | Subject is sent to `/api/public/moves` on every page; page key includes it; the client re-filter was removed | `tests/api/test_public_pagination.py` (30 matches across two pages) |
+| 4 | Retry did nothing after a pagination failure | The first-page key includes the retry counter; "More" failures get their own message and retry the same next page instead of resetting | rendered first-page and pagination retry tests |
+
+Rendered-component tests use jsdom + React Testing Library (new dev dependencies) and
+mount the real feed, so gating, labels and both retry paths are asserted against the DOM.
 
 Known limitation for the next slice: a subject that exists **only** in public results is
 not offered as an option, because options come from owned and shared sources. A facet
 endpoint (`GET /api/public/subjects`, counts over unfiltered listings) is the clean fix
-and belongs with P2.1 rather than being bolted onto the dormant control.
+and belongs with P2.1.
+
+## Browser checks (4 November 2026)
+
+Playwright and Chromium were installed into `.venv-saas`; the scripts mock their API and
+were run against `vite` dev on `127.0.0.1:5173` with `PRACTICE_TEST_URL` set. The feed
+mock now answers `/shared-lessons/summaries` and `/capabilities`, which was the reported
+startup failure ("Not found", no owned/shared cards). That startup failure is fixed; the
+script now reaches later steps and stops on the following drifts.
+
+| Script | Outcome | Where it stops |
+| --- | --- | --- |
+| `verify_practice_feed.py` | Fail | Startup and card counts pass, then the responsive loop cannot find the `Main navigation` landmark at 390×844: the navigation is inside a closed mobile drawer (`hidden` while `drawerOpen` is false). The script measures the nav at every width and predates the drawer. |
+| `verify_practice_preview.py` | Fail | `assert document.documentElement.scrollWidth <= innerWidth` at line 54 — horizontal overflow at the measured viewport. |
+| `verify_compete_flow.py` | Fail | Click on `Section 1/3` never resolves; the current section controls expose different names. |
+| `verify_practice_flow.py` | Fail | `expect(Practice settings).to_be_focused()` — the button is present and named correctly but reports `inactive`. |
+
+None of these paths were modified by the Phase 2 discovery work (feed gating, shared
+labels, public pagination, retry). They are recorded as **script/UI drift**, not signed
+off: each needs triage against the intended interface before Phase 2 can be accepted.
+Logs: `test-results/browser/*.log` (ignored by git).
+
+**Music fixture visual check: passed.** `scripts/verify_music_screen.py` mocks a reviewed
+music manifest, opens it through the preview destination and captures
+`test-results/music-fixture-phone.png` (390×844) and `music-fixture-desktop.png`
+(1280×800). Both render the heading, reference panel, sections and the "no camera,
+microphone or MIDI access" notice with no page errors.
 
 ## Remaining Phase 2 work
 
 | Slice | State |
 | --- | --- |
-| P2.1 migrate library/shared state from full manifests to `LessonSummary` | Not started. Deliberately held until the browser checks can run, because it changes every card, preview and studio consumer. |
-| P2.2 subject badges and filter | Started: dormant filter row and label on cards. Badges on all card types still to do once summaries drive the feed. |
+| P2.1 migrate library/shared state from full manifests to `LessonSummary` | Not started. Still held until the browser drifts above are triaged. |
+| P2.2 subject badges and filter | Gated filter and card label done; badges on all card types still to do. |
 | P2.3 extend summary queries | Owned, shared, group and public projections done. |
-| P2.4 dispatch music at check/preview/practice/edit | Host exists from Phase 1 and opens a music deep link; fixture cards not added. |
+| P2.4 dispatch music at check/preview/practice/edit | Host opens a music deep link; fixture cards not added. |
 | P2.5 deep links and Back | Unchanged; music deep links handled by the host. |
 | P2.6 inert music fixture cards | Not started; needs a real fixture through the import path. |
 | P2.7 session and resource cleanup | Not started. |
@@ -75,16 +106,16 @@ and belongs with P2.1 rather than being bolted onto the dormant control.
 | Check | Result |
 | --- | --- |
 | `npx tsc --noEmit` | Clean |
-| `npm --prefix apps/web test` | **230 passed** (Phase 1: 223; +7 feed-subject) |
+| `npm --prefix apps/web test` | **235 passed** (Phase 1: 223; +7 feed-subject, +5 rendered feed) |
 | `npm --prefix apps/web run build` | Passes |
 | API suite | **262 passed, 13 skipped** (Phase 1: 255/13; +4 discovery, +3 pagination) |
-| Movement browser scripts | **Not run.** Playwright and its Chromium build are now installed, but the scripts need a seeded Vite + API stack with a database; that stack was not started. |
-| Music screen visual check | Not run |
+| Movement browser scripts | **4/4 still failing on drift** (see above); feed startup fixed |
+| Music screen visual check | Passed (phone and desktop screenshots) |
 | PostgreSQL migration of 0015/0016 | Still pending; offline SQL only |
 
 ## Acceptance rule for this phase
 
-The Phase 2 interface work is complete only when `verify_practice_flow.py`,
-`verify_practice_preview.py`, `verify_practice_feed.py` and `verify_compete_flow.py`
-pass against the same build, plus a visual check of the music fixture screen. Until
-then, treat the feed filter as dormant scaffolding rather than an accepted change.
+The Phase 2 interface work is complete only when the four movement scripts pass against
+the same build and their drift is resolved in the scripts (or shown to be a real UI
+regression and fixed), plus the music screen visual check. Until then, the filter stays
+behind the disabled rollout capability and is not an accepted change.

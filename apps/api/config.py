@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     remote_conversion_concurrency: int = 1
     upload_temp_dir: Path = ROOT / '.local/upload-tmp'
     silhouettes_enabled: bool = False
+    # Rollout gate for the Phase 2 discovery interface. Off means the subject filter is
+    # not rendered at all, so an existing movement library keeps its current controls.
+    subject_filter_enabled: bool = False
     voice_enabled: bool = True
     voice_model_dir: Path = ROOT / 'models/vosk-model-small-en-us-0.15'
     # Temporary operator switch for testing: skips guided camera setup and uses

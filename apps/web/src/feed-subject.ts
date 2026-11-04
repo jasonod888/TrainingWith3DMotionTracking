@@ -44,6 +44,11 @@ export function subjectFor(rows: SubjectCarrier[], lessonId: string): string {
   return rows.find(row => row.lesson_id === lessonId)?.subject ?? UNKNOWN_SUBJECT;
 }
 
+/** Label for a card: owned lessons read the draft label, shared lessons the release. */
+export function subjectLabelFor(rows: SubjectCarrier[], lessonId: string): string {
+  return rows.find(row => row.lesson_id === lessonId)?.subject_label ?? 'Full Body Movement';
+}
+
 export function matchesSubject(value: string | null | undefined, active: string): boolean {
   return active === 'all' || (value || UNKNOWN_SUBJECT) === active;
 }

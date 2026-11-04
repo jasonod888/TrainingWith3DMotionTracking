@@ -21,7 +21,7 @@ import {PracticeFeed,type FeedFilter} from './PracticeFeed';
 import {AccountMenu} from './AccountMenu';
 import {FeedSearch} from './FeedSearch';
 import './feed.css';
-import {ApiError,assetUrl,loadPublicMove,copyDemo,getSession,loadDemo,loadLesson,loadLibrary,loadMoveStates,loadSharedSummaries,needsCheck,request,saveSections,signIn,signOut,type Account,type MoveState} from './api';
+import {ApiError,assetUrl,loadCapabilities,loadPublicMove,copyDemo,getSession,loadDemo,loadLesson,loadLibrary,loadMoveStates,loadSharedSummaries,needsCheck,request,saveSections,signIn,signOut,type Account,type MoveState} from './api';
 
 type Page='moves'|'preview'|'compete'|'practice'|'review'|'create'|'account'|'share'|'join'|'receiver'|'check'|'move'|'groups'|'group'|'groupjoin'|'explore'|'public'|'studio'|'admin';
 type AuthView='login'|'register'|'forgot'|'reset'|'verify';
@@ -39,7 +39,7 @@ export function App(){
  const [studioEnabled,setStudioEnabled]=useState(()=>localStorage.getItem('form-studio')==='1');
  const setStudio=(value:boolean)=>{setStudioEnabled(value);localStorage.setItem('form-studio',value?'1':'0');};
  const [incoming,setIncoming]=useState(()=>incomingShare()??(['join','account'].includes(routeOf().page)?pending<ReturnType<typeof incomingShare>>('move-invite'):null)),[shared,setShared]=useState<LessonManifest[]>([]),[lessonOwned,setLessonOwned]=useState(true);
- const [page,setPage]=useState<Page>(initialLink?'account':groupInvite?'groupjoin':incoming?'join':routeOf().page),[account,setAccount]=useState<Account|null>(null),[library,setLibrary]=useState<LessonManifest[]>([]),[demo,setDemo]=useState<LessonManifest|null>(null),[lesson,setLesson]=useState<LessonManifest|null>(null),[music,setMusic]=useState<MusicLessonManifest|null>(null),[sharedSummaries,setSharedSummaries]=useState<LessonSummary[]>([]);
+ const [page,setPage]=useState<Page>(initialLink?'account':groupInvite?'groupjoin':incoming?'join':routeOf().page),[account,setAccount]=useState<Account|null>(null),[library,setLibrary]=useState<LessonManifest[]>([]),[demo,setDemo]=useState<LessonManifest|null>(null),[lesson,setLesson]=useState<LessonManifest|null>(null),[music,setMusic]=useState<MusicLessonManifest|null>(null),[sharedSummaries,setSharedSummaries]=useState<LessonSummary[]>([]),[subjectFilter,setSubjectFilter]=useState(false);
  useEffect(()=>{setFeedQuery('');setFeedFilter('all');},[account?.id]);
  useEffect(()=>{const media=matchMedia('(max-width:760px)');const update=()=>setSmallScreen(media.matches);media.addEventListener('change',update);return()=>media.removeEventListener('change',update);},[]);
  const drawerNavigation=smallScreen||page==='preview';
@@ -57,7 +57,10 @@ export function App(){
  const [routeReady,setRouteReady]=useState(false),replaceRoute=useRef(true),restoring=useRef(false);
  const refresh=useCallback(async()=>{
   setLoading(true);setError('');
-  try{const session=await getSession();setAccount(session?.account??null);const [preview,saved,received,summaries,workflow]=await Promise.all([loadDemo(),session?loadLibrary():Promise.resolve([]),session?request<LessonManifest[]>('/shared-lessons'):Promise.resolve([]),session?loadSharedSummaries():Promise.resolve([]),session?loadMoveStates():Promise.resolve({lessons:[]})]);setDemo(preview);setLibrary(saved);setShared(received);setSharedSummaries(summaries);setStates(workflow.lessons);}
+  try{const session=await getSession();setAccount(session?.account??null);const [preview,saved,received,summaries,workflow]=await Promise.all([loadDemo(),session?loadLibrary():Promise.resolve([]),session?request<LessonManifest[]>('/shared-lessons'):Promise.resolve([]),session?loadSharedSummaries():Promise.resolve([]),session?loadMoveStates():Promise.resolve({lessons:[]})]);setDemo(preview);setLibrary(saved);setShared(received);setSharedSummaries(summaries);setStates(workflow.lessons);
+   // The subject filter is a server-controlled rollout: absent or failing means off.
+   void loadCapabilities().then(value=>setSubjectFilter(Boolean(value.subject_filter))).catch(()=>setSubjectFilter(false));
+  }
   catch(e){setError((e as Error).message);}finally{setLoading(false);}
  },[]);
  const restoreRoute=useCallback(async()=>{
@@ -152,7 +155,7 @@ export function App(){
    {error&&<div className="inline-notice error-notice" role="alert">{error}{page==='moves'&&<button className="back-link" onClick={()=>void refresh()}>Try again</button>}</div>}
    {busy&&<p className="operation-status" role="status">One moment…</p>}
    {page==='receiver'&&<Suspense fallback={<p>Opening display…</p>}><MimicReceiver onBack={()=>navigate('moves')}/></Suspense>}
-   <div className="feed-page" hidden={page!=='moves'}><PracticeFeed filter={feedFilter} setFilter={setFeedFilter} active={page==='moves'} query={feedQuery} onQuery={setFeedQuery} account={account} library={library} shared={shared} sharedSummaries={sharedSummaries} states={states} demo={demo} loading={loading}
+   <div className="feed-page" hidden={page!=='moves'}><PracticeFeed filter={feedFilter} setFilter={setFeedFilter} active={page==='moves'} query={feedQuery} onQuery={setFeedQuery} account={account} library={library} shared={shared} sharedSummaries={sharedSummaries} subjectFilterEnabled={subjectFilter} states={states} demo={demo} loading={loading}
     onCreate={()=>{setAdjustFor(null);navigate('create');}} onSignIn={()=>navigate('account')}
     onOpen={(item,owned,check)=>open(item,check?'check':'practice',owned)}
     onPublic={id=>void run(async()=>{const value=await loadPublicMove(id);setLesson(value);setLessonOwned(false);navigate('preview');})}

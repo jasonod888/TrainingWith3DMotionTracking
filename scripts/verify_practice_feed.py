@@ -31,6 +31,8 @@ with sync_playwright() as p:
   elif path=='demo':route.fulfill(status=404,json={'detail':'No demo'})
   elif path=='lessons':route.fulfill(json=[] if mode['empty'] else own)
   elif path=='shared-lessons':route.fulfill(json=[] if mode['empty'] else shared)
+  elif path=='shared-lessons/summaries':route.fulfill(json=[] if mode['empty'] else [{'summary_version':1,'lesson_id':v['lesson_id'],'revision_id':v['revision_id'],'title':v['title'],'subject':'movement_other','subject_label':'Full Body Movement','experience_family':'body','instrument':None,'duration':v['duration'],'section_count':len(v['section_set']['sections']),'poster':None,'capabilities':{'preview':True,'practice':True,'live_input':'camera'}} for v in shared])
+  elif path=='capabilities':route.fulfill(json={'subject_filter':False,'conversion':True,'processing':{}})
   elif path=='workflow/lessons':route.fulfill(json={'lessons':[{'lesson_id':v['lesson_id'],'accepted_revision_id':v['revision_id'] if i==0 else None,'latest_revision_id':v['revision_id'],'audiences':{'direct':0,'groups':0,'public':i==0}} for i,v in enumerate(own)]})
   elif path=='conversions':route.fulfill(json={'jobs':mode['jobs'],'worker_online':True})
   elif path=='groups':

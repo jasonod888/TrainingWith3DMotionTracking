@@ -103,6 +103,7 @@ def create_app(settings: Settings | None = None):
                 # availability. A missing music route never changes 'conversion'.
                 'subjects':subjects.catalogue(),
                 'lesson_formats':[1,2],
+                'subject_filter':settings.subject_filter_enabled,
                 'processing':processing_routes.capability_flags(settings),
                 'routes':processing_routes.public_catalogue()}
 

@@ -29,6 +29,8 @@ export const loadLibrary=()=>request<LessonManifest[]>('/lessons');
 const summaryQuery=(subject?:string)=>subject?`?subject=${encodeURIComponent(subject)}`:'';
 export const loadLessonSummaries=(subject?:string)=>request<LessonSummary[]>(`/lessons/summaries${summaryQuery(subject)}`,'GET',undefined,false,{'X-Lesson-Formats':'1,2'});
 export const loadSharedSummaries=(subject?:string)=>request<LessonSummary[]>(`/shared-lessons/summaries${summaryQuery(subject)}`,'GET',undefined,false,{'X-Lesson-Formats':'1,2'});
+export type Capabilities={subject_filter?:boolean;processing?:Record<string,boolean>};
+export const loadCapabilities=()=>request<Capabilities>('/capabilities');
 export const loadLesson=(id:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`);
 export const copyDemo=()=>request<LessonManifest>('/lessons/from-demo','POST');
 export const saveSections=(lesson:LessonManifest,sections:LessonManifest['section_set']['sections'],title:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/sections`,'PUT',{base_revision_id:lesson.revision_id,sections,title});
