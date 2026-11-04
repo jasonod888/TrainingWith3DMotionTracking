@@ -139,7 +139,9 @@ def install_groups(app, settings, identity, optional_identity, db):
                     title = publication.title
                 except HTTPException:
                     continue
+            from .lessons import subject_projection
             moves.append({'lesson_id': lesson.id, 'title': title, 'revision_id': revision.id,
+                          **subject_projection(lesson, revision),
                           'access_kind': access_kind, 'can_remove': record.role in ('owner', 'admin') or link.added_by == account.id or lesson.owner_id == account.id,
                           'duration': revision.manifest['duration'], 'sections': len(revision.manifest['section_set']['sections'])})
         return {'id': group.id, 'name': group.name, 'description': group.description, 'role': record.role,

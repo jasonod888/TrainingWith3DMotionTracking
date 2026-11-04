@@ -25,8 +25,9 @@ export async function getSession():Promise<SessionInfo|null>{
 export async function signIn(email:string,password:string){const value=await request<SessionInfo>('/auth/login','POST',{email,password});csrf=value.csrf;return value.account;}
 export async function signOut(){await request('/auth/logout','POST');csrf='';await clearClips().catch(()=>{});}
 export const loadLibrary=()=>request<LessonManifest[]>('/lessons');
-export const loadLessonSummaries=()=>request<LessonSummary[]>('/lessons/summaries','GET',undefined,false,{'X-Lesson-Formats':'1,2'});
-export const loadSharedSummaries=()=>request<LessonSummary[]>('/shared-lessons/summaries','GET',undefined,false,{'X-Lesson-Formats':'1,2'});
+const summaryQuery=(subject?:string)=>subject?`?subject=${encodeURIComponent(subject)}`:'';
+export const loadLessonSummaries=(subject?:string)=>request<LessonSummary[]>(`/lessons/summaries${summaryQuery(subject)}`,'GET',undefined,false,{'X-Lesson-Formats':'1,2'});
+export const loadSharedSummaries=(subject?:string)=>request<LessonSummary[]>(`/shared-lessons/summaries${summaryQuery(subject)}`,'GET',undefined,false,{'X-Lesson-Formats':'1,2'});
 export const loadLesson=(id:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`);
 export const copyDemo=()=>request<LessonManifest>('/lessons/from-demo','POST');
 export const saveSections=(lesson:LessonManifest,sections:LessonManifest['section_set']['sections'],title:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/sections`,'PUT',{base_revision_id:lesson.revision_id,sections,title});
@@ -51,7 +52,7 @@ export const audienceLabel=(audiences:MoveAudiences)=>{
 
 export type GroupSummary={id:string;name:string;description:string;role:'owner'|'admin'|'member';members:number;moves:number};
 export type GroupMemberView={account_id:string;email:string;role:string;joined_at:string};
-export type GroupMoveView={lesson_id:string;title:string;revision_id:string;duration:number;sections:number;access_kind:'grant'|'collection';can_remove:boolean};
+export type GroupMoveView={lesson_id:string;title:string;revision_id:string;duration:number;sections:number;access_kind:'grant'|'collection';can_remove:boolean;subject?:string;subject_label?:string;experience_family?:'body'|'music';instrument?:'piano'|'guitar'|null};
 export type GroupDetail={id:string;name:string;description:string;role:string;can_manage:boolean;contribution_policy:'members'|'managers';invitations:{id:string;email:string;role:string;expires_at:string}[];members:GroupMemberView[];moves:GroupMoveView[]};
 export const loadGroups=()=>request<{groups:GroupSummary[]}>('/groups');
 export const createGroup=(name:string,description='')=>request<GroupSummary>('/groups','POST',{name,description});
@@ -64,7 +65,7 @@ export const removeGroupMove=(id:string,lessonId:string,accessKind:'grant'|'coll
 export const removeGroupMember=(id:string,accountId:string)=>request(`/groups/${encodeURIComponent(id)}/members/${encodeURIComponent(accountId)}`,'DELETE');
 export const transferGroup=(id:string,accountId:string)=>request(`/groups/${encodeURIComponent(id)}/transfer`,'POST',{account_id:accountId});
 
-export type PublicMove={lesson_id:string;title:string;creator_name:string;description:string;tags:string[];duration:number;thumbnail_url:string|null};
+export type PublicMove={lesson_id:string;title:string;creator_name:string;description:string;tags:string[];duration:number;thumbnail_url:string|null;subject?:string;subject_label?:string;experience_family?:'body'|'music';instrument?:'piano'|'guitar'|null};
 export type PublicDetail=LessonManifest&{creator_name:string;description:string;tags:string[]};
 export const loadPublicMoves=(query='',tag='',offset=0)=>request<{moves:PublicMove[]}>(`/public/moves?q=${encodeURIComponent(query)}&tag=${encodeURIComponent(tag)}&offset=${offset}`);
 export const loadPublicTags=()=>request<{tags:{tag:string;count:number}[]}>('/public/tags');

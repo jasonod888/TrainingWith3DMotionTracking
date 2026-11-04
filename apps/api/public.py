@@ -44,6 +44,7 @@ def listing_item(session, publication, lesson):
     revision = session.get(LessonRevision, lesson.published_revision_id)
     if not revision or not accepted(session, lesson.id, revision.id):
         return None
+    from .lessons import subject_projection
     thumbnail = None  # Source-frame thumbnails are private.
     return {
         'lesson_id': lesson.id,
@@ -52,6 +53,7 @@ def listing_item(session, publication, lesson):
         'description': publication.description,
         'tags': tags_for(session, lesson.id),
         'duration': revision.manifest['duration'],
+        **subject_projection(lesson, revision),
         'thumbnail_url': f"/api/public/moves/{lesson.id}/assets/{Path(thumbnail['key']).name}" if thumbnail else None,
     }
 
@@ -73,7 +75,14 @@ def install_public(app, settings, identity, db):
     router = APIRouter(prefix='/api/public')
 
     @router.get('/moves')
-    def moves(q: str = '', tag: str = '', limit: int = 24, offset: int = 0, session: Session = Depends(db)):
+    def moves(q: str = '', tag: str = '', subject: str = '', limit: int = 24, offset: int = 0, session: Session = Depends(db)):
+        from . import subjects
+        wanted = None
+        if subject.strip():
+            try:
+                wanted = subjects.subject_spec(subject).id
+            except subjects.SubjectError as exc:
+                raise HTTPException(422, str(exc)) from exc
         limit = max(1, min(limit, 50))
         offset = max(0, offset)
         statement = select(LessonPublication, Lesson).join(Lesson, Lesson.id == LessonPublication.lesson_id).where(
@@ -84,6 +93,10 @@ def install_public(app, settings, identity, db):
         if q.strip():
             like = f'%{q.strip()[:80]}%'
             statement = statement.where(or_(LessonPublication.title.ilike(like), LessonPublication.creator_name.ilike(like)))
+        if wanted is not None:
+            # Filter on the released label, before limiting, so a page never omits matches.
+            statement = statement.join(LessonRevision, LessonRevision.id == Lesson.published_revision_id).where(
+                LessonRevision.subject == wanted)
         statement = statement.order_by(LessonPublication.listed_at.desc().nullslast(), LessonPublication.lesson_id).offset(offset).limit(limit)
         items = []
         for publication, lesson in session.execute(statement).all():

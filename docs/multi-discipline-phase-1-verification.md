@@ -58,12 +58,14 @@ Evidence: `tests/api/test_music_contract.py`.
 - `packages/lesson-schema/parse.ts`: `parseLessonManifest`, `parseMusicLessonManifest`,
   `parseLessonSummary`, `parseLessonDocument`, returning typed values or structured
   `{code, message}` failures. No new bundle dependency.
-- **Strict as the server contract:** unknown fields, missing required fields, unsafe asset
-  keys, wrong media types, out-of-range duration/frame-rate/standing-time, non-image
-  posters and inconsistent assessment policies are refused. A v2 payload given to the
-  body reader returns `unsupported_format`, never a cast.
+- **Strict as the server contract:** unknown fields, missing required fields, identity/label
+  lengths, unsafe asset keys, wrong media types, out-of-range duration/frame-rate/standing-time,
+  the focused-instructor-video and transparent-companion relationships, non-image posters,
+  music media roles and assessment consistency are refused; summary subject, family,
+  instrument and input mode must agree. A v2 payload given to the body reader returns
+  `unsupported_format`, never a cast.
 
-Evidence: `tests/engine/parse.test.ts` (16 tests).
+Evidence: `tests/engine/parse.test.ts` (20 tests).
 
 ### 1E Negotiation, summaries, capability and route responses
 
@@ -135,7 +137,7 @@ Evidence: `tests/api/test_acceptance_shortcuts.py`.
 | 3 | The legacy shared library still returned music manifests | `/shared-lessons` did not filter family, and `visible_manifest` had no v2 guard | The list filters to body; `visible_manifest` refuses v2. `test_shared_library_never_returns_a_music_manifest` |
 | 4 | Music completion was not bound to the requested instrument or duration | The completion validated the v2 shape but not the job | Subject, instrument and duration are checked against the leased job. `test_music_completion_is_bound_to_the_requested_subject` |
 | 5 | Body conversion discarded the selected subject | Completion created the lesson without the job's subject | The job's subject and family are written to the lesson and the revision snapshot. `test_body_conversion_keeps_the_selected_subject` |
-| 6 | Runtime readers accepted malformed contracts | Validators checked a subset and then cast | Required fields, unknown fields, asset key safety, media types and value ranges are enforced. Six new cases in `tests/engine/parse.test.ts` |
+| 6 | Runtime readers accepted malformed contracts | Validators checked a subset and then cast | Required/unknown fields, lengths, asset-key safety, media types, value ranges, the instructor-video relationships, music media roles and summary cross-field consistency are enforced; validated copies are returned. Nine new cases in `tests/engine/parse.test.ts` |
 | 7 | Piano and guitar could not be enabled independently | Both music routes read one provider setting | Per-instrument provider, target and kill switch. `test_piano_and_guitar_are_enabled_independently`, `test_piano_can_be_enabled_while_guitar_stays_off` |
 
 ## Commands and results

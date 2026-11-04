@@ -13,7 +13,11 @@ const filters:{id:FeedFilter;label:string}[]=[{id:'all',label:'All'},{id:'own',l
 
 export function PracticeFeed({filter,setFilter,active,query,onQuery,account,library,shared,states,demo,loading,onOpen,onPublic,onManage,onCreate,onSignIn,children}:Props){
  const [publicMoves,setPublicMoves]=useState<PublicMove[]>([]),[publicLoading,setPublicLoading]=useState(true),[publicError,setPublicError]=useState(''),[more,setMore]=useState(false),[moreBusy,setMoreBusy]=useState(false),[retry,setRetry]=useState(0);
+ // Secondary subject filter. It is dormant until the account can see more than one
+ // subject, so a movement-only library keeps exactly the current controls.
+ const [subject,setSubject]=useState('all');
  const generation=useRef(0),loadedKey=useRef('');
+ useEffect(()=>{setSubject('all');},[account?.id]);
  const showPublic=filter==='all'||filter==='public';
  useEffect(()=>{
   if(!active||!showPublic)return;
@@ -23,10 +27,13 @@ export function PracticeFeed({filter,setFilter,active,query,onQuery,account,libr
   return()=>{stopped=true;generation.current++;clearTimeout(timer);};
  },[query,showPublic,active,retry]);
  const matches=(title:string)=>title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
- const own=filter==='all'||filter==='own'?library.filter(item=>matches(item.title)):[];
- const received=filter==='all'||filter==='shared'?shared.filter(item=>matches(item.title)&&!library.some(own=>own.lesson_id===item.lesson_id)):[];
- const discovery=showPublic?publicMoves.filter(item=>filter==='public'||![...library,...shared].some(known=>known.lesson_id===item.lesson_id)):[];
- const sample=demo&&filter==='all'&&matches(demo.title)&&![...library,...shared,...publicMoves].some(item=>item.lesson_id===demo.lesson_id)?demo:null;
+ const subjectOptions=Array.from(new Map(states.filter(state=>state.subject&&state.subject_label).map(state=>[state.subject as string,state.subject_label as string])).entries());
+ const subjectOf=(lesson:LessonManifest)=>states.find(state=>state.lesson_id===lesson.lesson_id)?.subject??'movement_other';
+ const subjectMatch=(value:string)=>subject==='all'||value===subject;
+ const own=filter==='all'||filter==='own'?library.filter(item=>matches(item.title)&&subjectMatch(subjectOf(item))):[];
+ const received=filter==='all'||filter==='shared'?shared.filter(item=>matches(item.title)&&subjectMatch(subjectOf(item))&&!library.some(own=>own.lesson_id===item.lesson_id)):[];
+ const discovery=showPublic?publicMoves.filter(item=>(filter==='public'||![...library,...shared].some(known=>known.lesson_id===item.lesson_id))&&subjectMatch(item.subject??'movement_other')):[];
+ const sample=demo&&filter==='all'&&matches(demo.title)&&subjectMatch(subjectOf(demo))&&![...library,...shared,...publicMoves].some(item=>item.lesson_id===demo.lesson_id)?demo:null;
  const count=own.length+received.length+discovery.length+(sample?1:0);
  const localCard=(lesson:LessonManifest,source:'own'|'shared'|'demo')=>{
   const state=states.find(item=>item.lesson_id===lesson.lesson_id),check=source==='own'&&needsCheck(lesson,state);
@@ -38,6 +45,7 @@ export function PracticeFeed({filter,setFilter,active,query,onQuery,account,libr
  return <section className="practice-feed" aria-label="Practice feed">
   <h1 className="feed-sr-only">Find your next practice</h1>
   <div className="feed-filters" aria-label="Practice sources">{filters.map(item=><button key={item.id} aria-pressed={filter===item.id} onClick={()=>setFilter(item.id)}>{item.label}</button>)}</div>
+  {subjectOptions.length>1&&<div className="feed-filters subject-filters" aria-label="Lesson subjects"><button aria-pressed={subject==='all'} onClick={()=>setSubject('all')}>All subjects</button>{subjectOptions.map(([id,label])=><button key={id} aria-pressed={subject===id} onClick={()=>setSubject(id)}>{label}</button>)}</div>}
   {children&&<div className="feed-processing">{children}</div>}
   {showPublic&&publicError&&<div className="feed-load-error" role="status"><span>Public practices couldn’t load. Your available practices are shown below.</span><button onClick={()=>setRetry(n=>n+1)}>Try again</button></div>}
   {(loading||showPublic&&publicLoading)&&!count?<FeedSkeleton/>:count?<div className="feed-grid">{own.map(item=>localCard(item,'own'))}{received.map(item=>localCard(item,'shared'))}{discovery.map(item=><PublicFeedCard key={item.lesson_id} move={item} onOpen={()=>onPublic(item.lesson_id)}/>)}{sample&&localCard(sample,'demo')}</div>:<FeedEmpty icon={filter==='shared'?<Users size={28}/>:filter==='public'?<Globe size={28}/>:<Search size={28}/>} title={query?'No matching practices':filter==='own'?'Your practices start here':filter==='shared'?'Nothing shared with you yet':filter==='public'?'Public practices are on their way':'Your next practice starts here'} description={query?'Try a different title or browse another source.':!account&&(filter==='own'||filter==='shared')?'Sign in to see your practices and anything shared with you.':filter==='shared'?'Practices shared directly or through your groups will appear here.':filter==='public'?'Practices appear here when their creators publish them.':'Add a video, or browse the public practices available to you.'}>{query?<button className="secondary" onClick={()=>onQuery('')}>Clear search</button>:filter==='own'||filter==='all'?<button className="primary" onClick={account?onCreate:onSignIn}><Plus size={17}/>{account?'Create a practice':'Sign in to create'}</button>:!account&&filter==='shared'?<button className="primary" onClick={onSignIn}>Sign in</button>:null}</FeedEmpty>}

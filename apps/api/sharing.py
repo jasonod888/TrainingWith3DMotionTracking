@@ -80,12 +80,17 @@ def install_sharing(app,settings,identity,db):
                 if subject_projection(lesson,revision)['experience_family']=='body']
 
     @router.get('/shared-lessons/summaries')
-    def shared_summaries(request:Request,account=Depends(identity),session:Session=Depends(db)):
-        from .lessons import client_formats, summary_of, subject_projection
+    def shared_summaries(request:Request,subject:str|None=None,account=Depends(identity),session:Session=Depends(db)):
+        from .lessons import client_formats, subject_filter, summary_of, subject_projection
         formats=client_formats(request)
-        return [summary_of(lesson,revision,settings,include_private_poster=False).model_dump()
-                for lesson,revision in shared_pairs(session,account)
-                if subject_projection(lesson,revision)['experience_family']=='body' or '2' in formats]
+        wanted=subject_filter(subject)
+        values=[]
+        for lesson,revision in shared_pairs(session,account):
+            projection=subject_projection(lesson,revision)
+            if projection['experience_family']=='music' and '2' not in formats:continue
+            if wanted is not None and projection['subject']!=wanted:continue
+            values.append(summary_of(lesson,revision,settings,include_private_poster=False).model_dump())
+        return values
 
     @router.get('/lessons/{lesson_id}/sharing')
     def settings_view(lesson_id:str,account=Depends(identity),session:Session=Depends(db)):

@@ -1,6 +1,6 @@
 # Multi discipline lesson platform implementation plan
 
-Status: revised implementation plan, revision 2, 4 November 2026. Phase 0 and Phase 1 are delivered — see the [Phase 0 baseline](phase-0-multi-discipline-baseline.md) and the [Phase 1 verification record](multi-discipline-phase-1-verification.md). Phases 2–11 are planned, not implemented. This file is the canonical plan. `requirement/mutli discipline.txt` is a pointer to it and carries no requirements of its own.
+Status: revised implementation plan, revision 2, 4 November 2026. Phase 0 and Phase 1 are delivered — see the [Phase 0 baseline](phase-0-multi-discipline-baseline.md) and the [Phase 1 verification record](multi-discipline-phase-1-verification.md). Phase 2 is in progress under [its log](multi-discipline-phase-2.md); its interface changes are not accepted until the movement browser checks run. Phases 3–11 are planned, not implemented. This file is the canonical plan. `requirement/mutli discipline.txt` is a pointer to it and carries no requirements of its own.
 
 Revision 2 records twelve product and engineering decisions taken after a code-level review of the checkout. Where revision 1 left a boundary undecided, this revision decides it. Sections that changed materially are marked **[R2]**.
 

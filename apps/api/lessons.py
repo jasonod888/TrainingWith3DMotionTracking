@@ -23,6 +23,16 @@ from . import processing_routes, subjects
 FORMAT_HEADER = 'x-lesson-formats'
 
 
+def subject_filter(subject):
+    """Validate a discovery subject filter; an unknown subject is a client error."""
+    if subject is None or not str(subject).strip():
+        return None
+    try:
+        return subjects.subject_spec(subject).id
+    except subjects.SubjectError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 def client_formats(request):
     """Advertised lesson formats. An unversioned client is v1-only by default."""
     raw = request.headers.get(FORMAT_HEADER, '1')
@@ -270,9 +280,10 @@ def install_lessons(app, engine, settings, identity, db):
         return [row.manifest for row in rows]
 
     @router.get('/summaries')
-    def summaries(request: Request, account=Depends(identity), session: Session = Depends(db)):
+    def summaries(request: Request, subject: str | None = None, account=Depends(identity), session: Session = Depends(db)):
         """Mixed-subject card projection for clients that advertise v1 and v2."""
         formats = client_formats(request)
+        wanted = subject_filter(subject)
         rows = session.execute(select(Lesson, LessonRevision).join(
             LessonRevision, LessonRevision.lesson_id == Lesson.id).where(
             Lesson.owner_id == account.id, Lesson.archived.is_(False), Lesson.disabled.is_(False),
@@ -280,7 +291,10 @@ def install_lessons(app, engine, settings, identity, db):
         values = []
         for lesson, revision in rows:
             # The owner's list is the draft view: a relabel shows immediately.
-            if subject_projection(lesson, revision, current=True)['experience_family'] == 'music' and '2' not in formats:
+            projection = subject_projection(lesson, revision, current=True)
+            if projection['experience_family'] == 'music' and '2' not in formats:
+                continue
+            if wanted is not None and projection['subject'] != wanted:
                 continue
             values.append(summary_of(lesson, revision, settings, current=True).model_dump())
         return values
