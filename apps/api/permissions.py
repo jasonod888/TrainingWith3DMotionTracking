@@ -89,7 +89,14 @@ def latest_acceptance(session, lesson_id):
 
 
 def accept_revision(session, lesson, revision, account_id, warnings=None, source='owner'):
-    """Create the acceptance for an exact revision. Idempotent; never changes the manifest."""
+    """Create the acceptance for an exact revision. Idempotent; never changes the manifest.
+
+    A music revision is accepted only through its reference review. The movement
+    check and the two legacy shortcuts (publish, trim-with-accept) must not be able
+    to accept unreviewed music.
+    """
+    if (revision.manifest or {}).get('schema_version') == 2 and source != 'music-review':
+        raise HTTPException(409, 'Accept this music lesson through the reference review, not the movement check.')
     existing = accepted(session, lesson.id, revision.id)
     if existing:
         return existing
@@ -110,6 +117,8 @@ def accept_revision(session, lesson, revision, account_id, warnings=None, source
 
 def ensure_release(session, lesson, revision, account_id, source='publish'):
     """Point the shared release at an accepted revision, accepting it when legacy publishers did not."""
+    if (revision.manifest or {}).get('schema_version') == 2:
+        raise HTTPException(409, 'A music lesson needs a reviewed reference before it can be shared.')
     record = accept_revision(session, lesson, revision, account_id, warnings=[], source=source)
     lesson.published_revision_id = revision.id
     return record
@@ -148,6 +157,10 @@ def public_lesson(session, lesson_id):
 
 def public_manifest(revision, publication, tags):
     """Remove private media and private identity from a manifest for public delivery."""
+    if (revision.manifest or {}).get('schema_version') != 1:
+        # Music publication needs its own projection and permission policy; until
+        # then a music revision is never a public object.
+        raise HTTPException(404, 'Move unavailable.')
     value = dict(revision.manifest)
     value['source_video'] = None
     value['focused_video'] = None
@@ -162,6 +175,10 @@ def public_manifest(revision, publication, tags):
 
 def visible_manifest(session, lesson, revision, account_id):
     """Use the same private-media boundary for detail and paired displays."""
+    if (revision.manifest or {}).get('schema_version') != 1:
+        # Music needs its own projection and paired-display capabilities; the body
+        # helper must never hand a v2 object to a body-shaped caller.
+        raise HTTPException(404, 'Move unavailable.')
     _, reasons = access_reasons(session, lesson.id, account_id)
     if reasons == ['public'] or ('owner' in reasons and revision.id != latest_revision(session, lesson).id):
         from .database import LessonTag

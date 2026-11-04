@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     max_account_storage_bytes: int = 2 * 1024 * 1024 * 1024
     worker_lease_seconds: int = 120
     conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'local'
+    # Each music instrument has its own route and kill switch, so piano can be enabled
+    # while guitar stays off (and vice versa). Both are registered but disabled here.
+    music_piano_conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'disabled'
+    music_guitar_conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'disabled'
+    music_remote_conversion_enabled: bool = False
+    music_piano_conversion_target: str = ''
+    music_guitar_conversion_target: str = ''
     # Explicit operator gate after the custom full-pipeline deployment is verified.
     remote_conversion_enabled: bool = False
     conversion_target: str = ''
@@ -51,6 +58,10 @@ class Settings(BaseSettings):
         import re
         if self.conversion_target and not re.fullmatch(r'[A-Za-z0-9_-]+/[A-Za-z0-9_-]+', self.conversion_target):
             raise ValueError('CONVERSION_TARGET must be an owner/deployment or owner/app identifier.')
+        for name, value in (('MUSIC_PIANO_CONVERSION_TARGET', self.music_piano_conversion_target),
+                            ('MUSIC_GUITAR_CONVERSION_TARGET', self.music_guitar_conversion_target)):
+            if value and not re.fullmatch(r'[A-Za-z0-9_-]+/[A-Za-z0-9_-]+', value):
+                raise ValueError(f'{name} must be an owner/deployment or owner/app identifier.')
         if not 1 <= self.remote_conversion_concurrency <= 10:
             raise ValueError('REMOTE_CONVERSION_CONCURRENCY must be between 1 and 10.')
         origin = urlparse(self.public_url)

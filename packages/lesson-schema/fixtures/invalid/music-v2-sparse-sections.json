@@ -1,0 +1,34 @@
+{
+  "schema_version": 2,
+  "experience_family": "music",
+  "lesson_id": "synthetic-piano",
+  "revision_id": "synthetic-piano-v1",
+  "title": "Music fixture with sparse teaching sections",
+  "subject": "piano",
+  "duration": 8,
+  "instrument": {
+    "instrument": "piano"
+  },
+  "section_set": {
+    "id": "synthetic-piano-sections",
+    "revision": 1,
+    "duration": 8,
+    "sections": [
+      { "id": "intro", "label": "Introduction", "start": 0, "end": 2 },
+      { "id": "phrase", "label": "First phrase", "start": 4, "end": 8 }
+    ]
+  },
+  "reference": {
+    "key": "lessons/synthetic-piano/reference.json",
+    "mime": "application/json",
+    "bytes": 1200,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "reference_reviewed": true,
+  "assessment": {
+    "rubric_version": "piano-midi-v1",
+    "assessment": "notes",
+    "input_modes": ["midi"],
+    "dimensions": ["pitch"]
+  }
+}

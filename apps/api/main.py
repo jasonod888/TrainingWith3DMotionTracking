@@ -95,9 +95,16 @@ def create_app(settings: Settings | None = None):
 
     @app.get('/api/capabilities')
     def capabilities():
+        from . import processing_routes, subjects
         return {'phase':7, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':True, 'sharing':True,
                 'acceptance':True, 'groups':True, 'public':True, 'take_export':True, 'studio':True,
-                'camera_calibration':settings.camera_calibration_enabled}
+                'camera_calibration':settings.camera_calibration_enabled,
+                # Additive: subject catalogue, advertised lesson formats and per-capability
+                # availability. A missing music route never changes 'conversion'.
+                'subjects':subjects.catalogue(),
+                'lesson_formats':[1,2],
+                'processing':processing_routes.capability_flags(settings),
+                'routes':processing_routes.public_catalogue()}
 
     @app.get('/api/{path:path}', include_in_schema=False)
     def missing_api(path: str):

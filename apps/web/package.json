@@ -8,7 +8,7 @@
     "prebuild": "node prepare-tracking.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "test": "tsx --test ../../tests/engine/*.test.ts tests/*.test.mjs",
+    "test": "tsx --test ../../tests/engine/*.test.ts ../../tests/music-engine/*.test.ts tests/*.test.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

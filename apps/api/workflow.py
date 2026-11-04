@@ -31,8 +31,11 @@ def status(session, lesson):
         groups = group_count(session, lesson.id)
     except ImportError:
         pass
+    from .lessons import subject_projection
     return {
         'lesson_id': lesson.id,
+        # Owner view: the draft label, not a snapshot frozen at release time.
+        **subject_projection(lesson, latest, current=True),
         'latest_revision_id': latest.id if latest else None,
         'accepted_revision_id': acceptance.revision_id if acceptance else None,
         'accepted_at': acceptance.accepted_at.isoformat() if acceptance and acceptance.accepted_at else None,

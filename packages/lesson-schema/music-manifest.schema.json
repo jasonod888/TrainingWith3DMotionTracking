@@ -1,0 +1,369 @@
+{
+  "$defs": {
+    "AssessmentPolicy": {
+      "additionalProperties": false,
+      "description": "Which evidence dimensions a reviewed music reference may be scored on.",
+      "properties": {
+        "rubric_version": {
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*-v[0-9]+$",
+          "title": "Rubric Version",
+          "type": "string"
+        },
+        "assessment": {
+          "default": "notes",
+          "enum": [
+            "notes",
+            "chords",
+            "melody",
+            "none"
+          ],
+          "title": "Assessment",
+          "type": "string"
+        },
+        "input_modes": {
+          "items": {
+            "enum": [
+              "midi",
+              "microphone",
+              "none"
+            ],
+            "type": "string"
+          },
+          "title": "Input Modes",
+          "type": "array"
+        },
+        "dimensions": {
+          "items": {
+            "enum": [
+              "pitch",
+              "timing",
+              "release",
+              "coverage"
+            ],
+            "type": "string"
+          },
+          "title": "Dimensions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "rubric_version"
+      ],
+      "title": "AssessmentPolicy",
+      "type": "object"
+    },
+    "Asset": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_./-]*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "mime": {
+          "title": "Mime",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "mime",
+        "bytes",
+        "sha256"
+      ],
+      "title": "Asset",
+      "type": "object"
+    },
+    "InstrumentConfig": {
+      "additionalProperties": false,
+      "description": "Instrument settings that a music reference was generated against.",
+      "properties": {
+        "instrument": {
+          "enum": [
+            "piano",
+            "guitar"
+          ],
+          "title": "Instrument",
+          "type": "string"
+        },
+        "tuning": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tuning"
+        },
+        "capo": {
+          "anyOf": [
+            {
+              "maximum": 12,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capo"
+        },
+        "handedness": {
+          "anyOf": [
+            {
+              "enum": [
+                "right",
+                "left"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Handedness"
+        },
+        "reference_pitch_hz": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Pitch Hz"
+        }
+      },
+      "required": [
+        "instrument"
+      ],
+      "title": "InstrumentConfig",
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "number"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "start",
+        "end"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "SectionSet": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "duration": {
+          "exclusiveMinimum": 0,
+          "title": "Duration",
+          "type": "number"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/Section"
+          },
+          "minItems": 1,
+          "title": "Sections",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "duration",
+        "sections"
+      ],
+      "title": "SectionSet",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Manifest v2 for a reviewed music reference.\n\nDeliberately separate from the body manifest: no coordinates, standing time,\nGLB animation or landmarks. The reference is already reviewed, so a draft can\nnever be published as a manifest.",
+  "properties": {
+    "schema_version": {
+      "const": 2,
+      "default": 2,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "experience_family": {
+      "const": "music",
+      "default": "music",
+      "title": "Experience Family",
+      "type": "string"
+    },
+    "lesson_id": {
+      "title": "Lesson Id",
+      "type": "string"
+    },
+    "revision_id": {
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "subject": {
+      "enum": [
+        "piano",
+        "guitar"
+      ],
+      "title": "Subject",
+      "type": "string"
+    },
+    "duration": {
+      "exclusiveMinimum": 0,
+      "title": "Duration",
+      "type": "number"
+    },
+    "instrument": {
+      "$ref": "#/$defs/InstrumentConfig"
+    },
+    "section_set": {
+      "$ref": "#/$defs/SectionSet"
+    },
+    "reference": {
+      "$ref": "#/$defs/Asset"
+    },
+    "reference_reviewed": {
+      "const": true,
+      "default": true,
+      "title": "Reference Reviewed",
+      "type": "boolean"
+    },
+    "assessment": {
+      "$ref": "#/$defs/AssessmentPolicy"
+    },
+    "source_video": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "preview_video": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "waveform": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "midi_export": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "public_poster": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "lesson_id",
+    "revision_id",
+    "title",
+    "subject",
+    "duration",
+    "instrument",
+    "section_set",
+    "reference",
+    "assessment"
+  ],
+  "title": "MusicLessonManifest",
+  "type": "object"
+}

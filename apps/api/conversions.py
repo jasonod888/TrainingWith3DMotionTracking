@@ -8,18 +8,19 @@ import tempfile
 from datetime import timedelta
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import delete, func, or_, select, text, update
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from .auth import digest, now
-from .contracts import Asset, LessonManifest
+from .contracts import Asset, LessonManifest, MusicLessonManifest
 from .database import Account, Conversion, Lesson, LessonAsset, LessonRevision, WorkerCredential
 from .storage import storage_client
 from .processing import ENGINE_VERSION, PIPELINE_VERSION, Provider, processing_status
+from . import processing_routes, subjects
 
 PART_SIZE=5*1024*1024
 RUNNING=('validating','processing','exporting','verifying')
@@ -31,9 +32,22 @@ DERIVATIVE_ASSETS=('avatar-male.glb','avatar-female.glb','avatar-report.json')
 FILES={**{name:mime for name,mime in (
         ('reference.glb','model/gltf-binary'),('reference.json','application/json'),
         ('preview.mp4','video/mp4'),('thumbnail.jpg','image/jpeg'),('instructor.mp4','video/mp4'),
-        ('instructor-alpha.webm','video/webm'))},
+        ('instructor-alpha.webm','video/webm'),('source.mp4','video/mp4'),('waveform.json','application/json'),
+        ('midi.mid','audio/midi'),('poster.png','image/png'))},
     'avatar-male.glb':'model/gltf-binary','avatar-female.glb':'model/gltf-binary',
     'avatar-report.json':'application/json'}
+
+# Asset role to upload name, per completion contract. Declared once here and used by
+# completion, delivery and cleanup instead of scattered filename allowlists.
+MUSIC_ROLES=(('reference','reference.json'),('source_video','source.mp4'),('preview_video','preview.mp4'),
+             ('waveform','waveform.json'),('midi_export','midi.mid'),('public_poster','poster.png'))
+
+
+class Preparation(BaseModel):
+    """Client-reported provenance. Diagnostics only; never used for timing."""
+    preparation_version:str=Field(default='music-clip-v1',max_length=40)
+    selection_start:float|None=Field(default=None,ge=0,allow_inf_nan=False)
+    selection_end:float|None=Field(default=None,gt=0,allow_inf_nan=False)
 
 
 class Derivatives(BaseModel):
@@ -50,6 +64,10 @@ class NewConversion(BaseModel):
     duration:float=Field(ge=.2,allow_inf_nan=False)
     processing_provider:Provider='local'
     lesson_id:str|None=Field(default=None,max_length=80)
+    # Absent means the legacy movement default, so older clients keep working.
+    subject:str|None=Field(default=None,max_length=32)
+    instrument:str|None=Field(default=None,max_length=16)
+    preparation:Preparation|None=None
 
 
 class Heartbeat(BaseModel):
@@ -82,6 +100,7 @@ def install_conversions(app,engine,settings,identity,db):
     def summary(job):
         return {'id':job.id,'title':job.title,'filename':job.filename,'bytes':job.source_bytes,'start':job.start,'duration':job.duration,
                 'state':job.state,'attempts':job.attempts,'frames':job.frames,'error':job.error,'lesson_id':job.lesson_id,
+                'subject':job.subject,'instrument':job.instrument,
                 'target_lesson_id':job.target_lesson_id,
                 'parts':job.parts if job.state=='uploading' else {},'part_size':PART_SIZE,
                 'provider':job.provider,'pipeline_version':job.pipeline_version,
@@ -106,8 +125,13 @@ def install_conversions(app,engine,settings,identity,db):
         return job
 
     @router.get('/limits')
-    def limits(account=Depends(identity)):
-        return {'max_bytes':settings.max_upload_bytes,'max_seconds':settings.max_conversion_seconds,'max_active':settings.max_active_conversions,'part_size':PART_SIZE,'processing':processing_status(settings)}
+    def limits(account=Depends(identity),session:Session=Depends(db)):
+        online_routes=set(session.execute(select(WorkerCredential.provider,WorkerCredential.pipeline_version).where(WorkerCredential.active.is_(True),WorkerCredential.last_seen>now()-timedelta(seconds=90))).all())
+        return {'max_bytes':settings.max_upload_bytes,'max_seconds':settings.max_conversion_seconds,'max_active':settings.max_active_conversions,'part_size':PART_SIZE,
+                'processing':processing_status(settings),
+                'routes':processing_routes.status(settings,online_routes),
+                'capabilities':processing_routes.capability_flags(settings,online_routes),
+                'subjects':subjects.catalogue()}
 
     @router.get('')
     def listing(account=Depends(identity),session:Session=Depends(db)):
@@ -115,13 +139,25 @@ def install_conversions(app,engine,settings,identity,db):
         jobs=session.scalars(select(Conversion).where(Conversion.owner_id==account.id).order_by(Conversion.created_at.desc()).limit(100)).all()
         return {'worker_online':(settings.conversion_provider,PIPELINE_VERSION) in online_routes,
                 'processing':processing_status(settings),
+                'capabilities':processing_routes.capability_flags(settings,online_routes),
+                'routes':processing_routes.status(settings,online_routes),
                 'jobs':[{**summary(j),'processor_online':(j.provider,j.pipeline_version) in online_routes} for j in jobs]}
 
     @router.post('',status_code=201)
     def create(body:NewConversion,account=Depends(identity),session:Session=Depends(db)):
-        route=processing_status(settings)
-        if not route['available']:raise HTTPException(503,'Video processing is temporarily unavailable. Please try later.')
-        if body.processing_provider!=route['provider']:raise HTTPException(409,'The video processor changed. Reopen Create before uploading.')
+        try:
+            selected_subject,family,selected_instrument=subjects.validate_selection(body.subject,body.instrument)
+            route=processing_routes.route_for(selected_subject,selected_instrument)
+        except subjects.SubjectError as exc:
+            raise HTTPException(422,str(exc)) from exc
+        if not processing_routes.available(route,settings):
+            if family=='body':raise HTTPException(503,'Video processing is temporarily unavailable. Please try later.')
+            raise HTTPException(503,'Music processing is not available yet. The lesson can still be watched.')
+        provider=processing_routes.provider_for(route,settings)
+        if family=='body':
+            # Preserve the existing stale-tab guard for the movement processor.
+            current=processing_status(settings)
+            if body.processing_provider!=current['provider']:raise HTTPException(409,'The video processor changed. Reopen Create before uploading.')
         if body.bytes>settings.max_upload_bytes or body.duration>settings.max_conversion_seconds or body.start!=0:
             raise HTTPException(422,'Choose a video within the displayed size and time limits.')
         session.scalar(select(Account).where(Account.id==account.id).with_for_update())
@@ -130,22 +166,28 @@ def install_conversions(app,engine,settings,identity,db):
         assets=session.scalar(select(func.coalesce(func.sum(LessonAsset.bytes),0)).join(Lesson).where(Lesson.owner_id==account.id))
         if active>=settings.max_active_conversions or usage+assets+body.bytes>settings.max_account_storage_bytes:
             raise HTTPException(409,'Your current processing or storage limit is reached. Finish or remove a video first.')
-        title=body.title.strip() or 'Untitled move'
+        title=body.title.strip() or ('Untitled lesson' if family=='music' else 'Untitled move')
         if len(title)>200:raise HTTPException(422,'Use a shorter name for this move.')
         target=None
         if body.lesson_id:
             target=session.scalar(select(Lesson).where(Lesson.id==body.lesson_id,Lesson.owner_id==account.id,
                 Lesson.archived.is_(False),Lesson.disabled.is_(False)))
             if not target:raise HTTPException(404,'Move unavailable.')
+            if (target.experience_family or 'body')!=family:
+                raise HTTPException(409,'A replacement must be the same kind of lesson as the one it replaces.')
             replacing=session.scalar(select(func.count()).select_from(Conversion).where(
                 Conversion.target_lesson_id==target.id,Conversion.state.not_in(('failed','cancelled','ready_for_review'))))
             if replacing:raise HTTPException(409,'This move already has a replacement in progress.')
         key=f'uploads/{account.id}/{uuid4().hex}/source'
         store=storage_client(settings)
         upload=store.create_multipart_upload(Bucket=settings.storage_bucket,Key=key,ContentType='application/octet-stream')['UploadId']
+        external=provider in ('replicate','fal')
         job=Conversion(id=uuid4().hex,owner_id=account.id,title=title if not target else target.title,filename=body.filename,source_bytes=body.bytes,source_key=key,
                        upload_id=upload,start=body.start,duration=body.duration,state='uploading',parts={},target_lesson_id=target.id if target else None,
-                       provider=route['provider'],pipeline_version=PIPELINE_VERSION,provider_target=settings.conversion_target if route['external_processing'] else '')
+                       subject=selected_subject,instrument=selected_instrument,
+                       preparation=body.preparation.model_dump() if body.preparation else {},
+                       provider=provider,pipeline_version=route.pipeline_version,
+                       provider_target=getattr(settings,route.target_setting,'') if external else '')
         try:session.add(job);session.commit()
         except Exception:
             session.rollback();store.abort_multipart_upload(Bucket=settings.storage_bucket,Key=key,UploadId=upload);raise
@@ -321,12 +363,82 @@ def install_conversions(app,engine,settings,identity,db):
                     return {'key':key,'mime':FILES[name],'bytes':total,'sha256':checksum.hexdigest()}
             return await run_in_threadpool(upload)
 
+    def finish_music(job,manifest,token,session):
+        """Completion for a music route: typed separately from the body contract."""
+        if job.state!='verifying':raise HTTPException(422,'Invalid converted lesson.')
+        if job.provider!='local' and job.submission_state!='submitted':raise HTTPException(409,'Missing provider submission receipt.')
+        # The manifest must describe the work the server requested, not whatever the
+        # worker chose: a piano job cannot publish a guitar reference, and a clip cannot
+        # become longer than the source it was prepared from.
+        if manifest.subject!=job.subject:
+            raise HTTPException(422,'Converted instrument does not match the requested subject.')
+        if manifest.instrument.instrument!=(job.instrument or manifest.subject):
+            raise HTTPException(422,'Converted instrument does not match the requested instrument.')
+        if manifest.duration>job.duration+.1:
+            raise HTTPException(422,'Converted lesson is longer than the uploaded clip.')
+        store=storage_client(settings)
+        assets=[]
+        for role,name in MUSIC_ROLES:
+            asset=getattr(manifest,role)
+            if asset is None:
+                if role=='reference':raise HTTPException(422,'Conversion outputs are incomplete.')
+                continue
+            expected=f'attempts/{job.id}/{token}/{name}'
+            if asset.key!=expected or asset.mime!=FILES[name]:raise HTTPException(422,'Output is outside this processing attempt.')
+            head=store.head_object(Bucket=settings.storage_bucket,Key=expected)
+            if head['ContentLength']!=asset.bytes or head.get('Metadata',{}).get('sha256')!=asset.sha256:
+                raise HTTPException(422,'Output checksum/size mismatch.')
+            assets.append((asset,name))
+        lesson_id=job.target_lesson_id or job.id;revision_id=uuid4().hex
+        target=None
+        if job.target_lesson_id:
+            target=session.scalar(select(Lesson).where(Lesson.id==job.target_lesson_id,Lesson.owner_id==job.owner_id,
+                Lesson.archived.is_(False),Lesson.disabled.is_(False)).with_for_update())
+            if not target:raise HTTPException(409,'This lesson is no longer available for replacement.')
+            if (target.experience_family or 'body')!='music':raise HTTPException(409,'A replacement must be the same kind of lesson.')
+            version=target.version+1
+        else:
+            version=1
+        for asset,name in assets:
+            file_name=f'{revision_id}-{name}' if target else name
+            key=f'lessons/{lesson_id}/{file_name}'
+            store.copy_object(Bucket=settings.storage_bucket,Key=key,CopySource={'Bucket':settings.storage_bucket,'Key':asset.key})
+            asset.key=key
+        manifest.lesson_id=lesson_id;manifest.revision_id=revision_id
+        manifest.title=target.title if target else job.title
+        manifest.section_set.id=uuid4().hex;manifest.section_set.revision=1
+        projection={'subject':manifest.subject,'experience_family':'music','instrument':manifest.instrument.instrument}
+        if target:
+            changed=session.execute(update(Lesson).where(Lesson.id==lesson_id,Lesson.owner_id==job.owner_id,
+                Lesson.version==target.version).values(version=version,title=target.title))
+            if changed.rowcount!=1:raise HTTPException(409,'This lesson changed while the clip was being replaced. Reopen it and try again.')
+        else:
+            session.add(Lesson(id=lesson_id,owner_id=job.owner_id,title=job.title,version=1,**projection));session.flush()
+        session.add(LessonRevision(id=revision_id,lesson_id=lesson_id,version=version,manifest=manifest.model_dump(),**projection))
+        for asset,_ in assets:session.add(LessonAsset(lesson_id=lesson_id,**asset.model_dump()))
+        job.lesson_id=lesson_id;job.state='ready_for_review';job.lease_until=None;session.commit()
+        try:
+            store.delete_object(Bucket=settings.storage_bucket,Key=job.source_key)
+            for _,name in assets:store.delete_object(Bucket=settings.storage_bucket,Key=f'attempts/{job.id}/{token}/{name}')
+        except Exception:
+            import logging
+            logging.getLogger('form').warning('Music conversion cleanup pending for job %s',job.id)
+        return {'lesson_id':lesson_id}
+
     @worker.post('/jobs/{job_id}/finish')
-    def finish(job_id:str,body:LessonManifest,request:Request,credential=Depends(worker_identity),session:Session=Depends(db)):
+    def finish(job_id:str,request:Request,payload:dict=Body(...),credential=Depends(worker_identity),session:Session=Depends(db)):
         job=session.scalar(select(Conversion).where(Conversion.id==job_id).with_for_update())
         token=request.headers.get('x-job-lease','')
         if job and job.state=='ready_for_review' and job.worker_id==credential and hmac.compare_digest(job.attempt_token or '',token):return {'lesson_id':job.lesson_id}
         job=leased(session,job_id,credential,token)
+        route=processing_routes.route_for_pipeline(job.pipeline_version)
+        if route is None:raise HTTPException(422,'Unknown processing route.')
+        try:
+            if route.completion=='music-v2':
+                return finish_music(job,MusicLessonManifest.model_validate(payload),token,session)
+            body=LessonManifest.model_validate(payload)
+        except ValidationError as exc:
+            raise HTTPException(422,'Invalid converted lesson.') from exc
         if body.presentation:
             raise HTTPException(422,'Presentation assets must be verified through the derivative route.')
         if job.state!='verifying' or body.engine!='sam-3d-body' or body.engine_version!=ENGINE_VERSION or body.duration>job.duration+.1 or body.source_start!=0 or body.section_set.revision!=1 or len(body.section_set.sections)!=1:
@@ -364,13 +476,16 @@ def install_conversions(app,engine,settings,identity,db):
             store.copy_object(Bucket=settings.storage_bucket,Key=key,CopySource={'Bucket':settings.storage_bucket,'Key':asset.key})
             asset.key=key
         body.lesson_id=lesson_id;body.revision_id=revision_id;body.title=target.title if target else job.title
+        # The subject the instructor chose travels with the job, so completion must not
+        # reset a taekwondo or boxing lesson to the movement default.
+        projection={'subject':job.subject or subjects.DEFAULT_SUBJECT,'experience_family':'body','instrument':None}
         if target:
             changed=session.execute(update(Lesson).where(Lesson.id==lesson_id,Lesson.owner_id==job.owner_id,
                 Lesson.version==target.version).values(version=version,title=target.title))
             if changed.rowcount!=1:raise HTTPException(409,'This move changed while the clip was being replaced. Reopen it and try again.')
         else:
-            session.add(Lesson(id=lesson_id,owner_id=job.owner_id,title=job.title));session.flush()
-        session.add(LessonRevision(id=revision_id,lesson_id=lesson_id,version=version,manifest=body.model_dump()))
+            session.add(Lesson(id=lesson_id,owner_id=job.owner_id,title=job.title,version=1,**projection));session.flush()
+        session.add(LessonRevision(id=revision_id,lesson_id=lesson_id,version=version,manifest=body.model_dump(),**projection))
         for asset in assets:session.add(LessonAsset(lesson_id=lesson_id,**asset.model_dump()))
         job.lesson_id=lesson_id;job.state='ready_for_review';job.lease_until=None;session.commit()
         try:

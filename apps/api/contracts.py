@@ -115,3 +115,109 @@ TRANSITIONS = {
 
 def can_transition(current: JobState, target: JobState) -> bool:
     return target in TRANSITIONS.get(current, set())
+
+
+class InstrumentConfig(Contract):
+    """Instrument settings that a music reference was generated against."""
+
+    instrument: Literal['piano', 'guitar']
+    tuning: str | None = Field(default=None, max_length=40)
+    capo: int | None = Field(default=None, ge=0, le=12)
+    handedness: Literal['right', 'left'] | None = None
+    reference_pitch_hz: float | None = Field(default=None, gt=0)
+
+
+class AssessmentPolicy(Contract):
+    """Which evidence dimensions a reviewed music reference may be scored on."""
+
+    rubric_version: str = Field(pattern=r'^[a-z0-9]+(-[a-z0-9]+)*-v[0-9]+$')
+    assessment: Literal['notes', 'chords', 'melody', 'none'] = 'notes'
+    input_modes: list[Literal['midi', 'microphone', 'none']] = Field(default_factory=lambda: ['none'])
+    dimensions: list[Literal['pitch', 'timing', 'release', 'coverage']] = Field(
+        default_factory=lambda: ['pitch', 'timing'])
+
+    @model_validator(mode='after')
+    def consistent(self):
+        if self.assessment == 'none' and self.dimensions:
+            raise ValueError('An unassessed reference cannot declare scoring dimensions.')
+        if len(set(self.dimensions)) != len(self.dimensions):
+            raise ValueError('Scoring dimensions must be unique.')
+        if self.assessment != 'none' and 'pitch' not in self.dimensions:
+            raise ValueError('Note or chord assessment requires the pitch dimension.')
+        return self
+
+
+class MusicLessonManifest(Contract):
+    """Manifest v2 for a reviewed music reference.
+
+    Deliberately separate from the body manifest: no coordinates, standing time,
+    GLB animation or landmarks. The reference is already reviewed, so a draft can
+    never be published as a manifest.
+    """
+
+    schema_version: Literal[2] = 2
+    experience_family: Literal['music'] = 'music'
+    lesson_id: str
+    revision_id: str
+    title: str = Field(min_length=1, max_length=200)
+    subject: Literal['piano', 'guitar']
+    duration: float = Field(gt=0)
+    instrument: InstrumentConfig
+    section_set: SectionSet
+    reference: Asset
+    reference_reviewed: Literal[True] = True
+    assessment: AssessmentPolicy
+    source_video: Asset | None = None
+    preview_video: Asset | None = None
+    waveform: Asset | None = None
+    midi_export: Asset | None = None
+    public_poster: Asset | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+    @model_validator(mode='after')
+    def music_timeline(self):
+        if self.instrument.instrument != self.subject:
+            raise ValueError('The instrument configuration must match the music subject.')
+        if abs(self.section_set.duration - self.duration) > 1e-6:
+            raise ValueError('Teaching sections must cover the whole lesson.')
+        if self.reference.mime != 'application/json':
+            raise ValueError('A music reference must be JSON.')
+        for name in ('source_video', 'preview_video'):
+            asset = getattr(self, name)
+            if asset and asset.mime not in ('video/mp4', 'video/webm'):
+                raise ValueError('Music video must be MP4 or WebM.')
+        if self.waveform and self.waveform.mime != 'application/json':
+            raise ValueError('Waveform data must be JSON.')
+        if self.midi_export and self.midi_export.mime not in ('audio/midi', 'audio/mid', 'application/x-midi'):
+            raise ValueError('A MIDI export must use a MIDI media type.')
+        if self.public_poster and not self.public_poster.mime.startswith('image/'):
+            raise ValueError('A public poster must be an image.')
+        return self
+
+
+class SummaryCapabilities(Contract):
+    preview: bool = True
+    practice: bool = True
+    live_input: Literal['camera', 'midi', 'microphone', 'none'] = 'none'
+
+
+class LessonSummary(Contract):
+    """Card-sized projection: no body assets and no musical events."""
+
+    summary_version: Literal[1] = 1
+    lesson_id: str
+    revision_id: str
+    title: str
+    subject: Literal['dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'movement_other']
+    subject_label: str
+    experience_family: Literal['body', 'music']
+    instrument: Literal['piano', 'guitar'] | None = None
+    duration: float = Field(gt=0)
+    section_count: int = Field(ge=1)
+    poster: Asset | None = None
+    capabilities: SummaryCapabilities = Field(default_factory=SummaryCapabilities)
+
+
+# The only union in the product: a validated loading boundary, never a body
+# component's contract. Each member is disjoint by version field and forbids extras.
+LessonDocument = LessonManifest | MusicLessonManifest | LessonSummary

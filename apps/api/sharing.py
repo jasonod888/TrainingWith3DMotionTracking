@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -46,15 +46,16 @@ def future(value):
 def install_sharing(app,settings,identity,db):
     router=APIRouter(prefix='/api')
 
-    @router.get('/shared-lessons')
-    def shared_library(account=Depends(identity),session:Session=Depends(db)):
+    def shared_pairs(session, account):
+        """Lessons shared with an account, in the existing order and limits."""
+        pairs = []
+        seen = set()
         grants=session.scalars(select(LessonGrant).where(LessonGrant.account_id==account.id,LessonGrant.revoked.is_(False)).order_by(LessonGrant.accepted_at.desc()).limit(200)).all()
-        values=[];seen=set()
         for grant in grants:
             try:
                 lesson,revision=readable_lesson(session,grant.lesson_id,account.id)
                 if lesson.owner_id!=account.id and lesson.id not in seen:
-                    seen.add(lesson.id);values.append(visible_manifest(session,lesson,revision,account.id))
+                    seen.add(lesson.id);pairs.append((lesson,revision))
             except HTTPException:continue
         group_ids=session.scalars(select(GroupLesson.lesson_id).join(
             GroupMember,GroupMember.group_id==GroupLesson.group_id).join(
@@ -66,9 +67,25 @@ def install_sharing(app,settings,identity,db):
             try:
                 lesson,revision=readable_lesson(session,lesson_id,account.id)
                 if lesson.owner_id!=account.id:
-                    seen.add(lesson.id);values.append(visible_manifest(session,lesson,revision,account.id))
+                    seen.add(lesson.id);pairs.append((lesson,revision))
             except HTTPException:continue
-        return values
+        return pairs
+
+    @router.get('/shared-lessons')
+    def shared_library(account=Depends(identity),session:Session=Depends(db)):
+        # Body-shaped response: music lessons are offered through the summary route so a
+        # v1 client can never receive a v2 object from this endpoint.
+        from .lessons import subject_projection
+        return [visible_manifest(session,lesson,revision,account.id) for lesson,revision in shared_pairs(session,account)
+                if subject_projection(lesson,revision)['experience_family']=='body']
+
+    @router.get('/shared-lessons/summaries')
+    def shared_summaries(request:Request,account=Depends(identity),session:Session=Depends(db)):
+        from .lessons import client_formats, summary_of, subject_projection
+        formats=client_formats(request)
+        return [summary_of(lesson,revision,settings,include_private_poster=False).model_dump()
+                for lesson,revision in shared_pairs(session,account)
+                if subject_projection(lesson,revision)['experience_family']=='body' or '2' in formats]
 
     @router.get('/lessons/{lesson_id}/sharing')
     def settings_view(lesson_id:str,account=Depends(identity),session:Session=Depends(db)):
@@ -108,6 +125,13 @@ def install_sharing(app,settings,identity,db):
             if not revision or revision.lesson_id!=lesson.id:raise HTTPException(409,'The move has newer edits. Reopen it before sharing.')
         # Legacy publishers had no explicit acceptance step; record one so every release is accepted.
         ensure_release(session,lesson,revision,account.id,source='publish')
+        # Releasing is the act that adopts the current label. A reader keeps whatever the
+        # revision was labelled with when it was released, so an unpublished relabel is
+        # never inherited by the published revision.
+        from .lessons import subject_projection
+        released=subject_projection(lesson,revision,current=True)
+        revision.subject,revision.experience_family,revision.instrument=(
+            released['subject'],released['experience_family'],released['instrument'])
         link=None
         if body.mode=='link' and (body.rotate_link or lesson.distribution!='link' or not lesson.share_token_hash or not future(lesson.share_expires_at)):
             raw=secrets.token_urlsafe(32);lesson.share_token_hash=digest(raw);lesson.share_generation+=1;lesson.share_expires_at=now()+timedelta(days=30)

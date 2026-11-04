@@ -1,6 +1,6 @@
 # Multi discipline lesson platform implementation plan
 
-Status: revised implementation plan, revision 2, 4 November 2026. All phases below are planned, not completed. This file is the canonical plan. `requirement/mutli discipline.txt` is a pointer to it and carries no requirements of its own.
+Status: revised implementation plan, revision 2, 4 November 2026. Phase 0 and Phase 1 are delivered — see the [Phase 0 baseline](phase-0-multi-discipline-baseline.md) and the [Phase 1 verification record](multi-discipline-phase-1-verification.md). Phases 2–11 are planned, not implemented. This file is the canonical plan. `requirement/mutli discipline.txt` is a pointer to it and carries no requirements of its own.
 
 Revision 2 records twelve product and engineering decisions taken after a code-level review of the checkout. Where revision 1 left a boundary undecided, this revision decides it. Sections that changed materially are marked **[R2]**.
 
@@ -92,6 +92,8 @@ Dance, taekwondo, and boxing initially continue through the existing body pipeli
 
 Subject and family must agree. The server derives the allowed family and pipeline from subject and enabled capabilities. It rejects contradictory settings instead of accepting a client-supplied model route. Published subject/type changes require appropriate reference regeneration and a new revision; changing a piano lesson to guitar is not a harmless metadata edit.
 
+**[R2.1]** A label change inside the discipline and instrument the lesson already has is metadata only. It updates the lesson record immediately for the owner, reaches readers when the owner next publishes, and never mints a revision — so practice progress, acceptance and the published pointer survive an everyday relabel. Moving between movement and music, or between piano and guitar, still needs new content because the stored reference has no assets for it.
+
 ### 3.2 Extend through a small integration boundary
 
 Add a lesson experience host that dispatches body lessons to the existing components and music lessons to new modules. Keep body camera and reconstruction logic inside the body implementation. Do not rewrite `PracticeWorkspace.tsx` into a universal framework.
@@ -152,7 +154,7 @@ Replace the single pipeline constant and single provider status with a server-si
 | Piano | `music` | `music-piano-v1` | `music-v2` | `music_piano` |
 | Guitar | `music` | `music-guitar-v1` | `music-v2` | `music_guitar` |
 
-The body route stays the default and keeps its current configuration and credentials. The server selects the route from subject, instrument and enabled capabilities; the client declares only the subject and instrument it displayed. Availability is reported per capability in the existing capabilities response, with an additive per-route status in the conversion limits response. An offline guitar worker must not report body conversion as unavailable.
+The body route stays the default and keeps its current configuration and credentials. Each music instrument has its own provider, target and kill switch, so piano can be enabled while guitar remains disabled. The server selects the route from subject, instrument and enabled capabilities; the client declares only the subject and instrument it displayed. Availability is reported per capability in the existing capabilities response, with an additive per-route status in the conversion limits response. An offline guitar worker must not report body conversion as unavailable.
 
 Account-wide storage and active-conversion limits remain in force initially. The budget review must now include audio-bearing uploads, extracted audio, reference JSON, previews, temporary outputs and cleanup, before any quota is changed. Do not introduce silent quota increases or separate subject subscriptions.
 
@@ -642,7 +644,7 @@ The intended final product is one learning platform with several subjects. The p
 
 | ID | Blocker | Blocks | Resolution owner |
 | --- | --- | --- | --- |
-| B1 | Baseline is not reproducible: uncommitted instructor-alpha work touches `contracts.py`, `conversions.py`, `lessons.py`, the schema artifacts, the worker, and the practice workspace | Every Phase 1 slice except 1D's new parser files; any music change in those files | Owner of the in-flight work, with this plan's author |
+| B1 | Baseline is not reproducible: uncommitted instructor-alpha work touches `contracts.py`, `conversions.py`, `lessons.py`, the schema artifacts, the worker, and the practice workspace | Any later music change in those files | Agreed as the baseline on 4 November 2026 by owner instruction; still uncommitted, so the owner should commit or branch it before Phase 2 lands on the same files |
 | B2 | Audio-preparation matrix unverified: browser encoding of MP4 AVC/AAC and WebM VP8/Opus on the installed mediabunny and target devices | Phase 3 start; the recovery-path decision | P0.8 spike |
 | B3 | Music fixture media rights not recorded: the Phase 1 fixture needs owned or licensed video and audio | Slice 1G content | Product and legal review |
 | B4 | Music attempt event bound and retention not agreed | Phase 6 persistence and the shared history projection | P0.7 budget review |

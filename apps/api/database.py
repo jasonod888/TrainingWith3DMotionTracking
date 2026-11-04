@@ -11,6 +11,11 @@ class Lesson(Base):
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     owner_id: Mapped[str] = mapped_column(String(80), index=True)
     title: Mapped[str] = mapped_column(String(200))
+    # Subject metadata is mutable lesson metadata, not part of the frozen v1 manifest.
+    # Immutable revision snapshots below record what a release was published as.
+    subject: Mapped[str] = mapped_column(String(32), default='movement_other', server_default='movement_other', index=True)
+    experience_family: Mapped[str] = mapped_column(String(16), default='body', server_default='body')
+    instrument: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
     version: Mapped[int] = mapped_column(Integer, default=1, server_default='1')
@@ -28,6 +33,11 @@ class LessonRevision(Base):
     lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), index=True)
     manifest: Mapped[dict] = mapped_column(JSON)
     version: Mapped[int] = mapped_column(Integer)
+    # Snapshot of the subject projection at this revision. Null means the revision
+    # predates subjects; readers fall back to the lesson row.
+    subject: Mapped[str | None] = mapped_column(String(32))
+    experience_family: Mapped[str | None] = mapped_column(String(16))
+    instrument: Mapped[str | None] = mapped_column(String(16))
 
 class Account(Base):
     __tablename__ = 'accounts'
@@ -114,6 +124,11 @@ class Conversion(Base):
     source_bytes: Mapped[int] = mapped_column(Integer)
     source_sha256: Mapped[str | None] = mapped_column(String(64))
     source_key: Mapped[str] = mapped_column(String(512))
+    # Subject routing and client-reported preparation provenance. Provenance is
+    # diagnostics only; the uploaded clip timeline is authoritative.
+    subject: Mapped[str] = mapped_column(String(32), default='movement_other', server_default='movement_other')
+    instrument: Mapped[str | None] = mapped_column(String(16))
+    preparation: Mapped[dict] = mapped_column(JSON, default=dict)
     upload_id: Mapped[str | None] = mapped_column(String(512))
     parts: Mapped[dict] = mapped_column(JSON, default=dict)
     start: Mapped[float] = mapped_column(Float)
@@ -286,11 +301,12 @@ def database_ready(engine):
         connection.execute(text('SELECT id, actor_id, action FROM admin_audit LIMIT 0'))
         connection.execute(text('SELECT moderation_hidden FROM lesson_publications LIMIT 0'))
         connection.execute(text('SELECT resolved_at FROM lesson_reports LIMIT 0'))
-        connection.execute(text('SELECT id FROM lesson_revisions LIMIT 0'))
         connection.execute(text('SELECT a.id, s.token_hash, t.token_hash, l.version, l.archived, m.key, h.hits '
                                 'FROM accounts a, login_sessions s, account_tokens t, lessons l, lesson_assets m, auth_throttles h LIMIT 0'))
         connection.execute(text('SELECT account_id, lesson_id, revision_id, time FROM practice_progress LIMIT 0'))
-        connection.execute(text('SELECT id, state, lease_until, provider, pipeline_version, submission_state, target_lesson_id FROM conversions LIMIT 0'))
+        connection.execute(text('SELECT id, owner_id, title, subject, experience_family, instrument FROM lessons LIMIT 0'))
+        connection.execute(text('SELECT id, lesson_id, version, subject, experience_family, instrument FROM lesson_revisions LIMIT 0'))
+        connection.execute(text('SELECT id, state, lease_until, provider, pipeline_version, submission_state, target_lesson_id, subject, instrument, preparation FROM conversions LIMIT 0'))
         connection.execute(text('SELECT id, provider, pipeline_version, silhouettes FROM worker_credentials LIMIT 0'))
         connection.execute(text('SELECT l.published_revision_id, g.account_id, i.token_hash, r.id '
                                 'FROM lessons l, lesson_grants g, lesson_invitations i, lesson_reports r LIMIT 0'))

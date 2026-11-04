@@ -68,6 +68,10 @@ body.in-practice .app>.header{display:none}
 /* Camera preview options live under the live feed they affect, not in the panel.
    Raised above the tracking line so the two never overlap. */
 .mimic-immersive .camera-preview-controls{position:absolute;z-index:4;left:12px;bottom:56px;display:flex}
+/* Stage options belong to the settings view: during practice the stage stays clean and
+   only the transport remains. Opening settings hides the dock and reveals these. */
+.mimic-immersive:not(.settings-open) .stage-controls,
+.mimic-immersive:not(.settings-open) .camera-preview-controls{display:none}
 @media(max-width:700px){
  .mimic-immersive .stage-controls{left:50%;right:auto;transform:translateX(-50%);justify-content:center;max-width:calc(100% - 16px);gap:4px}
  .mimic-shell.mimic-immersive .stage-control-group button{padding:8px 10px}

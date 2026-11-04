@@ -44,3 +44,71 @@ export function mergeNext(sections: Section[], duration: number, index: number):
   draft.splice(index,2,{...draft[index],end:draft[index+1].end});
   return validateSections(draft,duration);
 }
+
+// Music contract v2. Deliberately separate from the body manifest: no coordinates,
+// standing time, GLB animation or landmarks. Kept as a distinct type so body
+// components never have to narrow a union.
+export type InstrumentConfig = {
+  instrument: 'piano' | 'guitar';
+  tuning?: string | null;
+  capo?: number | null;
+  handedness?: 'right' | 'left' | null;
+  reference_pitch_hz?: number | null;
+};
+
+export type AssessmentPolicy = {
+  rubric_version: string;
+  assessment: 'notes' | 'chords' | 'melody' | 'none';
+  input_modes: ('midi' | 'microphone' | 'none')[];
+  dimensions: ('pitch' | 'timing' | 'release' | 'coverage')[];
+};
+
+export type MusicLessonManifest = {
+  schema_version: 2;
+  experience_family: 'music';
+  lesson_id: string;
+  revision_id: string;
+  title: string;
+  subject: 'piano' | 'guitar';
+  duration: number;
+  instrument: InstrumentConfig;
+  section_set: SectionSet;
+  reference: Asset;
+  reference_reviewed: true;
+  assessment: AssessmentPolicy;
+  source_video?: Asset | null;
+  preview_video?: Asset | null;
+  waveform?: Asset | null;
+  midi_export?: Asset | null;
+  public_poster?: Asset | null;
+  warnings: string[];
+};
+
+export type SummaryCapabilities = {
+  preview: boolean;
+  practice: boolean;
+  live_input: 'camera' | 'midi' | 'microphone' | 'none';
+};
+
+export type LessonSubject = 'dance' | 'taekwondo' | 'boxing' | 'piano' | 'guitar' | 'movement_other';
+
+export type LessonSummary = {
+  summary_version: 1;
+  lesson_id: string;
+  revision_id: string;
+  title: string;
+  subject: LessonSubject;
+  subject_label: string;
+  experience_family: 'body' | 'music';
+  instrument?: 'piano' | 'guitar' | null;
+  duration: number;
+  section_count: number;
+  poster?: Asset | null;
+  capabilities: SummaryCapabilities;
+};
+
+/** The only union in the product: a validated loading boundary. */
+export type LessonDocument =
+  | { kind: 'body'; value: LessonManifest }
+  | { kind: 'music'; value: MusicLessonManifest }
+  | { kind: 'summary'; value: LessonSummary };

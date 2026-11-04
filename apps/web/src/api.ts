@@ -1,4 +1,4 @@
-import type {LessonManifest} from '../../../packages/lesson-schema/index';
+import type {LessonManifest,LessonSummary} from '../../../packages/lesson-schema/index';
 import {clearClips} from './clipCache';
 export async function loadDemo(signal?:AbortSignal):Promise<LessonManifest|null>{
   const response=await fetch('/api/demo',{signal});
@@ -25,6 +25,8 @@ export async function getSession():Promise<SessionInfo|null>{
 export async function signIn(email:string,password:string){const value=await request<SessionInfo>('/auth/login','POST',{email,password});csrf=value.csrf;return value.account;}
 export async function signOut(){await request('/auth/logout','POST');csrf='';await clearClips().catch(()=>{});}
 export const loadLibrary=()=>request<LessonManifest[]>('/lessons');
+export const loadLessonSummaries=()=>request<LessonSummary[]>('/lessons/summaries','GET',undefined,false,{'X-Lesson-Formats':'1,2'});
+export const loadSharedSummaries=()=>request<LessonSummary[]>('/shared-lessons/summaries','GET',undefined,false,{'X-Lesson-Formats':'1,2'});
 export const loadLesson=(id:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`);
 export const copyDemo=()=>request<LessonManifest>('/lessons/from-demo','POST');
 export const saveSections=(lesson:LessonManifest,sections:LessonManifest['section_set']['sections'],title:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/sections`,'PUT',{base_revision_id:lesson.revision_id,sections,title});
@@ -33,7 +35,7 @@ export const renameMove=(id:string,title:string)=>request<LessonManifest>(`/less
 
 export type MoveAudiences={direct:number;groups:number;public:boolean};
 export type PublicListing={title:string;creator_name:string;tags:string[];listed_at:string|null};
-export type MoveState={lesson_id:string;latest_revision_id:string|null;accepted_revision_id:string|null;accepted_at:string|null;
+export type MoveState={lesson_id:string;subject?:string;subject_label?:string;experience_family?:'body'|'music';instrument?:'piano'|'guitar'|null;latest_revision_id:string|null;accepted_revision_id:string|null;accepted_at:string|null;
  published_revision_id:string|null;distribution:string;audiences:MoveAudiences;public_listing:PublicListing|null;warnings?:string[]};
 export const loadMoveStates=()=>request<{lessons:MoveState[]}>('/workflow/lessons');
 export const acceptMove=(lessonId:string,revisionId:string,warnings:string[]=[])=>

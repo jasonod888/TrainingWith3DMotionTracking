@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Music preparation spike · Phase 0</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 15px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 900px; padding: 24px 18px 60px; }
+    h1 { font-size: 1.4rem; margin: 0 0 4px; }
+    p.lede { margin: 0 0 20px; opacity: .75; }
+    fieldset { border: 1px solid rgba(127,127,127,.35); border-radius: 12px; margin: 0 0 16px; padding: 14px 16px; }
+    legend { padding: 0 6px; font-weight: 600; }
+    label { display: inline-flex; align-items: center; gap: 6px; margin: 4px 14px 4px 0; }
+    button { font: inherit; padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(127,127,127,.5); background: transparent; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+    th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid rgba(127,127,127,.25); vertical-align: top; }
+    th { font-weight: 600; }
+    code { font-size: .92em; }
+    .pass { color: #137a3f; font-weight: 600; }
+    .fail { color: #a3261a; font-weight: 600; }
+    .warn { color: #8a5a00; font-weight: 600; }
+    #log { white-space: pre-wrap; font: 12px/1.45 ui-monospace, monospace; background: rgba(127,127,127,.1); border-radius: 8px; padding: 10px 12px; max-height: 260px; overflow: auto; }
+    video { width: 100%; max-height: 220px; background: #000; border-radius: 8px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+<h1>Music preparation spike</h1>
+<p class="lede">Phase 0 qualification harness for the two candidate preparation paths. This page is a development spike: it is not built into the app bundle and it changes nothing in the product.</p>
+
+<fieldset>
+  <legend>1 · Browser capability</legend>
+  <p>Reported by the installed mediabunny version for this browser.</p>
+  <button id="capabilities">Check encoder support</button>
+  <div id="capability-result"></div>
+</fieldset>
+
+<fieldset>
+  <legend>2 · Prepare a clip</legend>
+  <label>Source file <input id="source" type="file" accept="video/*"/></label>
+  <label>Start (s) <input id="start" type="number" min="0" step="0.1" value="0" style="width:80px"/></label>
+  <label>End (s) <input id="end" type="number" min="0" step="0.1" value="6" style="width:80px"/></label>
+  <p>
+    <label><input type="checkbox" name="path" value="mp4-aac" checked/> MP4 · AVC/AAC</label>
+    <label><input type="checkbox" name="path" value="webm-opus" checked/> WebM · VP8/Opus</label>
+  </p>
+  <button id="run">Prepare selected paths</button>
+  <button id="cancel" disabled>Cancel</button>
+</fieldset>
+
+<fieldset>
+  <legend>3 · Results</legend>
+  <table>
+    <thead><tr><th>Path</th><th>Encoder</th><th>Output</th><th>Audio</th><th>Timing</th><th>Size</th><th>Verdict</th></tr></thead>
+    <tbody id="results"></tbody>
+  </table>
+  <video id="preview" controls playsinline></video>
+  <p><small>Play the preview with sound to confirm the audio is audible. The verdict column is computed from stream facts, not from listening.</small></p>
+</fieldset>
+
+<fieldset>
+  <legend>Log</legend>
+  <div id="log"></div>
+</fieldset>
+
+<script type="module" src="./music-prepare.ts"></script>
+</body>
+</html>

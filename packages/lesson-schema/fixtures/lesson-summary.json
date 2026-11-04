@@ -1,0 +1,14 @@
+{
+  "summary_version": 1,
+  "lesson_id": "synthetic-piano",
+  "revision_id": "synthetic-piano-v1",
+  "title": "Synthetic piano contract fixture",
+  "subject": "piano",
+  "subject_label": "Piano",
+  "experience_family": "music",
+  "instrument": "piano",
+  "duration": 8,
+  "section_count": 2,
+  "poster": null,
+  "capabilities": { "preview": true, "practice": true, "live_input": "midi" }
+}

@@ -1,0 +1,47 @@
+{
+  "schema_version": 2,
+  "experience_family": "music",
+  "lesson_id": "synthetic-piano",
+  "revision_id": "synthetic-piano-v1",
+  "title": "Music fixture carrying body fields",
+  "subject": "piano",
+  "duration": 8,
+  "instrument": {
+    "instrument": "piano"
+  },
+  "section_set": {
+    "id": "synthetic-piano-sections",
+    "revision": 1,
+    "duration": 8,
+    "sections": [
+      { "id": "intro", "label": "Introduction", "start": 0, "end": 2 },
+      { "id": "phrase", "label": "First phrase", "start": 2, "end": 8 }
+    ]
+  },
+  "reference": {
+    "key": "lessons/synthetic-piano/reference.json",
+    "mime": "application/json",
+    "bytes": 1200,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "reference_reviewed": true,
+  "assessment": {
+    "rubric_version": "piano-midi-v1",
+    "assessment": "notes",
+    "input_modes": ["midi"],
+    "dimensions": ["pitch"]
+  },
+  "standing_time": 0,
+  "animation": {
+    "key": "lessons/synthetic-piano/reference.glb",
+    "mime": "model/gltf-binary",
+    "bytes": 1628,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "landmarks": {
+    "key": "lessons/synthetic-piano/landmarks.json",
+    "mime": "application/json",
+    "bytes": 95,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

@@ -12,11 +12,91 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from .contracts import LessonManifest, Section, SectionSet
+from .contracts import LessonManifest, LessonSummary, MusicLessonManifest, Section, SectionSet, SummaryCapabilities
 from .database import Account, Lesson, LessonAsset, LessonRevision, PracticeProgress, LessonGrant
 from .storage import storage_client
 from .permissions import access_reasons, latest_acceptance, owned_lesson,latest_revision,public_lesson,public_manifest,readable_lesson
 from .auth import now
+from . import processing_routes, subjects
+
+
+FORMAT_HEADER = 'x-lesson-formats'
+
+
+def client_formats(request):
+    """Advertised lesson formats. An unversioned client is v1-only by default."""
+    raw = request.headers.get(FORMAT_HEADER, '1')
+    values = {part.strip() for part in raw.split(',') if part.strip()}
+    return values or {'1'}
+
+
+def ensure_supported(lesson, revision, request):
+    """Refuse to hand a music object to a client that did not ask for v2."""
+    family = subject_projection(lesson, revision)['experience_family']
+    if family == 'music' and '2' not in client_formats(request):
+        raise HTTPException(406, 'This lesson needs a newer version of the app. Refresh to update.',
+                            headers={'X-Lesson-Format-Required': '2'})
+
+
+def subject_projection(lesson, revision=None, current=False):
+    """Release-aware subject projection.
+
+    `current=True` is the owner's draft view: it reads the lesson row, so a relabel
+    shows up immediately without creating a revision. Every other caller uses the
+    label frozen on the revision it is serving, so a reader never inherits a later
+    relabel. A revision with no snapshot (only possible for pre-subject data that the
+    migration did not reach) falls back to the row for compatibility.
+    """
+    snapshot = revision is not None and revision.subject is not None
+    if current or not snapshot:
+        subject = lesson.subject or subjects.DEFAULT_SUBJECT
+        family = lesson.experience_family or 'body'
+        instrument = lesson.instrument
+    else:
+        subject = revision.subject
+        family = revision.experience_family or 'body'
+        instrument = revision.instrument
+    return {
+        'subject': subject,
+        'subject_label': subjects.label_for(subject),
+        'experience_family': family,
+        'instrument': instrument,
+    }
+
+
+def summary_of(lesson, revision, settings, include_private_poster=True, current=False):
+    """Card projection. Never carries body assets or musical events."""
+    projection = subject_projection(lesson, revision, current=current)
+    manifest = revision.manifest or {}
+    family = projection['experience_family']
+    poster = None
+    if family == 'music':
+        poster = manifest.get('public_poster')
+    elif include_private_poster:
+        poster = manifest.get('thumbnail')
+    live_input = 'camera'
+    if family == 'music':
+        live_input = 'none'
+        try:
+            route = processing_routes.route_for(projection['subject'], projection['instrument'])
+            if processing_routes.available(route, settings):
+                live_input = 'midi'
+        except subjects.SubjectError:
+            live_input = 'none'
+    return LessonSummary(
+        lesson_id=lesson.id,
+        revision_id=revision.id,
+        title=manifest.get('title') or lesson.title,
+        subject=projection['subject'],
+        subject_label=projection['subject_label'],
+        experience_family=family,
+        instrument=projection['instrument'],
+        duration=max(0.001, float(manifest.get('duration') or 0)),
+        section_count=max(1, len((manifest.get('section_set') or {}).get('sections') or [])),
+        poster=poster,
+        capabilities=SummaryCapabilities(preview=True, practice=True, live_input=live_input),
+    )
+
 
 
 def import_fixture(engine, settings, owner_id, manifest_path, asset_dir):
@@ -54,9 +134,11 @@ def import_fixture(engine, settings, owner_id, manifest_path, asset_dir):
             manifest.revision_id = revision_id
             manifest.section_set.id = uuid4().hex
             manifest.section_set.revision = 1
-            session.add(Lesson(id=lesson_id, owner_id=owner_id, title=manifest.title, version=1, archived=False))
+            session.add(Lesson(id=lesson_id, owner_id=owner_id, title=manifest.title, version=1, archived=False,
+                               subject=subjects.DEFAULT_SUBJECT, experience_family='body'))
             session.flush()
-            session.add(LessonRevision(id=revision_id, lesson_id=lesson_id, manifest=manifest.model_dump(), version=1))
+            session.add(LessonRevision(id=revision_id, lesson_id=lesson_id, manifest=manifest.model_dump(), version=1,
+                                       subject=subjects.DEFAULT_SUBJECT, experience_family='body'))
             for asset in assets:
                 session.add(LessonAsset(lesson_id=lesson_id, **asset.model_dump()))
             session.commit()
@@ -69,6 +151,72 @@ def import_fixture(engine, settings, owner_id, manifest_path, asset_dir):
                     pass  # No access grant exists; operator can clean orphan objects later.
             raise
     return manifest
+
+
+def import_music_fixture(engine, settings, owner_id, manifest_path, asset_dir):
+    """Operator-controlled music fixture import.
+
+    Uses the same validate-before-write discipline as the body import. A music
+    fixture never runs a worker, so it is the only way a v2 lesson exists during
+    Phase 1. It is not publicly listable: publication requires the normal release
+    path, and music publishing is guarded until a reviewed reference exists.
+    """
+    manifest = MusicLessonManifest.model_validate_json(Path(manifest_path).read_text(encoding='utf-8'))
+    lesson_id, revision_id = uuid4().hex, uuid4().hex
+    roles = ('reference', 'source_video', 'preview_video', 'waveform', 'midi_export', 'public_poster')
+    assets = [getattr(manifest, role) for role in roles if getattr(manifest, role)]
+    names = [Path(asset.key).name for asset in assets]
+    if len(names) != len(set(names)):
+        raise ValueError('Music fixture assets must have unique filenames.')
+    root = Path(asset_dir).resolve()
+    paths = []
+    for asset, name in zip(assets, names):
+        path = (root / name).resolve()
+        if path.parent != root or not path.is_file():
+            raise ValueError('Missing or unsafe music fixture asset.')
+        with path.open('rb') as source:
+            checksum = hashlib.file_digest(source, 'sha256').hexdigest()
+        if path.stat().st_size != asset.bytes or checksum != asset.sha256:
+            raise ValueError(f'Music fixture checksum mismatch: {name}')
+        paths.append(path)
+    store = storage_client(settings)
+    written = []
+    with Session(engine) as session:
+        account = session.get(Account, owner_id)
+        if not account or not account.verified:
+            raise ValueError('Import requires a verified owner account.')
+        try:
+            for asset, name, path in zip(assets, names, paths):
+                asset.key = f'lessons/{lesson_id}/{name}'
+                written.append(asset.key)
+                store.upload_file(str(path), settings.storage_bucket, asset.key, ExtraArgs={'ContentType': asset.mime})
+            manifest.lesson_id = lesson_id
+            manifest.revision_id = revision_id
+            manifest.section_set.id = uuid4().hex
+            manifest.section_set.revision = 1
+            projection = subject_projection_for(manifest.subject, manifest.instrument.instrument)
+            session.add(Lesson(id=lesson_id, owner_id=owner_id, title=manifest.title, version=1, archived=False,
+                               **projection))
+            session.flush()
+            session.add(LessonRevision(id=revision_id, lesson_id=lesson_id, manifest=manifest.model_dump(), version=1,
+                                       **projection))
+            for asset in assets:
+                session.add(LessonAsset(lesson_id=lesson_id, **asset.model_dump()))
+            session.commit()
+        except Exception:
+            session.rollback()
+            for key in written:
+                try:
+                    store.delete_object(Bucket=settings.storage_bucket, Key=key)
+                except Exception:
+                    pass
+            raise
+    return manifest
+
+
+def subject_projection_for(subject, instrument=None):
+    resolved, family, resolved_instrument = subjects.validate_selection(subject, instrument)
+    return {'subject': resolved, 'experience_family': family, 'instrument': resolved_instrument}
 
 
 class SaveSections(BaseModel):
@@ -84,6 +232,11 @@ class TrimInput(BaseModel):
     start_frame: int = Field(ge=0, strict=True)
     end_frame: int = Field(gt=0, strict=True)
     accept: bool = False
+
+
+class SubjectInput(BaseModel):
+    subject: str = Field(min_length=1, max_length=32)
+    instrument: str | None = Field(default=None, max_length=16)
 
 class ProgressInput(BaseModel):
     revision_id: str = Field(min_length=1, max_length=80)
@@ -108,10 +261,29 @@ def install_lessons(app, engine, settings, identity, db):
 
     @router.get('')
     def library(account=Depends(identity), session: Session = Depends(db)):
+        # Body-shaped list: a client that assumes v1 must never receive a v2 object.
+        # Mixed-subject clients use /lessons/summaries instead.
         rows = session.execute(select(LessonRevision).join(Lesson, Lesson.id == LessonRevision.lesson_id).where(
-            Lesson.owner_id == account.id, Lesson.archived.is_(False), Lesson.disabled.is_(False), LessonRevision.version == Lesson.version)
+            Lesson.owner_id == account.id, Lesson.archived.is_(False), Lesson.disabled.is_(False),
+            Lesson.experience_family == 'body', LessonRevision.version == Lesson.version)
             .order_by(Lesson.created_at.desc())).scalars().all()
         return [row.manifest for row in rows]
+
+    @router.get('/summaries')
+    def summaries(request: Request, account=Depends(identity), session: Session = Depends(db)):
+        """Mixed-subject card projection for clients that advertise v1 and v2."""
+        formats = client_formats(request)
+        rows = session.execute(select(Lesson, LessonRevision).join(
+            LessonRevision, LessonRevision.lesson_id == Lesson.id).where(
+            Lesson.owner_id == account.id, Lesson.archived.is_(False), Lesson.disabled.is_(False),
+            LessonRevision.version == Lesson.version).order_by(Lesson.created_at.desc())).all()
+        values = []
+        for lesson, revision in rows:
+            # The owner's list is the draft view: a relabel shows immediately.
+            if subject_projection(lesson, revision, current=True)['experience_family'] == 'music' and '2' not in formats:
+                continue
+            values.append(summary_of(lesson, revision, settings, current=True).model_dump())
+        return values
 
     @router.post('/from-demo', response_model=LessonManifest, status_code=201)
     def copy_demo(account=Depends(identity), session: Session = Depends(db)):
@@ -123,15 +295,41 @@ def install_lessons(app, engine, settings, identity, db):
             raise HTTPException(503, 'The demonstration is unavailable for import.') from exc
 
     @router.get('/{lesson_id}')
-    def detail(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
+    def detail(lesson_id: str, request: Request, account=Depends(identity), session: Session = Depends(db)):
         lesson,reasons=access_reasons(session,lesson_id,account.id)
         if not lesson or not reasons:raise HTTPException(404,'Move unavailable.')
         if 'owner' in reasons or 'direct' in reasons or 'group' in reasons:
-            return readable_lesson(session,lesson_id,account.id)[1].manifest
+            _,revision=readable_lesson(session,lesson_id,account.id)
+            ensure_supported(lesson, revision, request)
+            return revision.manifest
         # A public-only reader never receives private source media.
         _,revision,publication=public_lesson(session,lesson_id)
+        ensure_supported(lesson, revision, request)
         from .workflow import public_tags
         return public_manifest(revision,publication,public_tags(session,lesson_id))
+
+    @router.patch('/{lesson_id}/subject')
+    def set_subject(lesson_id: str, body: SubjectInput, account=Depends(identity), session: Session = Depends(db)):
+        lesson = owned_lesson(session, lesson_id, account.id, True)
+        try:
+            resolved, family, instrument = subjects.validate_selection(body.subject, body.instrument)
+        except subjects.SubjectError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        latest = latest_revision(session, lesson)
+        published = session.get(LessonRevision, lesson.published_revision_id) if lesson.published_revision_id else None
+        # Discipline and instrument are fixed by the content that was processed: the stored
+        # manifest has no music or body assets for anything else. A label may become more
+        # specific only inside the discipline the lesson already belongs to.
+        provenance = subject_projection(lesson, published or latest)
+        if provenance['experience_family'] != family or provenance['instrument'] != instrument:
+            raise HTTPException(422, 'Changing between movement and music needs new content. Upload or convert the lesson again.')
+        # Metadata only. No revision is created, so practice progress, acceptance and the
+        # published pointer keep referring to the same revision. A reader keeps the label
+        # frozen on that revision; the public label changes when the owner next publishes.
+        lesson.subject, lesson.experience_family, lesson.instrument = resolved, family, instrument
+        session.commit()
+        return {'lesson_id': lesson.id, 'revision_id': latest.id if latest else None,
+                **subject_projection(lesson, latest, current=True)}
 
     @router.get('/{lesson_id}/progress')
     def progress(lesson_id: str, revision_id: str | None = None, account=Depends(identity), session: Session = Depends(db)):
@@ -184,7 +382,9 @@ def install_lessons(app, engine, settings, identity, db):
             raise HTTPException(409, 'This lesson has newer changes. Reopen it from your library before editing.')
         manifest.revision_id = uuid4().hex
         manifest.section_set = section_set
-        session.add(LessonRevision(id=manifest.revision_id, lesson_id=lesson.id, manifest=manifest.model_dump(), version=section_set.revision))
+        session.add(LessonRevision(id=manifest.revision_id, lesson_id=lesson.id, manifest=manifest.model_dump(),
+                                   version=section_set.revision, subject=lesson.subject,
+                                   experience_family=lesson.experience_family, instrument=lesson.instrument))
         session.commit()
         return manifest
 
@@ -192,6 +392,10 @@ def install_lessons(app, engine, settings, identity, db):
     def trim(lesson_id: str, body: TrimInput, account=Depends(identity), session: Session = Depends(db)):
         lesson = owned_lesson(session, lesson_id, account.id, True)
         revision = latest(session, lesson)
+        # The frame-based movement trim is not a music trim, and `accept` must never
+        # become a way to accept an unreviewed music reference.
+        if subject_projection(lesson, revision)['experience_family'] == 'music':
+            raise HTTPException(409, 'Music lessons are trimmed through the reviewed reference, not the movement trim.')
         if revision.id != body.base_revision_id:
             raise HTTPException(409, 'This move changed. Reopen it before trimming.')
         manifest = LessonManifest.model_validate(revision.manifest)
@@ -226,7 +430,9 @@ def install_lessons(app, engine, settings, identity, db):
         manifest.standing_time = max(0, min(manifest.standing_time-start, duration))
         manifest.revision_id = uuid4().hex
         manifest.section_set = SectionSet(id=manifest.section_set.id, revision=revision.version+1, duration=duration, sections=sections)
-        trimmed = LessonRevision(id=manifest.revision_id, lesson_id=lesson.id, manifest=manifest.model_dump(), version=revision.version+1)
+        trimmed = LessonRevision(id=manifest.revision_id, lesson_id=lesson.id, manifest=manifest.model_dump(),
+                                 version=revision.version+1, subject=lesson.subject,
+                                 experience_family=lesson.experience_family, instrument=lesson.instrument)
         session.add(trimmed)
         if body.accept:
             from .permissions import accept_revision
@@ -260,7 +466,14 @@ def install_lessons(app, engine, settings, identity, db):
         if not lesson or not reasons:raise HTTPException(404,'Move unavailable.')
         _,revision=readable_lesson(session,lesson_id,account.id)
         key = f'lessons/{lesson_id}/{name}'
-        fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail','focused_video','focused_video_alpha')
+        family = subject_projection(lesson, revision)['experience_family']
+        if family == 'music':
+            # Private extracted audio follows private source-video rules. A public
+            # viewer never receives audio, video, MIDI or the reference itself.
+            fields = ('public_poster',) if reasons == ['public'] else (
+                'reference', 'source_video', 'preview_video', 'waveform', 'midi_export', 'public_poster')
+        else:
+            fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail','focused_video','focused_video_alpha')
         allowed={value['key'] for value in (revision.manifest.get(field) for field in fields) if value}
         allowed.update(value['key'] for kind,value in revision.manifest.get('presentation',{}).items()
                        if reasons!=['public'] or kind in ('male','female'))
