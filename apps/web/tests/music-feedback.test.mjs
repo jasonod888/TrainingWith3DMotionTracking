@@ -1,0 +1,75 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {buildRunFeedback, calibrateLatency, feedbackEligibility} from '../src/music/music-feedback.ts';
+
+const reference = {
+  reference_version: 1, subject: 'piano', instrument: {instrument: 'piano'}, duration: 4,
+  events: [
+    {id: 'a', onset: 1.0, duration: 0.3, pitch: 60, optional: false},
+    {id: 'b', onset: 1.4, duration: 0.3, pitch: 64, optional: false},
+    {id: 'opt', onset: 1.8, duration: 0.3, pitch: 67, optional: true},
+  ],
+  spans: [{start: 0.5, end: 2}],
+};
+const base = {reference, sectionId: 'phrase', start: 0.5, end: 2.0, speed: 1, run: 0, latencyMs: 0, latencyMeasured: false};
+
+function feedback(attacks, overrides = {}) {
+  return buildRunFeedback({...base, attacks, ...overrides});
+}
+
+test('calibration takes a clamped median and needs four taps', () => {
+  assert.equal(calibrateLatency([20, 30, 40, 50]), 35);
+  assert.equal(calibrateLatency([10, 20, 30, 40, 50]), 30);
+  assert.equal(calibrateLatency([10, 20, 500, 30, 40]), 25);
+  assert.throws(() => calibrateLatency([10, 20, 30]), /four notes/);
+});
+
+test('watch-only rubrics and missing input are refused with reasons', () => {
+  const watch = feedbackEligibility({assessment: {rubric_version: 'x', assessment: 'none', input_modes: ['none'], dimensions: []},
+    subject: 'piano', referenceReviewed: true, inputSelected: true, latencyMeasured: true});
+  assert.equal(watch.eligible, false);
+  assert.match(watch.reasons.join(' '), /no MIDI note rubric/);
+  const good = feedbackEligibility({assessment: {rubric_version: 'x', assessment: 'notes', input_modes: ['midi'], dimensions: []},
+    subject: 'piano', referenceReviewed: true, inputSelected: true, latencyMeasured: true});
+  assert.equal(good.eligible, true);
+  const noInput = feedbackEligibility({assessment: {rubric_version: 'x', assessment: 'notes', input_modes: ['midi'], dimensions: []},
+    subject: 'piano', referenceReviewed: true, inputSelected: false, latencyMeasured: false});
+  assert.equal(noInput.eligible, false);
+  assert.match(noInput.reasons.join(' '), /keyboard input/);
+  assert.match(noInput.warnings.join(' '), /approximate/);
+});
+
+test('matching produces corrections without a score and never grades optional misses', () => {
+  const result = feedback([{id: 'x', pitch: 60, sourceTime: 1.02}, {id: 'y', pitch: 64, sourceTime: 1.44}]);
+  assert.equal(result.status, 'complete');
+  assert.equal(result.matched, 2);
+  assert.equal(result.missing, 0);
+  assert.equal(result.extra, 0);
+  assert.equal(result.notes.filter(note => note.status === 'matched').length, 2);
+  assert.equal(result.notes.find(note => note.status === 'matched')?.timing, 'on-time');
+  assert.ok(!('score' in result));
+  const missingRequired = feedback([{id: 'x', pitch: 60, sourceTime: 1.02}]);
+  assert.equal(missingRequired.missing, 1);
+  assert.equal(missingRequired.notes.find(note => note.status === 'missing')?.name, 'E4');
+  const withoutOptional = feedback([]);
+  assert.equal(withoutOptional.missing, 2, 'only the two required notes are missing');
+});
+
+test('extra notes are reported and duplicate evidence invalidates the run', () => {
+  const extra = feedback([{id: 'x', pitch: 60, sourceTime: 1.0}, {id: 'y', pitch: 72, sourceTime: 1.9}]);
+  assert.equal(extra.extra, 1);
+  assert.equal(extra.notes.find(note => note.status === 'extra')?.name, 'C5');
+  const invalid = feedback([{id: 'same', pitch: 60, sourceTime: 1}, {id: 'same', pitch: 64, sourceTime: 1.4}]);
+  assert.equal(invalid.status, 'invalid');
+  assert.match(invalid.reason ?? '', /Invalid/);
+  assert.equal(invalid.matched, 0);
+});
+
+test('each repeat is analysed independently', () => {
+  const first = feedback([{id: 'a1', pitch: 60, sourceTime: 1}, {id: 'a2', pitch: 64, sourceTime: 1.4}], {run: 0});
+  const second = feedback([{id: 'b1', pitch: 60, sourceTime: 1}], {run: 1});
+  assert.equal(first.run, 0);
+  assert.equal(second.run, 1);
+  assert.equal(first.matched, 2);
+  assert.equal(second.missing, 1);
+});

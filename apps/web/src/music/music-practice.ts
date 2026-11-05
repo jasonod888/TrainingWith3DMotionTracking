@@ -24,21 +24,25 @@ export function startPractice(options: PracticeOptions): PracticeState {
 /** Advance wall-clock seconds; playing progress is scaled by the speed preset. */
 export function advancePractice(state: PracticeState, seconds: number, options: PracticeOptions): PracticeState {
   if (state.phase === 'done') return state;
-  const elapsed = state.elapsed + Math.max(0, seconds);
-  if (state.phase === 'count-in') {
-    const total = options.countInBeats * BEAT_SECONDS;
-    if (elapsed >= total) return {phase: 'playing', run: 0, elapsed: 0, beat: 0};
-    return {...state, elapsed, beat: Math.max(1, Math.ceil((total - elapsed) / BEAT_SECONDS))};
+  if (!Number.isFinite(seconds)) return state;
+  let remaining = Math.max(0, seconds), next = {...state};
+  // Carry frame overshoot through every boundary; frame cadence must not change timing.
+  while (next.phase !== 'done') {
+    const total = next.phase === 'count-in' ? options.countInBeats * BEAT_SECONDS
+      : next.phase === 'rest' ? REST_SECONDS
+      : Math.max(0.05, options.end - options.start) / options.speed;
+    const available = Math.max(0, total - next.elapsed);
+    if (remaining + 1e-10 < available) {
+      next.elapsed += remaining;
+      if (next.phase === 'count-in') next.beat = Math.max(1, Math.ceil((total - next.elapsed) / BEAT_SECONDS));
+      return next;
+    }
+    remaining = Math.max(0, remaining - available);
+    if (next.phase === 'count-in') next = {phase:'playing', run:0, elapsed:0, beat:0};
+    else if (next.phase === 'rest') next = {phase:'playing', run:next.run + 1, elapsed:0, beat:0};
+    else next = {phase:next.run + 1 >= Math.max(1, options.repeats) ? 'done' : 'rest', run:next.run, elapsed:0, beat:0};
   }
-  if (state.phase === 'playing') {
-    const duration = Math.max(0.05, options.end - options.start);
-    if (elapsed * options.speed < duration) return {...state, elapsed};
-    return state.run + 1 >= Math.max(1, options.repeats)
-      ? {phase: 'done', run: state.run, elapsed: 0, beat: 0}
-      : {phase: 'rest', run: state.run, elapsed: 0, beat: 0};
-  }
-  if (elapsed >= REST_SECONDS) return {phase: 'playing', run: state.run + 1, elapsed: 0, beat: 0};
-  return {...state, elapsed};
+  return next;
 }
 
 /** Absolute reviewed time for the current moment; count-in and rest hold at the section start. */

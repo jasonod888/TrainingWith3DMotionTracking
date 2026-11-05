@@ -46,12 +46,42 @@ Limitations for the next slice: attacks are counted, not timestamped or matched;
 practice clock is a monotonic wall clock with the video paused, so 6C must map input
 timestamps to that same timeline and compensate measured latency before any feedback.
 
+## Delivered: Phase 6C gated local feedback
+
+Feedback is produced only for an **explicitly MIDI-enabled piano rubric**:
+
+1. the lesson's reviewed assessment is `notes` and lists `midi` input;
+2. the reviewed reference is loaded and bound to its reviewed hash;
+3. the learner has explicitly started practice and selected one connected input;
+4. the repeat is fully observed — seek, stop, hidden page or input replacement discards it.
+
+Each repeat gets its own run clock (`wallStartMs`, reviewed range, speed, measured latency).
+Attacks use `MIDIMessageEvent.timeStamp`, so simultaneous chord notes are individual
+events, and are converted to reviewed source time with the measured input delay. Matching
+reuses `matchOnsets`: one-to-one, exact pitch, required notes first, optional notes can
+absorb input but never create missing-note corrections, edge notes unassessed.
+
+`calibrateLatency` starts an eight-pulse visual calibration; at least four taps are
+required and the clamped median (0–300 ms) becomes the session's measured delay. Without a
+measurement, feedback still appears but is labelled approximate; timing corrections use
+the unmeasured value 0.
+
+The feedback contract (`apps/web/src/music/music-feedback.ts`) reports per repeat: matched,
+missing, extra and unassessed counts plus corrected note names and early/late/on-time
+direction. It has no score, percentage or grade, and it is never uploaded, persisted or
+turned into an attempt.
+
+Limits: only piano lessons with an explicit MIDI rubric are eligible; no latency
+qualification on physical hardware; feedback remains approximate until calibrated; the
+calibration UI is not yet exercised end-to-end in a browser check (its maths is unit
+tested).
+
 ## Remaining implementation phases
 
 | Slice | Work and acceptance |
 | --- | --- |
 | 6B: music practice controller | **Delivered 5 November 2026**: count-in, whole-lesson/section practice, four speed presets, repeat and clean reset; MIDI input remains optional and unscored. |
-| 6C: opt-in local feedback | Start only after explicit practice action, selected input, an exact reviewed reference hash/revision and a MIDI-enabled rubric. Account for measured input latency. Match distinct attacks one-to-one; held keys never count as repeated attacks. Optional notes do not produce missing-note corrections. Pedal sound and physical key duration remain distinct. |
+| 6C: opt-in local feedback | **Delivered 5 November 2026**: explicit gate, per-repeat timestamped capture, latency calibration and one-to-one corrections; unscored and local. Physical-device latency and coverage thresholds remain. |
 | 6D: trustworthy scoring | Review assessable spans and exercise-specific limits before scoring. Current generic passage spans are not proof of assessability. Disconnects, hidden pages, seeks and dropped observations invalidate affected evidence rather than marking the learner wrong. Establish coverage/false-correction thresholds on physical keyboards. Watch-only manifests stay unscored. |
 | 6E: persistence and rollout | Add a separately versioned, bounded music-attempt contract tied to reference hash, revision and rubric. Reuse the account/history destination without changing pose-attempt payloads. Avoid stable device identifiers and raw performance uploads by default. Qualify browsers/devices and gated deployment before a learner rollout. |
 
@@ -67,6 +97,7 @@ musical technique or model accuracy. Microphone assessment remains a separate fu
   explicit permission, selected-input isolation, sustain, device switching/disconnect,
   hidden-page/exit cleanup, denied and late permission, unsupported browsers and no media,
   progress or attempt requests. It is not hardware qualification.
+- `scripts/verify_music_feedback.py` covers matching and missing corrections per repeat for a MIDI rubric, the approximate-delay notice, and watch-only lessons staying ungraded with no persistence calls.
 - `scripts/verify_music_practice.py` covers count-in, section practice, repeats, completion and clean reset on seek, plus attack counting with a virtual keyboard; no media or attempt requests.
 - Guide browser checks also cover failed-video fallback, replay after end, hidden-page
   pause, old-reference removal during a delayed lesson switch, and a tampered-reference
@@ -77,3 +108,44 @@ musical technique or model accuracy. Microphone assessment remains a separate fu
 
 No new model/runtime dependency was installed, and music processing, sharing and scoring
 remain disabled.
+
+
+## Follow-up review of bbf45bb and Phase 6C foundation
+
+The timed-practice slice can proceed. Corrected phase-boundary time loss by carrying
+frame overshoot through count-in, playing and rest, including multiple transitions in
+one update. Practice stops on page hiding/pagehide even without MIDI. Native video
+transport is unavailable during practice; a native play event resets practice rather
+than starting a second clock. Rest holds at the range start and completion ends at the
+range end. The UI explains the silent guide and fixed visual 120 BPM count-in; this is
+not an inferred tempo. Without a selected keyboard, completion says no input was
+measured. Keyboard counts describe MIDI attacks, not musical correctness. Snapshot
+callbacks run per input event, outside batched React rendering, with resets forwarded.
+
+`packages/music-engine/onsets.ts` begins **6C as pure, unused analysis helpers**:
+
+- Map a monotonic MIDI event timestamp onto one repeat's source clock, subtracting
+  measured observation latency in wall milliseconds before applying playback speed.
+  Reject invalid clocks; timestamps outside that repeat are excluded.
+- Match distinct attacks one-to-one by exact pitch and source-time tolerance. Required
+  notes take priority over optional notes. Missing optional notes produce no corrections.
+- Exclude notes whose full tolerance window is outside the fully observed range; nearby
+  input is unassessed rather than reported as a false extra. The helper returns pairs,
+  signed timing differences, missing/extra IDs and an unassessed count, never a score.
+- Duration and pedal are not inferred from attacks. Existing MIDI normalization keeps
+  physical key state separate from pedal-held sound.
+
+These helpers are **not connected to the practice UI** and do not constitute rubric
+feedback, real timestamp capture, latency measurement or hardware qualification. Callers
+must first bind an exact reviewed reference/revision and an explicitly MIDI-enabled,
+versioned rubric; authorize feedback with an explicit learner action; collect bounded
+per-repeat MIDI timestamps in the same clock domain; and discard interrupted evidence.
+The current watch-only reference remains ungraded. Generic teaching spans are not
+assessment coverage. A next slice can implement that contract and capture/calibration
+flow behind a default-off feedback gate, then connect the matcher. No persistence or
+body-practice contract change is required for that slice.
+
+Verification for this continuation: 267 web tests; TypeScript/build and bundle check;
+practice, MIDI lifecycle and guide Playwright scripts. The practice script additionally
+checks hiding without a keyboard and three synchronous attacks (no React batching loss).
+No API/schema change, model selection, deployment, commit or push was performed.

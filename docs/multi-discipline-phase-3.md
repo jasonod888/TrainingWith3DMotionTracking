@@ -360,3 +360,54 @@ Verification for this slice:
 Next: rubric-based feedback (6C) with latency compensation and one-to-one attack matching,
 then trustworthy scoring and persistence. Model benchmarking, physical-device checks and
 PostgreSQL verification continue alongside; no model is qualified or installed.
+
+
+## bbf45bb follow-up: timed-practice fixes and initial 6C helpers
+
+Accepted continued development, with phase timing, hidden-page cancellation, native
+video transport isolation and honest unmeasured-input messaging corrected. Added
+independent timestamp/latency mapping and one-to-one onset matching helpers, not wired
+to learner feedback. Required/optional note priority and incomplete edge-window evidence
+have explicit tests. See `piano-midi-practice.md` for delivered scope and the next
+feedback-contract/capture gate. No live rubric feedback, scoring or persistence claim.
+
+267 web tests pass. TypeScript/production build and bundle check pass. Music practice,
+MIDI lifecycle and guide browser checks pass. No server/schema changes; the previously
+reported Python result was not rerun for this client-only continuation. Music processing,
+sharing and scoring remain disabled. PostgreSQL, physical-device checks and commercial
+model qualification remain parallel rollout work. Changes are local and uncommitted.
+
+
+## Implementation slice: gated local feedback (6C)
+
+5 November 2026. Client-only. Music processing, sharing and scoring remain disabled; no
+server contract changed.
+
+- **Gate.** Feedback requires a piano lesson whose reviewed assessment is `notes` with
+  `midi` input, the exact reviewed reference, an explicit practice action and a selected
+  connected input. Watch-only lessons never produce corrections. The gate explains why it
+  refused instead of silently grading nothing.
+- **Per-repeat evidence.** Each repeat has its own run clock and attack list. Attacks use
+  `MIDIMessageEvent.timeStamp` (so simultaneous notes are separate events) and are mapped
+  to reviewed source time with the measured delay. Seek, stop, hidden page and input
+  replacement discard the affected run.
+- **Calibration.** Eight visual pulses; at least four taps; clamped median delay in
+  milliseconds for the session. Without a measurement, feedback is shown but labelled
+  approximate.
+- **Contract.** Corrections per repeat: matched/missing/extra/unassessed plus note names
+  and early/late/on-time direction. No score, percentage, persistence or upload. Optional
+  notes never become missing corrections; invalid evidence yields an invalid run.
+
+Verification for this slice:
+
+| Check | Result |
+| --- | --- |
+| Web suite | **272 passed** (+5 feedback-contract) |
+| TypeScript / build / bundle | Clean; bundle within budget |
+| `verify_music_feedback.py` | **Passed**: 2 matched, per-repeat 1 missing, watch-only stays ungraded, approximate-delay notice, no progress/attempt/media calls |
+| `verify_music_practice.py`, `verify_music_midi.py`, `verify_music_guide.py` | **Passed** |
+| API suite | Not rerun; no server files changed in this slice (previous 292 passed, 13 skipped) |
+
+Next: 6D trustworthy scoring (assessable spans, exercise limits, coverage and
+false-correction thresholds on physical keyboards), then 6E bounded persistence. Model
+qualification and PostgreSQL verification continue alongside.

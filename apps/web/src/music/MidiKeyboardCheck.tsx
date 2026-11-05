@@ -5,14 +5,13 @@ import {pitchName} from './music-reference';
 const empty:MidiSnapshot={pressed:[],sounding:[],attacks:0,pedal:false};
 
 /** Opt-in input setup pilot. Preview never opens MIDI; no performance is graded or saved. */
-export function MidiKeyboardCheck({onSnapshot,onInputChange}:{onSnapshot?:(notes:MidiSnapshot)=>void;onInputChange?:(id:string)=>void}={}){
+export function MidiKeyboardCheck({onSnapshot,onInputChange,onAttack}:{onSnapshot?:(notes:MidiSnapshot)=>void;onInputChange?:(id:string)=>void;onAttack?:(attack:{pitch:number;timeStamp:number})=>void}={}){
  const [access,setAccess]=useState<MIDIAccess|null>(null),[inputs,setInputs]=useState<MIDIInput[]>([]),[selected,setSelected]=useState('');
  const [notes,setNotes]=useState(empty),[busy,setBusy]=useState(false),[message,setMessage]=useState('Connect your keyboard, then choose its input. Use the sound from your keyboard.');
  const alive=useRef(true),requestEpoch=useRef(0),opened=useRef<MIDIInput|null>(null),state=useRef(new MidiNotes()),selectedRef=useRef(selected);selectedRef.current=selected;
- const snapshotCallback=useRef(onSnapshot),inputCallback=useRef(onInputChange);snapshotCallback.current=onSnapshot;inputCallback.current=onInputChange;
+ const snapshotCallback=useRef(onSnapshot),inputCallback=useRef(onInputChange),attackCallback=useRef(onAttack);snapshotCallback.current=onSnapshot;inputCallback.current=onInputChange;attackCallback.current=onAttack;
  const supported=window.isSecureContext&&typeof navigator.requestMIDIAccess==='function';
- const clear=()=>setNotes(state.current.reset());
- useEffect(()=>{snapshotCallback.current?.(notes);},[notes]);
+ const clear=()=>{const snapshot=state.current.reset();setNotes(snapshot);snapshotCallback.current?.(snapshot);};
  useEffect(()=>{inputCallback.current?.(selected);},[selected]);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;requestEpoch.current++;};},[]);
  useEffect(()=>{
@@ -25,7 +24,7 @@ export function MidiKeyboardCheck({onSnapshot,onInputChange}:{onSnapshot?:(notes
   const input=inputs.find(item=>item.id===selected);let stopped=false;
   clear();
   if(!input)return;
-  const receive=(event:MIDIMessageEvent)=>{if(!stopped&&!document.hidden&&event.data)setNotes(state.current.receive(event.data));};
+  const receive=(event:MIDIMessageEvent)=>{if(stopped||document.hidden||!event.data)return;const [status,pitch,velocity]=event.data;if((status&0xf0)===0x90&&velocity>0)attackCallback.current?.({pitch,timeStamp:event.timeStamp});const snapshot=state.current.receive(event.data);setNotes(snapshot);snapshotCallback.current?.(snapshot);};
   void input.open().then(()=>{if(stopped){if(!alive.current||selectedRef.current!==input.id)void input.close().catch(()=>{});return;}
    opened.current=input;input.addEventListener('midimessage',receive);setMessage('Play a note to check this keyboard. This is not a scored exercise.');
   }).catch(()=>{if(!stopped){setSelected('');setMessage('This keyboard could not be opened. Choose another input or reconnect it.');}});

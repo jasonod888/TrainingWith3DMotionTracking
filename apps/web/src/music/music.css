@@ -296,3 +296,60 @@
     flex: 1 1 40%;
   }
 }
+
+/* Local, unscored MIDI feedback */
+.input-delay .calibration-pulse {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.input-delay .calibration-pulse strong {
+  font-size: 1.6rem;
+  color: #1d4ed8;
+  font-variant-numeric: tabular-nums;
+}
+
+.input-delay .calibration-pulse small {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.music-feedback {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.music-feedback h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.feedback-run {
+  margin-top: 10px;
+}
+
+.feedback-run h3 {
+  margin: 0 0 2px;
+  font-size: 0.9rem;
+}
+
+.feedback-run p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.feedback-run ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.82rem;
+}
+
+.feedback-note.matched { color: #15803d; }
+.feedback-note.missing { color: #b91c1c; }
+.feedback-note.extra { color: #b45309; }

@@ -60,3 +60,17 @@ test('labels describe each phase without implying a score', () => {
   assert.match(practiceLabel({phase: 'done', run: 1, elapsed: 0, beat: 0}, options), /complete/);
   assert.doesNotMatch(practiceLabel({phase: 'done', run: 1, elapsed: 0, beat: 0}, options), /score|grade/i);
 });
+
+test('phase boundaries preserve overshoot regardless of frame cadence', () => {
+  const settings = {...options, end: 2, repeats: 3, speed: 0.75};
+  const total = 2 + 3 / 0.75 + 2 * REST_SECONDS;
+  const initial = startPractice(settings);
+  let stepped = initial;
+  for (let i = 0; i < 53; i++) stepped = advancePractice(stepped, 0.13, settings);
+  const direct = advancePractice(initial, 53 * 0.13, settings);
+  assert.equal(stepped.phase, direct.phase);
+  assert.equal(stepped.run, direct.run);
+  assert.ok(Math.abs(stepped.elapsed - direct.elapsed) < 1e-9);
+  assert.equal(advancePractice(initial, total, settings).phase, 'done');
+  assert.deepEqual(advancePractice(initial, NaN, settings), initial);
+});

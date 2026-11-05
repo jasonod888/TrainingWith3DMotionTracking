@@ -91,7 +91,7 @@ with sync_playwright() as p:
     expect(page.locator('.practice-count')).to_contain_text('Get ready')
     expect(page.locator('.practice-status')).to_contain_text('Count-in 2')
     expect(page.locator('.music-practice')).to_contain_text('Practice complete', timeout=15000)
-    expect(page.locator('.music-practice')).to_contain_text('0 notes played')
+    expect(page.locator('.music-practice')).to_contain_text('No keyboard input was measured')
     expect(page.locator('.music-practice')).to_contain_text('unscored')
     # A seek during a new run resets practice cleanly.
     page.get_by_role('button', name='Practice again', exact=True).click()
@@ -107,6 +107,12 @@ with sync_playwright() as p:
     assert errors == [], errors
     assert page.evaluate('window.deviceRequests') == []
     page.screenshot(path=str(ROOT / 'test-results/music-practice-phone.png'), full_page=True)
+
+    # Hidden pages must stop practice even without any MIDI connection.
+    page.get_by_role('button', name='Start practice', exact=True).click()
+    page.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
+    expect(page.locator('.music-practice')).to_have_count(0)
+    page.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:false})")
 
     # With the opt-in setup capability on, attacks played during a run are counted (unscored).
     def api_midi(route):
@@ -128,9 +134,9 @@ with sync_playwright() as p:
     page.get_by_label('Repeats').select_option('1')
     page.get_by_role('button', name='Start practice', exact=True).click()
     page.wait_for_timeout(150)
-    page.evaluate('window.playNote(60)')
+    page.evaluate('window.playNote(60); window.playNote(64); window.playNote(67)')
     expect(page.locator('.music-practice')).to_contain_text('Practice complete', timeout=15000)
-    expect(page.locator('.music-practice')).to_contain_text('1 note played')
+    expect(page.locator('.music-practice')).to_contain_text('3 MIDI attacks counted locally')
     assert page.evaluate('window.midiRequests') == 1
     assert errors == [], errors
     browser.close()
