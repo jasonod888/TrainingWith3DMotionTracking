@@ -55,7 +55,7 @@ export function App(){
   window.addEventListener('keydown',escape);return()=>{document.body.style.overflow=previous;window.removeEventListener('keydown',escape);};
  },[drawerOpen]);
  useEffect(()=>{if(page==='account'&&accountPreferences){const section=document.getElementById('account-preferences');section?.scrollIntoView({block:'center'});section?.focus();setAccountPreferences(false);}},[page,accountPreferences]);
- const [states,setStates]=useState<MoveState[]>([]),[adjustFor,setAdjustFor]=useState<{lesson_id:string;title:string}|null>(null);
+ const [states,setStates]=useState<MoveState[]>([]),[adjustFor,setAdjustFor]=useState<{lesson_id:string;title:string;subject?:string}|null>(null);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[dirty,setDirty]=useState(false);
  const [routeReady,setRouteReady]=useState(false),replaceRoute=useRef(true),restoring=useRef(false);
  const refresh=useCallback(async()=>{
@@ -70,7 +70,7 @@ export function App(){
   const route=routeOf();restoring.current=true;replaceRoute.current=true;setRouteReady(false);setError('');
   try{
    setGroupId(route.page==='group'?route.id:null);setPublicId(route.page==='public'?route.id:null);
-   if(route.adjust&&account){const target=await loadLesson(route.adjust);setAdjustFor({lesson_id:target.lesson_id,title:target.title});}else setAdjustFor(null);
+   if(route.adjust&&account){const target=await loadLesson(route.adjust);setAdjustFor({lesson_id:target.lesson_id,title:target.title,subject:library.find(item=>item.lesson_id===target.lesson_id)?.subject});}else setAdjustFor(null);
    if(['preview','compete','practice','review','check','move','share','group','public'].includes(route.page)&&!route.id)throw new Error('This link is incomplete. Choose a move from your library.');
    if(['preview','compete','practice','review','check','move','share'].includes(route.page)&&route.id){
     if(route.source==='public'){setMusic(null);setLesson(await loadPublicMove(route.id));setLessonOwned(false);}

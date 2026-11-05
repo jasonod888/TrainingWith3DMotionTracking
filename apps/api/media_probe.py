@@ -8,6 +8,7 @@ treated as proof that the demonstration is valid.
 from __future__ import annotations
 
 import json
+import math
 import re
 import subprocess
 from pathlib import Path
@@ -65,19 +66,33 @@ def probe_audio_media(path: Path) -> dict:
     }
     if not video:
         findings.append('missing_video')
+    if duration_value is None or not math.isfinite(duration_value) or duration_value <= 0:
+        raise MediaProbeError('This clip has no usable duration.')
+    if video:
+        try:
+            decoded = _run(['ffmpeg', '-hide_banner', '-nostats', '-v', 'error', '-xerror',
+                            '-i', str(path), '-t', str(ANALYSIS_SECONDS), '-map', '0:v:0', '-an', '-f', 'null', '-'])
+        except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+            raise MediaProbeError('This clip video could not be decoded.') from exc
+        if decoded.returncode != 0:
+            raise MediaProbeError('This clip video could not be decoded.')
     if not audio:
         findings.append('missing_audio')
         return facts
 
     # Decode a bounded window to confirm the audio actually decodes and to measure level.
     try:
-        level = _run(['ffmpeg', '-hide_banner', '-nostats', '-v', 'info', '-t', str(ANALYSIS_SECONDS),
+        level = _run(['ffmpeg', '-hide_banner', '-nostats', '-v', 'info', '-xerror', '-t', str(ANALYSIS_SECONDS),
                       '-i', str(path), '-map', '0:a:0', '-af', 'volumedetect', '-f', 'null', '-'])
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         raise MediaProbeError('This clip audio could not be decoded.') from exc
     if level.returncode != 0:
         raise MediaProbeError('This clip audio could not be decoded.')
     output = f'{level.stdout}\n{level.stderr}'
+    samples = re.findall(r'n_samples:\s*(\d+)', output)
+    if not samples or int(samples[-1]) <= 0 or not facts['sample_rate'] or not facts['channels']:
+        raise MediaProbeError('This clip has no decodable audio samples.')
+    facts['decoded_audio_samples'] = int(samples[-1])
     match = re.search(r'max_volume:\s*(-?[\d.]+) dB', output)
     max_volume = float(match.group(1)) if match else None
     facts['max_volume_db'] = max_volume

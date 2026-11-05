@@ -101,3 +101,131 @@ Verification for this slice:
 Still open: selecting and qualifying the production preparation path, the target
 browser/device matrix, an isolated music worker, transcription, attempt-bound completion,
 cancellation/cleanup, and PostgreSQL verification with legacy rows.
+
+
+## Review of e197194 and worker continuation (5 November 2026)
+
+Proceeding with implementation is appropriate while music routes remain disabled. The
+review found concrete gaps and corrected them rather than requiring every deployment
+check before further development.
+
+### Corrections
+
+- **Usable media:** music upload completion now requires both audio and video, positive
+  decoded audio sample evidence and a duration within 150 ms of the declared prepared
+  clip. Video/audio decoding uses a bounded window; absent video no longer slips through
+  because an audio stream exists. An audio-only source and a duration mismatch are covered
+  by new real-media rejection tests. Probe download failures remove their temporary file.
+- **Independent creation:** file/submit availability now follows the chosen instrument,
+  rather than the body processor. Music requests do not carry a movement provider value;
+  the API already ignores that value for music and chooses its own route. Body provider
+  stale-tab checks remain intact. Replacement navigation supplies the existing body
+  subject to the creation screen instead of resetting it to `movement_other`.
+- **Resume:** server job summaries expose preparation provenance. Cache checks compare
+  subject, instrument and preparation version against the current server job. Old body
+  cache entries without subject metadata remain usable; missing/old music identity is
+  refused. Filename/size/part-hash checks remain in place.
+- **Preparation:** cancellation is rechecked around asynchronous encoder initialization,
+  and failed conversion initialization/execution can try the next eligible format.
+  Re-read output checks positive audio layout, duration within 150 ms, origins within
+  50 ms of zero and audio/video first-timestamp difference within 50 ms.
+- **Actual recovery path:** an error message alone could not recover a browser with no
+  encoder: choosing an exported file simply attempted encoding again. The explicit
+  **This file is already my exported clip (use the whole file)** option now verifies and
+  imports an entire standalone H.264/AAC MP4 or VP8/Opus WebM without encoding. It checks
+  sound/video, timing, size and full-file selection, and records `music-import-v1`.
+  There is no automatic original-file fallback; the option is off unless selected.
+- **Attempt assets:** music attempts may upload only their route's roles; body/avatars
+  cannot be staged on a music lease. Reference completion also checks duration in both
+  directions against the requested clip. Existing body completion behavior remains.
+
+### Delivered next slice: P3.6/P3.7 transport boundary
+
+Added `scripts/music_worker.py`, an independent CPU worker entry point with a separate
+transport dependency lock. It streams and checks the prepared source, extracts a lossless
+PCM analysis derivative, invokes an explicit adapter subprocess, advances heartbeat
+stages, binds outputs to the current attempt and completes through the existing typed
+endpoint. Owner cancellation/expired leases stop work; local private files are removed.
+The existing retention cleanup handles staged objects left by cancelled attempts.
+
+`manage_saas_worker.py --pipeline` now provisions pipeline-specific credentials, keeping
+movement as its default. No credentials were provisioned by this work and no music route
+was enabled. See `docs/music-worker.md` for the adapter protocol and operational limits.
+
+This is **not transcription implementation**. No model was installed or called. Tests
+use an explicitly reviewed synthetic reference; the worker refuses an unreviewed draft
+and never changes its review flag. The current music completion contract accepts reviewed
+references, so Phase 4/5 must add the unreviewed draft/reference handoff before a real
+model's output becomes a canonical lesson. Do not have a model assert teacher approval.
+
+### Verification
+
+- API regression run: **212 passed**. The newly added retention cleanup case was then
+  verified in the **6 passing worker integration tests** (four overlap the API run;
+  the other two are the retention case and the added guitar completion case).
+- Avatar regressions: **61 passed, 13 skipped**. Across these split runs, **275 distinct
+  Python tests passed**, with the existing 13 skips. Earlier log entries called the
+  combined API/avatar count the “API suite”; the breakdown here is explicit.
+- Web suite: **246 passed**; TypeScript and production build passed.
+- `verify_music_creation.py`: **passed**, using the actual `prepareAudioClip` module
+  and creation UI against mocked API routes. The body processor was unavailable while
+  piano was enabled in the mock, proving independent availability. Uploaded bytes were
+  inspected with real ffprobe:
+  - MP4 preferred: 75,874 bytes, 3.008 s, audio and video;
+  - WebM fallback: 54,074 bytes, 3.020 s, audio and video;
+  - all encoders disabled: initial preparation made no creation request, then explicit
+    verified import uploaded the exact 75,874-byte exported MP4, 3.008 s.
+- Subject-choice default/disabled-music and movement feed browser checks passed.
+- Worker CLI help/syntax checks passed. A fresh isolated environment install was not run.
+
+### Next work
+
+Continue with the Phase 4 model adapter and draft-reference contract, while completing
+Phase 3 diagnostics/resource sizing and browser qualification. Keep teacher review and
+release acceptance separate from worker completion. Pin and review the actual model
+artifact's commercial terms before installing it. Production music creation/processing
+remain disabled; PostgreSQL 0015–0017 against legacy rows and the target browser/device
+matrix remain deployment/upload-enablement checks. Movement preparation remains unchanged.
+
+Final measured initial JS/CSS gzip: **127,824 bytes** (+1,066 bytes against the
+`43a01ab` measurement); the music screen remains a separate lazy chunk and the bundle
+check passes. New work in this continuation is local and uncommitted; nothing was pushed.
+
+
+## Implementation slice: transcription adapter and unreviewed draft handoff
+
+5 November 2026. Music routes remain **disabled**, no transcription model is installed,
+and this slice adds no runtime model dependency.
+
+- **Adapter.** `scripts/music_transcription.py` implements the worker adapter contract and
+  emits a **draft**, never a reviewed manifest. `--engine fixture` is deterministic and
+  labelled as a fixture; `--engine basic-pitch` lazily imports the optional package and
+  fails with an explicit message when it is absent (the default in this checkout). No
+  package, weights or model are downloaded automatically.
+- **Worker handoff.** The worker now accepts either an unreviewed `draft` result or a
+  reviewed `manifest`. A draft is uploaded within the attempt and posted to
+  `/api/worker/jobs/{id}/draft`; a manifest that claims to be unreviewed is still refused.
+  Transport retries, lease handling and cleanup are unchanged.
+- **Server contract and storage.** `MusicDraftDocument` bounds a proposal (20,000 events,
+  500 spans, events inside the clip) and requires provenance. Migration
+  `0018_music_drafts.py` adds `music_drafts`, stored apart from lesson revisions. The draft
+  endpoint validates the lease, pipeline, subject/instrument, duration and reference
+  attempt identity/checksum, copies the reference into the lesson's private assets,
+  creates the lesson **without a revision**, and moves the job to `ready_for_review`.
+- **Guards.** A draft lesson returns 409 to its owner and 404 to everyone else, is never
+  public, refuses publishing, and has no revision to accept. The owner reads the proposal
+  through `GET /api/lessons/{id}/music-draft`; other accounts get 404.
+
+Verification for this slice:
+
+| Check | Result |
+| --- | --- |
+| Adapter CLI | **3 passed**: bounded fixture draft with audio-hash provenance, basic-pitch absence fails explicitly, incomplete job refused |
+| Draft handoff | **2 passed**: server validation/guards/owner-only read, and a real worker run posting an unreviewed draft with no revision created |
+| Migration | `alembic upgrade head --sql` renders 0018 |
+| Full API suite | **280 passed, 13 skipped** |
+| Model installed | **None**; `basic-pitch` is absent by default |
+
+Still open: review finalisation from draft to a reviewed reference and manifest, the review
+editor, adapter selection/benchmarking, worker deployment, PostgreSQL verification with
+legacy rows, and the browser/device preparation matrix before enabling music processing.

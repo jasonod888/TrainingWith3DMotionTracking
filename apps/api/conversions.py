@@ -17,8 +17,8 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from .auth import digest, now
-from .contracts import Asset, LessonManifest, MusicLessonManifest
-from .database import Account, Conversion, Lesson, LessonAsset, LessonRevision, WorkerCredential
+from .contracts import Asset, LessonManifest, MusicDraftDocument, MusicLessonManifest
+from .database import Account, Conversion, Lesson, LessonAsset, LessonRevision, MusicDraft, WorkerCredential
 from .storage import storage_client
 from .processing import ENGINE_VERSION, PIPELINE_VERSION, Provider, processing_status
 from .media_probe import MediaProbeError, probe_audio_media
@@ -103,6 +103,7 @@ def install_conversions(app,engine,settings,identity,db):
         return {'id':job.id,'title':job.title,'filename':job.filename,'bytes':job.source_bytes,'start':job.start,'duration':job.duration,
                 'state':job.state,'attempts':job.attempts,'frames':job.frames,'error':job.error,'lesson_id':job.lesson_id,
                 'subject':job.subject,'instrument':job.instrument,
+                'preparation':job.preparation or {},
                 'target_lesson_id':job.target_lesson_id,
                 'parts':job.parts if job.state=='uploading' else {},'part_size':PART_SIZE,
                 'provider':job.provider,'pipeline_version':job.pipeline_version,
@@ -239,13 +240,18 @@ def install_conversions(app,engine,settings,identity,db):
         if music:
             settings.upload_temp_dir.mkdir(parents=True,exist_ok=True)
             temp=tempfile.NamedTemporaryFile(dir=settings.upload_temp_dir,suffix='.upload',delete=False)
-        obj=store.get_object(Bucket=settings.storage_bucket,Key=job.source_key);checksum=hashlib.sha256()
+        obj=None;checksum=hashlib.sha256()
         try:
+            obj=store.get_object(Bucket=settings.storage_bucket,Key=job.source_key)
             for chunk in obj['Body'].iter_chunks(chunk_size=1024*1024):
                 checksum.update(chunk)
                 if temp:temp.write(chunk)
+        except BaseException:
+            if temp:
+                temp.close();Path(temp.name).unlink(missing_ok=True)
+            raise
         finally:
-            obj['Body'].close()
+            if obj:obj['Body'].close()
             if temp:temp.close()
         job.source_sha256=checksum.hexdigest();job.upload_id=None
         if temp is not None:
@@ -255,7 +261,9 @@ def install_conversions(app,engine,settings,identity,db):
                 except MediaProbeError as exc:findings={'audio':False,'findings':['unreadable_media'],'error':str(exc)}
             finally:path.unlink(missing_ok=True)
             job.media_findings=findings
-            if not findings.get('audio'):
+            if findings.get('duration') is not None and abs(findings['duration']-job.duration)>.15:
+                findings.setdefault('findings',[]).append('duration_mismatch')
+            if not findings.get('audio') or not findings.get('video') or 'duration_mismatch' in findings.get('findings',[]):
                 job.state='failed';job.error='invalid_audio';session.commit()
                 try:store.delete_object(Bucket=settings.storage_bucket,Key=job.source_key)
                 except Exception:pass
@@ -314,6 +322,9 @@ def install_conversions(app,engine,settings,identity,db):
         job=selected;job.attempts+=1;job.worker_id=credential;job.attempt_token=secrets.token_hex(24);job.lease_until=now()+timedelta(seconds=settings.worker_lease_seconds);job.state='validating';job.frames=0;job.error=None
         session.commit()
         return {'id':job.id,'title':job.title,'bytes':job.source_bytes,'sha256':job.source_sha256,'start':job.start,'duration':job.duration,'attempt_token':job.attempt_token,
+                'subject':job.subject,'instrument':job.instrument,'experience_family':processing_routes.route_for_pipeline(job.pipeline_version).family,
+                'allowed_outputs':{name:FILES[name] for name in processing_routes.route_for_pipeline(job.pipeline_version).work_assets},
+                'output_roles':{role:{'name':name,'mime':FILES[name]} for role,name in MUSIC_ROLES} if job.instrument else {},
                 'provider':job.provider,'pipeline_version':job.pipeline_version,'provider_target':job.provider_target,
                 'provider_request_id':job.provider_request_id,'submission_state':job.submission_state,'stage':job.state}
 
@@ -384,6 +395,9 @@ def install_conversions(app,engine,settings,identity,db):
                 with Session(engine) as session:
                     job=leased(session,job_id,credential,token)
                     if job.state!='verifying':raise HTTPException(409,'Output is not ready for verification.')
+                    route=processing_routes.route_for_pipeline(job.pipeline_version)
+                    allowed=(*route.work_assets,*(DERIVATIVE_ASSETS if route.family=='body' else ())) if route else ()
+                    if name not in allowed:raise HTTPException(422,'Output does not belong to this processing route.')
                     key=f'attempts/{job.id}/{job.attempt_token}/{name}'
                     storage_client(settings).upload_fileobj(file,settings.storage_bucket,key,ExtraArgs={'ContentType':FILES[name],'Metadata':{'sha256':checksum.hexdigest()}})
                     return {'key':key,'mime':FILES[name],'bytes':total,'sha256':checksum.hexdigest()}
@@ -400,8 +414,8 @@ def install_conversions(app,engine,settings,identity,db):
             raise HTTPException(422,'Converted instrument does not match the requested subject.')
         if manifest.instrument.instrument!=(job.instrument or manifest.subject):
             raise HTTPException(422,'Converted instrument does not match the requested instrument.')
-        if manifest.duration>job.duration+.1:
-            raise HTTPException(422,'Converted lesson is longer than the uploaded clip.')
+        if abs(manifest.duration-job.duration)>.15:
+            raise HTTPException(422,'Converted lesson duration does not match the uploaded clip.')
         store=storage_client(settings)
         assets=[]
         for role,name in MUSIC_ROLES:
@@ -450,6 +464,54 @@ def install_conversions(app,engine,settings,identity,db):
             import logging
             logging.getLogger('form').warning('Music conversion cleanup pending for job %s',job.id)
         return {'lesson_id':lesson_id}
+
+
+    @worker.post('/jobs/{job_id}/draft')
+    def draft(job_id:str,body:MusicDraftDocument,request:Request,credential=Depends(worker_identity),session:Session=Depends(db)):
+        """Accept an unreviewed transcription proposal. It never creates a manifest."""
+        job=session.scalar(select(Conversion).where(Conversion.id==job_id).with_for_update())
+        token=request.headers.get('x-job-lease','')
+        existing=session.scalar(select(MusicDraft).where(MusicDraft.job_id==job_id)) if job else None
+        if existing and job and job.lesson_id:return {'lesson_id':job.lesson_id,'draft':True}
+        job=leased(session,job_id,credential,token)
+        route=processing_routes.route_for_pipeline(job.pipeline_version)
+        if route is None or route.completion!='music-v2':raise HTTPException(422,'Unknown processing route.')
+        if job.state!='verifying':raise HTTPException(422,'Draft is not ready for verification.')
+        if job.provider!='local' and job.submission_state!='submitted':raise HTTPException(409,'Missing provider submission receipt.')
+        if body.subject!=job.subject or body.instrument.instrument!=(job.instrument or job.subject):
+            raise HTTPException(422,'Draft instrument does not match the requested subject.')
+        if body.duration>job.duration+.1:raise HTTPException(422,'Draft is longer than the uploaded clip.')
+        expected=f'attempts/{job.id}/{token}/reference.json'
+        if body.reference.key!=expected or body.reference.mime!='application/json':
+            raise HTTPException(422,'Draft reference is outside this processing attempt.')
+        store=storage_client(settings)
+        head=store.head_object(Bucket=settings.storage_bucket,Key=expected)
+        if head['ContentLength']!=body.reference.bytes or head.get('Metadata',{}).get('sha256')!=body.reference.sha256:
+            raise HTTPException(422,'Draft reference checksum/size mismatch.')
+        lesson_id=job.target_lesson_id or job.id
+        if job.target_lesson_id:
+            target=session.scalar(select(Lesson).where(Lesson.id==job.target_lesson_id,Lesson.owner_id==job.owner_id,
+                Lesson.archived.is_(False),Lesson.disabled.is_(False)).with_for_update())
+            if not target or (target.experience_family or 'body')!='music':
+                raise HTTPException(409,'This lesson is not available for a music replacement.')
+        else:
+            session.add(Lesson(id=lesson_id,owner_id=job.owner_id,title=job.title,version=1,
+                               subject=job.subject,experience_family='music',instrument=job.instrument));session.flush()
+        key=f'lessons/{lesson_id}/reference.json'
+        store.copy_object(Bucket=settings.storage_bucket,Key=key,
+                          CopySource={'Bucket':settings.storage_bucket,'Key':expected})
+        body.reference.key=key
+        session.add(MusicDraft(id=uuid4().hex,job_id=job.id,lesson_id=lesson_id,owner_id=job.owner_id,
+                               subject=body.subject,instrument=body.instrument.instrument,status='draft',
+                               document=body.model_dump(),created_at=now()))
+        job.lesson_id=lesson_id;job.state='ready_for_review';job.lease_until=None;session.commit()
+        try:
+            store.delete_object(Bucket=settings.storage_bucket,Key=job.source_key)
+            store.delete_object(Bucket=settings.storage_bucket,Key=expected)
+        except Exception:
+            import logging
+            logging.getLogger('form').warning('Music draft cleanup pending for job %s',job.id)
+        return {'lesson_id':lesson_id,'draft':True}
 
     @worker.post('/jobs/{job_id}/finish')
     def finish(job_id:str,request:Request,payload:dict=Body(...),credential=Depends(worker_identity),session:Session=Depends(db)):

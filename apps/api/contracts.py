@@ -221,3 +221,61 @@ class LessonSummary(Contract):
 # The only union in the product: a validated loading boundary, never a body
 # component's contract. Each member is disjoint by version field and forbids extras.
 LessonDocument = LessonManifest | MusicLessonManifest | LessonSummary
+
+
+class MusicEvent(Contract):
+    """One proposed note attack in a draft reference. Never a reviewed requirement."""
+    id: str = Field(min_length=1, max_length=80)
+    onset: float = Field(ge=0)
+    duration: float | None = Field(default=None, gt=0)
+    pitch: int = Field(ge=0, le=127)
+    velocity: float | None = Field(default=None, ge=0, le=1)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    optional: bool = False
+
+
+class MusicSpan(Contract):
+    start: float = Field(ge=0)
+    end: float = Field(gt=0)
+
+    @model_validator(mode='after')
+    def ordered(self):
+        if self.end <= self.start:
+            raise ValueError('A draft span must end after it starts.')
+        return self
+
+
+class DraftProvenance(Contract):
+    adapter: str = Field(min_length=1, max_length=80)
+    engine: str = Field(min_length=1, max_length=80)
+    model: str | None = Field(default=None, max_length=120)
+    model_version: str | None = Field(default=None, max_length=80)
+    code_version: str = Field(min_length=1, max_length=80)
+    audio_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+
+
+class MusicDraftDocument(Contract):
+    """An unreviewed transcription proposal. It is not a publishable manifest."""
+    draft_version: Literal[1] = 1
+    subject: Literal['piano', 'guitar']
+    instrument: InstrumentConfig
+    duration: float = Field(gt=0)
+    reference: Asset
+    events: list[MusicEvent] = Field(default_factory=list, max_length=20000)
+    spans: list[MusicSpan] = Field(default_factory=list, max_length=500)
+    provenance: DraftProvenance
+    warnings: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode='after')
+    def bounded(self):
+        if self.instrument.instrument != self.subject:
+            raise ValueError('The draft instrument must match its subject.')
+        if self.reference.mime != 'application/json':
+            raise ValueError('A draft reference must be JSON.')
+        for span in self.spans:
+            if span.end > self.duration + 1e-6:
+                raise ValueError('A draft span must stay inside the clip.')
+        for event in self.events:
+            if event.onset > self.duration + 1e-6:
+                raise ValueError('A draft event must stay inside the clip.')
+        return self

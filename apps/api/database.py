@@ -290,6 +290,20 @@ class MimicPair(Base):
     receiver_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
+
+class MusicDraft(Base):
+    """Owner-scoped unreviewed transcription proposal for one conversion attempt."""
+    __tablename__ = 'music_drafts'
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    job_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), index=True)
+    owner_id: Mapped[str] = mapped_column(String(80), index=True)
+    subject: Mapped[str] = mapped_column(String(16))
+    instrument: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16), default='draft', server_default='draft')
+    document: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
 def make_engine(url):
     return create_engine(url, pool_pre_ping=True, connect_args={'connect_timeout': 3} if url.startswith('postgresql') else {})
 
@@ -321,3 +335,4 @@ def database_ready(engine):
         connection.execute(text('SELECT id, group_id, email FROM group_invitations LIMIT 0'))
         connection.execute(text('SELECT group_id, lesson_id FROM group_lessons LIMIT 0'))
         connection.execute(text('SELECT group_id, lesson_id FROM group_public_moves LIMIT 0'))
+        connection.execute(text('SELECT id, job_id, lesson_id, owner_id, subject, instrument, status, document FROM music_drafts LIMIT 0'))

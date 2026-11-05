@@ -13,7 +13,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from .contracts import LessonManifest, LessonSummary, MusicLessonManifest, Section, SectionSet, SummaryCapabilities
-from .database import Account, Lesson, LessonAsset, LessonRevision, PracticeProgress, LessonGrant
+from .database import Account, Lesson, LessonAsset, LessonRevision, MusicDraft, PracticeProgress, LessonGrant
 from .storage import storage_client
 from .permissions import access_reasons, latest_acceptance, owned_lesson,latest_revision,public_lesson,public_manifest,readable_lesson
 from .auth import now
@@ -312,6 +312,11 @@ def install_lessons(app, engine, settings, identity, db):
     def detail(lesson_id: str, request: Request, account=Depends(identity), session: Session = Depends(db)):
         lesson,reasons=access_reasons(session,lesson_id,account.id)
         if not lesson or not reasons:raise HTTPException(404,'Move unavailable.')
+        if (lesson.experience_family or 'body')=='music' and latest_revision(session,lesson) is None:
+            # A draft reference has no manifest yet; it is not readable as a lesson.
+            if 'owner' in reasons:
+                raise HTTPException(409,'This music lesson is still a draft. Review its reference before opening it.')
+            raise HTTPException(404,'Move unavailable.')
         if 'owner' in reasons or 'direct' in reasons or 'group' in reasons:
             _,revision=readable_lesson(session,lesson_id,account.id)
             ensure_supported(lesson, revision, request)
@@ -345,6 +350,14 @@ def install_lessons(app, engine, settings, identity, db):
         return {'lesson_id': lesson.id, 'revision_id': latest.id if latest else None,
                 **subject_projection(lesson, latest, current=True)}
 
+
+    @router.get('/{lesson_id}/music-draft')
+    def music_draft(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
+        """Owner-only view of an unreviewed proposal. Never served to recipients."""
+        owned_lesson(session, lesson_id, account.id)
+        row=session.scalar(select(MusicDraft).where(MusicDraft.lesson_id==lesson_id).order_by(MusicDraft.created_at.desc()))
+        if not row:raise HTTPException(404,'No draft reference is available.')
+        return {**row.document,'lesson_id':lesson_id,'revision_id':None,'status':row.status}
     @router.get('/{lesson_id}/progress')
     def progress(lesson_id: str, revision_id: str | None = None, account=Depends(identity), session: Session = Depends(db)):
         lesson,revision = readable_lesson(session,lesson_id,account.id,revision_id)

@@ -37,11 +37,11 @@ def media(directory: Path, kind: str) -> Path:
     return target
 
 
-def upload(client, path: Path):
+def upload(client, path: Path, duration=2, subject='piano'):
     data = path.read_bytes()
     created = client.post('/api/conversions', json={
-        'title': 'Piano clip', 'filename': path.name, 'bytes': len(data), 'start': 0, 'duration': 2,
-        'subject': 'piano', 'instrument': 'piano',
+        'title': 'Piano clip', 'filename': path.name, 'bytes': len(data), 'start': 0, 'duration': duration,
+        'subject': subject, 'instrument': subject,
         'preparation': {'preparation_version': 'music-clip-v1', 'selection_start': 1.0, 'selection_end': 3.0}})
     assert created.status_code == 201, created.text
     job = created.json()
@@ -78,6 +78,13 @@ def test_music_upload_without_audio_is_rejected_before_queueing(tmp_path):
         assert not any('uploads' in key for key in store.objects)
 
 
+def test_prepared_duration_mismatch_is_not_queued(tmp_path):
+    with real_media_app(tmp_path) as (client, app, settings, store, _mail):
+        body = upload(client, media(tmp_path, 'audio'), duration=1).json()
+        assert body['state'] == 'failed'
+        assert 'duration_mismatch' in body['media_findings']['findings']
+
+
 def test_silence_is_recorded_as_a_finding_not_a_rejection(tmp_path):
     with real_media_app(tmp_path) as (client, app, _settings, store, _mail):
         source = media(tmp_path, 'silent')
@@ -102,3 +109,14 @@ def test_movement_upload_without_audio_is_unchanged(tmp_path):
         assert completed.status_code == 200, completed.text
         assert completed.json()['state'] == 'queued'
         assert completed.json()['media_findings'] == {}
+
+
+def test_audio_only_upload_is_rejected_even_with_decodable_sound(tmp_path):
+    source = tmp_path/'audio-only.m4a'
+    subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i',
+                    'sine=frequency=440:sample_rate=48000:duration=2','-c:a','aac','-y',str(source)], check=True)
+    with real_media_app(tmp_path) as (client, app, settings, store, _mail):
+        body = upload(client, source).json()
+        assert body['state'] == 'failed' and body['error'] == 'invalid_audio'
+        assert 'missing_video' in body['media_findings']['findings']
+        assert not any('uploads' in key for key in store.objects)

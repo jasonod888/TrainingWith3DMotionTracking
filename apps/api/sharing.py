@@ -112,7 +112,7 @@ def install_sharing(app,settings,identity,db):
             groups=group_count(session,lesson_id)
         except ImportError:
             pass
-        return {'mode':lesson.distribution,'published_revision_id':lesson.published_revision_id,'draft_revision_id':latest_revision(session,lesson).id,
+        return {'mode':lesson.distribution,'published_revision_id':lesson.published_revision_id,'draft_revision_id':(latest_revision(session,lesson).id if latest_revision(session,lesson) else None),
                 'accepted_revision_id':acceptance.revision_id if acceptance else None,
                 'public_listed':bool(publication and publication.listed),'groups':int(groups),
                 'public_listing':({'title':publication.title,'creator_name':publication.creator_name,
@@ -125,6 +125,7 @@ def install_sharing(app,settings,identity,db):
     def publish(lesson_id:str,body:Publish,account=Depends(identity),session:Session=Depends(db)):
         lesson=owned_lesson(session,lesson_id,account.id,True)
         revision=latest_revision(session,lesson)
+        if revision is None:raise HTTPException(409,'Review the draft reference before sharing this music lesson.')
         if revision.id!=body.revision_id:
             revision=session.get(LessonRevision,body.revision_id) if body.keep_current_release and body.revision_id==lesson.published_revision_id else None
             if not revision or revision.lesson_id!=lesson.id:raise HTTPException(409,'The move has newer edits. Reopen it before sharing.')
