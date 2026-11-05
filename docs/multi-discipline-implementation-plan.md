@@ -404,6 +404,11 @@ Rollback disables new music authoring and publication. Keep existing approved mu
 
 ## 12 Phase 6 Deliver piano MIDI practice
 
+Implementation note (5 November 2026): the disabled-by-default input setup foundation
+for P6.1/P6.2 is implemented as an unscored keyboard check. It does not start practice,
+grade notes or save attempts. See `docs/piano-midi-practice.md` for delivered evidence
+and the next controller/feedback/scoring slices. Physical MIDI qualification remains open.
+
 - P6.1 Add a keyboard setup panel at the existing practice-start location. Feature-detect Web MIDI, request permission on explicit action, select an input, and verify a played note. Keyboard connection is never required to watch.
 - P6.2 Normalise note-on, note-off, velocity-zero note-on, sustain controller, all-notes-off, repeated same-pitch attacks, channel/device identity and disconnect. Support the selected keyboard only; unrelated MIDI devices must not contribute notes.
 - P6.3 Define input selection and channel policies for split keyboards and layers. Preserve notes already held at setup or start separately from scored attacks. Handle hanging notes without a false perfect result.

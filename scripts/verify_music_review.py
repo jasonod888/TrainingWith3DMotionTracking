@@ -61,6 +61,7 @@ with sync_playwright() as p:
                 headers['Content-Range']=f'bytes {start}-{end}/{len(data)}'
                 route.fulfill(status=206,body=data[start:end+1],headers=headers,content_type='video/mp4')
             else:route.fulfill(body=data,headers=headers,content_type='video/mp4')
+        elif path==f'lessons/{lesson_id}/assets/reference.json':route.fulfill(body=state['reference_bytes'],content_type='application/json')
         elif path==f'lessons/{lesson_id}/music-draft/review':
             payload=route.request.post_data_json;saves.append(copy.deepcopy(payload))
             if len(saves)==1:route.fulfill(status=503,json={'detail':'Temporary save failure. Try again.'});return
@@ -71,7 +72,9 @@ with sync_playwright() as p:
             manifest.update(lesson_id=lesson_id,revision_id='reviewed-v1',title='Reviewed piano',duration=2,
                             source_video=source_asset,section_set=dict(id='reviewed-sections',revision=1,duration=2,sections=payload['sections']),
                             assessment=dict(rubric_version='music-watch-v1',assessment='none',input_modes=['none'],dimensions=[]))
-            state.update(reviewed=True,manifest=manifest);route.fulfill(json=manifest)
+            ref=dict(reference_version=1,subject='piano',instrument={'instrument':'piano'},duration=2,events=payload['events'],spans=payload['spans'],review=dict(reviewer_id='fixture-owner',reviewed_at='2026-11-05T12:00:00Z',draft_id='fixture',source_reference_sha256='a'*64))
+            raw=json.dumps(ref).encode();manifest['reference']=dict(key=f'lessons/{lesson_id}/reference.json',mime='application/json',bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
+            state.update(reviewed=True,manifest=manifest,reference_bytes=raw);route.fulfill(json=manifest)
         elif path==f'lessons/{lesson_id}':route.fulfill(json=state['manifest']) if state['reviewed'] else route.fulfill(status=409,json={'detail':'Review this draft first.'})
         else:route.fulfill(status=404,json={'detail':'Unexpected mock route'})
     page.route('**/api/**',api)

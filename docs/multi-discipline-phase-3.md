@@ -293,3 +293,70 @@ Verification for this slice:
 Still open: no scoring/MIDI practice, no selected or qualified model artifact, no fixture
 corpus, no worker deployment, PostgreSQL verification with legacy rows, and the
 browser/device preparation matrix. Music processing, sharing and scoring stay disabled.
+
+
+## Guide review and next slice: corpus and MIDI setup (5 November 2026)
+
+Reviewed `cd4f766` and corrected failed-video fallback/replay, stale references during
+lesson changes, coarse guide updates, mandatory review evidence/reference identity,
+passage/teaching-section confusion, compact piano black-key geometry, and misleading
+unsupported/conflicting guitar markers.
+
+The qualification CLI now verifies actual artifact bytes and retains licence evidence,
+requires separate code/weights declarations and valid reviewed inputs, and uses
+maximum-cardinality ordered onset matching. Reports remain evidence-only, not model or
+licence approval. Six deterministic symbolic fixture cases now exist; no third-party
+recording or model output was added. See `docs/music-model-qualification.md`.
+
+Implemented the Phase 6A piano MIDI setup foundation behind **MUSIC_MIDI_SETUP_ENABLED**,
+default **false**. Only an explicit connection action requests MIDI; the learner selects
+one input, sees pressed/pedal-held notes and can disconnect. No grading, attempt storage,
+media capture or automatic practice start occurs. Movement is unchanged. Next scoring
+slices and their evidence requirements are in `docs/piano-midi-practice.md`.
+
+Verification: full configured Python run **292 passed, 13 skipped**; web **257 passed**;
+TypeScript/build/bundle passed; normal piano/guitar screens, owner review and mixed
+navigation passed. Guide regressions cover broken video, replay, hidden-page pause,
+lesson-switch cleanup and tamper rejection. Virtual MIDI tests cover selected-device
+isolation, note/pedal normalization, switching/disconnect, denial, stale permission,
+unsupported browsers and exit cleanup. Movement feed browser check passed.
+
+Initial JS/CSS gzip is **129,001 bytes**, +2,243 against `43a01ab`; the lazy music-screen
+closure is **7,816 gzip bytes**. Both existing 16 KiB allowances pass. No new runtime or
+model dependency was installed. Music processing, sharing, scoring and the MIDI setup
+pilot remain disabled in deployment. PostgreSQL 0015–0019, physical MIDI/device/browser
+qualification, worker rollout and actual model artifact qualification remain open.
+New changes are local and uncommitted; nothing was pushed.
+
+
+## Implementation slice: timed music practice controls
+
+5 November 2026. Reviewed piano lessons gain an unscored practice controller. Music
+processing, sharing and scoring remain disabled.
+
+- **Controller.** `apps/web/src/music/music-practice.ts` is a pure phase machine
+  (count-in → playing → rest → repeat → done) with whole-lesson or section ranges, count-in
+  of 0/2/4 beats, 1/2/3/5 repeats, 1.5 s rests and 0.5×/0.75×/1×/1.25× speed presets.
+- **Guide integration.** The practice panel shows count-in, run progress, rest and an
+  unscored completion summary. Seeks, section changes, Play, leaving the lesson and input
+  replacement reset practice cleanly. Watching requests no device.
+- **Optional MIDI capture.** `MidiKeyboardCheck` now exposes normalized snapshots; note
+  attacks are counted only while a run is playing. No notes are judged, stored or sent.
+- **Deliberate limits.** Attacks are counted but not timestamped or matched; the practice
+  clock is monotonic with the video paused. Latency mapping, rubric feedback, attempt
+  persistence and device qualification remain 6C–6E.
+
+Verification for this slice:
+
+| Check | Result |
+| --- | --- |
+| Full API suite | **292 passed, 13 skipped** |
+| Web suite | **262 passed** (+5 practice-controller) |
+| TypeScript / build / bundle | Clean; bundle within budget |
+| `verify_music_practice.py` | **Passed**: count-in, section practice, repeats, completion, clean reset on seek, attack counting, no media/attempt requests |
+| `verify_music_midi.py` | **Passed** (setup pilot unchanged) |
+| `verify_music_guide.py`, `verify_music_screen.py` | **Passed** |
+
+Next: rubric-based feedback (6C) with latency compensation and one-to-one attack matching,
+then trustworthy scoring and persistence. Model benchmarking, physical-device checks and
+PostgreSQL verification continue alongside; no model is qualified or installed.

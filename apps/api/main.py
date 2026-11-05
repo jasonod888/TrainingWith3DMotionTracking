@@ -104,6 +104,7 @@ def create_app(settings: Settings | None = None):
                 'subjects':subjects.catalogue(),
                 'lesson_formats':[1,2],
                 'subject_filter':settings.subject_filter_enabled,
+                'music_midi_setup':settings.music_midi_setup_enabled,
                 'processing':processing_routes.capability_flags(settings),
                 'routes':processing_routes.public_catalogue()}
 

@@ -21,7 +21,7 @@ export type MusicReference = {
   duration: number;
   events: MusicReferenceEvent[];
   spans: MusicReferenceSpan[];
-  review?: MusicReview;
+  review: MusicReview;
 };
 
 const WHITE = new Set([0, 2, 4, 5, 7, 9, 11]);
@@ -75,22 +75,26 @@ export function parseMusicReference(value: unknown): MusicReference {
     if (length !== null && (length <= 0 || onset + length > duration + 1e-6)) throw new Error(`Note ${id} ends outside the clip.`);
     const velocity = item.velocity == null ? null : finite(item.velocity, `note ${id} velocity`);
     if (velocity !== null && (velocity < 0 || velocity > 1)) throw new Error(`Note ${id} has an invalid velocity.`);
+    if(item.optional!=null&&typeof item.optional!=='boolean')throw new Error('A note has an invalid optional flag.');
     return {id, onset, duration: length, pitch, velocity, optional: item.optional === true};
   }).sort((left, right) => left.onset - right.onset || left.pitch - right.pitch);
-  let review: MusicReview | undefined;
-  if (document.review != null) {
+  let review: MusicReview;
+  if (document.review != null && !Array.isArray(document.review)) {
     if (typeof document.review !== 'object') throw new Error('The reviewed reference has invalid review evidence.');
     const raw = document.review as Record<string, unknown>;
     if (typeof raw.reviewer_id !== 'string' || typeof raw.reviewed_at !== 'string'
       || typeof raw.draft_id !== 'string' || typeof raw.source_reference_sha256 !== 'string') {
       throw new Error('The reviewed reference has incomplete review evidence.');
     }
+    if(!raw.reviewer_id||raw.reviewer_id.length>80||!raw.draft_id||raw.draft_id.length>80||!Number.isFinite(Date.parse(raw.reviewed_at))||! /^[a-f0-9]{64}$/.test(raw.source_reference_sha256))throw new Error('The reviewed reference has invalid review evidence.');
     review = {
       reviewer_id: raw.reviewer_id, reviewed_at: raw.reviewed_at,
       draft_id: raw.draft_id, source_reference_sha256: raw.source_reference_sha256,
     };
   }
-  return {reference_version: 1, subject: document.subject, instrument: (document.instrument as Record<string, unknown>) ?? {},
+  else throw new Error('The reviewed reference has no review evidence.');
+  if(!document.instrument||typeof document.instrument!=='object'||Array.isArray(document.instrument)||(document.instrument as Record<string,unknown>).instrument!==document.subject)throw new Error('The reference instrument does not match its subject.');
+  return {reference_version: 1, subject: document.subject, instrument: {...document.instrument as Record<string, unknown>},
     duration, events, spans, review};
 }
 
@@ -99,12 +103,12 @@ export function eventDuration(event: MusicReferenceEvent): number {
 }
 
 /** Notes sounding at a moment; the window keeps short notes visible between frames. */
-export function activeEvents(reference: MusicReference, time: number, window = 0.08): MusicReferenceEvent[] {
+export function activeEvents(reference: MusicReference, time: number, window = 0): MusicReferenceEvent[] {
   return reference.events.filter(event => time >= event.onset - window && time < event.onset + eventDuration(event) + window);
 }
 
 export function currentSpan(reference: MusicReference, time: number): MusicReferenceSpan | null {
-  return reference.spans.find(span => time >= span.start && time < span.end) ?? reference.spans[reference.spans.length - 1] ?? null;
+  return reference.spans.find(span => time >= span.start && time < span.end) ?? null;
 }
 
 export type PianoKey = {pitch: number; whiteIndex: number; black: boolean; left: number};
@@ -112,7 +116,7 @@ export type PianoGeometry = {whiteKeys: PianoKey[]; blackKeys: PianoKey[]; low: 
 
 /** Keyboard geometry in white-key units; pitches outside the clip's range are not drawn. */
 export function pianoGeometry(events: MusicReferenceEvent[], padding = 2): PianoGeometry {
-  const pitches = events.map(event => event.pitch);
+  const pitches = events.map(event => event.pitch).filter(pitch=>pitch>=21&&pitch<=108);
   let low = pitches.length ? Math.min(...pitches) : 60;
   let high = pitches.length ? Math.max(...pitches) : 72;
   low = Math.max(21, low - padding);
@@ -128,7 +132,7 @@ export function pianoGeometry(events: MusicReferenceEvent[], padding = 2): Piano
       whiteIndex += 1;
     } else {
       const previousWhite = whiteIndex - 1;
-      blackKeys.push({pitch, whiteIndex, black: true, left: previousWhite + 0.66});
+      blackKeys.push({pitch, whiteIndex, black: true, left: previousWhite + 1});
     }
   }
   return {whiteKeys, blackKeys, low, high, width: whiteIndex};
@@ -147,3 +151,19 @@ export function guitarPosition(pitch: number): GuitarPosition | null {
 }
 
 export const GUITAR_STRING_LABELS = GUITAR_STRINGS.map(string => string.label);
+
+
+export function bindMusicReference(reference:MusicReference,lesson:{subject:string;duration:number;instrument:unknown}):MusicReference{
+ if(reference.subject!==lesson.subject||Math.abs(reference.duration-lesson.duration)>1e-6||
+   JSON.stringify(reference.instrument)!==JSON.stringify(lesson.instrument)){
+  // Compare normalized optional settings as the manifest may include null fields.
+  const fields=['instrument','tuning','capo','handedness','reference_pitch_hz'];
+  const actual=lesson.instrument as Record<string,unknown>;
+  if(reference.subject!==lesson.subject||Math.abs(reference.duration-lesson.duration)>1e-6||fields.some(key=>(reference.instrument[key]??null)!==(actual[key]??null)))throw new Error('The reference does not match this lesson. Reopen it from your library.');
+ }
+ return reference;
+}
+export function supportsGuitarDiagram(instrument:Record<string,unknown>):boolean{
+ const tuning=String(instrument.tuning??'').trim().toUpperCase().replace(/[, -]+/g,' ');
+ return (!instrument.capo)&&(!tuning||tuning==='STANDARD'||tuning==='E2 A2 D3 G3 B3 E4');
+}

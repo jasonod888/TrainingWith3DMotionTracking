@@ -1,0 +1,17 @@
+{
+  "subject": "piano",
+  "instrument": {
+    "instrument": "piano"
+  },
+  "duration": 3,
+  "events": [],
+  "spans": [],
+  "reference_version": 1,
+  "fixture_kind": "authored-synthetic",
+  "review": {
+    "reviewer_id": "synthetic-fixture-author",
+    "reviewed_at": "2026-11-05T12:00:00Z",
+    "draft_id": "silence",
+    "source_reference_sha256": "68c3f4eff13b4702fb8d4f2aee13e40656a06aeb6f4443e9dbeca1f14f8f6bb2"
+  }
+}

@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     music_piano_conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'disabled'
     music_guitar_conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'disabled'
     music_remote_conversion_enabled: bool = False
+    music_midi_setup_enabled: bool = False
     music_piano_conversion_target: str = ''
     music_guitar_conversion_target: str = ''
     # Explicit operator gate after the custom full-pipeline deployment is verified.

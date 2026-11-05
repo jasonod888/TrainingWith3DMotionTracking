@@ -1,0 +1,68 @@
+{
+  "corpus_version": 1,
+  "kind": "authored-synthetic-symbolic",
+  "rights": "Project-authored test data; no third-party performance, recording or model content.",
+  "purpose": "Reader, guide, MIDI and matching regressions; not acoustic or model qualification.",
+  "cases": [
+    {
+      "id": "piano-scale",
+      "reference": "piano-scale/reference.json",
+      "proposal": "piano-scale/proposal.json",
+      "expected": {
+        "matched": 4,
+        "missing": 0,
+        "extra": 0
+      }
+    },
+    {
+      "id": "repeated-attacks",
+      "reference": "repeated-attacks/reference.json",
+      "proposal": "repeated-attacks/proposal.json",
+      "expected": {
+        "matched": 2,
+        "missing": 1,
+        "extra": 0
+      }
+    },
+    {
+      "id": "piano-chord",
+      "reference": "piano-chord/reference.json",
+      "proposal": "piano-chord/proposal.json",
+      "expected": {
+        "matched": 3,
+        "missing": 0,
+        "extra": 1
+      }
+    },
+    {
+      "id": "optional-note",
+      "reference": "optional-note/reference.json",
+      "proposal": "optional-note/proposal.json",
+      "expected": {
+        "matched": 2,
+        "missing": 0,
+        "extra": 0
+      }
+    },
+    {
+      "id": "guitar-open-strings",
+      "reference": "guitar-open-strings/reference.json",
+      "proposal": "guitar-open-strings/proposal.json",
+      "expected": {
+        "matched": 3,
+        "missing": 0,
+        "extra": 0
+      }
+    },
+    {
+      "id": "silence",
+      "reference": "silence/reference.json",
+      "proposal": "silence/proposal.json",
+      "expected": {
+        "matched": 0,
+        "missing": 0,
+        "extra": 0
+      }
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 """Reviewed music guide: instructor video, animated keys and section seeking. No devices."""
 import hashlib
+import copy
 import json
 import os
 import re
@@ -45,6 +46,15 @@ summary = {'summary_version': 1, 'lesson_id': 'music-guide', 'revision_id': 'mus
            'instrument': 'piano', 'duration': 6, 'section_count': 2, 'poster': None,
            'capabilities': {'preview': True, 'practice': False, 'live_input': 'none'}}
 
+mode={'broken':False,'hold_next':False,'tamper':False}
+pending=[]
+other_reference={**reference,'subject':'guitar','instrument':{'instrument':'guitar','capo':2}}
+other_data=json.dumps(other_reference,separators=(',',':')).encode()
+other_manifest=copy.deepcopy(manifest)
+other_manifest.update(lesson_id='music-guide-next',revision_id='music-guide-next-v1',title='Next guide',subject='guitar',
+    instrument=other_reference['instrument'],source_video=None,
+    reference=dict(key='lessons/music-guide-next/reference.json',mime='application/json',bytes=len(other_data),sha256=hashlib.sha256(other_data).hexdigest()))
+
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     page = browser.new_page(viewport={'width': 390, 'height': 844})
@@ -68,11 +78,15 @@ with sync_playwright() as p:
             route.fulfill(json=[summary])
         elif path == 'shared-lessons/summaries':
             route.fulfill(json=[])
+        elif path == 'lessons/music-guide-next':
+            route.fulfill(json=other_manifest)
         elif path == 'lessons/music-guide':
             route.fulfill(json=manifest)
         elif path.endswith('/assets/reference.json'):
-            route.fulfill(body=data, content_type='application/json')
+            if '/music-guide-next/' in path and mode['hold_next']:pending.append(route)
+            else:route.fulfill(body=other_data if '/music-guide-next/' in path else data+b' ' if mode['tamper'] else data,content_type='application/json')
         elif path.endswith('/assets/source.webm'):
+            if mode['broken']:route.fulfill(status=404,body='Missing');return
             byte_range = route.request.headers.get('range')
             headers = {'Accept-Ranges': 'bytes'}
             if byte_range:
@@ -118,7 +132,7 @@ with sync_playwright() as p:
     seek(0.6)
     expect(page.locator('.piano-white.is-active')).to_have_count(1)
     expect(page.locator('.music-now')).to_contain_text('C4')
-    page.get_by_role('button', name='Play section Phrase', exact=True).click()
+    page.get_by_role('button', name='Seek to section Phrase', exact=True).click()
     assert float(page.get_by_label('Lesson position').input_value()) >= 2.0
     seek(3.2)
     expect(page.locator('.music-now')).to_contain_text('G4')
@@ -129,6 +143,39 @@ with sync_playwright() as p:
     page.set_viewport_size({'width': 1280, 'height': 900})
     page.get_by_role('button', name='Pause guide', exact=True).click()
     page.screenshot(path=str(ROOT / 'test-results/music-guide-desktop.png'), full_page=True)
+    page.evaluate("window.previousVideo=document.querySelector('video')")
+    mode['hold_next']=True
+    page.evaluate("history.pushState(null,'','/?page=preview&id=music-guide-next');window.dispatchEvent(new PopStateEvent('popstate'))")
+    expect(page.locator('.music-home h1')).to_have_text('Next guide')
+    expect(page.locator('.piano')).to_have_count(0)
+    expect(page.locator('.fretboard')).to_have_count(0)
+    assert page.evaluate('previousVideo.paused') is True
+    for _ in range(60):
+        if pending:break
+        page.wait_for_timeout(50)
+    assert pending
+    pending.pop().fulfill(body=other_data,content_type='application/json')
+    expect(page.locator('.fretboard')).to_be_visible()
+    seek(.6)
+    expect(page.get_by_text('Fretboard positions are unavailable for this tuning or capo.',exact=False)).to_be_visible()
+    expect(page.locator('.fret-cell.is-active')).to_have_count(0)
+    mode['broken']=True
+    page.evaluate("history.pushState(null,'','/?page=preview&id=music-guide');window.dispatchEvent(new PopStateEvent('popstate'))")
+    expect(page.locator('.music-no-video')).to_be_visible()
+    page.get_by_role('button',name='Play guide',exact=True).click()
+    page.wait_for_function("Number(document.querySelector('input[aria-label=\"Lesson position\"]').value)>.2")
+    page.get_by_role('button',name='Pause guide',exact=True).click()
+    seek(6)
+    page.get_by_role('button',name='Play guide',exact=True).click()
+    page.wait_for_function("Number(document.querySelector('input[aria-label=\"Lesson position\"]').value)<1")
+    page.evaluate("Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))")
+    expect(page.get_by_role('button',name='Play guide',exact=True)).to_be_visible()
+    stopped=float(page.get_by_label('Lesson position').input_value());page.wait_for_timeout(200)
+    assert abs(float(page.get_by_label('Lesson position').input_value())-stopped)<.02
+    mode['tamper']=True
+    page.reload()
+    expect(page.get_by_role('alert')).to_contain_text('does not match its reviewed file')
+    expect(page.locator('.piano')).to_have_count(0)
     assert errors == [], errors
     assert page.evaluate('window.deviceRequests') == []
     browser.close()

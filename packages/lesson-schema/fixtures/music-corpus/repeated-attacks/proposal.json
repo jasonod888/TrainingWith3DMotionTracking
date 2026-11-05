@@ -1,0 +1,27 @@
+{
+  "subject": "piano",
+  "instrument": {
+    "instrument": "piano"
+  },
+  "duration": 3,
+  "events": [
+    {
+      "id": "n0",
+      "onset": 0.25,
+      "pitch": 60,
+      "duration": 0.25,
+      "velocity": 0.8,
+      "optional": false
+    },
+    {
+      "id": "n1",
+      "onset": 0.75,
+      "pitch": 60,
+      "duration": 0.25,
+      "velocity": 0.8,
+      "optional": false
+    }
+  ],
+  "spans": [],
+  "fixture_kind": "authored-synthetic-proposal"
+}

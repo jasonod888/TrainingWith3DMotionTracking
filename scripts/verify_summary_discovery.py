@@ -1,5 +1,6 @@
 """Mixed-family discovery uses summaries, then loads only the selected lesson. No devices."""
 import json
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -12,6 +13,11 @@ body.update(lesson_id='body-fixture', revision_id='body-v1', title='Movement fix
             source_video=None, thumbnail=None)
 music = json.loads((ROOT / 'packages/lesson-schema/fixtures/music-v2.json').read_text(encoding='utf-8'))
 music.update(lesson_id='music-fixture', revision_id='music-v1', title='Piano fixture')
+
+reference_bytes=json.dumps({'review': {'reviewer_id':'fixture-author','reviewed_at':'2026-11-05T12:00:00Z','draft_id':'fixture','source_reference_sha256':'a'*64}, 'reference_version': 1, 'subject': 'piano', 'instrument': {'instrument': 'piano'},
+                                'duration': 8, 'events': [{'id': 'a', 'onset': 0.5, 'pitch': 60}],
+                                'spans': [{'start': 0.2, 'end': 7.5}]}).encode()
+music['reference'].update(bytes=len(reference_bytes),sha256=hashlib.sha256(reference_bytes).hexdigest())
 
 
 def summary(value, subject, family, instrument=None):
@@ -80,9 +86,7 @@ with sync_playwright() as p:
         elif path == 'lessons/body-fixture':
             route.fulfill(json=body)
         elif path.endswith('/assets/reference.json'):
-            route.fulfill(json={'reference_version': 1, 'subject': 'piano', 'instrument': {'instrument': 'piano'},
-                                'duration': 8, 'events': [{'id': 'a', 'onset': 0.5, 'pitch': 60}],
-                                'spans': [{'start': 0.2, 'end': 7.5}]})
+            route.fulfill(body=reference_bytes,content_type='application/json')
         else:
             route.fulfill(status=404, json={'detail': 'Not found'})
 

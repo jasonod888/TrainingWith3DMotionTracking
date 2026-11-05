@@ -41,7 +41,7 @@ export function App(){
  const [studioEnabled,setStudioEnabled]=useState(()=>localStorage.getItem('form-studio')==='1');
  const setStudio=(value:boolean)=>{setStudioEnabled(value);localStorage.setItem('form-studio',value?'1':'0');};
  const [incoming,setIncoming]=useState(()=>incomingShare()??(['join','account'].includes(routeOf().page)?pending<ReturnType<typeof incomingShare>>('move-invite'):null)),[shared,setShared]=useState<LessonSummary[]>([]),[lessonOwned,setLessonOwned]=useState(true);
- const [page,setPage]=useState<Page>(initialLink?'account':groupInvite?'groupjoin':incoming?'join':routeOf().page),[account,setAccount]=useState<Account|null>(null),[library,setLibrary]=useState<LessonSummary[]>([]),[demo,setDemo]=useState<LessonManifest|null>(null),[lesson,setLesson]=useState<LessonManifest|null>(null),[music,setMusic]=useState<MusicLessonManifest|null>(null),[subjectFilter,setSubjectFilter]=useState(false);
+ const [page,setPage]=useState<Page>(initialLink?'account':groupInvite?'groupjoin':incoming?'join':routeOf().page),[account,setAccount]=useState<Account|null>(null),[library,setLibrary]=useState<LessonSummary[]>([]),[demo,setDemo]=useState<LessonManifest|null>(null),[lesson,setLesson]=useState<LessonManifest|null>(null),[music,setMusic]=useState<MusicLessonManifest|null>(null),[midiSetup,setMidiSetup]=useState(false),[subjectFilter,setSubjectFilter]=useState(false);
  useEffect(()=>{setFeedQuery('');setFeedFilter('all');},[account?.id]);
  // History restoration and authentication can change the page without navigate().
  useEffect(()=>{if(!['preview','practice','compete'].includes(page))setMusic(null);},[page]);
@@ -64,7 +64,7 @@ export function App(){
   setLoading(true);setError('');
   try{const session=await getSession();setAccount(session?.account??null);const [preview,saved,received,workflow]=await Promise.all([loadDemo(),session?loadLessonSummaries():Promise.resolve([]),session?loadSharedSummaries():Promise.resolve([]),session?loadMoveStates():Promise.resolve({lessons:[]})]);setDemo(preview);setLibrary(saved);setShared(received);setStates(workflow.lessons);
    // The subject filter is a server-controlled rollout: absent or failing means off.
-   void loadCapabilities().then(value=>setSubjectFilter(Boolean(value.subject_filter))).catch(()=>setSubjectFilter(false));
+   void loadCapabilities().then(value=>{setSubjectFilter(Boolean(value.subject_filter));setMidiSetup(value.music_midi_setup===true);}).catch(()=>{setSubjectFilter(false);setMidiSetup(false);});
   }
   catch(e){setError((e as Error).message);}finally{setLoading(false);}
  },[]);
@@ -181,7 +181,7 @@ export function App(){
     {account&&page==='moves'&&<div className="feed-uploads"><ConversionList readyIds={states.filter(state=>!state.latest_revision_id||state.accepted_revision_id!==state.latest_revision_id).map(state=>state.lesson_id)} onReady={()=>void refresh()} onOpen={id=>open({lesson_id:id},'check')}/></div>}
    </PracticeFeed>{notice&&<p className="inline-notice" role="status">{notice}</p>}</div>
    {page==='music-review'&&account&&reviewId&&<MusicDraftReview lessonId={reviewId} onDirty={setDirty} onBack={()=>navigate('moves')} onReviewed={value=>{setDirty(false);setMusic(value);setLesson(null);setLessonOwned(true);setPage('preview');void refresh();window.scrollTo({top:0});}}/>}
-   {page==='preview'&&music&&!lesson&&<MusicLessonScreen lesson={music} onBack={()=>navigate('moves')}/>}
+   {page==='preview'&&music&&!lesson&&<MusicLessonScreen midiSetupEnabled={midiSetup} lesson={music} onBack={()=>navigate('moves')}/>}
    {page==='preview'&&lesson&&<PracticePreview key={lesson.revision_id} lesson={lesson} owned={lessonOwned} resumeAt={previewPositions.current[lesson.lesson_id+':'+lesson.revision_id]??lesson.source_start} onPosition={time=>{previewPositions.current[lesson.lesson_id+':'+lesson.revision_id]=time;}} onChoose={chooseMode} onBack={()=>navigate('moves')}
     lessons={[...library.map(value=>({lesson:value,owned:true})),...shared.map(value=>({lesson:value,owned:false})),...(demo?[{lesson:summarizeBody(demo),owned:false}]:[])]}
     onOpen={item=>{setSessionSection(null);open(item.lesson,'practice',item.owned);}}

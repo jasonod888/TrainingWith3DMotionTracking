@@ -11,7 +11,7 @@ Studio preview) now renders `MusicLessonHome` as a player:
 - the retained instructor video with its original audio, or an explicit "video unavailable"
   panel and a timer-only guide;
 - Play/Pause, a position slider labelled **Lesson position**, elapsed/total time, and
-  **Play section** buttons that seek to each teaching section;
+  **Seek to section** buttons that seek to each teaching section;
 - an animated piano keyboard (white and black keys) or a guitar fretboard (standard
   tuning E2–E4, frets 0–12, lowest-fret position);
 - the notes currently sounding, named (`C4`, `E4`, …) and their current reviewed passage;
@@ -50,9 +50,34 @@ Screenshots: `test-results/music-guide-phone.png`, `test-results/music-guide-des
 
 ## Limits
 
-- No scoring, feedback, MIDI or microphone input.
+- No scoring or microphone input. An explicitly gated MIDI setup pilot is documented below.
 - Guitar positions use standard tuning only; capo and alternate tunings are shown as
   metadata, not applied to the fretboard.
 - The whole reference is fetched and held in memory (bounded); there is no offline cache.
 - The instructor video is the retained private asset; if an old draft lost its source, the
   guide falls back to timer-only playback.
+
+
+## Review continuation: timing, truthfulness and opt-in setup
+
+The player now verifies reference bytes/length against the immutable manifest hash,
+requires complete review evidence, and binds duration/instrument settings to the lesson.
+On a lesson change the old reference is removed before the next one can draw. Failed
+video playback switches to the usable timer guide; playback can restart from the end,
+pauses when hidden, and cancels its frame work/pauses old media on exit. Video time is
+sampled each animation frame rather than relying on coarse `timeupdate` events. Attack
+highlights do not begin early, and teaching-section state is independent of passage spans.
+Piano black-key width/position scale with white-key units, including compact ranges.
+
+Guitar positions remain illustrative. Capo/alternate tuning suppress unsupported markers
+while leaving pitches and video usable. Simultaneous lowest-fret positions that conflict
+on a string are not drawn; the UI explains that reviewed fingering is needed. Tuning/capo
+remain visible as metadata. This is not an instructor hand/finger reconstruction.
+
+A disabled-by-default `MUSIC_MIDI_SETUP_ENABLED` pilot can show a piano keyboard check.
+It is unscored and never opens a port on preview. See `docs/piano-midi-practice.md`.
+Normal preview's no-device-request behavior is unchanged.
+
+Latest checks: 257 web tests passed, TypeScript/build/bundle checks passed, extended guide
+browser checks and virtual-MIDI lifecycle checks passed. These supplement the earlier
+verification record above; they do not certify physical hardware or model accuracy.

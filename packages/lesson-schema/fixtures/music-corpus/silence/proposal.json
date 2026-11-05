@@ -1,0 +1,10 @@
+{
+  "subject": "piano",
+  "instrument": {
+    "instrument": "piano"
+  },
+  "duration": 3,
+  "events": [],
+  "spans": [],
+  "fixture_kind": "authored-synthetic-proposal"
+}

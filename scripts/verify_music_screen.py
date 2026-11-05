@@ -5,6 +5,7 @@ then a guitar reference through the shared preview navigation, saves phone and d
 screenshots, and asserts no camera/microphone/MIDI requests are made.
 """
 import json
+import hashlib
 import os
 from pathlib import Path
 
@@ -16,10 +17,10 @@ account = {'id': 'tester', 'email': 'test@example.test', 'platform_role': 'membe
 results = ROOT / 'test-results'
 
 
-def reference(subject: str) -> dict:
+def reference(subject: str, instrument=None) -> dict:
     pitches = [60, 64, 67] if subject == 'piano' else [40, 45, 50]
     return {
-        'reference_version': 1, 'subject': subject, 'instrument': {'instrument': subject}, 'duration': 8,
+        'reference_version': 1, 'subject': subject, 'instrument': instrument or {'instrument': subject}, 'duration': 8,
         'events': [{'id': f'{subject}-{index}', 'onset': 0.5 + index, 'duration': 0.5, 'pitch': pitch,
                     'velocity': 0.7, 'optional': False} for index, pitch in enumerate(pitches)],
         'spans': [{'start': 0.2, 'end': 7.5}],
@@ -77,9 +78,11 @@ with sync_playwright() as p:
         elif path == 'capabilities':
             route.fulfill(json={'subject_filter': False, 'conversion': True})
         elif path == 'lessons/music-fixture':
+            raw=json.dumps(reference(manifest['subject'], manifest['instrument'])).encode()
+            manifest['reference'].update(bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
             route.fulfill(json=manifest)
         elif path.endswith('/assets/reference.json'):
-            route.fulfill(json=reference(manifest['subject']))
+            route.fulfill(body=json.dumps(reference(manifest['subject'], manifest['instrument'])).encode(),content_type='application/json')
         else:
             route.fulfill(status=404, json={'detail': 'Not found'})
 

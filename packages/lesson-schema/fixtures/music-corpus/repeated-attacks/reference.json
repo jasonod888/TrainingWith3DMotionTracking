@@ -1,0 +1,42 @@
+{
+  "subject": "piano",
+  "instrument": {
+    "instrument": "piano"
+  },
+  "duration": 3,
+  "events": [
+    {
+      "id": "n0",
+      "onset": 0.25,
+      "pitch": 60,
+      "duration": 0.25,
+      "velocity": 0.8,
+      "optional": false
+    },
+    {
+      "id": "n1",
+      "onset": 0.75,
+      "pitch": 60,
+      "duration": 0.25,
+      "velocity": 0.8,
+      "optional": false
+    },
+    {
+      "id": "n2",
+      "onset": 1.25,
+      "pitch": 60,
+      "duration": 0.25,
+      "velocity": 0.8,
+      "optional": false
+    }
+  ],
+  "spans": [],
+  "reference_version": 1,
+  "fixture_kind": "authored-synthetic",
+  "review": {
+    "reviewer_id": "synthetic-fixture-author",
+    "reviewed_at": "2026-11-05T12:00:00Z",
+    "draft_id": "repeated-attacks",
+    "source_reference_sha256": "0dc56f4b14facbeb38d2cd7a53953c99aa7419c86b249192c893732ca934bba8"
+  }
+}

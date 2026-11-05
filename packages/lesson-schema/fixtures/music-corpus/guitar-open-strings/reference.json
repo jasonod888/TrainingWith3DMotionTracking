@@ -1,0 +1,42 @@
+{
+  "subject": "guitar",
+  "instrument": {
+    "instrument": "guitar"
+  },
+  "duration": 3,
+  "events": [
+    {
+      "id": "n0",
+      "onset": 0.5,
+      "pitch": 40,
+      "duration": 0.25,
+      "velocity": 0.8,
+      "optional": false
+    },
+    {
+      "id": "n1",
+      "onset": 1.0,
+      "pitch": 45,
+      "duration": 0.25,
+      "velocity": 0.8,
+      "optional": false
+    },
+    {
+      "id": "n2",
+      "onset": 1.5,
+      "pitch": 50,
+      "duration": 0.25,
+      "velocity": 0.8,
+      "optional": false
+    }
+  ],
+  "spans": [],
+  "reference_version": 1,
+  "fixture_kind": "authored-synthetic",
+  "review": {
+    "reviewer_id": "synthetic-fixture-author",
+    "reviewed_at": "2026-11-05T12:00:00Z",
+    "draft_id": "guitar-open-strings",
+    "source_reference_sha256": "342524be0e64fa66cc71b94fdc1f6e03eec44e048b221b890cefa3bec8b35b0e"
+  }
+}
