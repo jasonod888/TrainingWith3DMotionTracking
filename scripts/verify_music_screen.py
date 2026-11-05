@@ -21,6 +21,31 @@ with sync_playwright() as p:
     page = browser.new_page(viewport={'width': 390, 'height': 844})
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
+    # Instrument device entry points: watching a lesson must request none of them.
+    page.add_init_script("""
+      window.__permissionRequests = [];
+      const media = navigator.mediaDevices;
+      if (media && media.getUserMedia) {
+        media.getUserMedia = (...args) => {
+          window.__permissionRequests.push('getUserMedia');
+          return Promise.reject(new Error('Blocked by the music screen check'));
+        };
+      }
+      if (navigator.requestMIDIAccess) {
+        navigator.requestMIDIAccess = (...args) => {
+          window.__permissionRequests.push('requestMIDIAccess');
+          return Promise.reject(new Error('Blocked by the music screen check'));
+        };
+      }
+      const permissions = navigator.permissions;
+      if (permissions && permissions.query) {
+        const query = permissions.query.bind(permissions);
+        permissions.query = (descriptor) => {
+          window.__permissionRequests.push('permissions:' + (descriptor && descriptor.name));
+          return query(descriptor);
+        };
+      }
+    """)
 
     def api(route):
         path = route.request.url.split('/api/', 1)[1].split('?')[0]
@@ -55,6 +80,11 @@ with sync_playwright() as p:
     page.wait_for_timeout(300)
     page.screenshot(path=str(results / 'music-fixture-desktop.png'))
     heading = page.locator('.music-home h1').inner_text()
-    print(json.dumps({'heading': heading, 'errors': errors,
+    requests = page.evaluate('window.__permissionRequests')
+    assert errors == [], f'page errors: {errors}'
+    assert requests == [], f'device permission requests: {requests}'
+    assert heading, 'music heading is missing'
+    assert page.locator('.music-home-panel').count() == 2, 'music details are incomplete'
+    print(json.dumps({'heading': heading, 'errors': errors, 'permission_requests': requests,
                       'screenshots': ['test-results/music-fixture-phone.png', 'test-results/music-fixture-desktop.png']}))
     browser.close()

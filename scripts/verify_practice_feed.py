@@ -58,6 +58,16 @@ with sync_playwright() as p:
   elif path.endswith('/progress'):route.fulfill(json={})
   else:route.fulfill(status=404,json={'detail':'Not found'})
  page.route('**/api/**',api)
+ def open_navigation(width):
+  if width<=760:
+   page.locator('.feed-sidebar-toggle').click()
+   expect(page.get_by_role('navigation',name='Main navigation')).to_be_visible()
+ def close_navigation_with_escape(width):
+  # Closing the drawer must return focus to the control that opened it.
+  if width<=760:
+   page.keyboard.press('Escape')
+   expect(page.get_by_role('navigation',name='Main navigation')).not_to_be_visible()
+   expect(page.locator('.feed-sidebar-toggle')).to_be_focused()
  page.goto(os.environ.get('PRACTICE_TEST_URL','http://127.0.0.1:5195')+'/')
  expect(page.locator('.feed-card-public')).to_have_count(23)
  expect(page.locator('.feed-card-own')).to_have_count(2)
@@ -67,11 +77,14 @@ with sync_playwright() as p:
   page.set_viewport_size({'width':w,'height':h});page.wait_for_timeout(150)
   assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),(w,'horizontal overflow')
   first=page.locator('.feed-thumbnail').first.bounding_box();assert first and first['y']<150,(w,first)
+  open_navigation(w)
   nav=page.get_by_role('navigation',name='Main navigation').bounding_box();assert nav and nav['y']>=0 and nav['y']+nav['height']<=h+1,(w,nav)
+  close_navigation_with_escape(w)
   page.screenshot(path=str(ROOT/f'test-results/practice-feed-{w}.png'))
  # The browse pages share the shell and keep results close to the header.
  for width,height in [(1440,900),(900,800),(390,844)]:
   page.set_viewport_size({'width':width,'height':height})
+  open_navigation(width)
   page.get_by_role('navigation',name='Main navigation').get_by_role('button',name='Explore',exact=True).click()
   expect(page.locator('.explore-screen')).to_be_visible()
   expect(page.locator('.explore-screen .feed-card')).to_have_count(24)
@@ -80,8 +93,8 @@ with sync_playwright() as p:
   page.screenshot(path=str(ROOT/f'test-results/explore-{width}.png'))
   if width<=760:
    page.get_by_role('button',name='Open search',exact=True).click()
-   expect(page.get_by_role('searchbox',name='Search public moves')).to_be_focused()
-  search=page.get_by_role('searchbox',name='Search public moves')
+   expect(page.get_by_role('searchbox',name='Search practices')).to_be_focused()
+  search=page.get_by_role('searchbox',name='Search practices')
   search.fill('Maya')
   expect(page.locator('.explore-screen .feed-card')).to_have_count(9)
   search.fill('no matching creator')
@@ -91,7 +104,8 @@ with sync_playwright() as p:
   if width<=760:page.get_by_role('button',name='Close search',exact=True).click()
   page.get_by_role('button',name='Foundations',exact=True).click()
   expect(page.get_by_role('button',name='Foundations',exact=True)).to_have_attribute('aria-pressed','true')
-  page.get_by_role('button',name='Groups',exact=True).click()
+  open_navigation(width)
+  page.get_by_role('navigation',name='Main navigation').get_by_role('button',name='Groups',exact=True).click()
   expect(page.get_by_role('heading',name='No groups yet')).to_be_visible()
   page.screenshot(path=str(ROOT/f'test-results/groups-{width}.png'))
   page.get_by_role('button',name='Create a group',exact=True).click()
@@ -105,13 +119,17 @@ with sync_playwright() as p:
   else:page.get_by_role('button',name='Cancel',exact=True).click()
   assert page.locator('.header').bounding_box()['height']==(56 if width<=760 else 60)
   assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-  page.get_by_role('button',name='Your account',exact=True).click()
+  page.get_by_role('button',name='Account menu',exact=True).click()
+  page.get_by_role('menuitem',name='Account',exact=True).click()
   expect(page.locator('.account-card')).to_be_visible()
   assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-  if width<=760: page.get_by_role('navigation',name='Main navigation').get_by_role('button',name='Create',exact=True).click()
+  if width<=760:
+   open_navigation(width)
+   page.get_by_role('navigation',name='Main navigation').get_by_role('button',name='Create',exact=True).click()
   else: page.get_by_role('button',name='Create a practice',exact=True).click()
   expect(page.locator('.create-screen')).to_be_visible()
   assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+  open_navigation(width)
   page.get_by_role('navigation',name='Main navigation').get_by_role('button',name='Home',exact=True).click()
   expect(page.locator('.feed-header-search')).to_be_visible()
  # The desktop rail can expand without covering content or changing search.

@@ -24,7 +24,7 @@ with sync_playwright() as p:
  page.route('**/api/**',api)
  page.goto(os.environ.get('PRACTICE_TEST_URL','http://127.0.0.1:5193')+'/?page=practice&id=synthetic-lesson&source=demo')
  expect(page.locator('.mimic-shell')).to_have_class(re.compile('mode-practice'))
- page.get_by_role('button',name='Section 1/3',exact=True).click()
+ page.get_by_role('button',name=re.compile(r'Browse sections\. Section 1 of 3')).click()
  page.get_by_role('button',name='Middle',exact=True).click()
  page.get_by_role('button',name='1× Speed',exact=True).click()
  page.get_by_role('button',name='0.5×',exact=True).click()
@@ -64,7 +64,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Return to practice',exact=True).click()
  expect(page.get_by_role('button',name='0.5× Speed',exact=True)).to_be_visible()
  expect(page.get_by_role('button',name='Loop on',exact=True)).to_be_visible()
- expect(page.get_by_role('button',name='Section 2/3',exact=True)).to_be_visible()
+ expect(page.get_by_role('button',name=re.compile(r'Browse sections\. Section 2 of 3'))).to_be_visible()
  # Low tracking must yield an unscored completion, then allow section practice.
  enter_compete()
  expect(start).to_be_enabled()
@@ -76,7 +76,7 @@ with sync_playwright() as p:
  expect(page.locator('.compete-result-score>strong')).to_have_text('—')
  page.get_by_role('button',name='Practise Middle',exact=True).click()
  expect(page.locator('.mimic-shell')).to_have_class(re.compile('mode-practice'))
- expect(page.get_by_role('button',name='Section 2/3',exact=True)).to_be_visible()
+ expect(page.get_by_role('button',name=re.compile(r'Browse sections\. Section 2 of 3'))).to_be_visible()
  # Backgrounding during countdown interrupts instead of silently resuming.
  page.evaluate('window.poseUnclear=false')
  enter_compete()

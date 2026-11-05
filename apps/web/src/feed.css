@@ -32,7 +32,7 @@
 .feed-processing:empty{display:none}.feed-uploads{margin:0 0 20px;font-size:12px;color:#66745c}.feed-uploads>summary{display:flex;align-items:center;gap:9px;min-height:44px;cursor:pointer;list-style:none}.feed-uploads>summary:after{content:'+';margin-left:auto;font-size:18px}.feed-uploads[open]>summary:after{content:'−'}.feed-uploads .conversion-list{margin:5px 0 20px}.feed-uploads .conversion-list .library-filter{display:none}
 @media(min-width:1600px){.feed-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:1100px) and (min-width:761px){
- .feed-app>.header{grid-template-columns:180px minmax(0,1fr) 160px;gap:16px;padding:0 16px}.feed-header-brand{gap:8px}.app.feed-app>main{padding-inline:20px}.feed-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .feed-app>.header{grid-template-columns:180px minmax(0,1fr) max-content;gap:16px;padding:0 16px}.feed-header-actions{min-width:0}.feed-header-brand{gap:8px}.app.feed-app>main{padding-inline:20px}.feed-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:760px){
  .feed-app{--shell-header-height:56px;--shell-sidebar-width:0px}
