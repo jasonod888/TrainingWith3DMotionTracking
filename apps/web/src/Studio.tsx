@@ -1,3 +1,4 @@
+import {SubjectBadge} from './SubjectBadge';
 import {useEffect,useState} from 'react';
 import {ArrowLeft,ArrowRight,Check,Play,Scissors,Share2,SlidersHorizontal} from 'lucide-react';
 import type {LessonSummary} from '../../../packages/lesson-schema/index';
@@ -18,7 +19,7 @@ export function StudioPage({lessons,states,onBack,onOpen,onCheck,onAdjust,onShar
    {lessons.map(lesson=>{
     const state=stateOf(lesson),music=lesson.experience_family==='music',checking=!music&&needsCheck(lesson,state);
     return <div className="studio-row" role="row" key={lesson.lesson_id}>
-     <span role="cell" className="studio-title"><strong>{lesson.title}</strong><small>{lesson.duration.toFixed(1)}s</small></span>
+     <span role="cell" className="studio-title"><strong>{lesson.title}</strong><SubjectBadge label={lesson.subject_label}/><small>{lesson.duration.toFixed(1)}s</small></span>
      <span role="cell">{lesson.section_count}</span>
      <span role="cell">{state?audienceLabel(state.audiences):'Only you'}</span>
      <span role="cell">{music?'Preview only':checking?<em className="state-check">Ready to check</em>:state?.accepted_revision_id?'Accepted':<em>Draft</em>}</span>

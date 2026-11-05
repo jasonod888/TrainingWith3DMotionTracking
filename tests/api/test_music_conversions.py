@@ -37,6 +37,7 @@ def music_app(tmp_path, music_piano_conversion_provider='local', music_guitar_co
     with patch('apps.api.auth.send_account_mail', side_effect=lambda s, e, p, t: mail.append((e, p, t))), \
          patch('apps.api.lessons.storage_client', return_value=store), \
          patch('apps.api.conversions.storage_client', return_value=store), \
+         patch('apps.api.conversions.probe_audio_media', return_value={'audio': True, 'video': True, 'findings': []}), \
          TestClient(app) as client:
         client.headers.update({'Origin': 'http://testserver', 'X-Form-Request': '1'})
         register(client, mail)

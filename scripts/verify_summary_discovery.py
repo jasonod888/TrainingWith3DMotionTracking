@@ -87,6 +87,11 @@ with sync_playwright() as p:
     expect(page.get_by_role('button', name='Open Piano fixture', exact=True)).to_be_visible()
     expect(page.get_by_role('button', name='Open Shared guitar fixture', exact=True)).to_be_visible()
     expect(page.get_by_role('button', name='Boxing', exact=True)).to_be_visible()
+    expect(page.locator('.feed-card-own').filter(has_text='Piano fixture').get_by_label('Lesson subject: Piano')).to_be_visible()
+    page.screenshot(path=str(ROOT/'test-results/summary-badges-phone.png'))
+    page.set_viewport_size({'width':1280,'height':800})
+    page.screenshot(path=str(ROOT/'test-results/summary-badges-desktop.png'))
+    page.set_viewport_size({'width':390,'height':844})
     assert not any(path in calls for path in ('lessons', 'shared-lessons', 'lessons/music-fixture', 'lessons/body-fixture'))
     page.get_by_role('button', name='Open Piano fixture', exact=True).click()
     expect(page.locator('.music-home h1')).to_have_text('Piano fixture')
@@ -103,6 +108,12 @@ with sync_playwright() as p:
     expect(page.get_by_role('button', name='Adjust Piano fixture', exact=True)).to_have_count(0)
     expect(page.get_by_role('button', name='Share Piano fixture', exact=True)).to_have_count(0)
     page.get_by_role('button', name='Preview', exact=True).click()
+    expect(page.locator('.music-home h1')).to_have_text('Piano fixture')
+    # Browser Back takes the history restoration path rather than navigate().
+    page.go_back()
+    expect(page.get_by_role('heading',name='Your library at a glance.',exact=True)).to_be_visible()
+    expect(page.locator('.music-home')).to_have_count(0)
+    page.get_by_role('button',name='Preview',exact=True).click()
     expect(page.locator('.music-home h1')).to_have_text('Piano fixture')
     # Leaving a music lesson destroys its screen, then the group entry path routes the
     # shared release and the movement grant to their own screens.

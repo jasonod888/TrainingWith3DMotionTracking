@@ -97,7 +97,8 @@ test('a shared card labels itself from the released summary, not our workflow st
     states: [{lesson_id: 'shared-1', subject: 'movement_other', subject_label: 'Full Body Movement'}],
   })}/>);
   await waitFor(() => assert.ok(container.querySelector('.feed-card-shared')));
-  assert.match(container.textContent, /Dance · 1 section/);
+  assert.equal(container.querySelector('.feed-card-shared .lesson-subject-badge')?.textContent,'Dance');
+  assert.match(container.textContent,/1 section/);
   assert.doesNotMatch(container.textContent, /Full Body Movement · 1 section/);
 });
 
@@ -161,7 +162,8 @@ test('a music summary renders and opens without any body manifest fields', async
   const {container}=render(<PracticeFeed {...props({library:[piano],onOpen:value=>{opened=value;}})}/>);
   fireEvent.click(await screen.findByRole('button',{name:'Open Piano basics'}));
   assert.equal(opened,piano);
-  assert.match(container.textContent,/Piano · 1 section/);
+  assert.equal(container.querySelector('.lesson-subject-badge')?.textContent,'Piano');
+  assert.match(container.textContent,/1 section/);
   fireEvent.click(screen.getByLabelText('Options for Piano basics'));
   assert.equal(screen.queryByRole('button',{name:'Check movement'}),null);
   assert.equal(screen.queryByRole('button',{name:'Adjust practice'}),null);

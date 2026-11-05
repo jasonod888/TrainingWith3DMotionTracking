@@ -1,0 +1,10 @@
+{
+  "commit": "43a01ab",
+  "description": "Phase 2 checkpoint; static JS/CSS closure of index.html, gzip per asset. Not the Phase 0 baseline.",
+  "initial": {
+    "bytes": 439456,
+    "gzip": 126758
+  },
+  "headroomGzip": 16384,
+  "musicScreenLimitGzip": 16384
+}

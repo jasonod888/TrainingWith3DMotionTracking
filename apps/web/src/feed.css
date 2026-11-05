@@ -82,3 +82,5 @@
  .app.feed-app.navigation-overlay>main{padding-bottom:24px}
  .account-menu-options{top:46px}
 }
+
+.lesson-subject-badge{display:inline-block;max-width:100%;padding:2px 7px;margin:3px 0;border-radius:6px;background:var(--surface-soft,#eef2e9);color:var(--text-muted,#46604e);font-size:11px;line-height:1.4;overflow-wrap:anywhere}

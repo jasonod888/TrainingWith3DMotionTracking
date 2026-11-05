@@ -6,6 +6,7 @@ import secrets
 import struct
 import tempfile
 from datetime import timedelta
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
@@ -20,6 +21,7 @@ from .contracts import Asset, LessonManifest, MusicLessonManifest
 from .database import Account, Conversion, Lesson, LessonAsset, LessonRevision, WorkerCredential
 from .storage import storage_client
 from .processing import ENGINE_VERSION, PIPELINE_VERSION, Provider, processing_status
+from .media_probe import MediaProbeError, probe_audio_media
 from . import processing_routes, subjects
 
 PART_SIZE=5*1024*1024
@@ -76,7 +78,7 @@ class Heartbeat(BaseModel):
 
 
 class Failure(BaseModel):
-    category:str=Field(pattern='^(invalid_video|conversion_failed|worker_interrupted|infrastructure|provider_submission_unknown|provider_failed)$')
+    category:str=Field(pattern='^(invalid_video|invalid_audio|conversion_failed|worker_interrupted|infrastructure|provider_submission_unknown|provider_failed)$')
 
 
 class SubmissionReceipt(BaseModel):
@@ -104,7 +106,8 @@ def install_conversions(app,engine,settings,identity,db):
                 'target_lesson_id':job.target_lesson_id,
                 'parts':job.parts if job.state=='uploading' else {},'part_size':PART_SIZE,
                 'provider':job.provider,'pipeline_version':job.pipeline_version,
-                'retryable':job.state=='failed' and job.attempts<3 and job.error not in ('invalid_video','source_expired') and job.submission_state=='none'}
+                'media_findings':job.media_findings or {},
+                'retryable':job.state=='failed' and job.attempts<3 and job.error not in ('invalid_video','invalid_audio','source_expired') and job.submission_state=='none'}
 
     def worker_identity(request:Request,session:Session=Depends(db)):
         value=request.headers.get('authorization','')
@@ -230,11 +233,34 @@ def install_conversions(app,engine,settings,identity,db):
                 MultipartUpload={'Parts':[{'PartNumber':n,'ETag':job.parts[str(n)]['etag']} for n in range(1,count+1)]})
             head=store.head_object(Bucket=settings.storage_bucket,Key=job.source_key)
         if head['ContentLength']!=job.source_bytes:raise HTTPException(422,'The uploaded video size did not match.')
+        music_route=processing_routes.route_for_pipeline(job.pipeline_version)
+        music=bool(music_route and music_route.completion=='music-v2')
+        temp=None
+        if music:
+            settings.upload_temp_dir.mkdir(parents=True,exist_ok=True)
+            temp=tempfile.NamedTemporaryFile(dir=settings.upload_temp_dir,suffix='.upload',delete=False)
         obj=store.get_object(Bucket=settings.storage_bucket,Key=job.source_key);checksum=hashlib.sha256()
         try:
-            for chunk in obj['Body'].iter_chunks(chunk_size=1024*1024):checksum.update(chunk)
-        finally:obj['Body'].close()
-        job.source_sha256=checksum.hexdigest();job.state='queued';job.upload_id=None;session.commit()
+            for chunk in obj['Body'].iter_chunks(chunk_size=1024*1024):
+                checksum.update(chunk)
+                if temp:temp.write(chunk)
+        finally:
+            obj['Body'].close()
+            if temp:temp.close()
+        job.source_sha256=checksum.hexdigest();job.upload_id=None
+        if temp is not None:
+            path=Path(temp.name)
+            try:
+                try:findings=probe_audio_media(path)
+                except MediaProbeError as exc:findings={'audio':False,'findings':['unreadable_media'],'error':str(exc)}
+            finally:path.unlink(missing_ok=True)
+            job.media_findings=findings
+            if not findings.get('audio'):
+                job.state='failed';job.error='invalid_audio';session.commit()
+                try:store.delete_object(Bucket=settings.storage_bucket,Key=job.source_key)
+                except Exception:pass
+                return summary(job)
+        job.state='queued';session.commit()
         return summary(job)
 
     @router.post('/{job_id}/cancel')
@@ -254,7 +280,7 @@ def install_conversions(app,engine,settings,identity,db):
     def retry(job_id:str,account=Depends(identity),session:Session=Depends(db)):
         session.scalar(select(Account).where(Account.id==account.id).with_for_update())
         job=owned(session,job_id,account.id,True)
-        if job.state!='failed' or job.error in ('invalid_video','source_expired') or job.attempts>=3 or job.submission_state!='none':raise HTTPException(409,'This conversion cannot be safely retried. Please contact support before submitting another video.')
+        if job.state!='failed' or job.error in ('invalid_video','invalid_audio','source_expired') or job.attempts>=3 or job.submission_state!='none':raise HTTPException(409,'This conversion cannot be safely retried. Please contact support before submitting another video.')
         active=session.scalar(select(func.count()).select_from(Conversion).where(Conversion.owner_id==account.id,Conversion.state.in_(('queued',*RUNNING))))
         if active>=settings.max_active_conversions:raise HTTPException(409,'Wait for your other conversions to finish.')
         job.state='queued';job.error=None;job.lease_until=None;session.commit();return summary(job)

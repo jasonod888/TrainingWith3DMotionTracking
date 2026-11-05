@@ -19,7 +19,7 @@ export function MusicLessonHome({lesson, onBack}: {lesson: MusicLessonManifest; 
       <h1>{lesson.title}</h1>
       <p className="subtle">
         A reviewed reference with {sections.length === 1 ? '1 teaching section' : `${sections.length} teaching sections`}.
-        Watch the instructor and follow the guide; nothing is scored here yet.
+        This preview shows lesson details and teaching sections. Instructor playback and the animated guide are not available yet.
       </p>
     </header>
     <div className="music-home-grid">
@@ -28,7 +28,7 @@ export function MusicLessonHome({lesson, onBack}: {lesson: MusicLessonManifest; 
         <dl>
           <div><dt>Instrument</dt><dd>{label(lesson)}</dd></div>
           <div><dt>Duration</dt><dd>{Math.floor(lesson.duration / 60)}:{Math.floor(lesson.duration % 60).toString().padStart(2, '0')}</dd></div>
-          <div><dt>Assessment</dt><dd>{lesson.assessment.assessment === 'none' ? 'Watch only' : lesson.assessment.assessment}</dd></div>
+          <div><dt>Reference assessment</dt><dd>{lesson.assessment.assessment === 'none' ? 'None' : lesson.assessment.assessment}</dd></div>
           {lesson.instrument.capo ? <div><dt>Capo</dt><dd>{lesson.instrument.capo}</dd></div> : null}
         </dl>
       </article>
@@ -40,7 +40,10 @@ export function MusicLessonHome({lesson, onBack}: {lesson: MusicLessonManifest; 
       </article>
     </div>
     <p className="inline-notice" role="status">
-      Live keyboard feedback arrives in the music milestone. No camera, microphone or MIDI access has been requested.
+      {lesson.subject === 'piano'
+        ? 'Live piano feedback is not enabled in this version. You can still browse this lesson and its sections.'
+        : 'Live guitar feedback is not enabled in this version. You can still browse this lesson and its sections.'}
+      {' '}No camera, microphone or MIDI access has been requested.
     </p>
   </section>;
 }

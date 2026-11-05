@@ -5,9 +5,9 @@ from playwright.sync_api import sync_playwright,expect
 from verify_practice_flow import MOCK
 ROOT=Path(__file__).resolve().parents[1]
 manifest=json.loads((ROOT/'packages/lesson-schema/fixture.json').read_text())
-manifest.update(engine='sam-3d-body',duration=3,title='Mode verification')
-manifest['section_set']['duration']=3
-manifest['section_set']['sections']=[{'id':str(i),'label':label,'start':i,'end':i+1} for i,label in enumerate(['Opening','Middle','Finish'])]
+manifest.update(engine='sam-3d-body',duration=9,title='Mode verification')
+manifest['section_set']['duration']=9
+manifest['section_set']['sections']=[{'id':str(i),'label':label,'start':i*3,'end':(i+1)*3} for i,label in enumerate(['Opening','Middle','Finish'])]
 reference=json.loads((ROOT/'web/dist/assets/reference.json').read_text())
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True)
@@ -31,24 +31,24 @@ with sync_playwright() as p:
  page.get_by_role('group',name='Playback speed').get_by_role('button',name='0.5×',exact=True).click()
  page.get_by_label('Repeat automatically',exact=True).check()
  page.get_by_role('button',name='Close Practice settings',exact=True).click()
- start=page.get_by_role('button',name='Start scored run',exact=True)
  def enter_compete():
   page.get_by_label('Lesson mode',exact=True).select_option('compete')
   expect(page.get_by_role('button',name='Prepare challenge',exact=True)).to_be_visible()
   page.get_by_role('button',name='Prepare challenge',exact=True).click()
-  expect(start).to_be_enabled(timeout=15000)
+  page.get_by_role('button',name='Start camera',exact=True).click()
+  expect(page.get_by_role('group',name='Camera setup',exact=True)).to_have_count(0,timeout=20000)
+  expect(page.get_by_role('button',name='Stop run',exact=True)).to_be_visible()
  enter_compete()
  expect(page.get_by_label('Lesson position',exact=True)).to_have_count(0)
  expect(page.get_by_role('button',name='0.5× Speed',exact=True)).to_have_count(0)
- start.click()
  expect(page.get_by_role('button',name='Practice',exact=True)).to_have_count(0)
- expect(page.get_by_role('button',name='More',exact=True)).to_be_disabled()
+ expect(page.get_by_role('button',name='Practice settings',exact=True)).to_be_disabled()
  expect(page.get_by_role('button',name='Stop run',exact=True)).to_be_visible()
  # Keyboard navigation and speed commands cannot alter the scored run.
  page.locator('.mimic-stage').click(position={'x':5,'y':180})
  page.keyboard.press('ArrowRight')
  page.wait_for_function("document.querySelector('.is-playing')")
- page.wait_for_function("document.querySelector('.compete-progress progress').value>1.25")
+ page.wait_for_function("document.querySelector('.compete-progress progress').value>3.25")
  expect(page.get_by_role('dialog')).to_have_count(0)
  expect(page.locator('.mimic-context h2')).to_have_text('Middle')
  expect(page.get_by_role('dialog',name='Your run',exact=True)).to_be_visible(timeout=10000)
@@ -62,13 +62,14 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Cancel',exact=True).click()
  expect(page.get_by_role('dialog',name='Attempt stopped',exact=True)).to_be_visible()
  page.get_by_role('button',name='Return to practice',exact=True).click()
- expect(page.get_by_role('button',name='0.5× Speed',exact=True)).to_be_visible()
- expect(page.get_by_role('button',name='Loop on',exact=True)).to_be_visible()
+ page.get_by_role('button',name='Practice settings',exact=True).click()
+ page.get_by_role('button',name=re.compile(r'^Playback & timing')).click()
+ expect(page.get_by_role('group',name='Playback speed').get_by_role('button',name='0.5×',exact=True)).to_have_attribute('aria-pressed','true')
+ expect(page.get_by_label('Repeat automatically',exact=True)).to_be_checked()
+ page.get_by_role('button',name='Close Practice settings',exact=True).click()
  expect(page.get_by_role('button',name=re.compile(r'Browse sections\. Section 2 of 3'))).to_be_visible()
  # Low tracking must yield an unscored completion, then allow section practice.
  enter_compete()
- expect(start).to_be_enabled()
- start.click()
  page.wait_for_function("document.querySelector('.is-playing')")
  page.evaluate('window.poseUnclear=true')
  expect(page.get_by_role('dialog',name='Your run',exact=True)).to_be_visible(timeout=10000)
@@ -80,7 +81,6 @@ with sync_playwright() as p:
  # Backgrounding during countdown interrupts instead of silently resuming.
  page.evaluate('window.poseUnclear=false')
  enter_compete()
- expect(start).to_be_enabled(timeout=10000);start.click()
  page.evaluate("Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))")
  expect(page.get_by_role('dialog',name='Attempt stopped',exact=True)).to_be_visible()
  expect(page.get_by_text('No competition score was recorded.',exact=False)).to_be_visible()

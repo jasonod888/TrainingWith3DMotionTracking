@@ -129,6 +129,7 @@ class Conversion(Base):
     subject: Mapped[str] = mapped_column(String(32), default='movement_other', server_default='movement_other')
     instrument: Mapped[str | None] = mapped_column(String(16))
     preparation: Mapped[dict] = mapped_column(JSON, default=dict)
+    media_findings: Mapped[dict] = mapped_column(JSON, default=dict)
     upload_id: Mapped[str | None] = mapped_column(String(512))
     parts: Mapped[dict] = mapped_column(JSON, default=dict)
     start: Mapped[float] = mapped_column(Float)
@@ -306,7 +307,7 @@ def database_ready(engine):
         connection.execute(text('SELECT account_id, lesson_id, revision_id, time FROM practice_progress LIMIT 0'))
         connection.execute(text('SELECT id, owner_id, title, subject, experience_family, instrument FROM lessons LIMIT 0'))
         connection.execute(text('SELECT id, lesson_id, version, subject, experience_family, instrument FROM lesson_revisions LIMIT 0'))
-        connection.execute(text('SELECT id, state, lease_until, provider, pipeline_version, submission_state, target_lesson_id, subject, instrument, preparation FROM conversions LIMIT 0'))
+        connection.execute(text('SELECT id, state, lease_until, provider, pipeline_version, submission_state, target_lesson_id, subject, instrument, preparation, media_findings FROM conversions LIMIT 0'))
         connection.execute(text('SELECT id, provider, pipeline_version, silhouettes FROM worker_credentials LIMIT 0'))
         connection.execute(text('SELECT l.published_revision_id, g.account_id, i.token_hash, r.id '
                                 'FROM lessons l, lesson_grants g, lesson_invitations i, lesson_reports r LIMIT 0'))

@@ -1,9 +1,9 @@
 # Multi-discipline Phase 2 log
 
-Started 4 November 2026. Status: **in progress.** Music processing stays disabled
+Started 4 November 2026. Latest status (5 November): **interface browser checks passed; Phase 3 preparation started.** Music processing stays disabled
 (`music_piano_conversion_provider` and `music_guitar_conversion_provider` default to
 `disabled`). Phase 2 development continues with the rollout flag off. Full production acceptance
-remains pending; the latest evidence and remaining browser debt are recorded below.
+remains pending; the latest verification and deployment gates are recorded below.
 
 Checkpoint for Phase 0 and Phase 1: commit `a6a91ff`.
 
@@ -248,3 +248,73 @@ Remaining Phase 2 work after this slice:
 | P2.7 session/resource cleanup | Music document cleared on leaving playback and on public/collection entry; verified |
 | P2.8 capability messaging at point of use | Not started |
 | P2.9 lazy loading and bundle budget | Music screen is a lazy chunk; measured budget check still to do |
+
+
+## Follow-on slice: capabilities, badges and camera-aware journeys (5 November 2026)
+
+Reviewed checkpoint `43a01ab` and proceeded with the remaining interface work.
+
+Necessary corrections:
+
+- Group grants no longer nest `open()` inside another `run()` call. One operation now
+  owns the loading indicator and errors instead of the outer wrapper finishing early.
+- Music state is also cleared when history restoration or authentication leaves playback,
+  covering page transitions that bypass `navigate()`. The mixed browser check now uses
+  browser Back from a music preview to Studio and verifies the screen is gone.
+- The music placeholder no longer promises video playback or an animated guide that
+  does not exist yet. The preview describes its current details/sections capability and
+  gives separate **piano** and **guitar** feedback-unavailable messages. Device APIs
+  are not probed or requested. The music check covers both valid instrument fixtures.
+
+Delivered:
+
+- Reused a small subject badge across owned/shared/demo/public cards, group rows and
+  Studio. Canonical labels still come from the API, with the existing legacy movement
+  default. Owned/shared card details no longer duplicate the subject text.
+- Camera-aware movement browser tests follow the existing setup rather than bypassing
+  calibration. Challenge preparation waits for automatic countdown handoff. Live
+  practice explicitly completes **Set up camera** before testing playback. Assertions
+  for scored results, low coverage, interruption, recording and saved preferences remain.
+  The challenge fixture uses three three-second sections to avoid narrow timing races.
+  Preferences are asserted in settings, where they are available on mobile.
+- Added a production manifest and `scripts/check_web_bundle.mjs`. The check measures
+  static JS/CSS import closures, sums gzip per asset, confirms music remains lazy, and
+  includes music-only static dependencies in its incremental size. It does not count
+  media/API responses or runtime allocations.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Web suite | **239 passed** |
+| TypeScript / production build | Passed; existing large lazy-chunk warning remains |
+| `verify_practice_feed.py` | **Passed** end to end |
+| `verify_practice_preview.py` | **Passed** end to end |
+| `verify_practice_flow.py` | **Passed** end to end, including real guided setup with synthetic camera/pose evidence |
+| `verify_compete_flow.py` | **Passed** end to end, including guided setup, scores, low coverage and background interruption |
+| `verify_summary_discovery.py` | **Passed**, including group grants, subject badges and browser Back |
+| `verify_music_screen.py` | **Passed**, piano and guitar messages, no page errors/device requests |
+| Visual review | Phone mixed feed and piano preview screenshots inspected; badge layout and unavailable-feature copy readable |
+| API tests | Not rerun; no server changes in this slice |
+
+Bundle baseline was measured from checkpoint **43a01ab**, not reconstructed from Phase
+0 (which had no comparable byte measurement). Initial JS/CSS gzip was **126,758 bytes**;
+this slice is **126,945 bytes**, an increase of **187 bytes**. Music-only JS/CSS is
+**1,376 gzip bytes** and is absent from the initial static closure. The checked-in
+baseline allows 16 KiB of initial gzip growth and caps music-only static closure at
+16 KiB as a small Phase 2 budget. Revisit explicitly when adding an actual music player;
+this is not a budget for later model assets.
+
+### Progression decision
+
+The four movement browser checks are no longer blockers. P2.2 badges, P2.8 current-version
+capability messaging, and a repeatable P2.9 bundle measurement are implemented. Continue
+Phase 3 development with creation/processing disabled while qualifying the new path.
+The first development-only audio harness run is recorded in
+`docs/multi-discipline-phase-3.md`: both candidate formats retained audio in headless
+Chromium, and a missing-audio source was correctly rejected. This is initial evidence,
+not the completed browser/device matrix.
+
+No production rollout flag was enabled. PostgreSQL migration verification remains a
+deployment gate, and the complete audio preparation qualification remains an upload
+enablement gate. New changes in this slice are not committed or pushed by this work.

@@ -11,6 +11,7 @@ export default defineConfig({
     proxy: {'/api': 'http://127.0.0.1:8001', '/health': 'http://127.0.0.1:8001'},
   },
   build: {
+    manifest: true,
     target: 'es2022',
     sourcemap: true,
     rollupOptions: {

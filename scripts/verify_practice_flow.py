@@ -109,7 +109,9 @@ def run():
   page.get_by_role('group',name='Camera',exact=True).get_by_role('button',name=re.compile(r'^(Front|Camera)$'),exact=True).click()
   # Choosing a feed opens that camera at once, so the person sees the real arrangement.
   expect(page.locator('.camera-pane')).to_be_visible(timeout=30000)
-  page.keyboard.press('Escape')
+  page.get_by_role('button',name='Set up camera',exact=True).click()
+  page.get_by_role('button',name='Start camera',exact=True).click()
+  expect(page.get_by_role('group',name='Camera setup',exact=True)).to_have_count(0,timeout=20000)
   expect(page.get_by_role('button',name='End practice',exact=True)).to_be_visible()
   # Playback remains available by keyboard; touching the stage restores overlays.
   page.locator('.mimic-stage').click(position={'x':20,'y':200})
@@ -121,7 +123,7 @@ def run():
   page.locator('.mimic-stage').click(position={'x':20,'y':200})
   page.keyboard.press('p')
   page.set_viewport_size({'width':1280,'height':800})
-  assert page.get_by_role('button',name='Record practice',exact=True).count()==0
+  expect(page.get_by_role('button',name='Record practice',exact=True)).to_be_visible()
   expect(page.locator('.camera-pane')).to_be_visible()
   record=page.get_by_role('button',name='Record practice',exact=True)
   try:expect(record).to_be_enabled(timeout=15000)
@@ -154,6 +156,8 @@ def run():
   expect(page.get_by_role('button',name='Record another',exact=True)).to_be_disabled()
   page.get_by_role('button',name='Close Your take',exact=True).click()
   page.get_by_role('button',name='Start camera practice',exact=True).click()
+  page.get_by_role('button',name='Start camera',exact=True).click()
+  expect(page.get_by_role('group',name='Camera setup',exact=True)).to_have_count(0,timeout=20000)
   expect(page.get_by_role('button',name='End practice',exact=True)).to_be_visible()
   page.get_by_role('button',name='Review take · not saved',exact=True).click()
   page.once('dialog',lambda dialog:dialog.accept())
