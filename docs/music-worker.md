@@ -91,3 +91,13 @@ labelled as a fixture, not a model result. `--engine basic-pitch` uses the optio
 Pitch package, which is **not installed** in this checkout and is never downloaded
 automatically; without it the adapter exits with an explicit message. No model, weights or
 transcription dependency is installed by this slice, and no production engine is selected.
+
+
+## Owner review continuation
+
+Owner review now finalises a stored draft through
+`POST /api/lessons/{lesson_id}/music-draft/review`. The worker still only proposes: it
+never sets the reviewer or accepts a draft. Handoff retains uniquely named private source
+video/reference assets before upload cleanup, and the owner review creates a separate
+immutable reviewed reference. See `docs/music-review-finalisation.md`. Music providers
+remain disabled and the optional Basic Pitch package has not been installed or qualified.

@@ -304,6 +304,17 @@ class MusicDraft(Base):
     document: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+class MusicReview(Base):
+    __tablename__ = 'music_reviews'
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    draft_id: Mapped[str] = mapped_column(ForeignKey('music_drafts.id'), unique=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), index=True)
+    revision_id: Mapped[str] = mapped_column(ForeignKey('lesson_revisions.id'), unique=True)
+    reviewer_id: Mapped[str] = mapped_column(String(80))
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    document: Mapped[dict] = mapped_column(JSON)
+
+
 def make_engine(url):
     return create_engine(url, pool_pre_ping=True, connect_args={'connect_timeout': 3} if url.startswith('postgresql') else {})
 
@@ -336,3 +347,4 @@ def database_ready(engine):
         connection.execute(text('SELECT group_id, lesson_id FROM group_lessons LIMIT 0'))
         connection.execute(text('SELECT group_id, lesson_id FROM group_public_moves LIMIT 0'))
         connection.execute(text('SELECT id, job_id, lesson_id, owner_id, subject, instrument, status, document FROM music_drafts LIMIT 0'))
+        connection.execute(text('SELECT id, draft_id, lesson_id, revision_id, reviewer_id, reviewed_at, document FROM music_reviews LIMIT 0'))

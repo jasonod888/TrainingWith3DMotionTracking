@@ -229,3 +229,67 @@ Verification for this slice:
 Still open: review finalisation from draft to a reviewed reference and manifest, the review
 editor, adapter selection/benchmarking, worker deployment, PostgreSQL verification with
 legacy rows, and the browser/device preparation matrix before enabling music processing.
+
+
+## Owner review finalisation continuation (5 November 2026)
+
+Reviewed `84b0130` and proceeded with explicit owner review and private finalisation.
+The existing feed now routes **Review music** to a lazy review screen with the retained
+instructor video, editable notes and teaching sections, and explicit confirmation. Saving
+creates an immutable reviewed reference/v2 revision, reviewer provenance and exact-revision
+acceptance; it does not publish or enable scored practice.
+
+Corrected attempt-idempotence checks, non-unique draft reference keys, deletion of the
+source video, event-end/identity bounds, cross-instrument replacements and the filter that
+hid no-revision drafts. Migration **0019** adds the review audit table.
+
+The full configured Python run passed **282 tests, 13 skipped**. Updated review/handoff
+checks passed, and two additional adapter edge regressions were verified separately
+(**284 distinct Python tests** across runs). Web: **248 passed**; TypeScript/build,
+schema drift, offline SQL, owner review browser flow, movement feed and mixed discovery
+all passed. Full evidence and remaining work: `docs/music-review-finalisation.md`.
+
+The next development work is model artifact qualification/benchmarking and the music
+guide/player. Production model selection, reviewed-reference re-editing, sharing, scored
+feedback, worker deployment, PostgreSQL and target-device preparation qualification remain
+open. Music creation/processing stay disabled. Changes in this continuation are local,
+uncommitted and unpushed.
+
+
+## Implementation slice: reviewed guide/player and model qualification harness
+
+5 November 2026. Music remains disabled and no model is installed. This slice builds the
+reviewed-reference consumer and the measurement gate the next engine must pass.
+
+- **Guide and player.** The private music preview now validates the reviewed reference at
+  runtime and renders instructor playback with an animated piano keyboard or guitar
+  fretboard, a position slider, teaching-section seeking and the currently sounding notes.
+  Timing follows `video.currentTime`, with a timer fallback when no video exists. No
+  scoring, microphone, MIDI or camera input is offered. See
+  [`music-guide-player.md`](music-guide-player.md).
+- **Reference reader.** `music-reference.ts` is DOM-free and rejects unsupported versions,
+  duplicate ids, out-of-clip onsets/ends, bad pitches, unordered passages and incomplete
+  review evidence before drawing. Piano geometry and standard-tuning guitar positions are
+  pure functions covered by unit tests.
+- **Qualification harness.** `scripts/qualify_music_model.py` requires artifact identity
+  and an approved licence, then scores a proposal against a reviewed reference with
+  one-to-one pitch/onset matching and reports precision, recall, F1 and onset error. It
+  installs and downloads nothing and does not select an engine. See
+  [`music-model-qualification.md`](music-model-qualification.md).
+
+Verification for this slice:
+
+| Check | Result |
+| --- | --- |
+| Full API suite | **289 passed, 13 skipped** |
+| Web suite | **253 passed** |
+| TypeScript / production build / bundle | Clean; bundle within budget |
+| Reference reader tests | **5 passed** |
+| Qualification harness tests | **5 passed**: perfect/tolerant/extra/wrong-pitch scoring, artifact metadata and licence refusal, CLI report |
+| `verify_music_guide.py` | **Passed**: reviewed reference, key highlighting, section seeking, video playback, no device requests, phone + desktop screenshots |
+| `verify_music_screen.py` | **Passed** for piano and guitar, no device requests |
+| `verify_summary_discovery.py` | Still **passes** with the guide |
+
+Still open: no scoring/MIDI practice, no selected or qualified model artifact, no fixture
+corpus, no worker deployment, PostgreSQL verification with legacy rows, and the
+browser/device preparation matrix. Music processing, sharing and scoring stay disabled.

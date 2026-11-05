@@ -179,6 +179,8 @@ def install_conversions(app,engine,settings,identity,db):
             if not target:raise HTTPException(404,'Move unavailable.')
             if (target.experience_family or 'body')!=family:
                 raise HTTPException(409,'A replacement must be the same kind of lesson as the one it replaces.')
+            if family=='music' and (target.instrument or target.subject)!=selected_instrument:
+                raise HTTPException(409,'Use a new lesson for a different instrument.')
             replacing=session.scalar(select(func.count()).select_from(Conversion).where(
                 Conversion.target_lesson_id==target.id,Conversion.state.not_in(('failed','cancelled','ready_for_review'))))
             if replacing:raise HTTPException(409,'This move already has a replacement in progress.')
@@ -472,7 +474,10 @@ def install_conversions(app,engine,settings,identity,db):
         job=session.scalar(select(Conversion).where(Conversion.id==job_id).with_for_update())
         token=request.headers.get('x-job-lease','')
         existing=session.scalar(select(MusicDraft).where(MusicDraft.job_id==job_id)) if job else None
-        if existing and job and job.lesson_id:return {'lesson_id':job.lesson_id,'draft':True}
+        if existing and job and job.lesson_id:
+            if job.worker_id!=credential or not hmac.compare_digest(job.attempt_token or '',token):
+                raise HTTPException(409,'Worker attempt is no longer valid.')
+            return {'lesson_id':job.lesson_id,'draft':True}
         job=leased(session,job_id,credential,token)
         route=processing_routes.route_for_pipeline(job.pipeline_version)
         if route is None or route.completion!='music-v2':raise HTTPException(422,'Unknown processing route.')
@@ -480,7 +485,7 @@ def install_conversions(app,engine,settings,identity,db):
         if job.provider!='local' and job.submission_state!='submitted':raise HTTPException(409,'Missing provider submission receipt.')
         if body.subject!=job.subject or body.instrument.instrument!=(job.instrument or job.subject):
             raise HTTPException(422,'Draft instrument does not match the requested subject.')
-        if body.duration>job.duration+.1:raise HTTPException(422,'Draft is longer than the uploaded clip.')
+        if abs(body.duration-job.duration)>.15:raise HTTPException(422,'Draft duration does not match the uploaded clip.')
         expected=f'attempts/{job.id}/{token}/reference.json'
         if body.reference.key!=expected or body.reference.mime!='application/json':
             raise HTTPException(422,'Draft reference is outside this processing attempt.')
@@ -494,14 +499,26 @@ def install_conversions(app,engine,settings,identity,db):
                 Lesson.archived.is_(False),Lesson.disabled.is_(False)).with_for_update())
             if not target or (target.experience_family or 'body')!='music':
                 raise HTTPException(409,'This lesson is not available for a music replacement.')
+            if (target.instrument or target.subject)!=body.instrument.instrument:
+                raise HTTPException(409,'Use a new lesson for a different instrument.')
         else:
             session.add(Lesson(id=lesson_id,owner_id=job.owner_id,title=job.title,version=1,
                                subject=job.subject,experience_family='music',instrument=job.instrument));session.flush()
-        key=f'lessons/{lesson_id}/reference.json'
+        draft_id=uuid4().hex
+        key=f'lessons/{lesson_id}/{draft_id}-draft-reference.json'
         store.copy_object(Bucket=settings.storage_bucket,Key=key,
                           CopySource={'Bucket':settings.storage_bucket,'Key':expected})
         body.reference.key=key
-        session.add(MusicDraft(id=uuid4().hex,job_id=job.id,lesson_id=lesson_id,owner_id=job.owner_id,
+        session.add(LessonAsset(lesson_id=lesson_id,**body.reference.model_dump()))
+        # Preserve private instructor media before upload/attempt retention removes it.
+        webm='webm' in ((job.media_findings or {}).get('container') or '') or job.filename.lower().endswith('.webm')
+        source_key=f'lessons/{lesson_id}/{draft_id}-source.'+('webm' if webm else 'mp4')
+        store.copy_object(Bucket=settings.storage_bucket,Key=source_key,
+                          CopySource={'Bucket':settings.storage_bucket,'Key':job.source_key})
+        body.source_video=Asset(key=source_key,mime='video/webm' if webm else 'video/mp4',
+                                bytes=job.source_bytes,sha256=job.source_sha256)
+        session.add(LessonAsset(lesson_id=lesson_id,**body.source_video.model_dump()))
+        session.add(MusicDraft(id=draft_id,job_id=job.id,lesson_id=lesson_id,owner_id=job.owner_id,
                                subject=body.subject,instrument=body.instrument.instrument,status='draft',
                                document=body.model_dump(),created_at=now()))
         job.lesson_id=lesson_id;job.state='ready_for_review';job.lease_until=None;session.commit()

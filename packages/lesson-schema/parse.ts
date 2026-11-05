@@ -13,7 +13,7 @@
 import {validateSections} from './index';
 import type {
   AssessmentPolicy, Asset, InstrumentConfig, LessonDocument, LessonManifest, LessonSummary,
-  MusicLessonManifest, Section, SectionSet, SummaryCapabilities,
+  MusicLessonManifest, MusicDraftView, MusicDraftEvent, Section, SectionSet, SummaryCapabilities,
 } from './index';
 
 export type ParseErrorCode = 'malformed' | 'unsupported_format';
@@ -366,3 +366,39 @@ export function parseLessonDocument(value: unknown): ParseResult<LessonDocument>
 }
 
 export type {SummaryCapabilities};
+
+
+/** Separate owner review boundary: an unreviewed proposal never becomes a LessonDocument. */
+export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
+ const bad=()=>malformed('This music draft could not be read. Reopen the review.');
+ if(!isRecord(value)||value.draft_version!==1||!isId(value.draft_id)||!isId(value.lesson_id)||!isTitle(value.title)||
+   !['draft','reviewed'].includes(String(value.status))||!isNumber(value.duration)||value.duration<=0||
+   (value.subject!=='piano'&&value.subject!=='guitar'))return bad();
+ const keys=['draft_version','draft_id','lesson_id','revision_id','title','status','subject','instrument','duration','reference','source_video','events','spans','provenance','warnings'];
+ if(Object.keys(value).some(key=>!keys.includes(key)))return bad();
+ const instrument=readInstrument(value.instrument),reference=readAsset(value.reference),source=readAsset(value.source_video??null);
+ if(!instrument||instrument.instrument!==value.subject||!reference||reference.mime!=='application/json'||source===undefined||source&&!isVideo(source))return bad();
+ if(!Array.isArray(value.events)||value.events.length>20000||!Array.isArray(value.spans)||value.spans.length>500)return bad();
+ const events:MusicDraftEvent[]=[],seen=new Set<string>();
+ for(const event of value.events){
+  if(!isRecord(event)||!isId(event.id)||seen.has(event.id)||!isNumber(event.onset)||event.onset<0||event.onset>value.duration||
+   !isCount(event.pitch)||event.pitch>127||Object.keys(event).some(key=>!['id','onset','duration','pitch','velocity','confidence','optional'].includes(key)))return bad();
+  const duration=event.duration??null,velocity=event.velocity??null,confidence=event.confidence??null,optional=event.optional??false;
+  if(duration!==null&&(!isNumber(duration)||duration<=0||event.onset+duration>value.duration+1e-6)||
+    velocity!==null&&(!isNumber(velocity)||velocity<0||velocity>1)||confidence!==null&&(!isNumber(confidence)||confidence<0||confidence>1)||typeof optional!=='boolean')return bad();
+  seen.add(event.id);events.push({id:event.id,onset:event.onset,pitch:event.pitch,duration,velocity,confidence,optional});
+ }
+ const spans:{start:number;end:number}[]=[];
+ for(const span of value.spans){
+  if(!isRecord(span)||Object.keys(span).some(key=>!['start','end'].includes(key))||!isNumber(span.start)||!isNumber(span.end)||span.start<0||span.end<=span.start||span.end>value.duration+1e-6)return bad();
+  spans.push({start:span.start,end:span.end});
+ }
+ const provenance=value.provenance;
+ if(!isRecord(provenance)||Object.keys(provenance).some(key=>!['adapter','engine','model','model_version','code_version','audio_sha256'].includes(key)))return bad();
+ for(const key of ['adapter','engine','code_version'])if(!isText(provenance[key])||(provenance[key] as string).length>80)return bad();
+ for(const [key,max] of [['model',120],['model_version',80]] as const)if(provenance[key]!=null&&(!isText(provenance[key])||provenance[key].length>max))return bad();
+ if(typeof provenance.audio_sha256!=='string'||! /^[a-f0-9]{64}$/.test(provenance.audio_sha256)||!isStringArray(value.warnings)||value.warnings.length>100)return bad();
+ return {ok:true,value:{draft_version:1,draft_id:value.draft_id,lesson_id:value.lesson_id,title:value.title,status:value.status as 'draft'|'reviewed',
+  subject:value.subject,instrument,duration:value.duration,reference,source_video:source,events,spans,warnings:[...value.warnings],
+  provenance:{adapter:String(provenance.adapter),engine:String(provenance.engine),code_version:String(provenance.code_version),model:provenance.model as string|null??null,model_version:provenance.model_version as string|null??null,audio_sha256:provenance.audio_sha256}}};
+}

@@ -58,6 +58,7 @@ def probe_audio_media(path: Path) -> dict:
         'video': bool(video),
         'audio': bool(audio),
         'video_codec': (video or {}).get('codec_name'),
+        'container': details.get('format',{}).get('format_name'),
         'audio_codec': (audio or {}).get('codec_name'),
         'sample_rate': int(audio['sample_rate']) if audio and audio.get('sample_rate') else None,
         'channels': int(audio['channels']) if audio and audio.get('channels') else None,

@@ -261,6 +261,7 @@ class MusicDraftDocument(Contract):
     instrument: InstrumentConfig
     duration: float = Field(gt=0)
     reference: Asset
+    source_video: Asset | None = None
     events: list[MusicEvent] = Field(default_factory=list, max_length=20000)
     spans: list[MusicSpan] = Field(default_factory=list, max_length=500)
     provenance: DraftProvenance
@@ -272,10 +273,14 @@ class MusicDraftDocument(Contract):
             raise ValueError('The draft instrument must match its subject.')
         if self.reference.mime != 'application/json':
             raise ValueError('A draft reference must be JSON.')
+        if self.source_video and self.source_video.mime not in ('video/mp4','video/webm'):
+            raise ValueError('A draft source must be a supported video.')
+        if len({event.id for event in self.events}) != len(self.events):
+            raise ValueError('Draft event ids must be unique.')
         for span in self.spans:
             if span.end > self.duration + 1e-6:
                 raise ValueError('A draft span must stay inside the clip.')
         for event in self.events:
-            if event.onset > self.duration + 1e-6:
+            if event.onset > self.duration + 1e-6 or event.onset+(event.duration or 0)>self.duration+1e-6:
                 raise ValueError('A draft event must stay inside the clip.')
         return self

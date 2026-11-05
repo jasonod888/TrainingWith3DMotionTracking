@@ -357,7 +357,7 @@ def install_lessons(app, engine, settings, identity, db):
         owned_lesson(session, lesson_id, account.id)
         row=session.scalar(select(MusicDraft).where(MusicDraft.lesson_id==lesson_id).order_by(MusicDraft.created_at.desc()))
         if not row:raise HTTPException(404,'No draft reference is available.')
-        return {**row.document,'lesson_id':lesson_id,'revision_id':None,'status':row.status}
+        return {**row.document,'draft_id':row.id,'title':session.get(Lesson,lesson_id).title,'lesson_id':lesson_id,'revision_id':None,'status':row.status}
     @router.get('/{lesson_id}/progress')
     def progress(lesson_id: str, revision_id: str | None = None, account=Depends(identity), session: Session = Depends(db)):
         lesson,revision = readable_lesson(session,lesson_id,account.id,revision_id)
@@ -492,6 +492,7 @@ def install_lessons(app, engine, settings, identity, db):
         lesson,reasons=access_reasons(session,lesson_id,account.id)
         if not lesson or not reasons:raise HTTPException(404,'Move unavailable.')
         _,revision=readable_lesson(session,lesson_id,account.id)
+        manifest=revision.manifest if revision else {}
         key = f'lessons/{lesson_id}/{name}'
         family = subject_projection(lesson, revision)['experience_family']
         if family == 'music':
@@ -501,9 +502,12 @@ def install_lessons(app, engine, settings, identity, db):
                 'reference', 'source_video', 'preview_video', 'waveform', 'midi_export', 'public_poster')
         else:
             fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail','focused_video','focused_video_alpha')
-        allowed={value['key'] for value in (revision.manifest.get(field) for field in fields) if value}
-        allowed.update(value['key'] for kind,value in revision.manifest.get('presentation',{}).items()
+        allowed={value['key'] for value in (manifest.get(field) for field in fields) if value}
+        allowed.update(value['key'] for kind,value in manifest.get('presentation',{}).items()
                        if reasons!=['public'] or kind in ('male','female'))
+        if 'owner' in reasons:
+            for proposal in session.scalars(select(MusicDraft).where(MusicDraft.lesson_id==lesson_id)).all():
+                allowed.update(value['key'] for value in (proposal.document.get(field) for field in ('reference','source_video')) if value)
         # Avatar clips are presentation derivatives: they are not in the immutable manifest, so
         # they are allowed by name and still require a stored record for this lesson below.
         if name in DERIVATIVE_NAMES:
@@ -535,3 +539,5 @@ def install_lessons(app, engine, settings, identity, db):
                                  media_type=record.mime, headers=headers)
 
     app.include_router(router)
+    from .music_review import install_music_review
+    install_music_review(app,settings,identity,db)

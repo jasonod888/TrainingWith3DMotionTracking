@@ -11,6 +11,7 @@ import {GroupsPage,GroupDetailPage,GroupJoinPage} from './Groups';
 const ExplorePage=lazy(()=>import('./Public').then(module=>({default:module.ExplorePage})));
 const PublicDetailPage=lazy(()=>import('./Public').then(module=>({default:module.PublicDetailPage})));
 const AdminPage=lazy(()=>import('./Admin').then(module=>({default:module.AdminPage})));
+const MusicDraftReview=lazy(()=>import('./music/MusicDraftReview').then(module=>({default:module.MusicDraftReview})));
 const StudioPage=lazy(()=>import('./Studio').then(module=>({default:module.StudioPage})));
 import {ShareLesson,JoinLesson,incomingShare} from './ShareLesson';
 import type {PracticePreferences} from './practice-types';
@@ -24,12 +25,12 @@ import {FeedSearch} from './FeedSearch';
 import './feed.css';
 import {ApiError,assetUrl,loadCapabilities,loadPublicMove,copyDemo,getSession,loadDemo,loadLesson,loadLessonSummaries,loadMoveStates,loadSharedSummaries,needsCheck,request,saveSections,signIn,signOut,type Account,type MoveState} from './api';
 
-type Page='moves'|'preview'|'compete'|'practice'|'review'|'create'|'account'|'share'|'join'|'receiver'|'check'|'move'|'groups'|'group'|'groupjoin'|'explore'|'public'|'studio'|'admin';
+type Page='music-review'|'moves'|'preview'|'compete'|'practice'|'review'|'create'|'account'|'share'|'join'|'receiver'|'check'|'move'|'groups'|'group'|'groupjoin'|'explore'|'public'|'studio'|'admin';
 type AuthView='login'|'register'|'forgot'|'reset'|'verify';
 const linkAction=()=>{const match=location.hash.match(/^#(verify|reset)=([A-Za-z0-9_-]{32,128})$/);return match?{view:match[1] as AuthView,token:match[2]}:null;};
 const groupInviteOf=()=>{const match=location.hash.match(/^#group=([A-Za-z0-9_-]{32,128})$/);return match?match[1]:null;};
 
-const routePages=new Set(['moves','preview','compete','practice','review','create','account','share','join','receiver','check','move','groups','group','groupjoin','explore','public','studio','admin']);
+const routePages=new Set(['music-review','moves','preview','compete','practice','review','create','account','share','join','receiver','check','move','groups','group','groupjoin','explore','public','studio','admin']);
 const routeOf=()=>{const q=new URLSearchParams(location.search);return {page:(routePages.has(q.get('page')??'')?q.get('page'):'moves') as Page,id:q.get('id'),source:q.get('source'),adjust:q.get('adjust')};};
 const pending=<T,>(key:string,value?:T):T|null=>{try{if(value!==undefined){sessionStorage.setItem(key,JSON.stringify({value,until:Date.now()+30*60*1000}));return value;}const item=JSON.parse(sessionStorage.getItem(key)??'null');if(item?.until>Date.now())return item.value;sessionStorage.removeItem(key);}catch{}return null;};
 export function App(){
@@ -55,6 +56,7 @@ export function App(){
   window.addEventListener('keydown',escape);return()=>{document.body.style.overflow=previous;window.removeEventListener('keydown',escape);};
  },[drawerOpen]);
  useEffect(()=>{if(page==='account'&&accountPreferences){const section=document.getElementById('account-preferences');section?.scrollIntoView({block:'center'});section?.focus();setAccountPreferences(false);}},[page,accountPreferences]);
+ const [reviewId,setReviewId]=useState<string|null>(routeOf().page==='music-review'?routeOf().id:null);
  const [states,setStates]=useState<MoveState[]>([]),[adjustFor,setAdjustFor]=useState<{lesson_id:string;title:string;subject?:string}|null>(null);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[dirty,setDirty]=useState(false);
  const [routeReady,setRouteReady]=useState(false),replaceRoute=useRef(true),restoring=useRef(false);
@@ -71,6 +73,7 @@ export function App(){
   try{
    setGroupId(route.page==='group'?route.id:null);setPublicId(route.page==='public'?route.id:null);
    if(route.adjust&&account){const target=await loadLesson(route.adjust);setAdjustFor({lesson_id:target.lesson_id,title:target.title,subject:library.find(item=>item.lesson_id===target.lesson_id)?.subject});}else setAdjustFor(null);
+   if(route.page==='music-review'){if(!account){pending('auth-return',location.search);setPage('account');return;}if(!route.id)throw new Error('This review link is incomplete.');setReviewId(route.id);setLesson(null);setMusic(null);setPage('music-review');return;}
    if(['preview','compete','practice','review','check','move','share','group','public'].includes(route.page)&&!route.id)throw new Error('This link is incomplete. Choose a move from your library.');
    if(['preview','compete','practice','review','check','move','share'].includes(route.page)&&route.id){
     if(route.source==='public'){setMusic(null);setLesson(await loadPublicMove(route.id));setLessonOwned(false);}
@@ -97,12 +100,13 @@ export function App(){
   const q=new URLSearchParams();if(page!=='moves')q.set('page',page);
   if(page==='group'&&groupId)q.set('id',groupId);
   if(page==='public'&&publicId)q.set('id',publicId);
+  if(page==='music-review'&&reviewId)q.set('id',reviewId);
   if(['preview','compete','practice','review','check','move','share'].includes(page)&&(lesson||music)){const active=lesson??music!;q.set('id',active.lesson_id);if(lesson){if(lesson.animation.key.startsWith('public/'))q.set('source','public');else if(!lesson.animation.key.startsWith('lessons/'))q.set('source','demo');}}
   if(page==='create'&&adjustFor)q.set('adjust',adjustFor.lesson_id);
   const url='/'+(q.size?'?'+q.toString():'');
   if(url!==location.pathname+location.search){if(replaceRoute.current)history.replaceState(null,'',url);else history.pushState(null,'',url);}
   replaceRoute.current=false;
- },[page,lesson,music,publicId,groupId,adjustFor,routeReady]);
+ },[page,lesson,music,publicId,groupId,adjustFor,routeReady,reviewId]);
  useEffect(()=>{const back=()=>{if(dirty&&!window.confirm('Leave without saving your changes or take?')){history.go(1);return;}setDirty(false);void restoreRoute();};window.addEventListener('popstate',back);return()=>window.removeEventListener('popstate',back);},[dirty,restoreRoute]);
  useEffect(()=>{if(initialLink)pending('auth-action',initialLink);if(incoming)pending('move-invite',incoming);if(groupInvite)pending('group-invite',groupInvite);if(initialLink||incoming||groupInvite)history.replaceState(null,'',location.pathname+location.search);void refresh();},[refresh,initialLink]);
  useEffect(()=>{const receive=()=>{const sharedLink=incomingShare();const authenticationLink=linkAction();const invite=groupInviteOf();if(!sharedLink&&!authenticationLink&&!invite)return;history.replaceState(null,'',location.pathname+location.search);if(dirty&&!window.confirm('Leave without saving your changes or take?'))return;setDirty(false);setError('');setNotice('');if(invite){pending('group-invite',invite);setGroupInvite(invite);setPage('groupjoin');}else if(sharedLink){pending('move-invite',sharedLink);setIncoming(sharedLink);setPage('join');}else{pending('auth-action',authenticationLink);setInitialLink(authenticationLink);setPage('account');}};window.addEventListener('hashchange',receive);return()=>window.removeEventListener('hashchange',receive);},[dirty]);
@@ -124,6 +128,8 @@ export function App(){
  const run=async(action:()=>Promise<void>)=>{setBusy(true);setError('');try{await action();}catch(e){setError((e as Error).message);if(e instanceof ApiError&&e.status===401){pending('auth-return',location.search);setAccount(null);setLibrary([]);setShared([]);setStates([]);setLesson(null);setMusic(null);setPage('account');}}finally{setBusy(false);}};
  const stateOf=(value:{lesson_id:string})=>states.find(item=>item.lesson_id===value.lesson_id);
  const open=(value:{lesson_id:string},mode:'auto'|'practice'|'check'|'edit'='auto',owned=true)=>void run(async()=>{
+  const workflow=stateOf(value);
+  if(owned&&workflow?.experience_family==='music'&&(mode==='check'||!workflow.latest_revision_id)){setReviewId(value.lesson_id);setLesson(null);setMusic(null);navigate('music-review');return;}
   const document=demo?.lesson_id===value.lesson_id?{kind:'body' as const,value:demo}:await loadLessonDocument(value.lesson_id);
   if(document.kind==='music'){setMusic(document.value);setLesson(null);setLessonOwned(owned);navigate('preview');return;}
   if(document.kind!=='body')throw new Error('This lesson is not available on this version.');
@@ -172,8 +178,9 @@ export function App(){
      if(action==='remove'&&window.confirm(`Remove “${item.title}” from your practices?`))void run(async()=>{await request(`/lessons/${item.lesson_id}`,'DELETE');setLibrary(previous=>previous.filter(value=>value.lesson_id!==item.lesson_id));});
      if(action==='report'){const reason=window.prompt('What would you like to report?');if(reason&&reason.trim().length>=3)void run(async()=>{await request(`/lessons/${item.lesson_id}/report`,'POST',{reason});setNotice('Report received. Thank you.');});}
     }}>
-    {account&&page==='moves'&&<div className="feed-uploads"><ConversionList readyIds={states.filter(state=>state.accepted_revision_id!==state.latest_revision_id).map(state=>state.lesson_id)} onReady={()=>void refresh()} onOpen={id=>open({lesson_id:id},'check')}/></div>}
+    {account&&page==='moves'&&<div className="feed-uploads"><ConversionList readyIds={states.filter(state=>!state.latest_revision_id||state.accepted_revision_id!==state.latest_revision_id).map(state=>state.lesson_id)} onReady={()=>void refresh()} onOpen={id=>open({lesson_id:id},'check')}/></div>}
    </PracticeFeed>{notice&&<p className="inline-notice" role="status">{notice}</p>}</div>
+   {page==='music-review'&&account&&reviewId&&<MusicDraftReview lessonId={reviewId} onDirty={setDirty} onBack={()=>navigate('moves')} onReviewed={value=>{setDirty(false);setMusic(value);setLesson(null);setLessonOwned(true);setPage('preview');void refresh();window.scrollTo({top:0});}}/>}
    {page==='preview'&&music&&!lesson&&<MusicLessonScreen lesson={music} onBack={()=>navigate('moves')}/>}
    {page==='preview'&&lesson&&<PracticePreview key={lesson.revision_id} lesson={lesson} owned={lessonOwned} resumeAt={previewPositions.current[lesson.lesson_id+':'+lesson.revision_id]??lesson.source_start} onPosition={time=>{previewPositions.current[lesson.lesson_id+':'+lesson.revision_id]=time;}} onChoose={chooseMode} onBack={()=>navigate('moves')}
     lessons={[...library.map(value=>({lesson:value,owned:true})),...shared.map(value=>({lesson:value,owned:false})),...(demo?[{lesson:summarizeBody(demo),owned:false}]:[])]}

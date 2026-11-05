@@ -74,3 +74,168 @@
     padding: 16px 14px 36px;
   }
 }
+
+/* Reviewed music guide and player */
+.music-player {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin: 18px 0;
+}
+
+.music-video video,
+.music-no-video {
+  display: block;
+  width: 100%;
+  border-radius: 12px;
+  background: #111;
+}
+
+.music-no-video {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  color: #d9dde3;
+  font-size: 0.85rem;
+}
+
+.music-guide-panel {
+  min-width: 0;
+}
+
+.music-transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.music-transport input[type='range'] {
+  flex: 1;
+  min-width: 120px;
+}
+
+.music-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.music-now {
+  margin: 8px 0 4px;
+  font-weight: 600;
+  min-height: 1.2em;
+}
+
+.music-span {
+  font-weight: 400;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+}
+
+.piano {
+  position: relative;
+  height: 148px;
+  margin: 10px 0 4px;
+  background: #1f2937;
+  border-radius: 8px;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.piano-white {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #f8fafc;
+  border-left: 1px solid #cbd5e1;
+  color: #64748b;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 4px;
+  font-size: 9px;
+  box-sizing: border-box;
+}
+
+.piano-white.is-active {
+  background: #dbeafe;
+  box-shadow: inset 0 -7px 0 #2563eb;
+  color: #1d4ed8;
+}
+
+.piano-black {
+  position: absolute;
+  top: 0;
+  height: 62%;
+  background: #111827;
+  border-radius: 0 0 3px 3px;
+  z-index: 2;
+}
+
+.piano-black.is-active {
+  background: #2563eb;
+}
+
+.fretboard {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 4px;
+  overflow-x: auto;
+}
+
+.fret-row {
+  display: grid;
+  grid-template-columns: 30px repeat(13, minmax(26px, 1fr));
+  gap: 3px;
+  align-items: center;
+}
+
+.fret-label {
+  font-size: 0.68rem;
+  color: #64748b;
+  text-align: right;
+}
+
+.fret-cell {
+  padding: 6px 2px;
+  text-align: center;
+  font-size: 0.64rem;
+  border-radius: 4px;
+  background: #eef2f7;
+  color: #334155;
+}
+
+.fret-cell.is-active {
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+}
+
+.music-sections {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  margin: 10px 0 0;
+}
+
+.music-sections button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.music-sections button[aria-current='step'] {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+@media (max-width: 900px) {
+  .music-player {
+    grid-template-columns: 1fr;
+  }
+}

@@ -34,13 +34,13 @@ def fixture_events(duration: float, instrument: str) -> list[dict]:
     step = max(0.25, duration / (count + 1))
     events = []
     for index in range(count):
-        onset = round(min(duration - 0.05, 0.25 + index * step), 3)
+        onset = min(duration - 0.05, round(0.25 + index * step, 3))
         if onset < 0:
             onset = 0.0
         events.append({
             'id': f'fixture-{index + 1}',
             'onset': onset,
-            'duration': round(min(0.4, max(0.05, duration - onset)), 3),
+            'duration': min(round(min(0.4, max(0.05, duration - onset)), 3), duration-onset),
             'pitch': base + index,
             'velocity': 0.8,
             'confidence': None,
@@ -85,11 +85,17 @@ def basic_pitch_document(job: dict, audio: Path) -> dict:
     instrument = job['instrument']
     model_output, midi_data, note_events = predict(str(audio), ICASSP_2022_MODEL_PATH, onset_threshold=0.5)
     events = []
-    for index, note in enumerate(midi_data.instruments[0].notes[:20000]):
+    notes=[note for track in midi_data.instruments for note in track.notes]
+    if len(notes)>20000:
+        raise SystemExit('The transcription exceeds the draft event limit; use a shorter clip.')
+    for index, note in enumerate(notes):
+        onset=max(0.0,min(duration,round(note.start,3)))
+        end=max(0.0,min(duration,round(note.end,3)))
+        if end<=onset:continue
         events.append({
             'id': f'basic-pitch-{index + 1}',
-            'onset': round(max(0.0, note.start), 3),
-            'duration': round(max(0.01, note.end - note.start), 3),
+            'onset': onset,
+            'duration': end-onset,
             'pitch': int(note.pitch),
             'velocity': round(min(1.0, max(0.0, note.velocity / 127)), 3),
             'confidence': None,

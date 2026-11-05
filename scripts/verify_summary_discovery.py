@@ -79,6 +79,10 @@ with sync_playwright() as p:
             route.fulfill(json=music)
         elif path == 'lessons/body-fixture':
             route.fulfill(json=body)
+        elif path.endswith('/assets/reference.json'):
+            route.fulfill(json={'reference_version': 1, 'subject': 'piano', 'instrument': {'instrument': 'piano'},
+                                'duration': 8, 'events': [{'id': 'a', 'onset': 0.5, 'pitch': 60}],
+                                'spans': [{'start': 0.2, 'end': 7.5}]})
         else:
             route.fulfill(status=404, json={'detail': 'Not found'})
 

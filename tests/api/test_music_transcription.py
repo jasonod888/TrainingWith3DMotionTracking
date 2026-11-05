@@ -4,6 +4,8 @@ import importlib.util
 import json
 import subprocess
 import sys
+from types import SimpleNamespace, ModuleType
+from unittest.mock import patch
 from pathlib import Path
 
 import pytest
@@ -56,3 +58,27 @@ def test_adapter_refuses_an_incomplete_job(tmp_path):
     result, _ = run_adapter(tmp_path, job={'id': 'a', 'subject': 'piano', 'duration': 2.0})
     assert result.returncode == 2
     assert 'instrument' in result.stderr
+
+
+def test_fractional_short_fixture_events_stay_inside_the_clip(tmp_path):
+    from scripts.music_transcription import fixture_document
+    audio=tmp_path/'analysis.wav';audio.write_bytes(b'fixture')
+    document=fixture_document({'duration':.2008,'subject':'piano','instrument':'piano'},audio)
+    assert all(event['onset']+(event['duration'] or 0)<=document['duration']+1e-6 for event in document['events'])
+
+
+def test_optional_engine_handles_empty_and_out_of_bounds_notes_without_installing_a_model(tmp_path):
+    from scripts.music_transcription import basic_pitch_document
+    audio=tmp_path/'analysis.wav';audio.write_bytes(b'fixture')
+    job={'duration':2,'subject':'piano','instrument':'piano'}
+    package=ModuleType('basic_pitch');package.ICASSP_2022_MODEL_PATH='fixture-only'
+    inference=ModuleType('basic_pitch.inference')
+    midi=SimpleNamespace(instruments=[])
+    inference.predict=lambda *args,**kwargs:(None,midi,[])
+    with patch.dict(sys.modules,{'basic_pitch':package,'basic_pitch.inference':inference}), \
+         patch('importlib.metadata.version',return_value='test-stub'):
+        assert basic_pitch_document(job,audio)['events']==[]
+        midi.instruments=[SimpleNamespace(notes=[SimpleNamespace(start=-1,end=3,pitch=60,velocity=100),
+                                                 SimpleNamespace(start=3,end=4,pitch=62,velocity=100)])]
+        events=basic_pitch_document(job,audio)['events']
+        assert len(events)==1 and events[0]['onset']==0 and events[0]['duration']==2

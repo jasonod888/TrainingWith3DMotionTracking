@@ -63,6 +63,12 @@ export type AssessmentPolicy = {
   dimensions: ('pitch' | 'timing' | 'release' | 'coverage')[];
 };
 
+export type MusicDraftEvent={id:string;onset:number;duration:number|null;pitch:number;velocity:number|null;confidence:number|null;optional:boolean};
+export type MusicDraftView={draft_version:1;draft_id:string;lesson_id:string;title:string;status:'draft'|'reviewed';
+ subject:'piano'|'guitar';instrument:InstrumentConfig;duration:number;reference:Asset;source_video:Asset|null;
+ events:MusicDraftEvent[];spans:{start:number;end:number}[];warnings:string[];
+ provenance:{adapter:string;engine:string;model:string|null;model_version:string|null;code_version:string;audio_sha256:string}};
+
 export type MusicLessonManifest = {
   schema_version: 2;
   experience_family: 'music';
