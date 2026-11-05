@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from .auth import now
-from .database import Lesson, LessonAsset, LessonPublication, LessonTag, LessonRevision
+from .database import Lesson, LessonAsset, LessonPublication, LessonTag, LessonRevision, LessonAcceptance
 from .permissions import accepted, latest_revision, owned_lesson, public_lesson, public_manifest
 from .storage import storage_client
 
@@ -73,6 +73,23 @@ def public_keys(manifest, lesson_id):
 
 def install_public(app, settings, identity, db):
     router = APIRouter(prefix='/api/public')
+
+    @router.get('/subjects')
+    def subject_facets(session: Session = Depends(db)):
+        from .subjects import subject_spec
+        # Use released labels, never draft labels or a paginated/search-filtered page.
+        released = select(LessonAcceptance.id).where(
+            LessonAcceptance.lesson_id == Lesson.id,
+            LessonAcceptance.revision_id == LessonRevision.id).exists()
+        rows = session.execute(select(LessonRevision.subject, func.count()).select_from(LessonPublication)
+            .join(Lesson, Lesson.id == LessonPublication.lesson_id)
+            .join(LessonRevision, LessonRevision.id == Lesson.published_revision_id)
+            .where(LessonPublication.listed.is_(True), LessonPublication.moderation_hidden.is_(False),
+                   Lesson.archived.is_(False), Lesson.disabled.is_(False), released)
+            .group_by(LessonRevision.subject).order_by(LessonRevision.subject)).all()
+        return {'subjects': [{'subject': subject_spec(subject).id,
+                              'subject_label': subject_spec(subject).label, 'count': int(count)}
+                             for subject, count in rows]}
 
     @router.get('/moves')
     def moves(q: str = '', tag: str = '', subject: str = '', limit: int = 24, offset: int = 0, session: Session = Depends(db)):

@@ -1,6 +1,7 @@
 """Exercise review layout at phone, desktop and landscape sizes with isolated API fixtures."""
 import copy,json,re
 from pathlib import Path
+from lesson_fixture_summary import body_summary
 from urllib.request import urlopen
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
@@ -26,9 +27,11 @@ with sync_playwright() as p:
             if path=='/api/auth/session': value={'account':{'id':'qa','email':'qa@example.test','platform_role':'member','status':'active','mfa_enrolled':False},'csrf':'qa'}
             elif path=='/api/demo': return r.fulfill(status=404,json={'detail':'No demo in fixture'})
             elif path=='/api/lessons': value=[current]
+            elif path=='/api/lessons/summaries':value=[body_summary(current)]
             elif path=='/api/lessons/review-qa': value=current
             elif path=='/api/workflow/lessons': value={'lessons':[{'lesson_id':'review-qa','latest_revision_id':current['revision_id'],'accepted_revision_id':None,'audiences':{'direct':0,'groups':0,'public':False}}]}
             elif path=='/api/shared-lessons': value=[]
+            elif path=='/api/shared-lessons/summaries':value=[]
             elif path=='/api/lessons/review-qa/trim':
                 body=r.request.post_data_json;calls.append(body)
                 start=body['start_frame']/15;end=body['end_frame']/15

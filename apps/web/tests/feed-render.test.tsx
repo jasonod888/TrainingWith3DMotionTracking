@@ -28,19 +28,10 @@ afterEach(() => {
   delete globalThis.fetch;
 });
 
-const sha = 'a'.repeat(64);
-
 function body(id, title) {
-  return {
-    schema_version: 1, lesson_id: id, revision_id: `${id}-rev`, title, duration: 2, source_start: 0,
-    standing_time: 0, engine: 'synthetic', engine_version: '1', units: 'metres',
-    landmark_axes: 'x-right/y-down/z-forward', root_motion: 'in-place', confidence: 'unmeasured',
-    animation: {key: `lessons/${id}/synthetic.glb`, mime: 'model/gltf-binary', bytes: 10, sha256: sha},
-    landmarks: {key: `lessons/${id}/landmarks.json`, mime: 'application/json', bytes: 10, sha256: sha},
-    source_video: null, thumbnail: null,
-    section_set: {id: 'sections', revision: 1, duration: 2, sections: [{id: 'a', label: 'Whole', start: 0, end: 2}]},
-    warnings: [],
-  };
+  return {summary_version:1,lesson_id:id,revision_id:`${id}-rev`,title,
+    subject:'movement_other',subject_label:'Full Body Movement',experience_family:'body',instrument:null,
+    duration:2,section_count:1,poster:null,capabilities:{preview:true,practice:true,live_input:'camera'}};
 }
 
 function publicMove(index) {
@@ -52,7 +43,7 @@ function props(overrides) {
   return {
     filter: 'all', setFilter() {}, active: true, query: '', onQuery() {},
     account: {id: 'tester', email: 'test@example.test', platform_role: 'member', status: 'active', mfa_enrolled: false},
-    library: [], shared: [], states: [], sharedSummaries: [], subjectFilterEnabled: false, demo: null, loading: false,
+    library: [], shared: [], states: [], subjectFilterEnabled: false, demo: null, loading: false,
     onOpen() {}, onPublic() {}, onManage() {}, onCreate() {}, onSignIn() {},
     ...overrides,
   };
@@ -74,7 +65,7 @@ const subjectButtons = (container: HTMLElement) => Array.from(
 test('the subject filter is hidden from a movement library unless rollout enables it', async () => {
   stubFetch(() => response({moves: []}));
   const {container} = render(<PracticeFeed {...props({
-    library: [body('own-1', 'Taegeuk'), body('own-2', 'Dance basics')],
+    library: [body('own-1', 'Taegeuk'), {...body('own-2', 'Dance basics'),subject:'dance',subject_label:'Dance'}],
     states: [
       {lesson_id: 'own-1', subject: 'movement_other', subject_label: 'Full Body Movement'},
       {lesson_id: 'own-2', subject: 'dance', subject_label: 'Dance'},
@@ -87,7 +78,7 @@ test('the subject filter is hidden from a movement library unless rollout enable
 test('the subject filter appears when rollout enables it', async () => {
   stubFetch(() => response({moves: []}));
   const {container} = render(<PracticeFeed {...props({
-    library: [body('own-1', 'Taegeuk'), body('own-2', 'Dance basics')],
+    library: [body('own-1', 'Taegeuk'), {...body('own-2', 'Dance basics'),subject:'dance',subject_label:'Dance'}],
     states: [
       {lesson_id: 'own-1', subject: 'movement_other', subject_label: 'Full Body Movement'},
       {lesson_id: 'own-2', subject: 'dance', subject_label: 'Dance'},
@@ -101,10 +92,9 @@ test('the subject filter appears when rollout enables it', async () => {
 test('a shared card labels itself from the released summary, not our workflow state', async () => {
   stubFetch(() => response({moves: []}));
   const {container} = render(<PracticeFeed {...props({
-    shared: [body('shared-1', 'Shared dance')],
+    shared: [{...body('shared-1', 'Shared dance'),subject:'dance',subject_label:'Dance'}],
     // The owner states are about our own lessons; a shared lesson is absent from them.
     states: [{lesson_id: 'shared-1', subject: 'movement_other', subject_label: 'Full Body Movement'}],
-    sharedSummaries: [{lesson_id: 'shared-1', subject: 'dance', subject_label: 'Dance'}],
   })}/>);
   await waitFor(() => assert.ok(container.querySelector('.feed-card-shared')));
   assert.match(container.textContent, /Dance · 1 section/);
@@ -146,4 +136,33 @@ test('retry after a pagination failure resumes the same page instead of resettin
 
   await waitFor(() => assert.equal(container.querySelectorAll('.feed-card-public').length, 26));
   assert.equal(moreCalls, 2);
+});
+
+
+test('public-only subjects remain selectable across a filtered public response', async () => {
+  const calls:string[]=[];
+  stubFetch(url=>{calls.push(url);return response(url.endsWith('/public/subjects')?{subjects:[
+    {subject:'dance',subject_label:'Dance',count:30},
+    {subject:'boxing',subject_label:'Boxing',count:2},
+  ]}:{moves:[]});});
+  const {container}=render(<PracticeFeed {...props({subjectFilterEnabled:true})}/>);
+  const boxing=await screen.findByRole('button',{name:'Boxing',exact:true});
+  fireEvent.click(boxing);
+  await waitFor(()=>assert.ok(calls.some(url=>url.includes('/public/moves?subject=boxing'))));
+  assert.deepEqual(subjectButtons(container),['All subjects','Dance','Boxing']);
+  assert.equal(boxing.getAttribute('aria-pressed'),'true');
+});
+
+test('a music summary renders and opens without any body manifest fields', async () => {
+  stubFetch(()=>response({moves:[]}));
+  const piano={...body('piano-1','Piano basics'),subject:'piano',subject_label:'Piano',
+    experience_family:'music',instrument:'piano',capabilities:{preview:true,practice:false,live_input:'none'}};
+  let opened:unknown;
+  const {container}=render(<PracticeFeed {...props({library:[piano],onOpen:value=>{opened=value;}})}/>);
+  fireEvent.click(await screen.findByRole('button',{name:'Open Piano basics'}));
+  assert.equal(opened,piano);
+  assert.match(container.textContent,/Piano · 1 section/);
+  fireEvent.click(screen.getByLabelText('Options for Piano basics'));
+  assert.equal(screen.queryByRole('button',{name:'Check movement'}),null);
+  assert.equal(screen.queryByRole('button',{name:'Adjust practice'}),null);
 });

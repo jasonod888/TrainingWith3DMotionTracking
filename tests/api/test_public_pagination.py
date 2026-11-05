@@ -71,3 +71,24 @@ def test_unfiltered_listing_still_returns_everything(system):
     page = client.get('/api/public/moves?limit=24').json()['moves']
     assert len(page) == 24
     assert client.get('/api/public/moves?limit=50').json()['moves'].__len__() == 33
+
+
+def test_subject_facets_count_released_visible_lessons_not_drafts_or_pages(system):
+    client, dance, movement = seeded(system)
+    with Session(system[1].state.engine) as session:
+        # Draft relabelling must not alter a public facet.
+        session.get(Lesson, dance[0]).subject = 'boxing'
+        session.get(LessonPublication, dance[1]).moderation_hidden = True
+        session.get(LessonPublication, dance[2]).listed = False
+        session.get(Lesson, dance[3]).archived = True
+        session.get(Lesson, dance[4]).disabled = True
+        # A release pointer without acceptance is not publicly readable.
+        acceptance = session.query(LessonAcceptance).filter_by(lesson_id=dance[5]).one()
+        session.delete(acceptance)
+        session.commit()
+    response = client.get('/api/public/subjects')
+    assert response.status_code == 200
+    assert response.json() == {'subjects': [
+        {'subject': 'dance', 'subject_label': 'Dance', 'count': 25},
+        {'subject': 'movement_other', 'subject_label': 'Full Body Movement', 'count': 3},
+    ]}

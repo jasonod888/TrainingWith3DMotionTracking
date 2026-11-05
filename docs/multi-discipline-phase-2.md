@@ -2,9 +2,8 @@
 
 Started 4 November 2026. Status: **in progress.** Music processing stays disabled
 (`music_piano_conversion_provider` and `music_guitar_conversion_provider` default to
-`disabled`). Phase 2 interface changes are **not accepted yet**: the four movement browser
-scripts were run against this build and each stops on a script/UI drift that still needs
-triage (see the outcomes table).
+`disabled`). Phase 2 development continues with the rollout flag off. Full production acceptance
+remains pending; the latest evidence and remaining browser debt are recorded below.
 
 Checkpoint for Phase 0 and Phase 1: commit `a6a91ff`.
 
@@ -71,7 +70,7 @@ assertions that caught them. No global overflow clipping was added.
 | Landscape header overflow | At 812×375 signed out, `scrollWidth` was 842: the actions block measured 206 px inside a fixed 160 px grid column | The 761–1100 px header column now sizes to its content (`max-content`) with `min-width:0` on the actions | Probe at 812×375: `scrollWidth == innerWidth == 812` for signed-in (actions 152 px) and signed-out (actions 206 px) |
 | Focus lost after closing settings | Pressing Escape left focus on `document.body`; the opener was already inert before the panel's effect read `activeElement` | `PracticePanel` captures the opener during render (before the inert commit) and restores focus on the animation frame after the closing commit | `verify_practice_flow.py` now passes the keyboard focus assertion and continues to later steps |
 
-## Browser checks (5 November 2026)
+## Earlier browser checks (5 November 2026; superseded by follow-on results below)
 
 Playwright + Chromium were installed into `.venv-saas`; scripts mock their API and ran
 against `vite` dev on `127.0.0.1:5173` with `PRACTICE_TEST_URL` set.
@@ -112,11 +111,11 @@ is not closed: none of the four movement scripts runs to completion yet.
 
 | Slice | State |
 | --- | --- |
-| P2.1 migrate library/shared state from full manifests to `LessonSummary` | Not started. Still held until the browser drifts above are triaged. |
+| P2.1 migrate library/shared state from full manifests to `LessonSummary` | Implemented in the follow-on slice below; detail loads on selection. |
 | P2.2 subject badges and filter | Gated filter and card label done; badges on all card types still to do. |
 | P2.3 extend summary queries | Owned, shared, group and public projections done. |
-| P2.4 dispatch music at check/preview/practice/edit | Host opens a music deep link; fixture cards not added. |
-| P2.5 deep links and Back | Unchanged; music deep links handled by the host. |
+| P2.4 dispatch music at check/preview/practice/edit | Summary cards, recommendations and Studio dispatch music to its preview; group/conversion entry paths remain follow-on work. |
+| P2.5 deep links and Back | Body preview Back added; mixed-library navigation and music deep links verified. |
 | P2.6 inert music fixture cards | Not started; needs a real fixture through the import path. |
 | P2.7 session and resource cleanup | Not started. |
 | P2.8 capability messaging at point of use | Not started. |
@@ -136,7 +135,116 @@ is not closed: none of the four movement scripts runs to completion yet.
 
 ## Acceptance rule for this phase
 
-The Phase 2 interface work is complete only when the four movement scripts pass against
-the same build and their drift is resolved in the scripts (or shown to be a real UI
-regression and fixed), plus the music screen visual check. Until then, the filter stays
-behind the disabled rollout capability and is not an accepted change.
+Development of independently verified Phase 2 slices may proceed with the rollout
+capability disabled. Outdated test locators are tracked work rather than a blanket
+stop on development. Confirmed navigation, playback, access-control or device-permission
+regressions must be corrected in the affected slice. Production rollout still needs
+the movement browser journeys completed and the music screen check; the two remaining
+script stops are not silently waived. PostgreSQL and audio qualification remain gates
+for deployment and enabling Phase 3 uploads respectively.
+
+
+## Follow-on slice: summary-driven discovery (5 November 2026)
+
+Continued Phase 2 at the owner's request to make progress without treating every
+outdated browser expectation as a prerequisite for unrelated development.
+
+Delivered:
+
+- Owned and shared library state now contains validated `LessonSummary` objects.
+  Initial load and sign-in request the summary endpoints, not both legacy manifest
+  lists and summaries. Home, preview recommendations and Studio consume summaries;
+  selected stored lessons load through the negotiated `loadLessonDocument` boundary.
+  The local body demo remains a manifest, projected to a summary for cards.
+- Body mutation responses update summary metadata while preserving the known subject.
+  Music selection dispatches to the inert music screen, not the body player or editor.
+  Music cards and Studio say **Preview only**; body editing/sharing controls are absent
+  for music. A music card without a poster no longer says “3D MOVEMENT”.
+- `GET /api/public/subjects` returns counts and canonical labels across listed, accepted,
+  released lessons, excluding hidden, archived, disabled, unlisted and unaccepted rows.
+  Counts use released labels, independent of draft relabels, search and pagination.
+  The gated feed combines these facets with local summaries and the demo. Facet failure
+  has its own retry and does not prevent local discovery.
+- Preview now has a visible **Back to feed** control, preserving the existing return
+  path and feed state.
+- The preview timeline test failure was reproduced with Chromium reporting a seekable
+  range of **0–0** for its mocked WebM response. The mock now supports HTTP byte ranges.
+  The complete preview script passes without a production playback change.
+- Browser mocks that use authenticated body libraries now answer summary endpoints.
+
+Verification for this slice:
+
+| Check | Result |
+| --- | --- |
+| Web tests | 239 passed, including mixed summary readers and music cards, public-only facets and existing feed retry cases |
+| TypeScript / production build | Passed; existing large-chunk build warning remains |
+| API public pagination / facets | 4 passed |
+| API public listing + discovery filters | 12 passed |
+| Full API suite | Not repeated; earlier 262/13 result remains historical, not a claim for this slice |
+| `verify_practice_feed.py` | Passed end to end with migrated summary mocks |
+| `verify_practice_preview.py` | Passed end to end with corrected byte-range media mock |
+| `verify_summary_discovery.py` | Passed: movement + owned piano + shared guitar summaries, public-only Boxing facet, lazy detail fetch, body/music Back navigation, Studio body tools and music preview isolation, no device requests or 3D assets |
+| `verify_music_screen.py` | Passed: no page errors or camera/microphone/MIDI permission requests |
+| Compete / live practice scripts | Earlier speed-label / camera-setup stops remain; not rerun or signed off in this slice |
+
+Next work is P2.4/P2.6 fixture and entry-path coverage, then P2.7 cleanup and P2.8
+capability messaging. Bring the remaining two browser scripts in line with current
+controls alongside that work. Do not enable music processing or uploads yet. Apply
+0015/0016 to disposable PostgreSQL with legacy data before deployment; qualify audio
+preparation on the target browsers before enabling Phase 3 uploads.
+
+## Follow-on slice: group/conversion entry paths and cleanup (5 November 2026)
+
+Delivered on top of the summary-driven discovery slice:
+
+- **Group entry path.** `GroupDetailPage` passes the summary row to the app instead of a
+  bare id, so a shared release resolves through the negotiated document loader. A group
+  grant that is a music lesson opens the music screen; a public collection still resolves
+  through the public body detail. No legacy full-manifest fetch is used for group grants.
+- **Conversion entry path.** The conversion card opens its lesson through the same
+  document loader (`open({lesson_id}, 'check')`) instead of fetching a body manifest
+  directly, so the entry cannot bypass family routing.
+- **Resource cleanup.** Leaving playback destinations (`preview`, `practice`, `compete`)
+  clears the loaded music document, and the public/collection entry paths clear it
+  explicitly. Returning from a music lesson therefore destroys the music screen; opening
+  a body lesson afterwards does not carry music state.
+- **Fixture coverage.** `verify_summary_discovery.py` now seeds a group with a music grant
+  and a movement grant, opens both through the group entry path, and asserts the music
+  screen, the body preview, and that the music screen is destroyed after Back. It still
+  asserts no camera/microphone/MIDI requests and no 3D assets.
+- **Browser expectations for this slice.** `verify_compete_flow.py` now opens Practice
+  settings from the dock, expands **Playback & timing**, and selects speed from the
+  current `Playback speed` group; the repeat switch keeps its label. `verify_practice_flow.py`
+  accepts the current camera option label (`Camera` when only one facing is available).
+
+Verification for this slice:
+
+| Check | Result |
+| --- | --- |
+| `npx tsc --noEmit` | Clean |
+| Web tests | **239 passed** |
+| Production build | Passed (existing large-chunk warning) |
+| `verify_practice_feed.py` | **Passed** end to end |
+| `verify_practice_preview.py` | **Passed** end to end |
+| `verify_summary_discovery.py` | **Passed**, now including group entry and cleanup |
+| `verify_music_screen.py` | **Passed**, no page errors or device requests |
+| API public pagination + discovery filters | **8 passed** (targeted; full suite not repeated) |
+| `verify_compete_flow.py` | Advances past the speed control; stops at `Start scored run` (line 39) after **Prepare challenge**, because the guided camera setup now sits between preparation and the run button |
+| `verify_practice_flow.py` | Advances past the camera option; stops at line 117 waiting for `controls-resting` after Space, i.e. playback does not start from the restored controls in that flow |
+
+The compete and live-practice scripts therefore still need a camera-setup-aware flow, not
+just label updates. Recorded, not waived.
+
+Remaining Phase 2 work after this slice:
+
+| Slice | State |
+| --- | --- |
+| P2.1 summary-driven discovery | Implemented; stored lessons load on selection, local demo projects to a summary |
+| P2.2 subject badges and filter | Gated filter and card label done; badges on all card types still to do |
+| P2.3 summary queries | Owned, shared, group and public projections plus public facets done |
+| P2.4 dispatch music at entry points | Feed, recommendations, Studio, group grants and conversion cards route through the document loader |
+| P2.5 deep links and Back | Body preview Back added; music Back and mixed navigation verified |
+| P2.6 fixture coverage | Covered by the mixed discovery check: fixture cards, group grants, Studio preview-only |
+| P2.7 session/resource cleanup | Music document cleared on leaving playback and on public/collection entry; verified |
+| P2.8 capability messaging at point of use | Not started |
+| P2.9 lazy loading and bundle budget | Music screen is a lazy chunk; measured budget check still to do |

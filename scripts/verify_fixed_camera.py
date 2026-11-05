@@ -1,6 +1,7 @@
 """Check the camera matrices while seeking and playing an actual saved motion fixture."""
 import copy,json
 from pathlib import Path
+from lesson_fixture_summary import body_summary
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[1]
@@ -33,8 +34,10 @@ with sync_playwright() as p:
    if path=='/api/auth/session': value={'account':{'id':'qa','email':'qa@example.test','platform_role':'member','status':'active','mfa_enrolled':False},'csrf':'qa'}
    elif path=='/api/demo':return r.fulfill(status=404)
    elif path=='/api/lessons':value=[manifest]
+   elif path=='/api/lessons/summaries':value=[body_summary(manifest)]
    elif path==f'/api/lessons/{lesson_id}':value=manifest
    elif path=='/api/shared-lessons':value=[]
+   elif path=='/api/shared-lessons/summaries':value=[]
    elif path=='/api/workflow/lessons':value={'lessons':[]}
    elif path=='/api/capabilities':value={'camera_calibration':True}
    else:return r.fulfill(status=404,json={'detail':'Fixture'})

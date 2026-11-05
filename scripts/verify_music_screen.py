@@ -53,7 +53,7 @@ with sync_playwright() as p:
             route.fulfill(json={'account': account, 'csrf': 'test'})
         elif path == 'demo':
             route.fulfill(status=404, json={'detail': 'No demo'})
-        elif path == 'lessons':
+        elif path in ('lessons', 'lessons/summaries'):
             route.fulfill(json=[])
         elif path == 'shared-lessons':
             route.fulfill(json=[])

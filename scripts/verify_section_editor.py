@@ -1,6 +1,7 @@
 """Verify viewport fit, shared preview frames and the marker editing/save workflow."""
 import copy,json,math
 from pathlib import Path
+from lesson_fixture_summary import body_summary
 from urllib.request import urlopen
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright,expect
@@ -25,6 +26,7 @@ with sync_playwright() as p:
             if path=='/api/auth/session':value={'account':{'id':'qa','email':'qa@example.test','platform_role':'member','status':'active','mfa_enrolled':False},'csrf':'qa'}
             elif path=='/api/demo':return r.fulfill(status=404,json={'detail':'No demo in fixture'})
             elif path=='/api/lessons':value=[current]
+            elif path=='/api/lessons/summaries':value=[body_summary(current)]
             elif path=='/api/lessons/marker-qa':value=current
             elif path=='/api/lessons/marker-qa/sections':
                 body=r.request.post_data_json;calls.append(body)
@@ -32,6 +34,7 @@ with sync_playwright() as p:
                 current['section_set']['sections']=body['sections'];value=current
             elif path=='/api/workflow/lessons':value={'lessons':[{'lesson_id':'marker-qa','latest_revision_id':current['revision_id'],'accepted_revision_id':None,'audiences':{'direct':0,'groups':0,'public':False}}]}
             elif path=='/api/shared-lessons':value=[]
+            elif path=='/api/shared-lessons/summaries':value=[]
             elif path=='/api/conversions':value={'jobs':[]}
             elif path=='/api/capabilities':value={'camera_calibration':True}
             else:return r.fulfill(status=404,json={'detail':'Unavailable in fixture'})

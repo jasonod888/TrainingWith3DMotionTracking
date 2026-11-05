@@ -30,6 +30,7 @@ with sync_playwright() as p:
   if path=='auth/session':route.fulfill(json={'account':account,'csrf':'test'}) if mode['signed_in'] else route.fulfill(status=401,json={'detail':'Sign in'})
   elif path=='demo':route.fulfill(status=404,json={'detail':'No demo'})
   elif path=='lessons':route.fulfill(json=[] if mode['empty'] else own)
+  elif path=='lessons/summaries':route.fulfill(json=[] if mode['empty'] else [{'summary_version':1,'lesson_id':v['lesson_id'],'revision_id':v['revision_id'],'title':v['title'],'subject':'movement_other','subject_label':'Full Body Movement','experience_family':'body','instrument':None,'duration':v['duration'],'section_count':len(v['section_set']['sections']),'poster':v.get('thumbnail'),'capabilities':{'preview':True,'practice':True,'live_input':'camera'}} for v in own])
   elif path=='shared-lessons':route.fulfill(json=[] if mode['empty'] else shared)
   elif path=='shared-lessons/summaries':route.fulfill(json=[] if mode['empty'] else [{'summary_version':1,'lesson_id':v['lesson_id'],'revision_id':v['revision_id'],'title':v['title'],'subject':'movement_other','subject_label':'Full Body Movement','experience_family':'body','instrument':None,'duration':v['duration'],'section_count':len(v['section_set']['sections']),'poster':None,'capabilities':{'preview':True,'practice':True,'live_input':'camera'}} for v in shared])
   elif path=='capabilities':route.fulfill(json={'subject_filter':False,'conversion':True,'processing':{}})

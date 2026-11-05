@@ -1,4 +1,5 @@
 import type {LessonManifest,LessonSummary} from '../../../packages/lesson-schema/index';
+import {parseLessonSummary} from '../../../packages/lesson-schema/parse';
 import {publicMovesPath} from './feed-subject';
 import {clearClips} from './clipCache';
 export async function loadDemo(signal?:AbortSignal):Promise<LessonManifest|null>{
@@ -27,8 +28,13 @@ export async function signIn(email:string,password:string){const value=await req
 export async function signOut(){await request('/auth/logout','POST');csrf='';await clearClips().catch(()=>{});}
 export const loadLibrary=()=>request<LessonManifest[]>('/lessons');
 const summaryQuery=(subject?:string)=>subject?`?subject=${encodeURIComponent(subject)}`:'';
-export const loadLessonSummaries=(subject?:string)=>request<LessonSummary[]>(`/lessons/summaries${summaryQuery(subject)}`,'GET',undefined,false,{'X-Lesson-Formats':'1,2'});
-export const loadSharedSummaries=(subject?:string)=>request<LessonSummary[]>(`/shared-lessons/summaries${summaryQuery(subject)}`,'GET',undefined,false,{'X-Lesson-Formats':'1,2'});
+export function readLessonSummaries(value:unknown):LessonSummary[]{
+ if(!Array.isArray(value))throw new Error('Your lesson list could not be read. Try again.');
+ return value.map(item=>{const parsed=parseLessonSummary(item);if(!parsed.ok)throw new Error(parsed.message);return parsed.value;});
+}
+const loadSummaries=async(path:string)=>readLessonSummaries(await request<unknown>(path,'GET',undefined,false,{'X-Lesson-Formats':'1,2'}));
+export const loadLessonSummaries=(subject?:string)=>loadSummaries(`/lessons/summaries${summaryQuery(subject)}`);
+export const loadSharedSummaries=(subject?:string)=>loadSummaries(`/shared-lessons/summaries${summaryQuery(subject)}`);
 export type Capabilities={subject_filter?:boolean;processing?:Record<string,boolean>};
 export const loadCapabilities=()=>request<Capabilities>('/capabilities');
 export const loadLesson=(id:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`);
@@ -44,7 +50,7 @@ export type MoveState={lesson_id:string;subject?:string;subject_label?:string;ex
 export const loadMoveStates=()=>request<{lessons:MoveState[]}>('/workflow/lessons');
 export const acceptMove=(lessonId:string,revisionId:string,warnings:string[]=[])=>
  request<MoveState&{warnings:string[]}>(`/workflow/lessons/${encodeURIComponent(lessonId)}/accept`,'POST',{revision_id:revisionId,warnings});
-export const needsCheck=(lesson:LessonManifest,state:MoveState|undefined)=>!!state&&state.accepted_revision_id!==lesson.revision_id;
+export const needsCheck=(lesson:Pick<LessonManifest,'revision_id'>,state:MoveState|undefined)=>!!state&&state.accepted_revision_id!==lesson.revision_id;
 export const audienceLabel=(audiences:MoveAudiences)=>{
  if(audiences.public)return 'Public';
  const parts=[];
@@ -76,6 +82,8 @@ export const loadPublicMoves=(query='',tag='',offset=0,subject='')=>{
  return request<{moves:PublicMove[]}>(tag?`${path}${separator}tag=${encodeURIComponent(tag)}`:path);
 };
 export const loadPublicTags=()=>request<{tags:{tag:string;count:number}[]}>('/public/tags');
+export type PublicSubject={subject:string;subject_label:string;count:number};
+export const loadPublicSubjects=()=>request<{subjects:PublicSubject[]}>('/public/subjects');
 export const loadPublicMove=(id:string)=>request<PublicDetail>(`/public/moves/${encodeURIComponent(id)}`);
 export const updatePublic=(lessonId:string,body:{listed:boolean;title?:string;description?:string;creator_name?:string;tags?:string[];rights_acknowledged?:boolean;release_revision_id?:string})=>
  request(`/public/lessons/${encodeURIComponent(lessonId)}`,'PATCH',body);

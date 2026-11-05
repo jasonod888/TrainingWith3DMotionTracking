@@ -1,13 +1,13 @@
 import {useEffect,useRef,useState} from 'react';
-import {Maximize,Pause,Play,Rotate3D,Volume2,VolumeX,VideoOff} from 'lucide-react';
-import type {LessonManifest} from '../../../packages/lesson-schema/index';
+import {ArrowLeft,Maximize,Pause,Play,Rotate3D,Volume2,VolumeX,VideoOff} from 'lucide-react';
+import type {LessonManifest,LessonSummary} from '../../../packages/lesson-schema/index';
 import {assetUrl,loadPublicMoves,type PublicMove} from './api';
 import {PracticeTimeline} from './PracticeTimeline';
 import {timelineSectionAt} from './practice-timeline';
 import './preview.css';
 
-export type WatchLesson={lesson:LessonManifest;owned:boolean};
-export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,lessons=[],onOpen,onPublic}:{lesson:LessonManifest;owned:boolean;resumeAt:number;onPosition:(time:number)=>void;onChoose:(mode:'practice'|'compete')=>void;lessons?:WatchLesson[];onOpen:(item:WatchLesson)=>void;onPublic:(id:string)=>void}){
+export type WatchLesson={lesson:LessonSummary;owned:boolean};
+export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBack,lessons=[],onOpen,onPublic}:{lesson:LessonManifest;owned:boolean;resumeAt:number;onPosition:(time:number)=>void;onChoose:(mode:'practice'|'compete')=>void;onBack:()=>void;lessons?:WatchLesson[];onOpen:(item:WatchLesson)=>void;onPublic:(id:string)=>void}){
  const video=useRef<HTMLVideoElement>(null),player=useRef<HTMLDivElement>(null),position=useRef(onPosition);position.current=onPosition;
  const start=lesson.source_start,end=start+lesson.duration;
  const initial=resumeAt>=end-.1?start:Math.max(start,Math.min(resumeAt||start,end));
@@ -34,6 +34,7 @@ export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,lesso
  const poster=(thumbnail:string|null)=>(thumbnail?<img src={thumbnail} alt="" loading="lazy" onError={event=>{event.currentTarget.hidden=true;}}/>:<Rotate3D size={30}/>);
  const duration=(value:number)=>`${Math.floor(value/60)}:${Math.floor(value%60).toString().padStart(2,'0')}`;
  return <section className="lesson-watch" aria-label="Watch lesson">
+  <div className="watch-header"><button onClick={onBack}><ArrowLeft size={18}/>Back to feed</button></div>
   <div className="watch-layout">
    <div className="watch-main">
     <div className="watch-player" ref={player}>
@@ -52,7 +53,7 @@ export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,lesso
     <div className="watch-description"><h1>{lesson.title}</h1><p>{creator} <span>· {duration(lesson.duration)} · {lesson.section_set.sections.length} sections</span></p>{meta.description&&<p>{meta.description}</p>}</div>
    </div>
    <aside className="watch-related" aria-label="Other lessons"><h2>More lessons</h2>
-    {available.map(item=><button className="watch-lesson" key={item.lesson.lesson_id} onClick={()=>onOpen(item)}><span className="watch-thumbnail">{poster(item.lesson.thumbnail?assetUrl(item.lesson.thumbnail.key):null)}<small>{duration(item.lesson.duration)}</small></span><span className="watch-lesson-copy"><strong>{item.lesson.title}</strong><span>{item.owned?'Your lesson':'Available lesson'}</span><span>{item.lesson.section_set.sections.length} sections</span></span></button>)}
+    {available.map(item=><button className="watch-lesson" key={item.lesson.lesson_id} onClick={()=>onOpen(item)}><span className="watch-thumbnail">{poster(item.lesson.poster?assetUrl(item.lesson.poster.key):null)}<small>{duration(item.lesson.duration)}</small></span><span className="watch-lesson-copy"><strong>{item.lesson.title}</strong><span>{item.owned?'Your lesson':'Available lesson'}</span><span>{item.lesson.section_count} sections</span></span></button>)}
     {related.map(item=><button className="watch-lesson" key={item.lesson_id} onClick={()=>onPublic(item.lesson_id)}><span className="watch-thumbnail">{poster(item.thumbnail_url)}<small>{duration(item.duration)}</small></span><span className="watch-lesson-copy"><strong>{item.title}</strong><span>{item.creator_name}</span></span></button>)}
     {recommendationsError&&<p className="watch-related-note">More lessons couldn’t load. <button onClick={()=>setRetry(value=>value+1)}>Retry</button></p>}
     {!available.length&&!related.length&&!recommendationsError&&<p className="watch-related-note">{recommendationsLoading?'Loading more lessons…':'Other available lessons will appear here.'}</p>}

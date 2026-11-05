@@ -106,7 +106,7 @@ def run():
   page.get_by_role('button',name='Enable TV presentation',exact=True).click()
   assert page.evaluate('window.captureCounts.streams.length')==0
   page.get_by_role('button',name='Turn off TV presentation',exact=True).click()
-  page.get_by_role('group',name='Camera',exact=True).get_by_role('button',name='Front',exact=True).click()
+  page.get_by_role('group',name='Camera',exact=True).get_by_role('button',name=re.compile(r'^(Front|Camera)$'),exact=True).click()
   # Choosing a feed opens that camera at once, so the person sees the real arrangement.
   expect(page.locator('.camera-pane')).to_be_visible(timeout=30000)
   page.keyboard.press('Escape')

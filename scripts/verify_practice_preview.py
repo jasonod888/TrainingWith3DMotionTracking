@@ -25,7 +25,17 @@ with sync_playwright() as p:
   elif path=='demo':route.fulfill(json={**manifest,'source_video':None} if mode['missing'] else manifest)
   elif path.endswith('demonstration.webm'):
    if mode['broken']:route.fulfill(status=404,body='Missing')
-   else:route.fulfill(path=str(fixture),content_type='video/webm')
+   else:
+    data=fixture.read_bytes()
+    byte_range=route.request.headers.get('range')
+    headers={'Accept-Ranges':'bytes'}
+    if byte_range:
+     match=re.fullmatch(r'bytes=(\d+)-(\d*)',byte_range)
+     assert match, byte_range
+     start=int(match[1]);end=min(int(match[2]) if match[2] else len(data)-1,len(data)-1)
+     headers['Content-Range']=f'bytes {start}-{end}/{len(data)}'
+     route.fulfill(status=206,body=data[start:end+1],content_type='video/webm',headers=headers)
+    else:route.fulfill(body=data,content_type='video/webm',headers=headers)
   elif path.endswith('thumbnail.jpg'):route.fulfill(path=str(ROOT/'web/dist/assets/thumbnail.jpg'))
   elif path.startswith('demo/assets/'):route.fulfill(path=str(ROOT/'packages/lesson-schema'/path.rsplit('/',1)[-1]))
   elif path.startswith('public/moves'):route.fulfill(json={'moves':[]})
