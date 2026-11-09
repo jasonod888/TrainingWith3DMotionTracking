@@ -1,5 +1,6 @@
 """Separate music summary history: opt-in gate, immutable identity, privacy and bounds."""
 import json
+from datetime import datetime, timezone
 from uuid import uuid4
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -36,6 +37,8 @@ def test_music_history_is_off_by_default_and_pose_history_refuses_music(tmp_path
         path = f'/api/lessons/{lesson.lesson_id}/music-attempts'
         assert client.get('/api/capabilities').json()['music_history'] is False
         assert client.get(path).status_code == 404
+        assert client.get(path+'/page').status_code == 404
+        assert client.get('/api/music-attempts').status_code == 404
         assert client.post(path, json=payload(lesson)).status_code == 404
         pose = f'/api/lessons/{lesson.lesson_id}/attempts'
         assert client.get(pose).status_code == 409
@@ -99,11 +102,49 @@ def test_history_is_personal_even_for_simulated_future_music_recipient(tmp_path)
                 accept_revision(session,row,session.get(LessonRevision,lesson.revision_id),row.owner_id,source='music-review')
                 session.add(LessonGrant(lesson_id=row.id,account_id=other_id,source='invite'));session.commit()
             assert other.get(path).json()==[]
+            assert other.get('/api/music-attempts').json()['items']==[]
             own=payload(lesson)
             assert other.post(path,json=own).status_code==201
             assert len(client.get(path).json())==1
+            assert [item['id'] for item in client.get('/api/music-attempts').json()['items']]==[value['id']]
             assert client.delete(path+'/'+own['id'],headers={'Content-Type':'application/json'}).status_code==404
             with Session(app.state.engine) as session:
                 session.get(LessonGrant,(lesson.lesson_id,other_id)).revoked=True;session.commit()
             assert other.get(path).status_code==404
+            personal=other.get('/api/music-attempts').json()['items']
+            assert len(personal)==1 and personal[0]['id']==own['id'] and personal[0]['title'] is None
             assert other.delete(path+'/'+own['id'],headers={'Content-Type':'application/json'}).status_code==200
+
+
+def test_cursor_pagination_handles_equal_dates_deleted_boundary_and_new_summaries(tmp_path):
+    with music_app(tmp_path,music_history_enabled=True) as system:
+        client,app,*_=system
+        first=imported_music(system);second=imported_music(system)
+        ids=[]
+        for lesson in (first,second,first,second):
+            body=payload(lesson);ids.append(body['id'])
+            assert client.post(f'/api/lessons/{lesson.lesson_id}/music-attempts',json=body).status_code==201
+        with Session(app.state.engine) as session:
+            for row in session.query(MusicPracticeAttempt):row.created_at=datetime(2026,11,10,tzinfo=timezone.utc)
+            session.commit()
+        response=client.get('/api/music-attempts?limit=2').json()
+        assert [row['id'] for row in response['items']]==sorted(ids,reverse=True)[:2]
+        boundary=response['items'][-1]
+        assert client.delete(f"/api/lessons/{boundary['lesson_id']}/music-attempts/{boundary['id']}",headers={'Content-Type':'application/json'}).status_code==200
+        new=payload(first)
+        assert client.post(f'/api/lessons/{first.lesson_id}/music-attempts',json=new).status_code==201
+        with Session(app.state.engine) as session:
+            session.get(MusicPracticeAttempt,new['id']).created_at=datetime(2027,1,1,tzinfo=timezone.utc);session.commit()
+        page=client.get('/api/music-attempts',params={'limit':2,'cursor':response['next_cursor']}).json()
+        assert [row['id'] for row in page['items']]==sorted(ids,reverse=True)[2:]
+        assert page['next_cursor'] is None
+        scoped=client.get(f'/api/lessons/{first.lesson_id}/music-attempts/page?limit=1').json()
+        assert scoped['items'][0]['lesson_id']==first.lesson_id
+        assert scoped['next_cursor'] is not None
+        assert client.get('/api/music-attempts?cursor=invalid!').status_code==422
+        assert client.get('/api/music-attempts?limit=101').status_code==422
+        # Account history can remove archived/unavailable lessons without exposing their title.
+        with Session(app.state.engine) as session:
+            session.get(Lesson,first.lesson_id).archived=True;session.commit()
+        archived=[row for row in client.get('/api/music-attempts').json()['items'] if row['lesson_id']==first.lesson_id]
+        assert archived and all(row['title'] is None for row in archived)

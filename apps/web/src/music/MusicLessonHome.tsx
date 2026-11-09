@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
+import {lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
 import {Music2, Pause, Play} from 'lucide-react';
 import type {MusicLessonManifest} from '../../../../packages/lesson-schema/index';
 import {assetUrl, request} from '../api';
@@ -8,6 +8,7 @@ import {
 } from './music-reference';
 import './music.css';
 import {MidiKeyboardCheck} from './MidiKeyboardCheck';
+const MusicHistoryPanel=lazy(()=>import('./MusicHistoryPanel').then(module=>({default:module.MusicHistoryPanel})));
 import {attackSourceTime} from '../../../../packages/music-engine/onsets';
 import {buildRunFeedback, calibrateLatency, feedbackEligibility, invalidFeedback, type Attack, type MusicFeedback, type RunClock} from './music-feedback';
 import {
@@ -16,8 +17,6 @@ import {
 } from './music-practice';
 
 const label = (lesson: MusicLessonManifest) => lesson.subject === 'piano' ? 'Piano' : 'Guitar';
-type MusicAttemptView = {id:string;date:string;section_id:string;run:number;start:number;end:number;speed:number;
-  note_window:{total:number;eligible:number;matched:number;missing:number;extra:number}};
 type SaveState = {id:string;state:'saving'|'saved'|'error';message?:string};
 
 function timeLabel(seconds: number): string {
@@ -54,8 +53,11 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   const [feedback,setFeedback]=useState<MusicFeedback[]>([]);
   const [feedbackNotice,setFeedbackNotice]=useState('');
   const [saves,setSaves]=useState<Record<string,SaveState>>({});
-  const [historyOpen,setHistoryOpen]=useState(false),[history,setHistory]=useState<MusicAttemptView[]|null>(null);
-  const [historyError,setHistoryError]=useState('');
+  const [historyRefresh,setHistoryRefresh]=useState(0);
+  const saveSession=useRef(0),saveAlive=useRef(true),saveIdentity=useRef(identity);saveIdentity.current=identity;
+  const saveEntries=useRef(new Map<string,{id:string;state:SaveState['state'];payload:Record<string,unknown>}>());
+  const resetSaves=()=>{saveSession.current++;saveEntries.current.clear();setSaves({});};
+  useEffect(()=>{saveAlive.current=true;return()=>{saveAlive.current=false;saveSession.current++;};},[identity]);
   const runs=useRef<{run:number;attacks:Attack[];clock:RunClock;complete:boolean}[]>([]);
   const runClock=useRef<RunClock|null>(null);
   const practiceStarted=useRef(0);
@@ -78,7 +80,7 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   useEffect(() => {
     let stopped = false;const abort=new AbortController();
     setLoaded(null);setError('');setTime(0);clock.current=0;setPlaying(false);setVideoFailed(false);
-    practiceRef.current=null;optionsRef.current=null;setPractice(null);setPracticeOptions(null);setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;cancelCalibration();setLatency(null);
+    practiceRef.current=null;optionsRef.current=null;setPractice(null);setPracticeOptions(null);setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;resetSaves();cancelCalibration();setLatency(null);
     void fetch(assetUrl(lesson.reference.key), {signal:abort.signal,credentials:'same-origin',headers: {'Accept': 'application/json'}})
       .then(async response => {
         if (!response.ok) throw new Error('The reviewed reference could not be loaded.');
@@ -175,7 +177,7 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
 
   const stopPractice=(returnToStart=true)=>{
     const current=optionsRef.current;
-    practiceRef.current=null;optionsRef.current=null;setPractice(null);setPracticeOptions(null);setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;setPlaying(false);
+    practiceRef.current=null;optionsRef.current=null;setPractice(null);setPracticeOptions(null);setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;resetSaves();setPlaying(false);
     if(returnToStart&&current){clock.current=current.start;setTime(current.start);if(video.current)video.current.currentTime=current.start;}
   };
 
@@ -187,7 +189,7 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
     const options:PracticeOptions={sectionId:practiceSection,start,end,repeats,countInBeats:countIn,speed};
     const state=startPractice(options);
     practiceStarted.current=performance.now();
-    setPracticeOptions(options);optionsRef.current=options;practiceRef.current=state;setPractice(state);setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;
+    setPracticeOptions(options);optionsRef.current=options;practiceRef.current=state;setPractice(state);setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;resetSaves();
     if(state.phase==='playing'){
       const measured={wallStartMs:practiceStarted.current,sourceStart:start,sourceEnd:end,speed,inputLatencyMs:latencyRef.current??0};
       runClock.current=measured;runs.current.push({run:0,attacks:[],clock:measured,complete:false});
@@ -248,38 +250,31 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   };
 
   const saveRun=async(run:MusicFeedback)=>{
-    if(!musicHistoryEnabled||!eligibilityRef.current.eligible)return;
-    const key=`${run.run}-${run.window.start}-${run.window.end}`;
-    const id=saves[key]?.id??crypto.randomUUID();
-    setSaves(previous=>({...previous,[key]:{id,state:'saving'}}));
-    try{
-      await request(`/lessons/${encodeURIComponent(lesson.lesson_id)}/music-attempts`,'POST',{
-        summary_version:1,status:'complete',id,save_requested:true,
+    if(!musicHistoryEnabled||!eligibilityRef.current.eligible||run.status!=='complete')return;
+    const session=saveSession.current,view=identity;
+    const key=`${session}:${run.run}-${run.window.start}-${run.window.end}`;
+    let entry=saveEntries.current.get(key);
+    if(entry?.state==='saving'||entry?.state==='saved')return;
+    if(!entry){
+      const id=crypto.randomUUID();
+      entry={id,state:'saving',payload:{summary_version:1,status:'complete',id,save_requested:true,
         revision_id:lesson.revision_id,reference_sha256:lesson.reference.sha256,
         rubric_version:lesson.assessment.rubric_version,section_id:run.sectionId,
         start:run.window.start,end:run.window.end,speed:run.speed,run:run.run,
         assessment:'unscored',alignment:run.latencyMeasured?'visual-estimate':'none',
-        note_window:{total:run.total,eligible:run.assessed,matched:run.matched,missing:run.missing,extra:run.extra},
-      });
-      setSaves(previous=>({...previous,[key]:{id,state:'saved'}}));
-      if(historyOpen)void loadHistory();
-    }catch(error){
-      setSaves(previous=>({...previous,[key]:{id,state:'error',message:error instanceof Error?error.message:'The summary was not saved.'}}));
+        note_window:{total:run.total,eligible:run.assessed,matched:run.matched,missing:run.missing,extra:run.extra}}};
+      saveEntries.current.set(key,entry);
     }
-  };
-
-  const loadHistory=async()=>{
-    setHistoryOpen(true);setHistoryError('');
-    try{setHistory(await request<MusicAttemptView[]>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/music-attempts`));}
-    catch(error){setHistoryError(error instanceof Error?error.message:'Your history could not be loaded.');}
-  };
-
-  const deleteAttempt=async(id:string)=>{
-    setHistoryError('');
-    try{await request(`/lessons/${encodeURIComponent(lesson.lesson_id)}/music-attempts/${encodeURIComponent(id)}`,'DELETE');
-      setHistory(previous=>previous?previous.filter(item=>item.id!==id):null);
-      setSaves(previous=>Object.fromEntries(Object.entries(previous).filter(([,value])=>value.id!==id)) as Record<string,SaveState>);
-    }catch(error){setHistoryError(error instanceof Error?error.message:'That summary could not be removed.');}
+    entry.state='saving';setSaves(previous=>({...previous,[key]:{id:entry!.id,state:'saving'}}));
+    const current=()=>saveAlive.current&&saveSession.current===session&&saveIdentity.current===view;
+    try{
+      await request(`/lessons/${encodeURIComponent(lesson.lesson_id)}/music-attempts`,'POST',entry.payload);
+      if(!current())return;
+      entry.state='saved';setSaves(previous=>({...previous,[key]:{id:entry!.id,state:'saved'}}));setHistoryRefresh(value=>value+1);
+    }catch(error){
+      if(!current())return;
+      entry.state='error';setSaves(previous=>({...previous,[key]:{id:entry!.id,state:'error',message:error instanceof Error?error.message:'The summary was not saved.'}}));
+    }
   };
 
   const active = useMemo(() => reference ? activeEvents(reference, time) : [], [reference, time]);
@@ -393,25 +388,18 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
           <h3>Run {run.run+1}</h3>
           {run.status==='invalid'?<p role="alert">This run could not be analysed: {run.reason}</p>:<p>{run.matched} matched · {run.missing} missing · {run.extra} extra · {run.assessed} of {run.total} notes eligible for comparison ({Math.round(run.coverage*100)}% of reference notes){run.unassessed?` · ${run.unassessed} unassessed`:''}</p>}
           {run.status==='complete'&&<ul>{run.notes.map((note,noteIndex)=><li key={noteIndex} className={`feedback-note ${note.status}`}>{note.status==='matched'?`${note.name} ${note.timing}${note.errorSeconds!==null?` (${Math.round(note.errorSeconds*1000)} ms)`:''}`:note.status==='missing'?`Missing ${note.name}`:`Extra ${note.name}`}</li>)}</ul>}
-          {musicHistoryEnabled&&eligibility.eligible&&run.status==='complete'&&(()=>{const key=`${run.run}-${run.window.start}-${run.window.end}`;const saved=saves[key];
+          {musicHistoryEnabled&&eligibility.eligible&&run.status==='complete'&&(()=>{const key=`${saveSession.current}:${run.run}-${run.window.start}-${run.window.end}`;const saved=saves[key];
             return <div className="feedback-save">{saved?.state==='saved'?<p role="status">Summary saved to your private history.</p>:
               <><button className="secondary" disabled={saved?.state==='saving'} onClick={()=>void saveRun(run)}>{saved?.state==='saving'?'Saving…':saved?.state==='error'?'Retry save':'Save summary'}</button>
               {saved?.state==='error'&&<p className="small muted" role="alert">{saved.message}</p>}</>}</div>;})()}
         </article>)}
         {feedback.some(run=>!run.latencyMeasured)&&<p className="small muted">No timing alignment estimate was made; timing feedback is approximate.</p>}
-        <p className="small muted">Timing remains approximate, including after visual alignment. Feedback is local and unscored. Nothing is saved or sent.</p>
+        <p className="small muted">Timing remains approximate, including after visual alignment. {musicHistoryEnabled?'Feedback is unscored. A summary is sent only when you choose Save summary.':'Feedback is local and unscored. Nothing is saved or sent.'}</p>
       </section>}
-      {musicHistoryEnabled&&lesson.assessment.assessment==='notes'&&<section className="music-history" aria-label="Music practice history">
-        <div className="history-head"><h2>Practice history</h2><button className="secondary" onClick={()=>void loadHistory()}>{historyOpen?'Refresh history':'View music history'}</button></div>
-        {historyOpen&&<>
-          {historyError&&<p className="inline-notice error-notice" role="alert">{historyError}</p>}
-          {history===null&&!historyError?<p role="status">Loading your saved summaries…</p>:history?.length?<ul className="history-list">{history.map(item=><li key={item.id}>
-            <div><strong>{new Date(item.date).toLocaleString()}</strong><span> Run {item.run+1} · {item.section_id==='all'?'Whole lesson':item.section_id} · {Math.round(item.start)}–{Math.round(item.end)}s · {item.speed}× · {item.note_window.matched} matched · {item.note_window.missing} missing · {item.note_window.eligible} of {item.note_window.total} eligible</span></div>
-            <button className="back-link" aria-label={`Delete summary ${item.id}`} onClick={()=>void deleteAttempt(item.id)}>Delete</button>
-          </li>)}</ul>:<p className="small muted">No saved summaries yet. Save a completed, unscored repeat above.</p>}
-          <p className="small muted">Private, unscored, client-reported summaries with a separate 5,000-summary allowance. Not a score or accuracy measure.</p>
-        </>}
-      </section>}
+      {musicHistoryEnabled&&<Suspense fallback={<p>Opening history controls…</p>}><MusicHistoryPanel key={identity} lessonId={lesson.lesson_id} refreshToken={historyRefresh} onDelete={id=>{
+        for(const [key,entry] of saveEntries.current)if(entry.id===id)saveEntries.current.delete(key);
+        setSaves(previous=>Object.fromEntries(Object.entries(previous).filter(([,value])=>value.id!==id)));
+      }}/></Suspense>}
       {midiSetupEnabled&&lesson.subject==='piano'&&<MidiKeyboardCheck key={lesson.revision_id} onAttack={handleAttack} onInputChange={id=>{setKeyboardConnected(Boolean(id));cancelCalibration();setLatency(null);if(practiceRef.current)stopPractice();}}/>}
       <div className="music-home-grid">
         <article className="music-home-panel">

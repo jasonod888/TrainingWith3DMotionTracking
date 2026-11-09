@@ -1,18 +1,30 @@
 """Default-off, explicit-save API for self-reported unscored music summaries."""
 from typing import Literal
 from uuid import UUID
+from datetime import datetime, timezone
+import base64
+import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field, model_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .contracts import Contract
-from .database import Account, MusicPracticeAttempt
+from .database import Account, MusicPracticeAttempt, LessonRevision
 from .permissions import readable_lesson
 
 MAX_SUMMARIES = 5000
+
+
+class HistoryCursor(Contract):
+    date: datetime
+    id: UUID
+
+
+def utc_date(value):
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
 class NoteWindowSummary(Contract):
@@ -67,7 +79,53 @@ def install_music_attempts(app, settings, identity, db):
         return revision
 
     def result(row):
-        return {**row.summary, 'evidence': 'client-reported', 'date': row.created_at.isoformat()}
+        return {**row.summary, 'evidence': 'client-reported', 'date': utc_date(row.created_at).isoformat()}
+
+    def page(session, account_id, limit, cursor, lesson_id=None):
+        query = select(MusicPracticeAttempt).where(MusicPracticeAttempt.account_id == account_id)
+        if lesson_id is not None:
+            query = query.where(MusicPracticeAttempt.lesson_id == lesson_id)
+        if cursor:
+            try:
+                decoded = base64.b64decode(cursor + '=' * (-len(cursor) % 4), altchars=b'-_', validate=True)
+                boundary = HistoryCursor.model_validate_json(decoded)
+                stamp = utc_date(boundary.date)
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(422, 'Invalid history cursor. Refresh history.') from exc
+            query = query.where(or_(MusicPracticeAttempt.created_at < stamp,
+                and_(MusicPracticeAttempt.created_at == stamp, MusicPracticeAttempt.id < str(boundary.id))))
+        rows = session.scalars(query.order_by(MusicPracticeAttempt.created_at.desc(), MusicPracticeAttempt.id.desc()).limit(limit+1)).all()
+        more = len(rows) > limit
+        rows = rows[:limit]
+        items = []
+        for row in rows:
+            title = None
+            try:
+                lesson, readable = readable_lesson(session, row.lesson_id, account_id)
+                if readable and (lesson.owner_id == account_id or readable.id == row.revision_id):
+                    revision = session.get(LessonRevision, row.revision_id)
+                    title = revision.manifest['title'] if revision else None
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+            items.append({**result(row), 'lesson_id': row.lesson_id, 'title': title})
+        next_cursor = None
+        if more:
+            last = rows[-1]
+            data = json.dumps({'date': utc_date(last.created_at).isoformat(), 'id': last.id}).encode()
+            next_cursor = base64.urlsafe_b64encode(data).decode().rstrip('=')
+        return {'items': items, 'next_cursor': next_cursor}
+
+    @router.get('/{lesson_id}/music-attempts/page', dependencies=[Depends(enabled)])
+    def lesson_page(lesson_id: str, limit: int=Query(20, ge=1, le=100), cursor: str | None=Query(None, max_length=400),
+                    account=Depends(identity), session: Session=Depends(db)):
+        music_revision(session, lesson_id, account.id)
+        return page(session, account.id, limit, cursor, lesson_id)
+
+    @app.get('/api/music-attempts', dependencies=[Depends(enabled)])
+    def account_page(limit: int=Query(20, ge=1, le=100), cursor: str | None=Query(None, max_length=400),
+                     account=Depends(identity), session: Session=Depends(db)):
+        return page(session, account.id, limit, cursor)
 
     @router.get('/{lesson_id}/music-attempts', dependencies=[Depends(enabled)])
     def history(lesson_id: str, account=Depends(identity), session: Session=Depends(db)):

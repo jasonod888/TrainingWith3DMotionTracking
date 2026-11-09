@@ -3,7 +3,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
+from urllib.parse import urlparse, parse_qs
 
 from playwright.sync_api import sync_playwright, expect
 
@@ -36,7 +37,7 @@ summary = {'summary_version': 1, 'lesson_id': 'music-history', 'revision_id': 'm
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     page = browser.new_page(viewport={'width': 390, 'height': 844})
-    errors, posts, deletes = [], [], []
+    errors, posts, deletes, reads = [], [], [], []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.add_init_script("""
       window.deviceRequests=[];
@@ -50,7 +51,7 @@ with sync_playwright() as p:
       navigator.mediaDevices.getUserMedia=()=>{deviceRequests.push('camera');throw Error('Unexpected camera');};
     """)
 
-    state = {'history_enabled': True, 'rows': [], 'attempts': 0}
+    state = {'history_enabled': True, 'rows': [], 'attempts': 0, 'more_failure': True, 'hold_next': False}
     saved_payload = {}
 
     def api(route):
@@ -101,13 +102,28 @@ with sync_playwright() as p:
             for key in ('score', 'accuracy', 'events', 'midi', 'latency_ms'):
                 assert key not in payload
             saved_payload.update(payload)
+            if not any(row['id']==payload['id'] for row in state['rows']):
+                state['rows'].insert(0,{**payload,'evidence':'client-reported','date':'2026-11-10T12:00:00+00:00','lesson_id':'music-history','title':'History lesson'})
+            if state['hold_next']:
+                state['hold_next']=False;state['held_route']=route
+                return
             route.fulfill(status=201, json={**payload, 'evidence': 'client-reported',
                                             'date': '2026-11-09T12:00:00+00:00'})
+        elif path in ('lessons/music-history/music-attempts/page','music-attempts') and method == 'GET':
+            reads.append(route.request.url)
+            offset=int(parse_qs(urlparse(route.request.url).query).get('cursor',['0'])[0])
+            if path=='music-attempts' and offset and state['more_failure']:
+                state['more_failure']=False
+                route.fulfill(status=503,json={'detail':'Temporary page failure.'})
+            else:
+                rows=state['rows'][offset:offset+2]
+                route.fulfill(json={'items':rows,'next_cursor':str(offset+2) if offset+2<len(state['rows']) else None})
         elif path == 'lessons/music-history/music-attempts' and method == 'GET':
             route.fulfill(json=[{**saved_payload, 'evidence': 'client-reported',
                                  'date': '2026-11-09T12:00:00+00:00'}] if saved_payload else [])
         elif path.startswith('lessons/music-history/music-attempts/') and method == 'DELETE':
             deletes.append(path.rsplit('/', 1)[-1])
+            state['rows']=[row for row in state['rows'] if row['id']!=deletes[-1]]
             route.fulfill(json={'ok': True})
         else:
             route.fulfill(status=404, json={'detail': 'Not found'})
@@ -126,32 +142,80 @@ with sync_playwright() as p:
     page.wait_for_timeout(420)
     page.evaluate('window.playNote(64)')
     page.wait_for_selector('.music-feedback', timeout=15000)
-    assert posts == [], 'practice completion must not upload automatically'
+    assert posts == [] and reads == [], 'completion must not upload or load history automatically'
     save = page.get_by_role('button', name='Save summary', exact=True)
     expect(save).to_be_visible()
     save.click()
     expect(page.locator('.feedback-save')).to_contain_text('Temporary history failure')
     page.get_by_role('button', name='Retry save', exact=True).click()
     expect(page.locator('.feedback-save')).to_contain_text('Summary saved')
-    assert len(posts) == 2 and posts[0]['id'] == posts[1]['id'], 'retry must reuse the same summary id'
+    assert len(posts) == 2 and posts[0] == posts[1], 'retry must reuse the exact payload'
+    # The same range in another session is a new performance, not an already-saved run.
+    state['hold_next']=True
+    page.get_by_role('button',name='Practice again',exact=True).click()
+    page.wait_for_selector('.music-feedback',timeout=15000)
+    expect(page.get_by_role('button',name='Save summary',exact=True)).to_be_visible()
+    page.get_by_role('button',name='Save summary',exact=True).click()
+    expect(page.locator('.feedback-save')).to_contain_text('Saving…')
+    # A late response from that session cannot mark a third session's run as saved.
+    page.get_by_role('button',name='Practice again',exact=True).click()
+    page.wait_for_selector('.music-feedback',timeout=15000)
+    state['held_route'].fulfill(status=201,json={**posts[-1],'evidence':'client-reported','date':'2026-11-10T12:00:00Z'})
+    page.wait_for_timeout(100)
+    expect(page.get_by_role('button',name='Save summary',exact=True)).to_be_visible()
+    assert 'Summary saved' not in page.locator('.feedback-save').inner_text()
+    assert len(posts)==3 and posts[-1]['id']!=posts[0]['id']
+    assert reads==[], 'saving does not silently open history'
     page.get_by_role('button', name='View music history', exact=True).click()
     history = page.locator('.history-list li')
-    expect(history).to_have_count(1)
-    expect(history).to_contain_text('Whole lesson' if saved_payload['section_id'] == 'all' else 'intro')
-    expect(history).to_contain_text('matched')
+    expect(history).to_have_count(2)
+    expect(history.first).to_contain_text('Whole lesson' if saved_payload['section_id'] == 'all' else 'intro')
+    expect(history.first).to_contain_text('matched')
     page.get_by_role('button', name=f"Delete summary {saved_payload['id']}", exact=True).click()
-    expect(page.locator('.history-list')).to_have_count(0)
-    expect(page.locator('.music-history')).to_contain_text('No saved summaries yet')
+    expect(page.locator('.history-list li')).to_have_count(1)
     assert deletes == [saved_payload['id']] and page.evaluate('window.deviceRequests') == []
     assert errors == [], errors
+
+    # Account history is also explicitly loaded and supports retrying a later page.
+    seed=state['rows'][0]
+    state['rows'].extend([{**seed,'id':str(uuid4()),'title':None if index==0 else 'Earlier piano'} for index in range(4)])
+    before=len(reads)
+    page.get_by_role('button',name='Account menu',exact=True).click()
+    page.get_by_role('menuitem',name='Account',exact=True).click()
+    expect(page.get_by_role('button',name='View all music history',exact=True)).to_be_visible()
+    assert len(reads)==before
+    page.get_by_role('button',name='View all music history',exact=True).click()
+    panel=page.get_by_role('region',name='Account music history',exact=True)
+    expect(panel.locator('.history-list li')).to_have_count(2)
+    expect(panel).to_contain_text('Lesson unavailable')
+    page.get_by_role('button',name='More summaries',exact=True).click()
+    expect(panel).to_contain_text('Temporary page failure')
+    expect(panel.locator('.history-list li')).to_have_count(2)
+    page.get_by_role('button',name='Retry more summaries',exact=True).click()
+    expect(panel.locator('.history-list li')).to_have_count(4)
+    assert reads[-1]==reads[-2], 'retry requests the same cursor'
+    page.get_by_role('button',name='More summaries',exact=True).click()
+    expect(panel.locator('.history-list li')).to_have_count(5)
+    assert page.get_by_role('button',name='More summaries',exact=True).count()==0
+    for width,height in [(390,844),(1280,900)]:
+        page.set_viewport_size({'width':width,'height':height})
+        page.evaluate('window.scrollTo(0,0)')
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        page.screenshot(path=str(ROOT/f'test-results/music-account-history-{width}.png'),full_page=True)
 
     # Capability off: no save or history controls, and no history requests.
     state['history_enabled'] = False
     posts.clear()
+    before=len(reads)
     page.reload()
-    page.wait_for_selector('.music-home h1', timeout=15000)
+    page.wait_for_selector('.account-email', timeout=15000)
+    assert page.get_by_role('button', name='View all music history', exact=True).count() == 0
+    page.get_by_role('button',name='My moves',exact=False).click()
+    page.get_by_role('button',name='Open History lesson',exact=True).click()
+    page.wait_for_selector('.music-home h1',timeout=15000)
     assert page.get_by_role('button', name='Save summary', exact=True).count() == 0
     assert page.get_by_role('button', name='View music history', exact=True).count() == 0
-    assert posts == []
+    assert posts == [] and len(reads)==before
+    assert errors==[],errors
     browser.close()
-print('PASS: explicit save with stable retry id, private history list and delete, no auto-upload, capability-off hidden.')
+print('PASS: distinct practice-session saves, account pagination and page retry, no auto-reads, explicit save with stable retry id, private history list and delete, no auto-upload, capability-off hidden.')

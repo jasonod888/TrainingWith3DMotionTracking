@@ -247,3 +247,30 @@ TypeScript/production build and bundle check pass. Browser checks for instructor
 movement feed pass. All three lesson-schema artifacts are current. Migration SQL renders
 through 0020; no PostgreSQL migration or physical-device qualification was performed.
 No commit, push, deployed flag change or automatic learner upload was performed.
+
+
+## 10 November 2026: 7d91d58 review and account history continuation
+
+Corrected practice-session save-state reuse, froze save retry payloads, guarded duplicate
+submissions and discarded late callbacks from prior sessions/references. Updated the
+privacy copy to describe explicit aggregate uploads truthfully. Added lazy, explicit
+account-level history at the existing Account destination and paginated lesson history.
+The additive cursor API preserves legacy latest-100 lesson reads. Pages are account-
+scoped and stable across tied dates, deleted boundary rows and newer inserts; unavailable
+lessons show no protected title while personal summaries remain removable. Runtime
+response validation and page retry/stale-read guards protect the private UI.
+
+See `music-history.md` for the new paginated read contracts, save lifecycle evidence
+and remaining qualification work. No new migration, model, scored mode or deployed
+capability was enabled. No automatic upload, new login or movement workflow change.
+Changes in this continuation remain local, uncommitted and not pushed.
+
+
+Verification for this continuation: full configured Python suite **297 passed,
+13 skipped**; web suite **279 passed**. TypeScript/production build, bundle check and
+all three lesson-schema artifacts pass. Browser checks pass for enhanced music history,
+local feedback, instructor review and the movement feed. Phone and desktop history
+screenshots are recorded and the phone layout was visually checked. Initial JS/CSS is
+129,114 gzip bytes; the music screen static closure is 14,046 gzip bytes, within budget.
+No database migration, physical-keyboard test, model installation/qualification, deployed
+flag change, commit or push was performed. Changes remain local and uncommitted.

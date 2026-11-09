@@ -522,3 +522,53 @@ Verification:
 Still open: history in the account destination, pagination beyond the latest 100,
 PostgreSQL verification of migrations 0015–0020, physical-keyboard thresholds and any
 scored rollout. Music processing, sharing and scoring remain disabled.
+
+
+## 10 November 2026: 7d91d58 review and account history continuation
+
+Corrected practice-session save-state reuse, froze save retry payloads, guarded duplicate
+submissions and discarded late callbacks from prior sessions/references. Updated the
+privacy copy to describe explicit aggregate uploads truthfully. Added lazy, explicit
+account-level history at the existing Account destination and paginated lesson history.
+The additive cursor API preserves legacy latest-100 lesson reads. Pages are account-
+scoped and stable across tied dates, deleted boundary rows and newer inserts; unavailable
+lessons show no protected title while personal summaries remain removable. Runtime
+response validation and page retry/stale-read guards protect the private UI.
+
+See `music-history.md` for the new paginated read contracts, save lifecycle evidence
+and remaining qualification work. No new migration, model, scored mode or deployed
+capability was enabled. No automatic upload, new login or movement workflow change.
+Changes in this continuation remain local, uncommitted and not pushed.
+
+
+Verification for this continuation: full configured Python suite **297 passed,
+13 skipped**; web suite **279 passed**. TypeScript/production build, bundle check and
+all three lesson-schema artifacts pass. Browser checks pass for enhanced music history,
+local feedback, instructor review and the movement feed. Phone and desktop history
+screenshots are recorded and the phone layout was visually checked. Initial JS/CSS is
+129,114 gzip bytes; the music screen static closure is 14,046 gzip bytes, within budget.
+No database migration, physical-keyboard test, model installation/qualification, deployed
+flag change, commit or push was performed. Changes remain local and uncommitted.
+
+
+## Verification slice: PostgreSQL 0015–0020 and physical-keyboard gate
+
+10 November 2026. Two deployment gates checked; only one could be executed here.
+
+- **PostgreSQL, executed.** A disposable PostgreSQL 16 container was upgraded from a
+  seeded 0014 body-era schema (account, lesson, revision, failed conversion) to head, and
+  a second empty database was upgraded from zero. Result: version 0020; legacy revision
+  backfilled to `movement_other`/`body`; new draft/review/attempt tables present; the
+  attempt table has the expected UUID primary key and account/lesson/revision FKs; a
+  repeated upgrade was a no-op. Details and limits:
+  [`music-postgresql-verification.md`](music-postgresql-verification.md).
+- **Physical keyboard, not executed.** No MIDI hardware is attached to this environment.
+  A protocol with prerequisites, per-device procedure, proposed pass criteria and evidence
+  shape is recorded in
+  [`music-keyboard-qualification.md`](music-keyboard-qualification.md). No latency,
+  coverage, false-correction or device claim is made.
+
+Not covered by the database run: production-shaped volume, downgrade/recovery rehearsal,
+concurrent quota locking and idempotent retry races. Those remain deployment work, not
+development blockers. Unscored history and local feedback can continue; scoring stays
+disabled until physical qualification and threshold decisions.

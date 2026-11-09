@@ -1,6 +1,6 @@
 # Music history: Phase 6E backend foundation
 
-9 November 2026. **Implemented behind a default-off gate. No history UI or automatic uploads.**
+10 November 2026. **Explicit save and paginated lesson/account history; default-off, unscored, no automatic uploads.**
 
 ## Scope and rollout
 
@@ -147,3 +147,72 @@ and the other music browser checks pass.
 Limits: history is per lesson, not yet in the account destination; there is no pagination
 beyond the API's latest 100; summaries remain client-reported evidence, not scores; and
 the pilot stays disabled in deployment.
+
+
+## 10 November: review of 7d91d58, session-safe saves and account pagination
+
+This section supersedes earlier UI-status/100-row limitations. The existing Account
+screen now offers **View all music history**, gated by `music_history`, and lesson history
+uses the same paginated panel. Reading is explicit: entering Account, opening a lesson,
+finishing practice and connecting MIDI do not open history or upload performance.
+A successful explicit save refreshes a history panel only if the learner already opened
+it. Account/lesson history modules load lazily; capability-off screens keep existing
+movement controls. No second login, scored history or separate account destination.
+
+Fixed a review finding: repeat number and range were reused across separate practice
+sessions, allowing a new performance to inherit "saved" state. Save identity is now
+session-specific, allocated only on explicit save. The first request freezes its payload;
+retries reuse that object and UUID. A synchronous in-flight guard prevents duplicate
+clicks. Changing practice session or reference invalidates UI callbacks from old saves;
+late responses cannot label a new run as saved. A save already accepted by the server
+can still complete after leaving: use history to inspect it; no background save or
+cross-reload retry queue is introduced. The guide now accurately explains that choosing
+Save summary sends an aggregate, instead of always claiming nothing has been sent.
+
+### Additive paginated reads
+
+- `GET /api/music-attempts?limit=20&cursor=...` returns the authenticated account's own
+  summaries across lessons as `{items, next_cursor}`.
+- `GET /api/lessons/{lesson_id}/music-attempts/page?limit=20&cursor=...` returns the same
+  shape scoped to a currently readable lesson. The legacy GET without `/page` remains
+  a latest-100 array, so existing clients retain their contract.
+- Limit is 1–100. Cursors encode the last `(created_at, UUID)` pair; ordering is newest
+  date then descending UUID. Equal timestamps, deleting the cursor row and newer inserts
+  cannot cause the offset-based skips that an offset list would. Newer summaries above
+  the cursor appear on Refresh. Cursor contents are validated but are not permission
+  grants: every query is always scoped to the authenticated account.
+
+Rows add `lesson_id` and an immutable-revision title only when the caller still has the
+relevant lesson access (or owns the active lesson). Archived/revoked/unreadable revisions
+show **Lesson unavailable** without disclosing a lesson title. The learner's own aggregate
+remains available in account history and can be deleted through the existing private
+DELETE route. An instructor still cannot read another learner's history. No protected
+lesson document or media is fetched just to render unavailable history.
+
+Client responses are runtime-validated and copied before rendering. Load More failures
+retain existing rows and retry the same cursor. Refresh/exit invalidates stale reads;
+deletions cannot be overwritten by an older read. Request dates are normalized to UTC.
+Invalid cursors and out-of-range limits return 422. The capability gates both new reads;
+no new table, migration, upload type or scored payload is introduced in this continuation.
+
+Browser evidence covers exact retry payloads, distinct sessions, a delayed save response
+arriving during another session, explicit account reads, unavailable-title display,
+page failure/retry with preserved rows and cursor, page exhaustion, deletion, phone/
+desktop overflow and capability-off no-read behavior. API tests cover tied dates,
+deleted cursor boundaries, newer inserts, account isolation and unavailable lessons.
+
+Next: qualify PostgreSQL migrations/concurrent writes and physical input monitoring in
+parallel. Actual measured observation coverage, assessment spans and device-qualified
+thresholds still gate scoring. Existing unscored summaries must never be reinterpreted
+as grades. Model/commercial artifact qualification remains separate.
+
+
+Verification for this continuation: full configured Python suite **297 passed,
+13 skipped**; web suite **279 passed**. TypeScript/production build, bundle check and
+all three lesson-schema artifacts pass. Browser checks pass for enhanced music history,
+local feedback, instructor review and the movement feed. Phone and desktop history
+screenshots are recorded and the phone layout was visually checked. Initial JS/CSS is
+129,114 gzip bytes; the music screen static closure is 14,046 gzip bytes, within budget.
+No physical-keyboard test, model installation/qualification or deployed flag change was
+performed. Migrations 0015–0020 were exercised separately on a disposable PostgreSQL 16
+database; see [`music-postgresql-verification.md`](music-postgresql-verification.md).
