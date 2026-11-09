@@ -114,3 +114,29 @@ def test_replacement_drafts_do_not_overwrite_assets_and_stale_review_is_refused(
         assert latest.json()['reference']['key']!=frozen
         with Session(app.state.engine) as session:
             assert sorted(row.version for row in session.query(LessonRevision).all())==[1,2]
+
+
+def test_review_can_choose_midi_feedback_without_enabling_scoring_or_publishing(tmp_path):
+    with real_media_app(tmp_path) as (client, app, settings, store, mail):
+        source = media(tmp_path, 'audio')
+        lesson_id, view, lease, base, payload = proposal(client, app, source)
+        body = review_body(view)
+        body['assessment'] = {'assessment': 'notes', 'input_modes': ['midi'],
+                              'dimensions': ['pitch', 'timing'], 'rubric_version': 'piano-midi-v1'}
+        url = '/api/lessons/' + lesson_id + '/music-draft/review'
+        bad = copy.deepcopy(body)
+        bad['assessment']['dimensions'] = ['pitch', 'loudness']
+        assert client.post(url, json=bad).status_code == 422
+        watch_with_midi = copy.deepcopy(body)
+        watch_with_midi['assessment'] = {'assessment': 'none', 'input_modes': ['midi'], 'dimensions': []}
+        assert client.post(url, json=watch_with_midi).status_code == 422
+        response = client.post(url, json=body)
+        assert response.status_code == 200, response.text
+        manifest = response.json()
+        assert manifest['assessment']['assessment'] == 'notes'
+        assert manifest['assessment']['input_modes'] == ['midi']
+        assert manifest['assessment']['dimensions'] == ['pitch', 'timing']
+        assert manifest['assessment']['rubric_version'] == 'piano-midi-v1'
+        assert 'score' not in manifest
+        assert client.post('/api/lessons/' + lesson_id + '/publish', json={'revision_id': manifest['revision_id'],
+            'mode': 'invite', 'reviewed': True, 'rights_acknowledged': True}).status_code == 409

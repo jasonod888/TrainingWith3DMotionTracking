@@ -29,10 +29,10 @@ test('watch-only rubrics and missing input are refused with reasons', () => {
     subject: 'piano', referenceReviewed: true, inputSelected: true, latencyMeasured: true});
   assert.equal(watch.eligible, false);
   assert.match(watch.reasons.join(' '), /no MIDI note rubric/);
-  const good = feedbackEligibility({assessment: {rubric_version: 'x', assessment: 'notes', input_modes: ['midi'], dimensions: []},
+  const good = feedbackEligibility({assessment: {rubric_version: 'piano-midi-v1', assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch','timing']},
     subject: 'piano', referenceReviewed: true, inputSelected: true, latencyMeasured: true});
   assert.equal(good.eligible, true);
-  const noInput = feedbackEligibility({assessment: {rubric_version: 'x', assessment: 'notes', input_modes: ['midi'], dimensions: []},
+  const noInput = feedbackEligibility({assessment: {rubric_version: 'piano-midi-v1', assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch','timing']},
     subject: 'piano', referenceReviewed: true, inputSelected: false, latencyMeasured: false});
   assert.equal(noInput.eligible, false);
   assert.match(noInput.reasons.join(' '), /keyboard input/);
@@ -72,4 +72,26 @@ test('each repeat is analysed independently', () => {
   assert.equal(second.run, 1);
   assert.equal(first.matched, 2);
   assert.equal(second.missing, 1);
+});
+
+
+test('unknown rubrics and unsupported dimensions never enable fixed-policy feedback', () => {
+  const base={subject:'piano', referenceReviewed:true, inputSelected:true, latencyMeasured:true};
+  for(const assessment of [
+    {rubric_version:'future-midi-v2',assessment:'notes',input_modes:['midi'],dimensions:['pitch','timing']},
+    {rubric_version:'piano-midi-v1',assessment:'notes',input_modes:['midi'],dimensions:['pitch','timing','release']},
+    {rubric_version:'piano-midi-v1',assessment:'notes',input_modes:['midi'],dimensions:[]},
+  ]) assert.equal(feedbackEligibility({...base,assessment}).eligible,false);
+  assert.equal(feedback([],{speed:NaN}).status,'invalid');
+  assert.equal(feedback([],{end:5}).status,'invalid');
+});
+
+test('coverage reports how much of the reference has a complete assessment window', () => {
+  const edged = {...reference, events: [...reference.events, {id: 'edge', onset: 0.55, duration: 0.2, pitch: 72, optional: false}]};
+  const result = buildRunFeedback({...base, reference: edged, attacks: [{id: 'x', pitch: 60, sourceTime: 1.0}]});
+  assert.equal(result.total, 4);
+  assert.equal(result.unassessed, 1);
+  assert.equal(result.assessed, 3);
+  assert.equal(result.coverage, 0.75);
+  assert.ok(!result.notes.some(note => note.name === 'C5'), 'an unassessed edge note is not a correction');
 });

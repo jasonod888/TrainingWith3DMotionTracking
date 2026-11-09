@@ -97,7 +97,7 @@ with sync_playwright() as p:
     expect(page.locator('.music-home h1')).to_have_text('Feedback lesson')
     page.get_by_role('button', name='Connect a keyboard', exact=True).click()
     page.get_by_label('Keyboard input').select_option('kbd-1')
-    expect(page.get_by_role('button', name='Measure input delay')).to_be_visible()
+    expect(page.get_by_role('button', name='Estimate timing alignment')).to_be_visible()
     page.get_by_label('Practice section').select_option('intro')
     page.get_by_label('Count-in').select_option('0')
     page.get_by_label('Repeats').select_option('1')
@@ -108,8 +108,9 @@ with sync_playwright() as p:
     page.evaluate('window.playNote(64)')
     page.wait_for_selector('.music-feedback', timeout=15000)
     expect(page.locator('.music-feedback')).to_contain_text('2 matched · 0 missing · 0 extra')
+    expect(page.locator('.music-feedback')).to_contain_text('coverage')
     expect(page.locator('.music-feedback')).to_contain_text('Nothing is saved or sent')
-    expect(page.locator('.music-feedback')).to_contain_text('Input delay was not measured')
+    expect(page.locator('.music-feedback')).to_contain_text('No timing alignment estimate was made')
 
     # A repeat that omits one note produces one missing correction, per repeat.
     page.get_by_role('button', name='Practice again', exact=True).click()
@@ -117,6 +118,36 @@ with sync_playwright() as p:
     page.evaluate('window.playNote(60)')
     page.wait_for_selector('.music-feedback', timeout=15000)
     expect(page.locator('.music-feedback')).to_contain_text('1 missing')
+
+    # Exercise the actual calibration UI. A chord counts as one tap per visual pulse.
+    page.get_by_role('button', name='Close practice', exact=True).click()
+    # React to rendered pulses in-page, avoiding automation polling delay in a 300 ms window.
+    page.evaluate('''() => {
+      window.calibrationPulses=[];window.calibrationTapCount=0;
+      window.pulseObserver=new MutationObserver(()=>{
+        const pulse=Number(document.querySelector('.calibration-pulse strong')?.textContent);
+        const count=Number(document.querySelector('.calibration-pulse small')?.textContent.split(' ')[0]);
+        if(Number.isFinite(count))window.calibrationTapCount=Math.max(window.calibrationTapCount,count);
+        if(pulse>0&&!window.calibrationPulses.includes(pulse)){
+          window.calibrationPulses.push(pulse);window.playNote(60);window.playNote(64);window.playNote(67);
+        }
+      });
+      window.pulseObserver.observe(document.querySelector('.music-home'),{childList:true,subtree:true,characterData:true});
+    }''')
+    page.get_by_role('button', name='Estimate timing alignment', exact=True).click()
+    expect(page.get_by_role('button', name='Start practice', exact=True)).to_be_disabled()
+    page.wait_for_function('window.calibrationTapCount===8')
+    assert page.evaluate('window.calibrationPulses') == list(range(1, 9))
+    page.evaluate('window.pulseObserver.disconnect()')
+    expect(page.get_by_role('region', name='Timing alignment')).to_contain_text('Estimated personal alignment:')
+    expect(page.get_by_role('region', name='Timing alignment')).to_contain_text('hardware latency is not measured')
+    page.get_by_role('button', name='Measure again', exact=True).click()
+    page.get_by_role('button', name='Estimate timing alignment', exact=True).click()
+    expect(page.locator('.calibration-pulse')).to_be_visible()
+    page.get_by_label('Keyboard input').select_option('')
+    expect(page.locator('.calibration-pulse')).to_have_count(0)
+    page.wait_for_timeout(900)
+    assert 'Estimated personal alignment:' not in page.locator('.input-delay').inner_text()
 
     # A watch-only rubric never produces feedback.
     watch_manifest = {**manifest, 'assessment': watch}

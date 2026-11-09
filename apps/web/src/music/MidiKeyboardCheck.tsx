@@ -12,7 +12,7 @@ export function MidiKeyboardCheck({onSnapshot,onInputChange,onAttack}:{onSnapsho
  const snapshotCallback=useRef(onSnapshot),inputCallback=useRef(onInputChange),attackCallback=useRef(onAttack);snapshotCallback.current=onSnapshot;inputCallback.current=onInputChange;attackCallback.current=onAttack;
  const supported=window.isSecureContext&&typeof navigator.requestMIDIAccess==='function';
  const clear=()=>{const snapshot=state.current.reset();setNotes(snapshot);snapshotCallback.current?.(snapshot);};
- useEffect(()=>{inputCallback.current?.(selected);},[selected]);
+ useEffect(()=>{inputCallback.current?.('');},[selected]);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;requestEpoch.current++;};},[]);
  useEffect(()=>{
   if(!access)return;
@@ -24,9 +24,9 @@ export function MidiKeyboardCheck({onSnapshot,onInputChange,onAttack}:{onSnapsho
   const input=inputs.find(item=>item.id===selected);let stopped=false;
   clear();
   if(!input)return;
-  const receive=(event:MIDIMessageEvent)=>{if(stopped||document.hidden||!event.data)return;const [status,pitch,velocity]=event.data;if((status&0xf0)===0x90&&velocity>0)attackCallback.current?.({pitch,timeStamp:event.timeStamp});const snapshot=state.current.receive(event.data);setNotes(snapshot);snapshotCallback.current?.(snapshot);};
+  const receive=(event:MIDIMessageEvent)=>{if(stopped||document.hidden||!event.data)return;const [status,pitch,velocity]=event.data;if(event.data.length===3&&status>=0x90&&status<=0x9f&&pitch<=127&&velocity>0&&velocity<=127)attackCallback.current?.({pitch,timeStamp:event.timeStamp});const snapshot=state.current.receive(event.data);setNotes(snapshot);snapshotCallback.current?.(snapshot);};
   void input.open().then(()=>{if(stopped){if(!alive.current||selectedRef.current!==input.id)void input.close().catch(()=>{});return;}
-   opened.current=input;input.addEventListener('midimessage',receive);setMessage('Play a note to check this keyboard. This is not a scored exercise.');
+   opened.current=input;input.addEventListener('midimessage',receive);inputCallback.current?.(input.id);setMessage('Play a note to check this keyboard. This is not a scored exercise.');
   }).catch(()=>{if(!stopped){setSelected('');setMessage('This keyboard could not be opened. Choose another input or reconnect it.');}});
   return()=>{stopped=true;input.removeEventListener('midimessage',receive);if(opened.current===input)opened.current=null;void input.close().catch(()=>{});};
  },[selected,inputs]);

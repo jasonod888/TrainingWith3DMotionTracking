@@ -67,11 +67,13 @@ with sync_playwright() as p:
             if len(saves)==1:route.fulfill(status=503,json={'detail':'Temporary save failure. Try again.'});return
             assert payload==saves[0], 'Save retry must retain the same review identity and corrections'
             assert payload['events'][0]['pitch']==62 and payload['confirm_reviewed'] is True
+            assert payload['assessment']==dict(assessment='notes',input_modes=['midi'],dimensions=['pitch','timing'],rubric_version='piano-midi-v1')
             assert len(payload['sections'])==2
             manifest=json.loads((ROOT/'packages/lesson-schema/fixtures/music-v2.json').read_text())
             manifest.update(lesson_id=lesson_id,revision_id='reviewed-v1',title='Reviewed piano',duration=2,
                             source_video=source_asset,section_set=dict(id='reviewed-sections',revision=1,duration=2,sections=payload['sections']),
-                            assessment=dict(rubric_version='music-watch-v1',assessment='none',input_modes=['none'],dimensions=[]))
+                            assessment=dict(rubric_version=payload['assessment']['rubric_version'],assessment=payload['assessment']['assessment'],
+                            input_modes=payload['assessment']['input_modes'],dimensions=payload['assessment']['dimensions']))
             ref=dict(reference_version=1,subject='piano',instrument={'instrument':'piano'},duration=2,events=payload['events'],spans=payload['spans'],review=dict(reviewer_id='fixture-owner',reviewed_at='2026-11-05T12:00:00Z',draft_id='fixture',source_reference_sha256='a'*64))
             raw=json.dumps(ref).encode();manifest['reference']=dict(key=f'lessons/{lesson_id}/reference.json',mime='application/json',bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
             state.update(reviewed=True,manifest=manifest,reference_bytes=raw);route.fulfill(json=manifest)
@@ -85,6 +87,8 @@ with sync_playwright() as p:
     expect(page.get_by_label('Note 1 pitch',exact=True)).to_have_value('60')
     expect(page.get_by_label('Instructor video for reference review',exact=True)).to_be_visible()
     page.get_by_label('Lesson title',exact=True).fill('Reviewed piano')
+    page.get_by_role('radio',name='MIDI note feedback (unscored)',exact=True).check()
+    expect(page.get_by_role('radio',name='MIDI note feedback (unscored)',exact=True)).to_be_checked()
     page.get_by_label('Note 1 pitch',exact=True).select_option('62')
     page.get_by_role('button',name='Add section',exact=True).click()
     confirm=page.get_by_role('checkbox',name='I have checked the notes and teaching sections against the instructor material.',exact=True)
@@ -107,6 +111,7 @@ with sync_playwright() as p:
     page.get_by_role('button',name='Save reviewed reference',exact=True).click()
     expect(page.locator('.music-home h1')).to_have_text('Reviewed piano')
     assert len(saves)==2 and page.evaluate('window.deviceRequests')==[]
+    assert saves[1]['assessment']['assessment']=='notes' and saves[1]['assessment']['input_modes']==['midi']
     assert errors==[],errors
     browser.close()
 print('PASS: existing feed entry, deep-link refresh, video review, corrected notes/sections, confirmation reset, save retry and private preview; no device requests.')

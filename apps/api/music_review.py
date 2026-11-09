@@ -6,7 +6,7 @@ from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,26 @@ from .permissions import accept_revision, latest_revision, owned_lesson
 from .storage import storage_client
 
 
+class ReviewAssessment(Contract):
+    """Instructor-chosen assessment policy. It never enables scoring or publication."""
+    assessment: Literal['none', 'notes'] = 'none'
+    input_modes: list[Literal['none', 'midi']] = Field(default_factory=list, max_length=2)
+    dimensions: list[Literal['pitch', 'timing']] = Field(default_factory=list, max_length=2)
+    rubric_version: str = Field(default='music-watch-v1', max_length=80)
+
+    @model_validator(mode='after')
+    def supported(self):
+        if self.assessment == 'none':
+            if self.input_modes not in ([], ['none']) or self.dimensions or self.rubric_version != 'music-watch-v1':
+                raise ValueError('A watch-only policy takes no input modes or dimensions.')
+        else:
+            if self.input_modes != ['midi'] or not self.dimensions or self.rubric_version != 'piano-midi-v1':
+                raise ValueError('MIDI feedback requires midi input, pitch/timing dimensions and piano-midi-v1.')
+            if len(set(self.dimensions)) != len(self.dimensions):
+                raise ValueError('Assessment dimensions must be unique.')
+        return self
+
+
 class ReviewMusic(Contract):
     draft_id: str = Field(min_length=1,max_length=80)
     reference_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
@@ -26,6 +46,7 @@ class ReviewMusic(Contract):
     spans: list[MusicSpan] = Field(max_length=500)
     sections: list[Section] = Field(min_length=1,max_length=500)
     confirm_reviewed: Literal[True]
+    assessment: ReviewAssessment = Field(default_factory=ReviewAssessment)
 
 
 def canonical(value):
@@ -52,6 +73,8 @@ def install_music_review(app,settings,identity,db):
         newest=session.scalar(select(MusicDraft).where(MusicDraft.lesson_id==lesson_id)
                               .order_by(MusicDraft.created_at.desc(),MusicDraft.id.desc()))
         if newest.id!=row.id or row.status!='draft':raise HTTPException(409,'A newer draft is available. Reopen the review.')
+        if body.assessment.assessment=='notes' and row.subject!='piano':
+            raise HTTPException(422,'MIDI feedback is only available for piano lessons.')
         if row.document['reference']['sha256']!=body.reference_sha256:
             raise HTTPException(409,'The draft changed. Reopen the review.')
         try:
@@ -81,7 +104,8 @@ def install_music_review(app,settings,identity,db):
         manifest=MusicLessonManifest(lesson_id=lesson_id,revision_id=uuid4().hex,title=body.title.strip() or lesson.title,
             subject=proposal.subject,duration=proposal.duration,instrument=proposal.instrument,
             section_set=sections,reference=asset,reference_reviewed=True,source_video=proposal.source_video,
-            assessment=AssessmentPolicy(rubric_version='music-watch-v1',assessment='none',input_modes=['none'],dimensions=[]),
+            assessment=AssessmentPolicy(rubric_version=body.assessment.rubric_version,assessment=body.assessment.assessment,
+                input_modes=body.assessment.input_modes or ['none'],dimensions=body.assessment.dimensions),
             warnings=proposal.warnings)
         revision=LessonRevision(id=manifest.revision_id,lesson_id=lesson_id,version=version,
             manifest=manifest.model_dump(),subject=proposal.subject,experience_family='music',instrument=proposal.subject)
@@ -92,7 +116,7 @@ def install_music_review(app,settings,identity,db):
         session.add(MusicReview(id=uuid4().hex,draft_id=row.id,lesson_id=lesson_id,revision_id=revision.id,
             reviewer_id=account.id,reviewed_at=reviewed_at,document={'request_sha256':request_hash,
                 'source_reference_sha256':body.reference_sha256,'reviewed_reference_sha256':digest,
-                'provenance':proposal.provenance.model_dump()}))
+                'provenance':proposal.provenance.model_dump(),'assessment':body.assessment.model_dump()}))
         accept_revision(session,lesson,revision,account.id,warnings=proposal.warnings,source='music-review')
         row.status='reviewed'
         session.commit()

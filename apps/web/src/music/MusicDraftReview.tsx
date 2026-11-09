@@ -11,6 +11,7 @@ const noteName=(pitch:number)=>`${['C','C♯','D','E♭','E','F','F♯','G','A�
 export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:string;onBack:()=>void;onReviewed:(lesson:MusicLessonManifest)=>void;onDirty:(dirty:boolean)=>void}){
  const [draft,setDraft]=useState<MusicDraftView|null>(null),[events,setEvents]=useState<MusicDraftEvent[]>([]),[sections,setSections]=useState<Section[]>([]),[title,setTitle]=useState('');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[confirmed,setConfirmed]=useState(false),[page,setPage]=useState(0),[retry,setRetry]=useState(0);
+ const [policy,setPolicy]=useState<'none'|'notes'>('none');
  const video=useRef<HTMLVideoElement>(null),alive=useRef(true);
  useEffect(()=>{alive.current=true;let stopped=false;setError('');setDraft(null);
   request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft`).then(value=>{
@@ -26,6 +27,8 @@ export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:
  const save=async()=>{if(!draft||!confirmed||busy)return;setBusy(true);setError('');
   try{const result=await request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft/review`,'POST',{
    draft_id:draft.draft_id,reference_sha256:draft.reference.sha256,title,events,spans:draft.spans,sections,confirm_reviewed:true,
+   assessment:policy==='notes'?{assessment:'notes',input_modes:['midi'],dimensions:['pitch','timing'],rubric_version:'piano-midi-v1'}
+     :{assessment:'none',input_modes:['none'],dimensions:[],rubric_version:'music-watch-v1'},
   });const parsed=parseMusicLessonManifest(result);if(!parsed.ok)throw new Error(parsed.message);if(alive.current){onDirty(false);onReviewed(parsed.value);}}
   catch(e){if(alive.current)setError((e as Error).message);}finally{if(alive.current)setBusy(false);}
  };
@@ -39,6 +42,11 @@ export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:
    {draft.source_video?<video ref={video} src={assetUrl(draft.source_video.key)} controls playsInline preload="metadata" aria-label="Instructor video for reference review"/>:<p className="inline-notice">Instructor video is unavailable for this older draft.</p>}
    <form onSubmit={event=>{event.preventDefault();void save();}}>
     <label>Lesson title<input required maxLength={200} value={title} disabled={busy} onChange={e=>{changed();setTitle(e.target.value);}}/></label>
+    <fieldset className="music-review-policy"><legend>Assessment</legend>
+     <label className="review-checkbox"><input type="radio" name="assessment" checked={policy==='none'} disabled={busy} onChange={()=>{changed();setPolicy('none');}}/>Watch only — no feedback</label>
+     <label className="review-checkbox"><input type="radio" name="assessment" checked={policy==='notes'} disabled={busy} onChange={()=>{changed();setPolicy('notes');}}/>MIDI note feedback (unscored)</label>
+     {policy==='notes'?<p className="small muted">Local pitch and timing corrections only. No score, grade, upload or persistence. Requires a connected MIDI keyboard; scoring stays disabled.</p>:<p className="small muted">Learners watch and use the guide; no corrections are produced.</p>}
+    </fieldset>
     <h2>Proposed notes</h2><p>{events.length} notes. Changes reset the review confirmation.</p>
     <div className="music-review-notes">{events.slice(page*PAGE_SIZE,(page+1)*PAGE_SIZE).map((event,i)=>{const index=page*PAGE_SIZE+i;return <fieldset key={event.id} disabled={busy}><legend>Note {index+1}</legend>
      <label>Note<select aria-label={`Note ${index+1} pitch`} value={event.pitch} onChange={e=>edit(index,{pitch:Number(e.target.value)})}>{Array.from({length:128},(_,pitch)=><option key={pitch} value={pitch}>{noteName(pitch)}</option>)}</select></label>

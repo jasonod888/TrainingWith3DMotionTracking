@@ -1,6 +1,6 @@
 # Piano MIDI: setup pilot and next scoring phases
 
-5 November 2026. **Setup only; no grading or attempt persistence.**
+Updated 9 November 2026. **Local unscored feedback; no grades or attempt persistence.**
 
 ## Delivered: Phase 6A input setup
 
@@ -50,21 +50,25 @@ timestamps to that same timeline and compensate measured latency before any feed
 
 Feedback is produced only for an **explicitly MIDI-enabled piano rubric**:
 
-1. the lesson's reviewed assessment is `notes` and lists `midi` input;
+1. the reviewed assessment uses supported `piano-midi-v1`, `notes`, `midi` input and exactly the implemented `pitch`/`timing` dimensions;
 2. the reviewed reference is loaded and bound to its reviewed hash;
-3. the learner has explicitly started practice and selected one connected input;
+3. the learner has explicitly started practice and selected one input whose port has opened successfully;
 4. the repeat is fully observed — seek, stop, hidden page or input replacement discards it.
 
-Each repeat gets its own run clock (`wallStartMs`, reviewed range, speed, measured latency).
+Each repeat gets its own run clock (`wallStartMs`, reviewed range, speed, timing offset).
 Attacks use `MIDIMessageEvent.timeStamp`, so simultaneous chord notes are individual
-events, and are converted to reviewed source time with the measured input delay. Matching
+events, and are converted to reviewed source time with the optional personal alignment estimate. Matching
 reuses `matchOnsets`: one-to-one, exact pitch, required notes first, optional notes can
 absorb input but never create missing-note corrections, edge notes unassessed.
 
-`calibrateLatency` starts an eight-pulse visual calibration; at least four taps are
-required and the clamped median (0–300 ms) becomes the session's measured delay. Without a
-measurement, feedback still appears but is labelled approximate; timing corrections use
-the unmeasured value 0.
+The UI offers eight visual alignment pulses. At least four distinct pulses need taps;
+chords/double taps contribute only one sample per pulse. `calibrateLatency` filters
+offsets to 0–300 ms and returns the median. This is a personal timing estimate including
+human reaction/anticipation, not a hardware-latency measurement. Feedback stays
+approximate even after alignment. Without an estimate the offset is 0. Switching inputs,
+hiding/leaving the page or changing the reference cancels calibration and its pending
+completion timer. Input replacement/reference changes clear the estimate. Practice and
+alignment cannot run together.
 
 The feedback contract (`apps/web/src/music/music-feedback.ts`) reports per repeat: matched,
 missing, extra and unassessed counts plus corrected note names and early/late/on-time
@@ -72,9 +76,34 @@ direction. It has no score, percentage or grade, and it is never uploaded, persi
 turned into an attempt.
 
 Limits: only piano lessons with an explicit MIDI rubric are eligible; no latency
-qualification on physical hardware; feedback remains approximate until calibrated; the
-calibration UI is not yet exercised end-to-end in a browser check (its maths is unit
-tested).
+qualification on physical hardware; feedback remains approximate after visual alignment.
+The calibration UI now has browser coverage for eight pulses, duplicate-tap suppression
+and input-change cancellation. No score or persistent attempt is produced.
+
+## Delivered: instructor assessment policy and observation coverage
+
+The owner review screen now includes an **Assessment** choice:
+
+- **Watch only** (default): no corrections are produced.
+- **MIDI note feedback (unscored)**: the saved review carries `assessment: notes`,
+  `input_modes: [midi]`, dimensions `pitch` and `timing`, and rubric `piano-midi-v1`.
+
+The server validates the policy: MIDI feedback is piano-only, requires `midi` input,
+the two implemented dimensions and the supported rubric; watch-only refuses input modes
+and dimensions. The policy is stored in the reviewed manifest and in the review audit
+record (`MusicReview.document.assessment`), and it is part of the idempotency fingerprint.
+Saving still does not publish, score or persist attempts.
+
+Feedback now reports **observation coverage** per repeat: matched, missing, extra,
+assessed/total notes and the coverage fraction. Notes near a section edge without a
+complete tolerance window are `unassessed`; they never become corrections. Optional notes
+still never produce missing-note corrections. The Phase 6D readiness foundation
+(`packages/music-engine/scoring-readiness.ts`) remains unused for grading: the editor does
+not pretend that a saved policy is physically qualified or scoreable.
+
+Limits: the policy is chosen during review; editing an already reviewed policy is not
+implemented, readiness thresholds are not enforced in the editor, and no physical-keyboard
+qualification has been run. Scores, grades and attempts remain disabled.
 
 ## Remaining implementation phases
 
@@ -82,7 +111,7 @@ tested).
 | --- | --- |
 | 6B: music practice controller | **Delivered 5 November 2026**: count-in, whole-lesson/section practice, four speed presets, repeat and clean reset; MIDI input remains optional and unscored. |
 | 6C: opt-in local feedback | **Delivered 5 November 2026**: explicit gate, per-repeat timestamped capture, latency calibration and one-to-one corrections; unscored and local. Physical-device latency and coverage thresholds remain. |
-| 6D: trustworthy scoring | Review assessable spans and exercise-specific limits before scoring. Current generic passage spans are not proof of assessability. Disconnects, hidden pages, seeks and dropped observations invalidate affected evidence rather than marking the learner wrong. Establish coverage/false-correction thresholds on physical keyboards. Watch-only manifests stay unscored. |
+| 6D: trustworthy scoring | **Partly delivered 9 November 2026**: instructor assessment-policy choice, per-repeat observation coverage and edge-note handling. Physical-device qualification, enforced thresholds and false-correction measurements remain. |
 | 6E: persistence and rollout | Add a separately versioned, bounded music-attempt contract tied to reference hash, revision and rubric. Reuse the account/history destination without changing pose-attempt payloads. Avoid stable device identifiers and raw performance uploads by default. Qualify browsers/devices and gated deployment before a learner rollout. |
 
 These slices can proceed while PostgreSQL and model/device qualification run. None of the
@@ -97,6 +126,7 @@ musical technique or model accuracy. Microphone assessment remains a separate fu
   explicit permission, selected-input isolation, sustain, device switching/disconnect,
   hidden-page/exit cleanup, denied and late permission, unsupported browsers and no media,
   progress or attempt requests. It is not hardware qualification.
+- `scripts/verify_music_review.py` covers choosing the MIDI policy, save retry with the same policy and private preview; the server tests cover policy validation and publishing refusal.
 - `scripts/verify_music_feedback.py` covers matching and missing corrections per repeat for a MIDI rubric, the approximate-delay notice, and watch-only lessons staying ungraded with no persistence calls.
 - `scripts/verify_music_practice.py` covers count-in, section practice, repeats, completion and clean reset on seek, plus attack counting with a virtual keyboard; no media or attempt requests.
 - Guide browser checks also cover failed-video fallback, replay after end, hidden-page
@@ -149,3 +179,39 @@ Verification for this continuation: 267 web tests; TypeScript/build and bundle c
 practice, MIDI lifecycle and guide Playwright scripts. The practice script additionally
 checks hiding without a keyboard and three synchronous attacks (no React batching loss).
 No API/schema change, model selection, deployment, commit or push was performed.
+
+
+## 9 November continuation: feedback corrections and 6D readiness foundation
+
+Reviewed `de094a9`; continued development is supported. Run timing now starts at the
+practice action (including count-in off), and repeat clocks account for transition
+overshoot instead of starting late at a rendering frame. A frame gap over 250 ms aborts
+analysis instead of manufacturing missing notes from a stalled timeline. Input is bounded
+to 20,000 valid attacks per repeat. Unknown rubric versions or unsupported dimensions
+cannot reuse fixed note-feedback tolerances.
+
+`packages/music-engine/scoring-readiness.ts` is an **unused, pure Phase 6D foundation**.
+It returns readiness reasons and observed coverage, never a grade. Its policy binds an
+exact reference hash/revision/rubric, explicitly reviewed assessment spans, allowed
+speeds, minimum required notes, maximum polyphony and a coverage threshold. Coverage
+uses interval unions, so overlapping samples/passages cannot inflate evidence. Empty
+assessment coverage, interrupted runs, visual-only alignment, unqualified policy and
+identity/exercise-limit mismatches all refuse readiness.
+
+The caller must derive note/polyphony counts and observation intervals from verified
+reference and run evidence; the helper does not certify supplied data or qualification
+flags. Test thresholds and qualified flags are synthetic fixtures, not approved production
+policies. No policy was qualified, authored through the instructor UI or connected to a
+score. Existing teaching spans must not be substituted for assessment spans.
+
+Next: add the separately versioned instructor assessment-policy contract/editor and
+collect actual input-observation coverage. Choose and validate exercise thresholds and
+timing evidence with physical keyboards, then connect the readiness checks behind a
+scoring gate. The bounded persistence contract can be designed alongside this work;
+no saved grade should precede evidence qualification.
+
+Verification: **276 web tests**, TypeScript/production build and bundle checks pass.
+Feedback browser coverage includes calibration and cancellation; practice, MIDI lifecycle
+and guide regression checks pass. No server/schema changes; Python tests were not rerun
+(previous reported result: 292 passed, 13 skipped). Processing/sharing/scoring stay
+disabled. Changes in this continuation are local and uncommitted; nothing was pushed.

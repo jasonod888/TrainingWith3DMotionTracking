@@ -15,17 +15,21 @@ export function feedbackEligibility(input: {
   const reasons: string[] = [];
   if (input.assessment.assessment !== 'notes') reasons.push('This lesson has no MIDI note rubric.');
   if (!(input.assessment.input_modes ?? []).includes('midi')) reasons.push('This lesson does not accept MIDI input.');
+  if (input.assessment.rubric_version !== 'piano-midi-v1' ||
+      !input.assessment.dimensions.includes('pitch') || !input.assessment.dimensions.includes('timing') ||
+      input.assessment.dimensions.some(dimension => dimension !== 'pitch' && dimension !== 'timing'))
+    reasons.push('This rubric version or its dimensions are not supported by local note feedback.');
   if (input.subject !== 'piano') reasons.push('MIDI feedback is only available for piano lessons.');
   if (!input.referenceReviewed) reasons.push('The reference is not reviewed.');
   if (!input.inputSelected) reasons.push('Choose a connected keyboard input.');
   return {
     eligible: reasons.length === 0,
     reasons,
-    warnings: input.latencyMeasured ? [] : ['Input delay has not been measured, so timing feedback is approximate.'],
+    warnings: ['Timing feedback is approximate. Visual tapping estimates personal alignment, not hardware latency.'],
   };
 }
 
-/** Median measured offset, clamped to a plausible input delay. Requires at least four taps. */
+/** Median personal alignment estimate. Visual taps include human anticipation/reaction. */
 export function calibrateLatency(samples: number[]): number {
   const valid = samples.filter(value => Number.isFinite(value) && value >= 0 && value <= 300);
   if (valid.length < 4) throw new Error('Play at least four notes with the pulses to measure delay.');
@@ -54,13 +58,16 @@ export type MusicFeedback = {
   missing: number;
   extra: number;
   unassessed: number;
+  total: number;
+  assessed: number;
+  coverage: number;
   latencyMeasured: boolean;
   notes: FeedbackNote[];
 };
 
 export function invalidFeedback(reason: string, run: number, sectionId: string): MusicFeedback {
   return {version: 1, status: 'invalid', reason, run, sectionId, window: {start: 0, end: 0},
-    matched: 0, missing: 0, extra: 0, unassessed: 0, latencyMeasured: false, notes: []};
+    matched: 0, missing: 0, extra: 0, unassessed: 0, total: 0, assessed: 0, coverage: 0, latencyMeasured: false, notes: []};
 }
 
 /**
@@ -79,6 +86,9 @@ export function buildRunFeedback(input: {
   latencyMeasured: boolean;
   tolerance?: number;
 }): MusicFeedback {
+  if (!Number.isFinite(input.speed) || input.speed <= 0 || !Number.isFinite(input.latencyMs) || input.latencyMs < 0 || input.latencyMs > 300 ||
+      !Number.isInteger(input.run) || input.run < 0 || input.start < 0 || input.end > input.reference.duration)
+    return invalidFeedback('Invalid run evidence.', input.run, input.sectionId);
   const tolerance = input.tolerance ?? 0.15;
   const window = {start: input.start, end: input.end};
   const expected: ExpectedAttack[] = input.reference.events
@@ -107,9 +117,11 @@ export function buildRunFeedback(input: {
     if (attack) notes.push({status: 'extra', pitch: attack.pitch, name: pitchName(attack.pitch), optional: false, errorSeconds: null, timing: null});
   }
   notes.sort((left, right) => (left.errorSeconds ?? 0) - (right.errorSeconds ?? 0) || left.pitch - right.pitch);
+  const total = expected.length, assessed = total - result.unassessed;
   return {version: 1, status: 'complete', reason: null, run: input.run, sectionId: input.sectionId,
     window, matched: result.matches.length, missing: result.missing.length, extra: result.extra.length,
-    unassessed: result.unassessed, latencyMeasured: input.latencyMeasured, notes};
+    unassessed: result.unassessed, total, assessed, coverage: total ? assessed / total : 0,
+    latencyMeasured: input.latencyMeasured, notes};
 }
 
 export type {Attack, RunClock};

@@ -411,3 +411,57 @@ Verification for this slice:
 Next: 6D trustworthy scoring (assessable spans, exercise limits, coverage and
 false-correction thresholds on physical keyboards), then 6E bounded persistence. Model
 qualification and PostgreSQL verification continue alongside.
+
+
+## 9 November 2026: de094a9 feedback review and Phase 6D foundation
+
+Completed the interrupted continuation. Supported rubric version/dimensions are now
+checked; input eligibility waits for a successfully opened MIDI port. Corrected the
+run origin and transition clocks, bounded attack evidence, and discarded long timing
+stalls. Visual tapping is accurately labelled a personal timing alignment estimate,
+not measured hardware latency. One sample is accepted per pulse. Calibration and its
+pending completion timeout cancel on input/reference changes, page hiding and exit;
+practice cannot start during calibration.
+
+Added an unused pure scoring-readiness helper: exact policy/reference identity,
+explicit assessment spans, unioned observation coverage, speed/polyphony/note limits,
+interruption refusal and qualified timing/policy evidence. It returns readiness/reasons,
+not scores, and is not integrated with lesson manifests or attempts. No real device,
+model, scoring policy or deployment was qualified by these tests.
+
+276 web tests; TypeScript/build and bundle pass. Feedback, practice, MIDI lifecycle
+and guide browser checks pass, including eight calibration pulses, duplicate-tap
+suppression and cancellation. No API/schema changes or Python-suite rerun. See
+`piano-midi-practice.md` for the remaining policy/coverage/qualification work. Changes
+are local and uncommitted; no commit or push performed.
+
+
+## Implementation slice: instructor assessment policy and coverage
+
+9 November 2026. Review-screen policy editor and per-repeat coverage reporting. Scoring,
+sharing and persistence remain disabled.
+
+- **Policy editor.** The owner review screen offers **Watch only** (default) or **MIDI
+  note feedback (unscored)**. The server validates the policy (piano-only, `midi` input,
+  `pitch`/`timing`, `piano-midi-v1`; watch-only rejects inputs/dimensions), stores it in
+  the reviewed manifest and review audit record, and includes it in the idempotency
+  fingerprint. Saving still cannot publish or score.
+- **Coverage.** Each repeat reports assessed/total notes and coverage; edge notes without
+  a complete tolerance window are unassessed and never corrections. Optional notes never
+  become missing corrections. The 6D readiness helper stays a non-grading foundation.
+
+Verification for this slice:
+
+| Check | Result |
+| --- | --- |
+| Full API suite | **293 passed, 13 skipped** |
+| Web suite | **277 passed** |
+| TypeScript / build / bundle | Clean; bundle within budget |
+| `verify_music_review.py` | **Passed**, now selecting the MIDI policy and asserting it in the saved request |
+| `verify_music_feedback.py` | **Passed** with coverage text |
+| Practice / MIDI / guide / screen checks | **Passed** |
+| Policy validation | Server tests: notes policy saved without publishing; invalid dimensions and watch-with-midi refused |
+
+Still open: editing a policy after review, enforced readiness thresholds and physical-
+keyboard qualification (latency, coverage, false corrections), then 6E bounded
+persistence. Model and PostgreSQL qualification continue alongside.
