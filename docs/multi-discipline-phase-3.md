@@ -465,3 +465,60 @@ Verification for this slice:
 Still open: editing a policy after review, enforced readiness thresholds and physical-
 keyboard qualification (latency, coverage, false corrections), then 6E bounded
 persistence. Model and PostgreSQL qualification continue alongside.
+
+
+## 9 November 2026: 97c73a3 review and Phase 6E backend foundation
+
+Corrected MIDI assessment validation to require both pitch/timing, guitar review policy
+availability and Watch-only reset on new drafts. Reworded reference-note eligibility so
+it cannot be mistaken for measured observation coverage. Added music-family refusal to
+the pose history routes without changing the pose-v1 contract or movement quota.
+
+New `music_attempts.py` and migration 0020 provide separate, bounded, default-off,
+account-private unscored music summaries. Exact reference/revision/rubric binding,
+explicit save, complete-only status, strict count bounds, UUID idempotency, separate
+5,000-account quota, and personal read/delete are enforced. Results are labelled
+client-reported. Raw MIDI, device identifiers, scored payloads and arbitrary fields are
+refused. No client UI/automatic save or live deployment was enabled.
+
+See `music-history.md` for the contract and next steps. PostgreSQL legacy-data migration
+verification now includes 0020. Physical-device evidence, observed-input coverage and
+qualified thresholds still gate scoring. Model qualification continues separately.
+Changes in this continuation remain local, uncommitted and not pushed.
+
+
+Verification of the 97c73a3 continuation: full configured Python suite **296 passed,
+13 skipped**; latest complete-only history checks **3 passed**; web suite **277 passed**.
+TypeScript/production build and bundle check pass. Browser checks for instructor review
+(including guitar policy availability), local feedback/reference-window wording and the
+movement feed pass. All three lesson-schema artifacts are current. Migration SQL renders
+through 0020; no PostgreSQL migration or physical-device qualification was performed.
+No commit, push, deployed flag change or automatic learner upload was performed.
+
+
+## Implementation slice: explicit music summary save and history UI
+
+9 November 2026. Client controls for the existing default-off history API.
+
+- **Save summary.** A completed analysed repeat offers an explicit Save summary only when
+  the `music_history` capability is on and the local feedback gate is met. No automatic
+  upload occurs. Retries reuse the same UUID and payload; success/error/retry states are
+  inline.
+- **History.** View music history loads the caller's own latest summaries on demand with
+  date, run, section, speed and client-reported counts; Delete removes the caller's row.
+  Capability-off hides both controls and makes no history request.
+- The guide continues to describe feedback as local, unscored and client-reported.
+
+Verification:
+
+| Check | Result |
+| --- | --- |
+| Full API suite | **296 passed, 13 skipped** |
+| Web suite | **277 passed** |
+| TypeScript / build / bundle | Clean; within budget |
+| `verify_music_history.py` | **Passed**: explicit save, stable retry id after 503, history list, delete, no auto-upload, capability-off hidden |
+| Feedback / review / practice / MIDI / guide checks | **Passed** |
+
+Still open: history in the account destination, pagination beyond the latest 100,
+PostgreSQL verification of migrations 0015–0020, physical-keyboard thresholds and any
+scored rollout. Music processing, sharing and scoring remain disabled.

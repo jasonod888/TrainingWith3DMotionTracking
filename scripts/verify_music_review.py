@@ -83,6 +83,7 @@ with sync_playwright() as p:
     page.goto(os.environ.get('PRACTICE_TEST_URL','http://127.0.0.1:5196')+'/')
     page.get_by_role('button',name='Review music',exact=True).click()
     expect(page.get_by_role('heading',name='Review your music reference',exact=True)).to_be_visible()
+    review_url=page.url
     page.reload()  # the dedicated owner review destination survives refresh
     expect(page.get_by_label('Note 1 pitch',exact=True)).to_have_value('60')
     expect(page.get_by_label('Instructor video for reference review',exact=True)).to_be_visible()
@@ -112,6 +113,12 @@ with sync_playwright() as p:
     expect(page.locator('.music-home h1')).to_have_text('Reviewed piano')
     assert len(saves)==2 and page.evaluate('window.deviceRequests')==[]
     assert saves[1]['assessment']['assessment']=='notes' and saves[1]['assessment']['input_modes']==['midi']
+    # A guitar review defaults to watch-only and cannot select the piano-only policy.
+    state['reviewed']=False
+    draft['subject']='guitar';draft['instrument']={'instrument':'guitar'}
+    page.goto(review_url)
+    expect(page.get_by_role('radio',name='Watch only — no feedback',exact=True)).to_be_checked()
+    expect(page.get_by_role('radio',name='MIDI note feedback (unscored)',exact=True)).to_be_disabled()
     assert errors==[],errors
     browser.close()
 print('PASS: existing feed entry, deep-link refresh, video review, corrected notes/sections, confirmation reset, save retry and private preview; no device requests.')

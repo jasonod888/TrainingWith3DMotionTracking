@@ -108,7 +108,7 @@ with sync_playwright() as p:
     page.evaluate('window.playNote(64)')
     page.wait_for_selector('.music-feedback', timeout=15000)
     expect(page.locator('.music-feedback')).to_contain_text('2 matched · 0 missing · 0 extra')
-    expect(page.locator('.music-feedback')).to_contain_text('coverage')
+    expect(page.locator('.music-feedback')).to_contain_text('2 of 2 notes eligible for comparison (100% of reference notes)')
     expect(page.locator('.music-feedback')).to_contain_text('Nothing is saved or sent')
     expect(page.locator('.music-feedback')).to_contain_text('No timing alignment estimate was made')
 

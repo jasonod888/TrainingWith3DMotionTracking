@@ -127,6 +127,9 @@ def test_review_can_choose_midi_feedback_without_enabling_scoring_or_publishing(
         bad = copy.deepcopy(body)
         bad['assessment']['dimensions'] = ['pitch', 'loudness']
         assert client.post(url, json=bad).status_code == 422
+        for dimensions in (['pitch'], ['timing'], [], ['pitch', 'pitch']):
+            bad['assessment']['dimensions'] = dimensions
+            assert client.post(url, json=bad).status_code == 422
         watch_with_midi = copy.deepcopy(body)
         watch_with_midi['assessment'] = {'assessment': 'none', 'input_modes': ['midi'], 'dimensions': []}
         assert client.post(url, json=watch_with_midi).status_code == 422
@@ -137,6 +140,12 @@ def test_review_can_choose_midi_feedback_without_enabling_scoring_or_publishing(
         assert manifest['assessment']['input_modes'] == ['midi']
         assert manifest['assessment']['dimensions'] == ['pitch', 'timing']
         assert manifest['assessment']['rubric_version'] == 'piano-midi-v1'
+        assert client.post(url, json=body).json() == manifest
+        changed = copy.deepcopy(body)
+        changed['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [], 'rubric_version': 'music-watch-v1'}
+        assert client.post(url, json=changed).status_code == 409
+        with Session(app.state.engine) as session:
+            assert session.query(MusicReview).one().document['assessment'] == body['assessment']
         assert 'score' not in manifest
         assert client.post('/api/lessons/' + lesson_id + '/publish', json={'revision_id': manifest['revision_id'],
             'mode': 'invite', 'reviewed': True, 'rights_acknowledged': True}).status_code == 409

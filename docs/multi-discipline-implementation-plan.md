@@ -404,6 +404,15 @@ Rollback disables new music authoring and publication. Keep existing approved mu
 
 ## 12 Phase 6 Deliver piano MIDI practice
 
+Implementation update (9 November 2026): reviewed piano note-feedback policy authoring
+is implemented for the supported unscored rubric. Reference-note window eligibility is
+shown explicitly and is not measured input-observation coverage. The separate,
+default-off Phase 6E history API/table contract is implemented; client save/history
+controls and scoring qualification remain open. See `docs/music-history.md` for the
+bounded summary contract, migration 0020 and pilot prerequisites. No grade, automatic
+upload, sharing or processing rollout is enabled by this work.
+
+
 Implementation note (5 November 2026): the disabled-by-default input setup foundation
 for P6.1/P6.2 is implemented as an unscored keyboard check. It does not start practice,
 grade notes or save attempts. See `docs/piano-midi-practice.md` for delivered evidence

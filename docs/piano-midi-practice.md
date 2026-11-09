@@ -215,3 +215,35 @@ Feedback browser coverage includes calibration and cancellation; practice, MIDI 
 and guide regression checks pass. No server/schema changes; Python tests were not rerun
 (previous reported result: 292 passed, 13 skipped). Processing/sharing/scoring stay
 disabled. Changes in this continuation are local and uncommitted; nothing was pushed.
+
+
+## Review of 97c73a3 and initial Phase 6E persistence
+
+The instructor policy authoring and reference-note counts support continuing. Fixed the
+server's acceptance of pitch-only/timing-only policies: supported `piano-midi-v1` now
+requires exactly both dimensions. Guitar cannot select the piano-only MIDI option in
+the review UI; each newly loaded review resets to Watch only. Save retries retain edits
+and policy, and a changed policy for a finalised draft is refused.
+
+The previous "coverage" display was reference-window eligibility, not observation
+coverage. The guide now says **notes eligible for comparison**, with an explanation.
+No actual input-coverage threshold or physical-device qualification is implied. The
+readiness helper remains a separate foundation; teaching spans are not qualified
+assessment spans. Policy re-editing after review remains follow-on work.
+
+Added the **default-off Phase 6E backend foundation** for bounded, client-reported,
+unscored summary history. It has its own contract/table and 5,000-account allowance,
+exact reference/revision/policy binding, idempotent UUIDs and private read/delete paths.
+It refuses raw MIDI and grades. The pose endpoint now refuses music revisions. No
+client save/history UI or automatic upload was added. See `music-history.md` for the
+contract, migration 0020, limits and next client-integration work. Unscored history can
+progress alongside physical qualification; scoring remains disabled.
+
+
+Verification of the 97c73a3 continuation: full configured Python suite **296 passed,
+13 skipped**; latest complete-only history checks **3 passed**; web suite **277 passed**.
+TypeScript/production build and bundle check pass. Browser checks for instructor review
+(including guitar policy availability), local feedback/reference-window wording and the
+movement feed pass. All three lesson-schema artifacts are current. Migration SQL renders
+through 0020; no PostgreSQL migration or physical-device qualification was performed.
+No commit, push, deployed flag change or automatic learner upload was performed.

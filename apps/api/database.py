@@ -314,6 +314,16 @@ class MusicReview(Base):
     reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     document: Mapped[dict] = mapped_column(JSON)
 
+class MusicPracticeAttempt(Base):
+    """Opt-in aggregate, unscored music history; never raw performance data."""
+    __tablename__ = 'music_practice_attempts'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'), index=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), index=True)
+    revision_id: Mapped[str] = mapped_column(ForeignKey('lesson_revisions.id'))
+    summary: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
 
 def make_engine(url):
     return create_engine(url, pool_pre_ping=True, connect_args={'connect_timeout': 3} if url.startswith('postgresql') else {})
@@ -348,3 +358,4 @@ def database_ready(engine):
         connection.execute(text('SELECT group_id, lesson_id FROM group_public_moves LIMIT 0'))
         connection.execute(text('SELECT id, job_id, lesson_id, owner_id, subject, instrument, status, document FROM music_drafts LIMIT 0'))
         connection.execute(text('SELECT id, draft_id, lesson_id, revision_id, reviewer_id, reviewed_at, document FROM music_reviews LIMIT 0'))
+        connection.execute(text('SELECT id, account_id, lesson_id, revision_id, summary FROM music_practice_attempts LIMIT 0'))

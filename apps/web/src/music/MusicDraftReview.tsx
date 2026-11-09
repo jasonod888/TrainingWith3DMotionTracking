@@ -13,7 +13,7 @@ export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[confirmed,setConfirmed]=useState(false),[page,setPage]=useState(0),[retry,setRetry]=useState(0);
  const [policy,setPolicy]=useState<'none'|'notes'>('none');
  const video=useRef<HTMLVideoElement>(null),alive=useRef(true);
- useEffect(()=>{alive.current=true;let stopped=false;setError('');setDraft(null);
+ useEffect(()=>{alive.current=true;let stopped=false;setError('');setDraft(null);setPolicy('none');
   request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft`).then(value=>{
    const parsed=parseMusicDraftView(value);if(!parsed.ok)throw new Error(parsed.message);
    if(stopped)return;setDraft(parsed.value);setEvents(parsed.value.events);setTitle(parsed.value.title);
@@ -44,7 +44,8 @@ export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:
     <label>Lesson title<input required maxLength={200} value={title} disabled={busy} onChange={e=>{changed();setTitle(e.target.value);}}/></label>
     <fieldset className="music-review-policy"><legend>Assessment</legend>
      <label className="review-checkbox"><input type="radio" name="assessment" checked={policy==='none'} disabled={busy} onChange={()=>{changed();setPolicy('none');}}/>Watch only — no feedback</label>
-     <label className="review-checkbox"><input type="radio" name="assessment" checked={policy==='notes'} disabled={busy} onChange={()=>{changed();setPolicy('notes');}}/>MIDI note feedback (unscored)</label>
+     <label className="review-checkbox"><input type="radio" name="assessment" checked={policy==='notes'} disabled={busy||draft.subject!=='piano'} onChange={()=>{changed();setPolicy('notes');}}/>MIDI note feedback (unscored)</label>
+     {draft.subject!=='piano'&&<p className="small muted">MIDI note feedback is available for piano only. This guitar reference stays watch only.</p>}
      {policy==='notes'?<p className="small muted">Local pitch and timing corrections only. No score, grade, upload or persistence. Requires a connected MIDI keyboard; scoring stays disabled.</p>:<p className="small muted">Learners watch and use the guide; no corrections are produced.</p>}
     </fieldset>
     <h2>Proposed notes</h2><p>{events.length} notes. Changes reset the review confirmation.</p>

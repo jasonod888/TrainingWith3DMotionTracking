@@ -31,7 +31,7 @@ class ReviewAssessment(Contract):
             if self.input_modes not in ([], ['none']) or self.dimensions or self.rubric_version != 'music-watch-v1':
                 raise ValueError('A watch-only policy takes no input modes or dimensions.')
         else:
-            if self.input_modes != ['midi'] or not self.dimensions or self.rubric_version != 'piano-midi-v1':
+            if self.input_modes != ['midi'] or set(self.dimensions) != {'pitch', 'timing'} or self.rubric_version != 'piano-midi-v1':
                 raise ValueError('MIDI feedback requires midi input, pitch/timing dimensions and piano-midi-v1.')
             if len(set(self.dimensions)) != len(self.dimensions):
                 raise ValueError('Assessment dimensions must be unique.')

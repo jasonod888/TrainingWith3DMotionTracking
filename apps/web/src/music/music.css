@@ -353,3 +353,47 @@
 .feedback-note.matched { color: #15803d; }
 .feedback-note.missing { color: #b91c1c; }
 .feedback-note.extra { color: #b45309; }
+
+/* Explicit unscored music summary saving and private history */
+.feedback-save {
+  margin-top: 6px;
+}
+
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.history-head h2 {
+  margin: 0;
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+  display: grid;
+  gap: 8px;
+}
+
+.history-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
+.history-list strong {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.history-list span {
+  font-size: 0.78rem;
+  color: #475569;
+}

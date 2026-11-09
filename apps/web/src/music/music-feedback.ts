@@ -60,14 +60,16 @@ export type MusicFeedback = {
   unassessed: number;
   total: number;
   assessed: number;
+  /** Reference-note window eligibility, not observed-input coverage or accuracy. */
   coverage: number;
   latencyMeasured: boolean;
+  speed: number;
   notes: FeedbackNote[];
 };
 
 export function invalidFeedback(reason: string, run: number, sectionId: string): MusicFeedback {
   return {version: 1, status: 'invalid', reason, run, sectionId, window: {start: 0, end: 0},
-    matched: 0, missing: 0, extra: 0, unassessed: 0, total: 0, assessed: 0, coverage: 0, latencyMeasured: false, notes: []};
+    matched: 0, missing: 0, extra: 0, unassessed: 0, total: 0, assessed: 0, coverage: 0, latencyMeasured: false, speed: 1, notes: []};
 }
 
 /**
@@ -121,7 +123,7 @@ export function buildRunFeedback(input: {
   return {version: 1, status: 'complete', reason: null, run: input.run, sectionId: input.sectionId,
     window, matched: result.matches.length, missing: result.missing.length, extra: result.extra.length,
     unassessed: result.unassessed, total, assessed, coverage: total ? assessed / total : 0,
-    latencyMeasured: input.latencyMeasured, notes};
+    latencyMeasured: input.latencyMeasured, speed: input.speed, notes};
 }
 
 export type {Attack, RunClock};

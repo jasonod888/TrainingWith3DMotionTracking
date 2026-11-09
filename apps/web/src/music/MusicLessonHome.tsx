@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
 import {Music2, Pause, Play} from 'lucide-react';
 import type {MusicLessonManifest} from '../../../../packages/lesson-schema/index';
-import {assetUrl} from '../api';
+import {assetUrl, request} from '../api';
 import {
   activeEvents, currentSpan, GUITAR_STRING_LABELS, guitarPosition, parseMusicReference,
   bindMusicReference, supportsGuitarDiagram, pianoGeometry, pitchName, type MusicReference,
@@ -16,6 +16,9 @@ import {
 } from './music-practice';
 
 const label = (lesson: MusicLessonManifest) => lesson.subject === 'piano' ? 'Piano' : 'Guitar';
+type MusicAttemptView = {id:string;date:string;section_id:string;run:number;start:number;end:number;speed:number;
+  note_window:{total:number;eligible:number;matched:number;missing:number;extra:number}};
+type SaveState = {id:string;state:'saving'|'saved'|'error';message?:string};
 
 function timeLabel(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, '0')}`;
@@ -27,7 +30,7 @@ function timeLabel(seconds: number): string {
  * The reviewed reference is read and validated at runtime. It requests no camera,
  * microphone or MIDI access, offers no scoring, and keeps the original instructor audio.
  */
-export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false}: {lesson: MusicLessonManifest; onBack: () => void;midiSetupEnabled?:boolean}) {
+export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHistoryEnabled=false}: {lesson: MusicLessonManifest; onBack: () => void;midiSetupEnabled?:boolean;musicHistoryEnabled?:boolean}) {
   const [loaded,setLoaded]=useState<{identity:string;value:MusicReference}|null>(null);
   const identity=`${lesson.revision_id}:${lesson.reference.key}:${lesson.reference.sha256}`;
   const reference=loaded?.identity===identity?loaded.value:null;
@@ -50,6 +53,9 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false}: {lesson
   const [calibration,setCalibration]=useState<{pulse:number;samples:number}|null>(null);
   const [feedback,setFeedback]=useState<MusicFeedback[]>([]);
   const [feedbackNotice,setFeedbackNotice]=useState('');
+  const [saves,setSaves]=useState<Record<string,SaveState>>({});
+  const [historyOpen,setHistoryOpen]=useState(false),[history,setHistory]=useState<MusicAttemptView[]|null>(null);
+  const [historyError,setHistoryError]=useState('');
   const runs=useRef<{run:number;attacks:Attack[];clock:RunClock;complete:boolean}[]>([]);
   const runClock=useRef<RunClock|null>(null);
   const practiceStarted=useRef(0);
@@ -241,6 +247,41 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false}: {lesson
     setCalibration(null);
   };
 
+  const saveRun=async(run:MusicFeedback)=>{
+    if(!musicHistoryEnabled||!eligibilityRef.current.eligible)return;
+    const key=`${run.run}-${run.window.start}-${run.window.end}`;
+    const id=saves[key]?.id??crypto.randomUUID();
+    setSaves(previous=>({...previous,[key]:{id,state:'saving'}}));
+    try{
+      await request(`/lessons/${encodeURIComponent(lesson.lesson_id)}/music-attempts`,'POST',{
+        summary_version:1,status:'complete',id,save_requested:true,
+        revision_id:lesson.revision_id,reference_sha256:lesson.reference.sha256,
+        rubric_version:lesson.assessment.rubric_version,section_id:run.sectionId,
+        start:run.window.start,end:run.window.end,speed:run.speed,run:run.run,
+        assessment:'unscored',alignment:run.latencyMeasured?'visual-estimate':'none',
+        note_window:{total:run.total,eligible:run.assessed,matched:run.matched,missing:run.missing,extra:run.extra},
+      });
+      setSaves(previous=>({...previous,[key]:{id,state:'saved'}}));
+      if(historyOpen)void loadHistory();
+    }catch(error){
+      setSaves(previous=>({...previous,[key]:{id,state:'error',message:error instanceof Error?error.message:'The summary was not saved.'}}));
+    }
+  };
+
+  const loadHistory=async()=>{
+    setHistoryOpen(true);setHistoryError('');
+    try{setHistory(await request<MusicAttemptView[]>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/music-attempts`));}
+    catch(error){setHistoryError(error instanceof Error?error.message:'Your history could not be loaded.');}
+  };
+
+  const deleteAttempt=async(id:string)=>{
+    setHistoryError('');
+    try{await request(`/lessons/${encodeURIComponent(lesson.lesson_id)}/music-attempts/${encodeURIComponent(id)}`,'DELETE');
+      setHistory(previous=>previous?previous.filter(item=>item.id!==id):null);
+      setSaves(previous=>Object.fromEntries(Object.entries(previous).filter(([,value])=>value.id!==id)) as Record<string,SaveState>);
+    }catch(error){setHistoryError(error instanceof Error?error.message:'That summary could not be removed.');}
+  };
+
   const active = useMemo(() => reference ? activeEvents(reference, time) : [], [reference, time]);
   const activePitches = useMemo(() => new Set(active.map(event => event.pitch)), [active]);
   const geometry = useMemo(() => reference ? pianoGeometry(reference.events) : null, [reference]);
@@ -347,13 +388,29 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false}: {lesson
       </section>}
       {feedback.length>0&&<section className="music-feedback" aria-label="Practice feedback">
         <h2>Local feedback · unscored</h2>
+        <p className="small muted">Note eligibility reflects complete timing windows, not keyboard observation coverage or accuracy.</p>
         {feedback.map((run,index)=><article className="feedback-run" key={`${run.run}-${index}`}>
           <h3>Run {run.run+1}</h3>
-          {run.status==='invalid'?<p role="alert">This run could not be analysed: {run.reason}</p>:<p>{run.matched} matched · {run.missing} missing · {run.extra} extra · {run.assessed} of {run.total} notes assessed ({Math.round(run.coverage*100)}% coverage){run.unassessed?` · ${run.unassessed} unassessed`:''}</p>}
+          {run.status==='invalid'?<p role="alert">This run could not be analysed: {run.reason}</p>:<p>{run.matched} matched · {run.missing} missing · {run.extra} extra · {run.assessed} of {run.total} notes eligible for comparison ({Math.round(run.coverage*100)}% of reference notes){run.unassessed?` · ${run.unassessed} unassessed`:''}</p>}
           {run.status==='complete'&&<ul>{run.notes.map((note,noteIndex)=><li key={noteIndex} className={`feedback-note ${note.status}`}>{note.status==='matched'?`${note.name} ${note.timing}${note.errorSeconds!==null?` (${Math.round(note.errorSeconds*1000)} ms)`:''}`:note.status==='missing'?`Missing ${note.name}`:`Extra ${note.name}`}</li>)}</ul>}
+          {musicHistoryEnabled&&eligibility.eligible&&run.status==='complete'&&(()=>{const key=`${run.run}-${run.window.start}-${run.window.end}`;const saved=saves[key];
+            return <div className="feedback-save">{saved?.state==='saved'?<p role="status">Summary saved to your private history.</p>:
+              <><button className="secondary" disabled={saved?.state==='saving'} onClick={()=>void saveRun(run)}>{saved?.state==='saving'?'Saving…':saved?.state==='error'?'Retry save':'Save summary'}</button>
+              {saved?.state==='error'&&<p className="small muted" role="alert">{saved.message}</p>}</>}</div>;})()}
         </article>)}
         {feedback.some(run=>!run.latencyMeasured)&&<p className="small muted">No timing alignment estimate was made; timing feedback is approximate.</p>}
         <p className="small muted">Timing remains approximate, including after visual alignment. Feedback is local and unscored. Nothing is saved or sent.</p>
+      </section>}
+      {musicHistoryEnabled&&lesson.assessment.assessment==='notes'&&<section className="music-history" aria-label="Music practice history">
+        <div className="history-head"><h2>Practice history</h2><button className="secondary" onClick={()=>void loadHistory()}>{historyOpen?'Refresh history':'View music history'}</button></div>
+        {historyOpen&&<>
+          {historyError&&<p className="inline-notice error-notice" role="alert">{historyError}</p>}
+          {history===null&&!historyError?<p role="status">Loading your saved summaries…</p>:history?.length?<ul className="history-list">{history.map(item=><li key={item.id}>
+            <div><strong>{new Date(item.date).toLocaleString()}</strong><span> Run {item.run+1} · {item.section_id==='all'?'Whole lesson':item.section_id} · {Math.round(item.start)}–{Math.round(item.end)}s · {item.speed}× · {item.note_window.matched} matched · {item.note_window.missing} missing · {item.note_window.eligible} of {item.note_window.total} eligible</span></div>
+            <button className="back-link" aria-label={`Delete summary ${item.id}`} onClick={()=>void deleteAttempt(item.id)}>Delete</button>
+          </li>)}</ul>:<p className="small muted">No saved summaries yet. Save a completed, unscored repeat above.</p>}
+          <p className="small muted">Private, unscored, client-reported summaries with a separate 5,000-summary allowance. Not a score or accuracy measure.</p>
+        </>}
       </section>}
       {midiSetupEnabled&&lesson.subject==='piano'&&<MidiKeyboardCheck key={lesson.revision_id} onAttack={handleAttack} onInputChange={id=>{setKeyboardConnected(Boolean(id));cancelCalibration();setLatency(null);if(practiceRef.current)stopPractice();}}/>}
       <div className="music-home-grid">

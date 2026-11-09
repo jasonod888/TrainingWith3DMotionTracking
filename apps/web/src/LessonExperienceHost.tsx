@@ -41,8 +41,8 @@ export function LessonExperienceHost({document, ...body}: {document: LessonDocum
 }
 
 /** Preview and practice destinations that a music lesson can occupy. */
-export function MusicLessonScreen({lesson, onBack,midiSetupEnabled=false}: {lesson: MusicLessonManifest; onBack: () => void;midiSetupEnabled?:boolean}) {
+export function MusicLessonScreen({lesson, onBack,midiSetupEnabled=false,musicHistoryEnabled=false}: {lesson: MusicLessonManifest; onBack: () => void;midiSetupEnabled?:boolean;musicHistoryEnabled?:boolean}) {
   return <Suspense fallback={<MusicFallback onBack={onBack}/>}>
-    <MusicLessonHome lesson={lesson} onBack={onBack} midiSetupEnabled={midiSetupEnabled}/>
+    <MusicLessonHome lesson={lesson} onBack={onBack} midiSetupEnabled={midiSetupEnabled} musicHistoryEnabled={musicHistoryEnabled}/>
   </Suspense>;
 }

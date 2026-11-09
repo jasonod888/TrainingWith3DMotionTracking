@@ -45,6 +45,8 @@ def create_app(settings: Settings | None = None):
     install_public(app,settings,identity,db)
     install_mimic_pairing(app,settings,identity,db)
     install_mimic_attempts(app,identity,db)
+    from .music_attempts import install_music_attempts
+    install_music_attempts(app,settings,identity,db)
 
     from fastapi.exceptions import RequestValidationError
 
@@ -105,6 +107,7 @@ def create_app(settings: Settings | None = None):
                 'lesson_formats':[1,2],
                 'subject_filter':settings.subject_filter_enabled,
                 'music_midi_setup':settings.music_midi_setup_enabled,
+                'music_history':settings.music_history_enabled,
                 'processing':processing_routes.capability_flags(settings),
                 'routes':processing_routes.public_catalogue()}
 
