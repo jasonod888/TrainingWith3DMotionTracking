@@ -1,0 +1,68 @@
+{
+  "status": "passed",
+  "image": "postgres:16-alpine",
+  "scope": "disposable synthetic PostgreSQL/API/backup tests; no production, hardware or model qualification",
+  "executed_at": "2026-11-10T03:29:53.161975+00:00",
+  "app_commit": "1e05253019f6725e5235767bd98dd7a81d5972c3",
+  "harness_sha256": "bdc7348763c102fc5b998a9c2bf3f39dd4bfdc8c9f3b9fdb7444e633f86cac79",
+  "image_id": "sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139",
+  "races": {
+    "quota_race": {
+      "start": 4999,
+      "requests": 4,
+      "statuses": [
+        201,
+        409,
+        409,
+        409
+      ],
+      "final": 5000,
+      "retry_at_quota": 201
+    },
+    "identical_retries": {
+      "requests": 4,
+      "statuses": [
+        201,
+        201,
+        201,
+        201
+      ],
+      "rows": 1
+    },
+    "changed_payload_race": {
+      "statuses": [
+        201,
+        409
+      ],
+      "rows_added": 1
+    },
+    "cross_account_insert_collision": {
+      "statuses": [
+        201,
+        409
+      ],
+      "rows_added": 1,
+      "forced_concurrent_inserts": true
+    },
+    "cursor_after_boundary_deletion": "passed",
+    "http_auth": "real synthetic sessions, CSRF and origin checks; no dependency overrides"
+  },
+  "snapshot_before_downgrade": {
+    "version": "0020",
+    "accounts": 4,
+    "lessons": 4,
+    "revisions": 4,
+    "attempts": 5002,
+    "manifest_sha256": "a69d8b7d72032025f2830c25a965b1527676fbb01014c45b371735bfe0b83e2b",
+    "summary_sha256": "9499bd9b9a68722db9d840771eca19b031886643e877bfb0912c31e173df4f31"
+  },
+  "recovery": {
+    "downgrade_scope": "0020 -> 0019 only",
+    "expected_history_loss_on_downgrade": true,
+    "upgrade_back_to_0020_empty_history": true,
+    "full_pg_dump_restore_into_empty_database": "exact snapshot match"
+  },
+  "server_version": "16.15",
+  "container_removed": true,
+  "elapsed_seconds": 8.83
+}

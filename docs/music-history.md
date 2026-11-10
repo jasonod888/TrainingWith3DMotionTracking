@@ -216,3 +216,15 @@ screenshots are recorded and the phone layout was visually checked. Initial JS/C
 No physical-keyboard test, model installation/qualification or deployed flag change was
 performed. Migrations 0015–0020 were exercised separately on a disposable PostgreSQL 16
 database; see [`music-postgresql-verification.md`](music-postgresql-verification.md).
+
+
+## PostgreSQL follow-up (10 November)
+
+Migration execution recorded with `1e05253` was reviewed. Real PostgreSQL quota/retry
+races and 0020 downgrade/backup/restore scenarios are now executed through the new
+`verify_music_postgresql.py` harness. One account at 4,999 summaries admits exactly one
+of four concurrent new saves; exact retries at quota work; same-UUID races are bounded;
+and a fresh restore reproduces the exact pre-downgrade summary/revision snapshots.
+See `music-postgresql-verification.md` and its durable aggregate evidence record.
+This closes those bounded development checks, not production scale or MIDI scoring.
+No application/deployed flag was changed. Work in this follow-up is uncommitted.

@@ -572,3 +572,34 @@ Not covered by the database run: production-shaped volume, downgrade/recovery re
 concurrent quota locking and idempotent retry races. Those remain deployment work, not
 development blockers. Unscored history and local feedback can continue; scoring stays
 disabled until physical qualification and threshold decisions.
+
+
+## 1e05253 review: PostgreSQL concurrency and recovery follow-up
+
+Accepted the recorded 0015–0020 execution as a development gate. Added a reproducible,
+self-contained PostgreSQL harness and ran it successfully: actual quota-5,000 concurrent
+saves, identical/changed/cross-account UUID races, cursor continuation after deletion,
+0020 downgrade/upgrade, and full pg_dump restore into an empty database. Final evidence
+is `docs/qualification/music-postgresql-concurrency-2026-11-10.json`; details and limits
+are in `music-postgresql-verification.md`. Test container removed; no live application
+or deployed flags changed. This is bounded scenario evidence, not production stress.
+
+Corrected the physical-keyboard protocol's alignment button name and separated personal
+alignment, reference-note eligibility, actual observation continuity, ground truth and
+independent latency measurements. Hardware protocol remains **not run**, with no pass
+record or score approval. The full application suites were not rerun because only the
+new harness/docs changed. Changes remain local, uncommitted and not pushed.
+
+
+## Verification attempt: physical MIDI hardware
+
+10 November 2026. **Blocked, not executed.** This host has no physical MIDI instrument:
+Windows lists only software MIDI endpoints, and a Chromium probe (headed and headless)
+could not obtain Web MIDI permission or any input device. The protocol remains unchanged;
+no latency, observation-coverage, false-correction or device result is claimed.
+
+Evidence: [`qualification/music-keyboard-2026-11-10-blocked.json`](qualification/music-keyboard-2026-11-10-blocked.json).
+The PostgreSQL race/recovery harness was independently re-run and passed (quota stops at
+5,000, identical retries create one row, 0020 downgrade loses history as documented,
+backup restore recovers the exact summaries and revision manifests). Unscored history can
+continue; scoring stays disabled until physical evidence and threshold decisions exist.

@@ -1,0 +1,37 @@
+{
+  "status": "blocked",
+  "scope": "physical MIDI keyboard qualification; no hardware or scored-practice qualification",
+  "protocol": "docs/music-keyboard-qualification.md",
+  "app_commit": "1e05253019f6725e5235767bd98dd7a81d5972c3",
+  "attempted_at": "2026-11-10T11:40:00+08:00",
+  "host": "Windows development machine",
+  "hardware_probe": {
+    "windows_midi_class_devices": [],
+    "windows_software_devices": [
+      "MIDI 2.0 Service Tests",
+      "MIDI 2.0 Virtual Devices",
+      "MIDI 2.0 Loop Devices"
+    ],
+    "keyboards_present": [
+      "Standard PS/2 Keyboard",
+      "HID Keyboard Device"
+    ],
+    "interpretation": "Typing keyboards and software MIDI endpoints only; no physical MIDI instrument is attached."
+  },
+  "web_midi_probe": {
+    "browser": "Chromium 156.0.8078.4 (headless and headed)",
+    "secure_context": true,
+    "api_supported": true,
+    "permission_result": "NotAllowedError: Permission to use Web MIDI API was not granted",
+    "inputs": [],
+    "interpretation": "No input device would be available even after a permission grant in this environment."
+  },
+  "result": "Protocol not executed. No latency, observation-coverage, false-correction or device-matrix result is claimed.",
+  "claims": {
+    "hardware_latency": false,
+    "observation_coverage": false,
+    "false_correction": false,
+    "device_qualified": false
+  },
+  "next": "Attach a physical USB-MIDI keyboard, grant Web MIDI access in a headed browser, and execute sections 1-7 of the protocol for each device/browser combination. Store only sanitized aggregate evidence under docs/qualification/ after review."
+}
