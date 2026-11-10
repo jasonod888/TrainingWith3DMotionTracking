@@ -127,3 +127,24 @@ test('passages may not overlap and boundary-crossing notes are unassessed', () =
   assert.equal(result.total, 2);
   assert.equal(result.assessed, 1);
 });
+
+test('boundary exclusions pair a note and its nearby attack in both directions', () => {
+  const boundary = {...reference, duration: 4,
+    events: [{id: 'late-expected', onset: 1.2, duration: 0.3, pitch: 60, optional: false},
+             {id: 'early-expected', onset: 1.1, duration: 0.3, pitch: 64, optional: false}],
+    spans: [{start: 0, end: 1, kind: 'explanation'}, {start: 1, end: 4, kind: 'playing'}]};
+  // Expected 1.20 is fully inside, but the learner's 1.10 attack crosses the boundary.
+  const earlyAttack = buildRunFeedback({...base, reference: {...boundary, events: [boundary.events[0]]},
+    start: 0, end: 4, tolerance: 0.15, attacks: [{id: 'a', pitch: 60, sourceTime: 1.1}]});
+  assert.equal(earlyAttack.matched, 0);
+  assert.equal(earlyAttack.missing, 0);
+  assert.equal(earlyAttack.extra, 0);
+  assert.equal(earlyAttack.unassessed, 1);
+  // Expected 1.10 is near the boundary; the learner's 1.20 attack must not be extra.
+  const lateAttack = buildRunFeedback({...base, reference: {...boundary, events: [boundary.events[1]]},
+    start: 0, end: 4, tolerance: 0.15, attacks: [{id: 'b', pitch: 64, sourceTime: 1.2}]});
+  assert.equal(lateAttack.matched, 0);
+  assert.equal(lateAttack.missing, 0);
+  assert.equal(lateAttack.extra, 0);
+  assert.equal(lateAttack.unassessed, 1);
+});

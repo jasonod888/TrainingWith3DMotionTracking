@@ -35,9 +35,9 @@ class LeaseLost(RuntimeError):
 
 class MusicWorker:
     def __init__(self, url, token, pipeline, adapter_command, work_dir, *, api=None, heartbeat_seconds=5,
-                 profile=None, fixture=False):
+                 profile=None, fixture=False, allow_insecure_local=False):
         parsed = urlparse(url)
-        if parsed.scheme != 'https' and parsed.hostname not in ('127.0.0.1', 'localhost'):
+        if parsed.scheme != 'https' and parsed.hostname not in ('127.0.0.1', 'localhost') and not allow_insecure_local:
             raise ValueError('Remote music workers require HTTPS.')
         if pipeline not in PIPELINES or not adapter_command:
             raise ValueError('Choose a music pipeline and an explicit adapter command.')
@@ -263,6 +263,7 @@ def main():
     parser.add_argument('--config', type=Path, help='Pinned inference configuration file')
     parser.add_argument('--approval', type=Path, help='Retained commercial evidence file')
     parser.add_argument('--fixture', action='store_true', help='Explicit fixture mode; never for production')
+    parser.add_argument('--allow-insecure-local', action='store_true', help='Permit plain HTTP to a local mock only')
     parser.add_argument('--adapter-command', nargs=argparse.REMAINDER, required=True)
     args = parser.parse_args()
     if args.fixture and args.profile:
@@ -286,7 +287,7 @@ def main():
         parser.error('WORKER_TOKEN or WORKER_TOKEN_FILE is required.')
     worker = MusicWorker(os.environ.get('WORKER_API_URL', 'http://127.0.0.1:8001'),
                          token, args.pipeline, args.adapter_command, args.work_dir,
-                         profile=profile, fixture=args.fixture)
+                         profile=profile, fixture=args.fixture, allow_insecure_local=args.allow_insecure_local)
     for name in ('SIGINT', 'SIGTERM'):
         signal.signal(getattr(signal, name), lambda *_: worker.shutdown.set())
     while not worker.shutdown.is_set():

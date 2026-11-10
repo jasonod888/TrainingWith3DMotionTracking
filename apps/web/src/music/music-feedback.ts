@@ -97,16 +97,27 @@ export function buildRunFeedback(input: {
   const playing = input.reference.spans.filter(span => span.kind !== 'explanation');
   const assessable = (time: number) => !hasSpans || playing.some(span => time >= span.start - 1e-6 && time < span.end);
   // A note or attack whose tolerance window crosses a passage boundary cannot support a
-  // correction; it is unassessed rather than missing/extra.
+  // correction. Exclusions are paired by pitch/proximity so an excluded attack never
+  // leaves its expected note reported as missing (or vice versa as extra).
   const fullyInside = (time: number) => !hasSpans
     || playing.some(span => time - tolerance >= span.start - 1e-6 && time + tolerance <= span.end + 1e-6);
   const candidates = input.reference.events
     .filter(event => event.onset >= window.start - 1e-6 && event.onset < window.end && assessable(event.onset));
+  const observed = input.attacks.filter(attack => assessable(attack.sourceTime));
+  const boundaryNotes = new Set(candidates.filter(event => !fullyInside(event.onset)).map(event => event.id));
+  const boundaryAttacks = new Set(observed.filter(attack => !fullyInside(attack.sourceTime)).map(attack => attack.id));
+  const nearby = (note: {pitch: number; onset: number}, attack: {pitch: number; sourceTime: number}) =>
+    note.pitch === attack.pitch && Math.abs(note.onset - attack.sourceTime) <= tolerance;
+  for (const note of candidates) for (const attack of observed) {
+    if (!nearby(note, attack)) continue;
+    if (boundaryNotes.has(note.id)) boundaryAttacks.add(attack.id);
+    if (boundaryAttacks.has(attack.id)) boundaryNotes.add(note.id);
+  }
   const expected: ExpectedAttack[] = candidates
-    .filter(event => fullyInside(event.onset))
+    .filter(event => !boundaryNotes.has(event.id))
     .map(event => ({id: event.id, pitch: event.pitch, onset: event.onset, optional: event.optional}));
-  const boundaryUnassessed = candidates.length - expected.length;
-  const attacks = input.attacks.filter(attack => assessable(attack.sourceTime) && fullyInside(attack.sourceTime));
+  const boundaryUnassessed = candidates.filter(event => boundaryNotes.has(event.id)).length;
+  const attacks = observed.filter(attack => !boundaryAttacks.has(attack.id));
   let result;
   try {
     result = matchOnsets(expected, attacks, window, tolerance);

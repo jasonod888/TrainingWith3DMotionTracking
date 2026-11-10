@@ -785,3 +785,22 @@ TypeScript/build/bundle pass within budget; **323 API passed, 13 skipped**. Shar
 - UI-L2/L3 library acceptance passed: independent flags, mappings, lazy isolation,
   read-only input, resize cleanup, fallback, phone/desktop.
 - Verification: **324 API passed, 13 skipped**; **284 web passed**; TypeScript/build/bundle within budget.
+
+
+## Verification slice: paired boundaries, worker lifecycle, candidate dossier
+
+10 November 2026.
+
+- Boundary exclusions are paired by pitch/proximity; the two reproduced false
+  missing/extra cases are unassessed, with regression tests.
+- The built worker image completed a fixture job against a mock API on a local Docker
+  network (claim, source, extraction, adapter, reference upload, draft) and cleaned its
+  attempt directory. A heartbeat 409 during a slow adapter terminated processing, sent no
+  draft and removed the attempt directory.
+- The transcription candidate dossier is empty: no approved code/weights, commercial
+  evidence, rights-cleared recordings or real adapter. No accuracy claim.
+- Reviewed guitar positions/chord authoring is not started; it remains the next
+  capability after the private piano loop inputs exist.
+
+Verification: **324 API passed, 13 skipped**; **285 web passed**; TypeScript, build and
+bundle pass (music screen within budget).

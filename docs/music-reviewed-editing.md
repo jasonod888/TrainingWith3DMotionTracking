@@ -74,3 +74,13 @@ not the same as measured observation coverage, and it does not enable scoring.
   null values until a later editor exposes them.
 - `verify_music_edit.py` and focused API tests cover boundary notes, overlap refusal and a
   title-only edit retaining velocity/confidence.
+
+
+### Paired boundary evidence correction
+
+The first boundary filter removed notes and attacks independently. That could leave an
+expected note reported missing when its matching attack was excluded, or report an attack
+as extra when its expected note was excluded. Exclusion is now paired by same pitch and
+tolerance proximity in both directions. Both reproduced cases (expected 1.20/played 1.10
+and expected 1.10/played 1.20 across a playing boundary) now yield unassessed evidence
+with no missing/extra correction, and are covered by regression tests.

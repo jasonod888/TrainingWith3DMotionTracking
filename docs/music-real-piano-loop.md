@@ -119,3 +119,16 @@ microphone/full guitar capabilities retain their separate qualification mileston
 - No frontend files changed; frontend/browser checks were not repeated for this slice.
 - No real model was installed, no deployment settings changed, and no commit or push
   was made by this review. Changes remain local for the next checkpoint.
+
+
+## Lifecycle transport evidence (10 November 2026)
+
+A local Docker network ran the built image against a stdlib mock API:
+
+- **Complete:** claim → source download → ffmpeg extraction → fixture adapter → reference
+  upload → draft handoff; work directory empty; mock recorded the draft.
+- **Lease loss:** heartbeat 409 during a slow adapter; worker terminated it, posted no
+  draft and removed the attempt directory.
+
+This is transport/lifecycle evidence, not real inference. The candidate dossier is still
+empty; see [`music-transcription-candidate.md`](music-transcription-candidate.md).

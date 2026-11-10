@@ -91,8 +91,9 @@ The image built locally as `form-music-worker:ui-smoke`
 | Token-file mount + verified profile | Started, loaded `/run/secrets/token`, verified weights/code/config/approval and reached claim |
 | Tampered weights | Exit 2 with `The weights bytes do not match the run profile` |
 | Explicit fixture | `--fixture` accepted; no profile stamped |
-| Live job/cancellation/cleanup | **Not exercised**; the local claim endpoint was unreachable from the container (`ConnectError`) |
+| Fixture lifecycle, same Docker network | **Passed**: mock API `complete` mode served one job; source download, ffmpeg extraction, fixture adapter, reference upload and draft handoff completed; work directory empty afterwards |
+| Lease loss/cancellation | **Passed**: mock returned 409 after the first heartbeat while a slow adapter slept; worker terminated it, sent no draft and removed the attempt directory |
 
-The image is not scanned, signed, pushed or deployed. No model or adapter was included;
+The local-mock transport flag (`--allow-insecure-local`) exists only for this network test; production requires HTTPS. The image is not scanned, signed, pushed or deployed. No model or adapter was included;
 the smoke used the image's fixture transcription adapter as the executed code artifact.
 The base image digest and ffmpeg version must be pinned before a real release.
