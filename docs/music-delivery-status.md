@@ -1,6 +1,6 @@
 # Music delivery: current status and next milestones
 
-10 November 2026. Review of `bb780c9` and the subsequent local qualification fixes.
+10 November 2026. Updated through review of `91b55be` and the private-sharing corrections.
 This is the current status summary; older phase records are historical evidence, not
 an assertion that every phase or production acceptance gate is complete.
 
@@ -20,7 +20,7 @@ scored MIDI result or microphone assessment is approved by the current evidence.
 | Area | Current state | Practical limit |
 | --- | --- | --- |
 | Shared account, subject metadata and discovery | Implemented and regression-tested; v1 body/v2 music boundary and shared navigation | Music rollout gates stay off by default |
-| Audio-preserving preparation and music worker | Separate preparation, import recovery, upload identity, server audio validation, leased/attempt-bound worker and draft handoff | Target-device preparation matrix and real deployed worker route are not qualified |
+| Audio-preserving preparation and music worker | Separate preparation, import recovery, upload identity, server audio validation, leased/attempt-bound worker/draft handoff, verified exact run profiles and a synthetic private loop | No approved model/recording, real deployed worker route or target-device preparation qualification yet |
 | Instructor review | Private draft editing, note corrections, teaching sections, reviewed reference identity and supported watch/MIDI policy | Policy/reference re-editing after finalisation and explicit assessable-span editing remain incomplete |
 | Guide/player | Instructor video and reviewed-time piano keyboard or illustrative guitar fretboard, section seeking and cleanup | Guitar positions are illustrative; no inferred instructor fingering or general capo/tuning support |
 | Piano MIDI | Opt-in input, sustain/attack normalization, timed practice and approximate local pitch/onset feedback | Virtual tests pass; physical keyboard still not tested; no score or acoustic-piano feedback |
@@ -179,12 +179,10 @@ integration, not merely another fixture; no deployed setting was changed.
    keyboard range/neck scrolling and a longer session; retain the legacy path through
    one comparison window. Do not wait for a full physical MIDI matrix just to accept
    a read-only diagram. SVGuitar cards stay deferred until reviewed shape authoring.
-2. **Implement reviewed private music release next.** Remove the blanket music-release
-   refusal only for an explicitly accepted, reviewed music revision/reference. Reuse
-   existing teacher invites/group access with private assets, exact revision/policy
-   binding, revocation, relabel/republication rules and v1-client protection. Keep public
-   music listing/derivatives off. This closes the current gap between an owner's lab
-   and an actual teacher-to-learner journey.
+2. **Private invitation release is implemented.** Complete the real two-account pilot
+   using this path. Group access, links and public music remain unavailable. The sharing
+   follow-up closes the group/public API bypasses and format-negotiation gap, and keeps
+   invitations separate from explicit release updates.
 3. **Complete a real piano processing loop in parallel.** Choose/pin/review one model
    artifact/runtime, retain commercial evidence, prepare rights-cleared acoustic clips,
    record actual inference provenance and qualify the isolated worker/browser upload.
@@ -213,3 +211,11 @@ net bundle checks, library guide and existing guide/history checks pass. All fou
 scripts pass, plus feed with both library flags on and no instrument imports. Details are
 in `music-ui-library-verification.md`. No package versions, deployed flags, model assets,
 database schema or scoring policy were changed. Code/docs/tests are local and uncommitted.
+
+
+## Current next action after the private-sharing review
+
+Continue into the real private piano processing milestone. The ordered implementation
+and acceptance criteria are in [the completion sequence](music-platform-completion-sequence.md).
+No physical-keyboard matrix is required for a watch-only teacher/learner playback pilot.
+Hardware evidence remains necessary for claims about MIDI feedback quality or scoring.

@@ -21,6 +21,11 @@ from urllib.parse import urlparse
 
 import httpx
 
+try:
+    from .music_run_profile import load_profile
+except ImportError:  # Direct script execution.
+    from music_run_profile import load_profile
+
 PIPELINES = {'music-piano-v1': 'piano', 'music-guitar-v1': 'guitar'}
 
 
@@ -29,12 +34,18 @@ class LeaseLost(RuntimeError):
 
 
 class MusicWorker:
-    def __init__(self, url, token, pipeline, adapter_command, work_dir, *, api=None, heartbeat_seconds=5):
+    def __init__(self, url, token, pipeline, adapter_command, work_dir, *, api=None, heartbeat_seconds=5,
+                 profile=None, fixture=False):
         parsed = urlparse(url)
         if parsed.scheme != 'https' and parsed.hostname not in ('127.0.0.1', 'localhost'):
             raise ValueError('Remote music workers require HTTPS.')
         if pipeline not in PIPELINES or not adapter_command:
             raise ValueError('Choose a music pipeline and an explicit adapter command.')
+        if fixture and profile:
+            raise ValueError('Choose either an exact run profile or explicit fixture mode.')
+        if not fixture and not profile:
+            raise ValueError('An exact run profile is required; fixture mode must be explicit.')
+        self.profile, self.fixture = profile, fixture
         self.pipeline, self.adapter_command = pipeline, list(adapter_command)
         self.work_dir = Path(work_dir)
         self.api = api or httpx.Client(base_url=url.rstrip('/'), timeout=60, trust_env=False)
@@ -97,6 +108,7 @@ class MusicWorker:
             with log.open('wb') as output:
                 environment={**os.environ,'CUDA_VISIBLE_DEVICES':'-1','OMP_NUM_THREADS':'1',
                              'TF_NUM_INTRAOP_THREADS':'1','TF_NUM_INTEROP_THREADS':'1'}
+                if self.profile:environment['MUSIC_RUN_PROFILE']=json.dumps(self.profile,sort_keys=True)
                 process = subprocess.Popen(arguments, env=environment, stdin=subprocess.DEVNULL, stdout=output, stderr=output,
                     start_new_session=os.name != 'nt',
                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
@@ -157,6 +169,11 @@ class MusicWorker:
             if draft is None and manifest is None:
                 raise ValueError('Adapter returned neither a draft nor a manifest.')
             if draft is not None:
+                if self.profile:
+                    provenance=draft.setdefault('provenance',{})
+                    provenance['profile_sha256']=self.profile['profile_sha256']
+                    provenance['model']=self.profile['model']
+                    provenance['model_version']=self.profile['model_version']
                 # Unreviewed proposals take the draft handoff and can never publish.
                 if draft.get('subject') != instrument or (draft.get('instrument') or {}).get('instrument') != instrument:
                     raise ValueError('Adapter returned the wrong instrument.')
@@ -220,10 +237,31 @@ def main():
     parser.add_argument('--pipeline', choices=tuple(PIPELINES), required=True)
     parser.add_argument('--work-dir', type=Path, default=Path('outputs/music-jobs'))
     parser.add_argument('--once', action='store_true')
+    parser.add_argument('--profile', type=Path, help='Exact run profile JSON; required unless --fixture')
+    parser.add_argument('--weights', type=Path, help='Pinned model weights file')
+    parser.add_argument('--code', type=Path, help='Pinned code bundle/lock file')
+    parser.add_argument('--config', type=Path, help='Pinned inference configuration file')
+    parser.add_argument('--approval', type=Path, help='Retained commercial evidence file')
+    parser.add_argument('--fixture', action='store_true', help='Explicit fixture mode; never for production')
     parser.add_argument('--adapter-command', nargs=argparse.REMAINDER, required=True)
     args = parser.parse_args()
+    if args.fixture and args.profile:
+        parser.error('Choose either --profile or explicit --fixture.')
+    if not args.fixture and not args.profile:
+        parser.error('An exact run profile is required; use --fixture only for tests.')
+    profile = None
+    if args.profile:
+        missing = [name for name in ('weights', 'code', 'config', 'approval') if getattr(args, name) is None]
+        if missing:
+            parser.error('A profile requires ' + ', '.join('--' + name for name in missing) + '.')
+        try:
+            profile = load_profile(args.profile, weights=args.weights, code=args.code,
+                                   config=args.config, approval=args.approval)
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
     worker = MusicWorker(os.environ.get('WORKER_API_URL', 'http://127.0.0.1:8001'),
-                         os.environ['WORKER_TOKEN'], args.pipeline, args.adapter_command, args.work_dir)
+                         os.environ['WORKER_TOKEN'], args.pipeline, args.adapter_command, args.work_dir,
+                         profile=profile, fixture=args.fixture)
     for name in ('SIGINT', 'SIGTERM'):
         signal.signal(getattr(signal, name), lambda *_: worker.shutdown.set())
     while not worker.shutdown.is_set():

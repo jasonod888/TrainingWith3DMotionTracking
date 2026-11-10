@@ -85,7 +85,8 @@ def install_public(app, settings, identity, db):
             .join(Lesson, Lesson.id == LessonPublication.lesson_id)
             .join(LessonRevision, LessonRevision.id == Lesson.published_revision_id)
             .where(LessonPublication.listed.is_(True), LessonPublication.moderation_hidden.is_(False),
-                   Lesson.archived.is_(False), Lesson.disabled.is_(False), released)
+                   Lesson.archived.is_(False), Lesson.disabled.is_(False), released,
+                   LessonRevision.manifest['schema_version'].as_integer()==1)
             .group_by(LessonRevision.subject).order_by(LessonRevision.subject)).all()
         return {'subjects': [{'subject': subject_spec(subject).id,
                               'subject_label': subject_spec(subject).label, 'count': int(count)}
@@ -102,8 +103,10 @@ def install_public(app, settings, identity, db):
                 raise HTTPException(422, str(exc)) from exc
         limit = max(1, min(limit, 50))
         offset = max(0, offset)
-        statement = select(LessonPublication, Lesson).join(Lesson, Lesson.id == LessonPublication.lesson_id).where(
-            LessonPublication.listed.is_(True), LessonPublication.moderation_hidden.is_(False), Lesson.archived.is_(False), Lesson.disabled.is_(False))
+        statement = select(LessonPublication, Lesson).join(Lesson, Lesson.id == LessonPublication.lesson_id).join(
+            LessonRevision,LessonRevision.id==Lesson.published_revision_id).where(
+            LessonPublication.listed.is_(True), LessonPublication.moderation_hidden.is_(False), Lesson.archived.is_(False), Lesson.disabled.is_(False),
+            LessonRevision.manifest['schema_version'].as_integer()==1)
         if tag.strip():
             statement = statement.join(LessonTag, LessonTag.lesson_id == LessonPublication.lesson_id).where(
                 LessonTag.tag == re.sub(r'\s+', ' ', tag.strip().lower())[:30])
@@ -112,7 +115,7 @@ def install_public(app, settings, identity, db):
             statement = statement.where(or_(LessonPublication.title.ilike(like), LessonPublication.creator_name.ilike(like)))
         if wanted is not None:
             # Filter on the released label, before limiting, so a page never omits matches.
-            statement = statement.join(LessonRevision, LessonRevision.id == Lesson.published_revision_id).where(
+            statement = statement.where(
                 LessonRevision.subject == wanted)
         statement = statement.order_by(LessonPublication.listed_at.desc().nullslast(), LessonPublication.lesson_id).offset(offset).limit(limit)
         items = []
@@ -126,8 +129,10 @@ def install_public(app, settings, identity, db):
     def tags(limit: int = 20, session: Session = Depends(db)):
         limit = max(1, min(limit, 50))
         rows = session.execute(select(LessonTag.tag, func.count()).join(
-            LessonPublication, LessonPublication.lesson_id == LessonTag.lesson_id).join(Lesson, Lesson.id == LessonPublication.lesson_id).where(
-            LessonPublication.listed.is_(True), LessonPublication.moderation_hidden.is_(False), Lesson.archived.is_(False), Lesson.disabled.is_(False)).group_by(LessonTag.tag).order_by(func.count().desc(), LessonTag.tag).limit(limit)).all()
+            LessonPublication, LessonPublication.lesson_id == LessonTag.lesson_id).join(Lesson, Lesson.id == LessonPublication.lesson_id)
+            .join(LessonRevision,LessonRevision.id==Lesson.published_revision_id).where(
+            LessonPublication.listed.is_(True), LessonPublication.moderation_hidden.is_(False), Lesson.archived.is_(False), Lesson.disabled.is_(False),
+            LessonRevision.manifest['schema_version'].as_integer()==1).group_by(LessonTag.tag).order_by(func.count().desc(), LessonTag.tag).limit(limit)).all()
         return {'tags': [{'tag': tag, 'count': int(count)} for tag, count in rows]}
 
     @router.get('/moves/{lesson_id}')
@@ -194,6 +199,8 @@ def install_public(app, settings, identity, db):
             raise HTTPException(409, 'Choose an accepted version of this move.')
         if not revision or not accepted(session, lesson.id, revision.id):
             raise HTTPException(409, 'Check this move before listing it publicly.')
+        if revision.manifest.get('schema_version') != 1:
+            raise HTTPException(409, 'Music lessons can only be shared by private invitation.')
         if not body.rights_acknowledged:
             raise HTTPException(422, 'Confirm you have the right to share this move publicly.')
         title = (body.title if body.title is not None else (publication.title if publication and publication.title else lesson.title)).strip()

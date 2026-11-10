@@ -128,7 +128,7 @@ def test_worker_hands_off_an_unreviewed_draft(tmp_path):
         music_worker(app, 'isolated-draft-worker', pipeline_version='music-piano-v1')
         worker = MusicWorker('http://localhost', 'isolated-draft-worker', 'music-piano-v1',
                              draft_adapter(tmp_path), tmp_path / 'attempts', api=client,
-                             heartbeat_seconds=.2)
+                             heartbeat_seconds=.2, fixture=True)
         job = worker.claim()
         result = worker.run(job)
         assert result['draft'] is True and result['lesson_id'] == job['id']

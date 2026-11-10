@@ -227,8 +227,12 @@ def install_sharing(app,settings,identity,db):
         return {'title':revision.manifest['title'],'sections':len(revision.manifest['section_set']['sections']),'duration':revision.manifest['duration']}
 
     @router.post('/shares/accept')
-    def accept(body:IncomingShare,account=Depends(identity),session:Session=Depends(db)):
+    def accept(body:IncomingShare,request:Request,account=Depends(identity),session:Session=Depends(db)):
         lesson,invitation=incoming(session,body,account,True)
+        released=session.get(LessonRevision,lesson.published_revision_id)
+        from .lessons import client_formats
+        if released and released.manifest.get('schema_version')==2 and '2' not in client_formats(request):
+            raise HTTPException(406,'This music lesson needs a newer app. Refresh before accepting it.')
         if lesson.owner_id==account.id:return latest_revision(session,lesson).manifest
         grant=session.get(LessonGrant,(lesson.id,account.id))
         if invitation:

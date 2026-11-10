@@ -252,6 +252,7 @@ class DraftProvenance(Contract):
     model_version: str | None = Field(default=None, max_length=80)
     code_version: str = Field(min_length=1, max_length=80)
     audio_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    profile_sha256: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
 
 
 class MusicDraftDocument(Contract):

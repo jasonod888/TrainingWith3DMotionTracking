@@ -41,7 +41,7 @@ def worker_for(client, app, directory, command, api=None, subject='piano'):
     pipeline = 'music-'+subject+'-v1'
     music_worker(app, 'isolated-music-worker', pipeline_version=pipeline)
     return MusicWorker('http://localhost', 'isolated-music-worker', pipeline, command,
-                       directory/'attempts', api=api or client, heartbeat_seconds=.2)
+                       directory/'attempts', api=api or client, heartbeat_seconds=.2, fixture=True)
 
 
 @pytest.mark.parametrize('subject', ['piano', 'guitar'])

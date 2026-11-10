@@ -42,10 +42,23 @@ export function MusicShareLesson({lessonId, title, onBack, onChange}: {
   };
 
   const ensurePublished = async () => {
-    if (!data?.accepted_revision_id) throw new Error('Review and save the music reference before sharing it.');
-    if (data.published_revision_id === data.accepted_revision_id && data.mode === 'invite') return;
+    // Inviting a new person never changes what existing recipients are watching.
+    if (data?.published_revision_id && data.mode === 'invite') return;
+    if (!data?.accepted_revision_id || data.accepted_revision_id !== data.draft_revision_id)
+      throw new Error('Review and save the latest music reference before sharing it.');
     await request(path + '/publish', 'POST', {
       revision_id: data.accepted_revision_id, mode: 'invite', reviewed: true, rights_acknowledged: true,
+    });
+  };
+
+  const updateRelease = () => {
+    if (!window.confirm('Update the shared music version for everyone who can open this lesson?')) return;
+    void run(async () => {
+      if (!data?.accepted_revision_id || data.accepted_revision_id !== data.draft_revision_id)
+        throw new Error('Review the latest reference before updating the shared version.');
+      await request(path+'/publish','POST',{revision_id:data.accepted_revision_id,mode:'invite',reviewed:true,rights_acknowledged:true});
+      setNotice('Shared version updated for everyone.');
+      await load();onChange?.();
     });
   };
 
@@ -91,7 +104,8 @@ export function MusicShareLesson({lessonId, title, onBack, onChange}: {
   });
 
   const published = Boolean(data?.published_revision_id) && data?.mode === 'invite';
-  const accepted = Boolean(data?.accepted_revision_id);
+  const latestReviewed = Boolean(data?.accepted_revision_id) && data?.accepted_revision_id === data?.draft_revision_id;
+  const accepted = published || latestReviewed;
 
   return <section className="share-sheet music-share">
     <button className="back-link" onClick={onBack}><ArrowLeft size={16}/>{title}</button>
@@ -106,6 +120,10 @@ export function MusicShareLesson({lessonId, title, onBack, onChange}: {
         <p>This music lesson cannot be shared by link, with a group or publicly. It has no public listing.</p>
       </div></div>
       {!accepted && <p className="inline-notice" role="status">Save the reviewed reference before sharing this music lesson.</p>}
+      {published && data.published_revision_id !== data.draft_revision_id && <div className="check-banner">
+        <span>People keep the current shared version, including new invitees. Review and explicitly update to release your newer changes.</span>
+        <button className="secondary" disabled={busy||!latestReviewed} onClick={updateRelease}>Update shared version</button>
+      </div>}
       {accepted && <>
         <div className="share-panel">
           <h2>Invite by email</h2>

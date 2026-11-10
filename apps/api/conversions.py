@@ -483,6 +483,8 @@ def install_conversions(app,engine,settings,identity,db):
         if route is None or route.completion!='music-v2':raise HTTPException(422,'Unknown processing route.')
         if job.state!='verifying':raise HTTPException(422,'Draft is not ready for verification.')
         if job.provider!='local' and job.submission_state!='submitted':raise HTTPException(409,'Missing provider submission receipt.')
+        if settings.music_require_run_profile and not body.provenance.profile_sha256:
+            raise HTTPException(422,'This worker must present an exact verified run profile.')
         if body.subject!=job.subject or body.instrument.instrument!=(job.instrument or job.subject):
             raise HTTPException(422,'Draft instrument does not match the requested subject.')
         if abs(body.duration-job.duration)>.15:raise HTTPException(422,'Draft duration does not match the uploaded clip.')

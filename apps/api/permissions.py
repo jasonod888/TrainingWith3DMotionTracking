@@ -65,7 +65,9 @@ def access_reasons(session, lesson_id, account_id):
             reasons.append('group')
     publication = session.get(LessonPublication, lesson_id)
     if publication and publication.listed and not publication.moderation_hidden and lesson.published_revision_id:
-        reasons.append('public')
+        released = session.get(LessonRevision, lesson.published_revision_id)
+        if released and released.manifest.get('schema_version') == 1:
+            reasons.append('public')
     return lesson, reasons
 
 
@@ -124,9 +126,10 @@ def ensure_release(session, lesson, revision, account_id, source='publish'):
     """
     if (revision.manifest or {}).get('schema_version') == 2:
         record = accepted(session, lesson.id, revision.id)
-        if not record or record.source != 'music-review':
+        if not record or record.source != 'music-review' or record.account_id != lesson.owner_id or account_id != lesson.owner_id:
             raise HTTPException(409, 'Save the reviewed reference before sharing this music lesson.')
-        if latest_revision(session, lesson).id != revision.id:
+        current = latest_revision(session, lesson)
+        if current is None or current.id != revision.id:
             raise HTTPException(409, 'Review the latest music revision before sharing it.')
         if not (revision.manifest or {}).get('reference_reviewed'):
             raise HTTPException(409, 'This music reference is not reviewed.')
@@ -164,6 +167,8 @@ def public_lesson(session, lesson_id):
         raise HTTPException(404, 'Move unavailable.')
     revision = session.get(LessonRevision, lesson.published_revision_id)
     if not revision or revision.lesson_id != lesson_id or not accepted(session, lesson_id, revision.id):
+        raise HTTPException(404, 'Move unavailable.')
+    if revision.manifest.get('schema_version') != 1:
         raise HTTPException(404, 'Move unavailable.')
     return lesson, revision, publication
 

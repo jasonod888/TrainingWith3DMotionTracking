@@ -51,6 +51,9 @@ class GroupMove(BaseModel):
 def group_access(session, lesson, account_id):
     if not account_id or not lesson.published_revision_id:
         return False
+    released = session.get(LessonRevision, lesson.published_revision_id)
+    if released and released.manifest.get('schema_version') == 2:
+        return False  # Music release is invitation-only, including legacy associations.
     return session.scalar(select(GroupMember.account_id).join(
         GroupLesson, GroupLesson.group_id == GroupMember.group_id).join(
         Group, Group.id == GroupMember.group_id).where(
@@ -60,8 +63,9 @@ def group_access(session, lesson, account_id):
 
 def group_count(session, lesson_id):
     return session.scalar(select(func.count()).select_from(GroupLesson).join(
-        Group, Group.id == GroupLesson.group_id).where(
-        GroupLesson.lesson_id == lesson_id, Group.archived.is_(False))) or 0
+        Group, Group.id == GroupLesson.group_id).join(Lesson,Lesson.id==GroupLesson.lesson_id)
+        .join(LessonRevision,LessonRevision.id==Lesson.published_revision_id).where(
+        GroupLesson.lesson_id == lesson_id, Group.archived.is_(False),LessonRevision.manifest['schema_version'].as_integer()==1)) or 0
 
 
 def future(value):
@@ -93,8 +97,14 @@ def install_groups(app, settings, identity, optional_identity, db):
 
     def summary(session, group, role):
         members = session.scalar(select(func.count()).select_from(GroupMember).where(GroupMember.group_id == group.id)) or 0
-        private_ids = set(session.scalars(select(GroupLesson.lesson_id).where(GroupLesson.group_id == group.id)))
-        public_ids = set(session.scalars(select(GroupCollection.lesson_id).where(GroupCollection.group_id == group.id)))
+        private_ids = set(session.scalars(select(GroupLesson.lesson_id).join(Lesson,Lesson.id==GroupLesson.lesson_id)
+            .join(LessonRevision,LessonRevision.id==Lesson.published_revision_id).where(
+            GroupLesson.group_id == group.id,LessonRevision.manifest['schema_version'].as_integer()==1)))
+        public_ids = set(session.scalars(select(GroupCollection.lesson_id)
+            .join(Lesson, Lesson.id == GroupCollection.lesson_id)
+            .join(LessonRevision, LessonRevision.id == Lesson.published_revision_id).where(
+                GroupCollection.group_id == group.id,
+                LessonRevision.manifest['schema_version'].as_integer() == 1)))
         moves = len(private_ids | public_ids)
         return {'id': group.id, 'name': group.name, 'description': group.description, 'role': role,
                 'contribution_policy': group.contribution_policy, 'members': int(members), 'moves': int(moves)}
@@ -131,6 +141,8 @@ def install_groups(app, settings, identity, optional_identity, db):
             lesson = session.get(Lesson, link.lesson_id)
             revision = session.get(LessonRevision, lesson.published_revision_id) if lesson and lesson.published_revision_id else None
             if not lesson or not revision or lesson.archived or lesson.disabled:
+                continue
+            if revision.manifest.get('schema_version') == 2:
                 continue
             title = lesson.title
             if access_kind == 'collection':
@@ -299,12 +311,16 @@ def install_groups(app, settings, identity, optional_identity, db):
         else:
             lesson = owned_lesson(session, body.lesson_id, account.id, True)
             revision = latest_revision(session, lesson)
+            if (lesson.experience_family or 'body') == 'music' or (revision and revision.manifest.get('schema_version') == 2):
+                raise HTTPException(409, 'Music lessons can only be shared by private invitation.')
             if not revision or not accepted(session, lesson.id, revision.id):
                 raise HTTPException(409, 'Check this move before sharing it with a group.')
             # Adding another audience does not silently replace an existing release.
             if not lesson.published_revision_id:
                 lesson.published_revision_id = revision.id
         association = GroupCollection if body.access_kind == 'collection' else GroupLesson
+        if revision.manifest.get('schema_version') == 2:
+            raise HTTPException(409, 'Music lessons can only be shared by private invitation.')
         if not session.get(association, (group_id, lesson.id)):
             session.add(association(group_id=group_id, lesson_id=lesson.id, added_by=account.id))
         session.commit()

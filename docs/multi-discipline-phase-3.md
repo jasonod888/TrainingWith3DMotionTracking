@@ -707,3 +707,23 @@ invitation workflow. No public, link, group, scored or model path was enabled.
 Verification: **307 API passed, 13 skipped** (one new sharing test); web **282 passed**;
 TypeScript, build, bundle, sharing/feed/summary browser checks pass. Details:
 [`music-private-sharing.md`](music-private-sharing.md).
+
+
+## Implementation slice: exact run profile and synthetic private loop
+
+10 November 2026. Worker binding and end-to-end private wiring; no real model or recording.
+
+- `scripts/music_run_profile.py` binds weights, code bundle, configuration, sample rate,
+  thresholds and commercial evidence by SHA-256 and derives a profile digest. The worker
+  refuses startup without a verified profile or explicit `--fixture`, never downloads or
+  falls back, passes the profile to the adapter, and records `profile_sha256` plus model
+  identity in draft provenance. `MUSIC_REQUIRE_RUN_PROFILE` can require a profile server-side.
+- A synthetic end-to-end test covers prepared clip → profiled fixture draft → watch-only
+  review → invitation-only release → separate learner v2 access. Browser preparation and
+  upload remain covered by the existing creation check.
+- Real inference, commercial approval, a rights-cleared recording and a deployed staging
+  worker are still absent; no accuracy or deployment claim is made.
+
+Verification: **314 API passed, 13 skipped** (run-profile bytes/digest/refusal tests, the
+synthetic private loop, and the existing worker/review/sharing suite); web **282 passed**,
+TypeScript, build and bundle checks pass.

@@ -18,7 +18,7 @@ refused. Publishing again after a new review releases the new revision; `keep_cu
 cannot resurrect an older music revision.
 
 Recipients still use `POST /api/shares/inspect` and `POST /api/shares/accept`. Accepting an
-invitation returns the v2 manifest, records the existing grant, and makes the music lesson
+invitation requires advertising format 2 (`X-Lesson-Formats: 1,2`) and returns the v2 manifest, records the existing grant, and makes the music lesson
 appear in `GET /api/shared-lessons/summaries` for clients that advertise format 2. The
 body-shaped `/api/shared-lessons` route still omits music.
 
@@ -34,7 +34,9 @@ revocation semantics.
 - The share screen is private-only: no Public, Group or Link tabs. It explains that the
   lesson cannot be shared by link, with a group or publicly.
 - The first invitation publishes the latest accepted revision by invitation; subsequent
-  invitations reuse that release. Pending invitations can be cancelled, people with access
+  invitations reuse that release even after a newer review. **Update shared version**
+  explicitly releases the latest reviewed revision for everyone; an unreviewed latest
+  revision cannot be released. Pending invitations can be cancelled, people with access
   can be removed, and **Make private** unpublishes the lesson.
 - Accepting an invitation now routes a v2 manifest to the music guide instead of the body
   player. The existing login, invitation email, video, timing, MIDI capture and per-account
@@ -57,3 +59,32 @@ revocation semantics.
 - The recipient can open the reviewed guide; practice summaries remain private per account.
 - No public music, scored release or model processing is enabled.
 - The feature is not enabled in a deployed environment by this change.
+
+
+## Review follow-up after 91b55be
+
+Corrected four concrete gaps:
+
+- Group grants and public-listing mutations now refuse music at the API boundary.
+  Stale group/public records cannot expose music details, assets, discovery rows or facets.
+- A format-1 invitation acceptance returns 406 before creating a grant or consuming the
+  invitation. The current client advertises formats 1/2 and runtime-validates the result
+  before choosing the body or music player.
+- Sending a new invitation preserves the current release. A separate confirmed action
+  updates it; latest-review validation remains enforced by the server.
+- Music release acceptance must belong to the owner. The sharing screen is keyed by lesson
+  so switching lessons cannot retain another lesson's sharing state.
+
+Regression coverage additionally verifies private replacement-reference assets, explicit
+republication, revocation and stale audience records. The enhanced browser check exercises
+new-invitation/version separation and accepted invitation → validated music-guide navigation,
+with no device requests. See the [remaining delivery sequence](music-platform-completion-sequence.md).
+
+Follow-up validation: 26 targeted API checks and 282 web tests pass; TypeScript/build,
+schema drift and bundle checks pass. Music sharing, movement feed and mixed discovery
+browser checks pass. Initial bundle: 130,474 B gzip; music shell: 14,568 B; additional
+piano/guitar renderers: 7,663 / 16,816 B, within the existing budgets.
+
+Full API follow-up: **309 passed, 13 skipped**. The final stale group-collection
+count guard was also covered by a fresh targeted run: **9 passed**. No model, database
+schema, deployed capability or scoring setting changed. Review fixes remain uncommitted.

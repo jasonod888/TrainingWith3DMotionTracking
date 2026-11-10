@@ -1,6 +1,6 @@
 # Multi discipline lesson platform implementation plan
 
-Status update, 10 November 2026: baseline/contracts and shared discovery are implemented; selected upload/worker, review/guide, unscored MIDI and personal-history work from Phases 3–6 and 9 is also implemented. These are partial delivery states, not a claim that the full music release or all phase exit gates are complete. Real model qualification/inference, supported-browser audio preparation, normal music release/sharing, physical-device evidence, microphone feedback and full guitar assessment remain open. See the [current delivery status](music-delivery-status.md) for evidence and remaining milestones.
+Status update, 10 November 2026: baseline/contracts and shared discovery are implemented; selected upload/worker, review/guide, unscored MIDI and personal-history work from Phases 3–6 and 9 is also implemented. These are partial delivery states, not a claim that the full music release or all phase exit gates are complete. Real model qualification/inference, supported-browser audio preparation, a real two-account music pilot, physical-device evidence, microphone feedback and full guitar assessment remain open. See the [current delivery status](music-delivery-status.md) for evidence and remaining milestones.
 
 This remains the canonical product plan; `requirement/mutli discipline.txt` is only a pointer. The new [piano/guitar UI library migration handoff](music-ui-library-migration-plan.md) is an implementation addendum for P4.6–P4.8 and P8.3–P8.5. It replaces custom diagram drawing incrementally inside the existing workflow; it does not restart the project, change login, approve a model or complete the remaining assessment work.
 
@@ -250,7 +250,7 @@ The table above is the intended dependency map, not a completion ledger. Current
 | 0–2 | Baseline/contracts/discovery foundations delivered; device/audio qualification remains open where called for |
 | 3 | Preparation/validation/worker contracts implemented; real model/worker/browser route not qualified |
 | 4 | Reviewed guide/player plus default-off library boundary and initial piano/neck adapters implemented; supported-scope internal acceptance remains |
-| 5 | Private draft review implemented; real transcription, assessable-span/post-review editing and music release still incomplete |
+| 5 | Private draft review and invitation-only reviewed release implemented; real transcription, assessable-span/post-review editing and two-account pilot remain |
 | 6 | Unscored piano MIDI and history implemented; physical observation/scoring qualification and remaining practice modes incomplete |
 | 7 | Microphone feedback remains to implement/qualify |
 | 8 | Illustrative guitar guide only; reviewed shapes and full guitar assessment remain |
@@ -682,16 +682,16 @@ The intended final product is one learning platform with several subjects. The p
 
 | ID | Blocker | Blocks | Resolution owner |
 | --- | --- | --- | --- |
-| B1 | Baseline is not reproducible: uncommitted instructor-alpha work touches `contracts.py`, `conversions.py`, `lessons.py`, the schema artifacts, the worker, and the practice workspace | Any later music change in those files | Agreed as the baseline on 4 November 2026 by owner instruction; still uncommitted, so the owner should commit or branch it before Phase 2 lands on the same files |
-| B2 | Audio-preparation matrix unverified: browser encoding of MP4 AVC/AAC and WebM VP8/Opus on the installed mediabunny and target devices | Phase 3 start; the recovery-path decision | P0.8 spike |
+| B1 | Baseline checkpoint resolved by `a6a91ff`, including the authorized instructor-video work | None; no longer a current blocker | Recorded baseline |
+| B2 | Audio-preparation matrix unverified: browser encoding of MP4 AVC/AAC and WebM VP8/Opus on the installed mediabunny and target devices | Enabling the selected production preparation path; independent development can continue | P0.8 spike / real private piano pilot |
 | B3 | Music fixture media rights not recorded: the Phase 1 fixture needs owned or licensed video and audio | Slice 1G content | Product and legal review |
-| B4 | Music attempt event bound and retention not agreed | Phase 6 persistence and the shared history projection | P0.7 budget review |
+| B4 | Bounded unscored summary persistence implemented; operational retention review remains | Broad history rollout; not private development | Phase 9 / operations |
 | B5 | Public preview rights for instructor audio and video unresolved | Phase 5 public derivative and Phase 10 rollout | Commercial review |
 | B6 | Commercial licence trail for the selected transcription and detector artifacts not yet inventoried with hashes and notices | Phase 5 transcription and Phase 7 microphone | P0.4 inventory |
-| B7 | Physical-device MIDI qualification not started, including iPhone Safari availability | Phase 6 closed pilot | Phase 6 pilot plan |
+| B7 | Physical-device MIDI qualification blocked by missing hardware; supported browser/device scope still unqualified | Phase 6 closed pilot | Phase 6 pilot plan |
 | B8 | Per-route storage and cleanup budget for audio-bearing uploads, extracted audio, references, previews and temporary outputs not sized | Phase 3 and Phase 9 rollout | P0.7 budget review |
 
-No Phase 1 detail is blocked by the music model decisions; those gate later phases. B1 is the only blocker that prevents starting Phase 1 slices, and Phase 0 documentation plus the B2 spike can proceed while it is resolved.
+No Phase 1 detail is blocked by the music model decisions; those gate later phases. B1 is resolved. The remaining evidence gates apply to their capabilities and rollout scope; they do not prevent independent implementation.
 
 ## 24 Deferred decisions
 
@@ -713,6 +713,21 @@ InstrumentGuideStage boundary, independent default-off flags, instrument-specifi
 renderers and legacy/error fallback. Initial controlled piano and standard guitar neck
 adapters are implemented; reviewed chord cards and full guitar/microphone/scored scope
 are not. Existing source timing, account/history and body workflow remain intact.
-The next software milestone is private reviewed-music release, alongside real model/
-corpus/worker qualification and teacher-confirmed assessable spans. See the current
+Private reviewed invitation release is now implemented. The next software milestone is
+the real model/corpus/worker loop, alongside teacher-confirmed assessable spans. See the current
 [delivery status and completion sequence](music-delivery-status.md).
+
+
+## Private invitation release review after 91b55be
+
+The latest reviewed music revision can be released to named accounts. The review follow-up
+closes group/public API bypasses (including stale records), negotiates format 2 before
+acceptance creates a grant, validates the accepted document on the client, and separates
+new invitations from explicit release updates. See [sharing evidence](music-private-sharing.md).
+This completes the invitation slice, not the complete Phase 5 or commercial exit gate.
+
+Proceed next with the [remaining delivery sequence](music-platform-completion-sequence.md).
+The immediate milestone is a real private piano upload → exact-model inference → teacher
+correction → invitation → learner playback. Keep movement workflows and login as the shell.
+Library UI acceptance, reference-editing software and hardware preparation can proceed in
+parallel; microphone/full guitar assessment and scoring are later, separately qualified work.
