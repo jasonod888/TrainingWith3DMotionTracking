@@ -3,11 +3,12 @@ import {ArrowLeft, Plus, Trash2} from 'lucide-react';
 import type {MusicLessonManifest, Section} from '../../../../packages/lesson-schema/index';
 import {parseMusicLessonManifest} from '../../../../packages/lesson-schema/parse';
 import {assetUrl, request} from '../api';
-import {parseMusicReference, pitchName, type MusicReferenceSpan} from './music-reference';
+import {parseMusicReference, pitchName, type GuitarChord, type MusicReferenceSpan} from './music-reference';
 import './music-review.css';
 
 type EditNote = {id: string; onset: number; duration: number | null; pitch: number; optional: boolean;
-  velocity: number | null; confidence: number | null};
+  velocity: number | null; confidence: number | null; string: number | null; fret: number | null};
+const OPEN_STRING: Record<number, number> = {1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40};
 const PAGE = 50;
 
 /** Explicit owner editing of a reviewed lesson; saving creates a new revision but does not release it. */
@@ -17,6 +18,7 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
   const [manifest, setManifest] = useState<MusicLessonManifest | null>(null);
   const [notes, setNotes] = useState<EditNote[]>([]);
   const [spans, setSpans] = useState<MusicReferenceSpan[]>([]);
+  const [chords, setChords] = useState<GuitarChord[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [title, setTitle] = useState('');
   const [policy, setPolicy] = useState<'none' | 'notes'>('none');
@@ -48,7 +50,9 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
       setManifest(parsed.value);
       setTitle(parsed.value.title);
       setNotes(reference.events.map(event => ({id: event.id, onset: event.onset, pitch: event.pitch,
-        duration: event.duration, optional: event.optional, velocity: event.velocity, confidence: event.confidence})));
+        duration: event.duration, optional: event.optional, velocity: event.velocity, confidence: event.confidence,
+        string: event.string, fret: event.fret})));
+      setChords(reference.guitarChords);
       setSpans(reference.spans);
       setSections(parsed.value.section_set.sections);
       setPolicy(parsed.value.assessment.assessment === 'notes' ? 'notes' : 'none');
@@ -75,6 +79,7 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
         title,
         events: notes,
         spans,
+        guitar_chords: chords,
         sections,
         assessment: policy === 'notes'
           ? {assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch', 'timing'], rubric_version: 'piano-midi-v1'}
@@ -123,9 +128,27 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
         const index = page * PAGE + offset;
         return <fieldset key={note.id} disabled={busy}><legend>Note {index + 1}</legend>
           <label>Note<select aria-label={`Note ${index + 1} pitch`} value={note.pitch}
-            onChange={event => update(index, {pitch: Number(event.target.value)})}>
+            onChange={event => update(index, {pitch: Number(event.target.value), string: null, fret: null})}>
             {Array.from({length: 128}, (_, pitch) => <option key={pitch} value={pitch}>{pitchName(pitch)}</option>)}
           </select></label>
+          {manifest.subject === 'guitar' && <>
+            <label>String<select aria-label={`Note ${index + 1} string`} value={note.string ?? ''}
+              onChange={event => {
+                const string = event.target.value === '' ? null : Number(event.target.value);
+                update(index, string === null ? {string: null, fret: null}
+                  : {string, fret: note.fret ?? 0, pitch: OPEN_STRING[string] + (note.fret ?? 0)});
+              }}>
+              <option value="">Not reviewed</option>
+              {[6, 5, 4, 3, 2, 1].map(string => <option key={string} value={string}>{string} ({pitchName(OPEN_STRING[string])})</option>)}
+            </select></label>
+            <label>Fret<input aria-label={`Note ${index + 1} fret`} type="number" min={0} max={24}
+              value={note.fret ?? ''} disabled={note.string === null}
+              onChange={event => {
+                if (note.string === null) return;
+                const fret = Math.max(0, Math.min(24, Number(event.target.value) || 0));
+                update(index, {fret, pitch: OPEN_STRING[note.string] + fret});
+              }}/></label>
+          </>}
           <label>Start (seconds)<input aria-label={`Note ${index + 1} start`} type="number" min={0} max={manifest.duration}
             step="any" value={note.onset} onChange={event => update(index, {onset: Number(event.target.value)})}/></label>
           <label>Length (seconds)<input aria-label={`Note ${index + 1} length`} type="number" min={0.001} max={manifest.duration}
@@ -142,7 +165,8 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
         <button type="button" disabled={busy || (page + 1) * PAGE >= notes.length} onClick={() => setPage(value => value + 1)}>Next notes</button>
         <button type="button" disabled={busy || notes.length >= 20000}
           onClick={() => { changed(); setNotes(previous => [...previous, {id: crypto.randomUUID(), onset: 0,
-            duration: Math.min(0.25, manifest.duration), pitch: 60, optional: false, velocity: null, confidence: null}]); }}><Plus size={14}/>Add note</button>
+            duration: Math.min(0.25, manifest.duration), pitch: 60, optional: false, velocity: null, confidence: null,
+            string: null, fret: null}]); }}><Plus size={14}/>Add note</button>
       </div>
       <h2>Assessable passages</h2>
       <p className="small muted">Only <strong>playing</strong> passages produce learner corrections. Explanation passages
@@ -163,6 +187,25 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
         onClick={() => { if (!passageGap) return; changed(); setSpans(previous => [...previous,
           {...passageGap, kind: 'playing' as const}]); }}><Plus size={14}/>Add passage</button>
       {!passageGap && <p className="small muted">No gap available; adjust existing passage boundaries to add another.</p>}
+      {manifest.subject === 'guitar' && <>
+        <h2>Reviewed chord shapes</h2>
+        <p className="small muted">Order strings low E to high E; use -1 for muted and 0 for open. These shapes render exactly as reviewed.</p>
+        {chords.map((chord, index) => <fieldset key={chord.id} disabled={busy}><legend>Chord {index + 1}</legend>
+          <label>Name<input aria-label={`Chord ${index + 1} name`} maxLength={40} value={chord.name}
+            onChange={event => { changed(); setChords(previous => previous.map((item, position) => position === index ? {...item, name: event.target.value} : item)); }}/></label>
+          <label>Start (seconds)<input aria-label={`Chord ${index + 1} start`} type="number" min={0} max={manifest.duration} step="any" value={chord.start}
+            onChange={event => { changed(); setChords(previous => previous.map((item, position) => position === index ? {...item, start: Number(event.target.value)} : item)); }}/></label>
+          <label>Base position<input aria-label={`Chord ${index + 1} position`} type="number" min={1} max={24} value={chord.position}
+            onChange={event => { changed(); setChords(previous => previous.map((item, position) => position === index ? {...item, position: Math.max(1, Math.min(24, Number(event.target.value) || 1))} : item)); }}/></label>
+          {chord.frets.map((fret, string) => <label key={string}>{['low E', 'A', 'D', 'G', 'B', 'high E'][string]}
+            <input aria-label={`Chord ${index + 1} fret ${string + 1}`} type="number" min={-1} max={24} value={fret}
+              onChange={event => { changed(); setChords(previous => previous.map((item, position) => position === index
+                ? {...item, frets: item.frets.map((value, slot) => slot === string ? Math.max(-1, Math.min(24, Number(event.target.value))) : value)} : item)); }}/></label>)}
+          <button type="button" onClick={() => { changed(); setChords(previous => previous.filter((_, position) => position !== index)); }}><Trash2 size={14}/>Remove chord {index + 1}</button>
+        </fieldset>)}
+        <button type="button" disabled={busy || chords.length >= 100} onClick={() => { changed(); setChords(previous => [...previous,
+          {id: crypto.randomUUID(), name: 'C', start: 0, frets: [-1, 3, 2, 0, 1, 0], position: 1}]); }}><Plus size={14}/>Add chord</button>
+      </>}
       <h2>Teaching sections</h2>
       {sections.map((section, index) => <fieldset key={section.id} disabled={busy}><legend>Section {index + 1}</legend>
         <label>Section name<input maxLength={80} value={section.label}

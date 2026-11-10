@@ -1,0 +1,58 @@
+# Reviewed guitar positions and chord authoring
+
+10 November 2026. Instructors can now save explicit string/fret positions per note and
+reviewed chord shapes; the guide renders those choices instead of inferred fingering.
+
+## Data contract
+
+- Each music note event may carry `string` (1 = high E … 6 = low E) and `fret` (0–24).
+  They must appear together and must match the note pitch in standard tuning
+  `E2 A2 D3 G3 B3 E4`; a mismatch is rejected (422). Omitting both keeps the old fallback.
+- A reviewed reference may carry up to 100 `guitar_chords`, each with a unique id, name,
+  start time, six frets ordered **low E to high E** (`-1` muted, `0` open, `1–24` fretted)
+  and a base position. The draft/review/edit contracts validate bounds and uniqueness.
+- The edit endpoint persists both into the new immutable reference; the manifest and
+  learner release rules are unchanged.
+
+## Editor
+
+For guitar lessons, the reviewed-lesson editor adds:
+
+- per-note **String** and **Fret** controls; choosing a position sets the pitch to the
+  standard-tuning value, and changing the pitch clears an inherited position;
+- **Reviewed chord shapes** with name, start, base position and six fret fields, plus
+  add/remove;
+- the existing title, notes, passages, sections and watch/MIDI policy editing.
+
+Saving still creates a new revision; learners keep the current shared release until
+**Update shared version**. Piano lessons do not show these controls.
+
+## Guide
+
+- `guitarGuide` prefers an explicit reviewed position for each active note; notes without
+  one use the previous illustrative lowest-fret fallback. When any reviewed position is
+  present, the notice says markers are the instructor's reviewed choices.
+- A lazy `GuitarChordCards` panel renders hand-built SVG diagrams for reviewed chords,
+  highlights the chord active at the current guide time and labels the string order. No
+  vendor chord database, sample assets or chord-inference claim is involved. SVGuitar is
+  still not imported by the application.
+- The chord panel is a lazy chunk, keeping the music-screen static closure within budget.
+
+## Verification
+
+| Check | Result |
+| --- | --- |
+| `tests/api/test_music_edit.py` | Positions/chords persist; pitch/position mismatch rejected |
+| `apps/web/tests/music-reference.test.mjs` | Position/chord parsing, duplicate/bounds rejection, explicit guide preference |
+| `scripts/verify_guitar_authoring.py` | Editor saves string/fret and a C chord; preview renders the reviewed neck marker and chord card; no device requests |
+| Web suite | **286 passed**; TypeScript/build pass; music screen 15,947 B gzip (within 16,384) |
+| Full API suite | **325 passed, 13 skipped** |
+
+## Limits
+
+- Standard tuning only; capo, alternate tunings and left-handed positions remain
+  unsupported and are refused/hidden rather than guessed.
+- Chord shapes are reviewed display data, not strum/voicing assessment; no scoring.
+- No chord inference, microphone/guitar assessment or public/group music release.
+- Positions are authored after review through the editor; the initial review screen does
+  not yet expose them.

@@ -108,3 +108,28 @@ def test_title_only_edit_preserves_velocity_and_confidence(tmp_path):
         reference = json.loads(store.objects[edited.json()['reference']['key']])
         assert reference['events'][0]['velocity'] == 0.5
         assert reference['events'][0]['confidence'] == 0.9
+
+
+def test_edit_persists_reviewed_positions_and_chords(tmp_path):
+    with real_media_app(tmp_path) as (client, app, settings, store, mail):
+        lesson_id, view, _lease, _base, _payload = proposal(client, app, media(tmp_path, 'audio'))
+        body = review_body(view)
+        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
+                              'rubric_version': 'music-watch-v1'}
+        reviewed = client.post(f'/api/lessons/{lesson_id}/music-draft/review', json=body)
+        first = reviewed.json()
+        edit = {'base_revision_id': first['revision_id'], 'title': 'Guitar choices',
+                'events': [{**body['events'][0], 'pitch': 60, 'string': 2, 'fret': 1},
+                           {**body['events'][1], 'string': None, 'fret': None}],
+                'spans': body['spans'], 'sections': body['sections'], 'assessment': body['assessment'],
+                'guitar_chords': [{'id': 'chord-c', 'name': 'C', 'start': 0,
+                                   'frets': [-1, 3, 2, 0, 1, 0], 'position': 1}],
+                'confirm_reviewed': True}
+        bad = {**edit, 'events': [{**edit['events'][0], 'string': 2, 'fret': 2}]}
+        with patch('apps.api.music_edit.storage_client', return_value=store):
+            assert client.post(f'/api/lessons/{lesson_id}/music-revision', json=bad).status_code == 422
+            edited = client.post(f'/api/lessons/{lesson_id}/music-revision', json=edit)
+        assert edited.status_code == 200, edited.text
+        reference = json.loads(store.objects[edited.json()['reference']['key']])
+        assert reference['events'][0]['string'] == 2 and reference['events'][0]['fret'] == 1
+        assert reference['guitar_chords'][0]['name'] == 'C' and reference['guitar_chords'][0]['frets'][1] == 3

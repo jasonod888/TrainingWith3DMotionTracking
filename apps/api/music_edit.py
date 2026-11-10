@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .auth import now
-from .contracts import (Asset, Contract, MusicDraftDocument, MusicEvent, MusicLessonManifest,
+from .contracts import (Asset, Contract, GuitarChord, MusicDraftDocument, MusicEvent, MusicLessonManifest,
                         MusicSpan, Section, SectionSet)
 from .database import LessonAsset, LessonRevision, MusicRevisionEdit
 from .music_review import ReviewAssessment, canonical
@@ -28,6 +28,7 @@ class EditMusic(Contract):
     title: str = Field(min_length=1, max_length=200)
     events: list[MusicEvent] = Field(max_length=20000)
     spans: list[MusicSpan] = Field(max_length=500)
+    guitar_chords: list[GuitarChord] = Field(default_factory=list, max_length=100)
     sections: list[Section] = Field(min_length=1, max_length=500)
     assessment: ReviewAssessment = Field(default_factory=ReviewAssessment)
     confirm_reviewed: Literal[True]
@@ -70,6 +71,7 @@ def install_music_edit(app, settings, identity, db):
                 'instrument': current.manifest['instrument'], 'duration': current.manifest['duration'],
                 'reference': current.manifest['reference'], 'events': [event.model_dump() for event in body.events],
                 'spans': [span.model_dump() for span in body.spans],
+                'guitar_chords': [chord.model_dump() for chord in body.guitar_chords],
                 'provenance': previous_reference['provenance'],
                 'warnings': [],
             })
@@ -84,6 +86,7 @@ def install_music_edit(app, settings, identity, db):
             'instrument': proposal.instrument.model_dump(), 'duration': proposal.duration,
             'events': [event.model_dump() for event in proposal.events],
             'spans': [span.model_dump() for span in proposal.spans],
+            'guitar_chords': [chord.model_dump() for chord in proposal.guitar_chords],
             'provenance': proposal.provenance.model_dump(),
             'review': {'reviewer_id': account.id, 'reviewed_at': reviewed_at.isoformat(),
                        'draft_id': current.id, 'source_reference_sha256': current.manifest['reference']['sha256'],

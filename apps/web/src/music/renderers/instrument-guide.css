@@ -4,3 +4,12 @@
 .library-neck {min-width:520px;width:100%;pointer-events:none;}
 .library-neck svg {display:block;max-width:100%;}
 @media(prefers-reduced-motion:reduce){.library-guide-scroll *{transition:none!important;animation:none!important;}}
+
+
+.guitar-chords { margin-top: 10px; }
+.guitar-chords h3 { margin: 0 0 6px; font-size: .9rem; }
+.guitar-chord-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.guitar-chord-list figure { margin: 0; padding: 6px; border: 1px solid #e2e8f0; border-radius: 8px; min-width: 108px; color: #334155; }
+.guitar-chord-list figure.is-active { border-color: #2563eb; background: #eff6ff; }
+.guitar-chord-list figcaption { font-size: .78rem; font-weight: 600; }
+.guitar-chord-list svg { display: block; width: 100px; height: 124px; }

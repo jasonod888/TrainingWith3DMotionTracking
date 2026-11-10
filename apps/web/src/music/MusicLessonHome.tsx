@@ -320,7 +320,7 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
             {active.length ? active.map(event => pitchName(event.pitch)).join(' · ') : 'No note sounding'}
             {span && <span className="music-span"> · {span.start.toFixed(1)}–{span.end.toFixed(1)}s</span>}
           </p>
-          <InstrumentGuideStage key={identity} reference={reference} active={active} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>
+          <InstrumentGuideStage key={identity} reference={reference} active={active} time={time} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>
           <ol className="music-sections" aria-label="Teaching sections">
             {sections.map(section => <li key={section.id}>
               <button className="secondary" aria-current={sectionIndex===sections.indexOf(section) ? 'step' : undefined}

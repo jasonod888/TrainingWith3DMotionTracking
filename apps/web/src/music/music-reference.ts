@@ -7,8 +7,11 @@ export type MusicReferenceEvent = {
   velocity: number | null;
   confidence: number | null;
   optional: boolean;
+  string: number | null;
+  fret: number | null;
 };
 export type MusicReferenceSpan = {start: number; end: number; kind: 'playing' | 'explanation'};
+export type GuitarChord = {id: string; name: string; start: number; frets: number[]; position: number};
 export type MusicReview = {
   reviewer_id: string;
   reviewed_at: string;
@@ -22,6 +25,7 @@ export type MusicReference = {
   duration: number;
   events: MusicReferenceEvent[];
   spans: MusicReferenceSpan[];
+  guitarChords: GuitarChord[];
   review: MusicReview;
 };
 
@@ -87,8 +91,35 @@ export function parseMusicReference(value: unknown): MusicReference {
     const confidence = item.confidence == null ? null : finite(item.confidence, `note ${id} confidence`);
     if (confidence !== null && (confidence < 0 || confidence > 1)) throw new Error(`Note ${id} has an invalid confidence.`);
     if(item.optional!=null&&typeof item.optional!=='boolean')throw new Error('A note has an invalid optional flag.');
-    return {id, onset, duration: length, pitch, velocity, confidence, optional: item.optional === true};
+    const string = item.string == null ? null : finite(item.string, `note ${id} string`);
+    const fret = item.fret == null ? null : finite(item.fret, `note ${id} fret`);
+    if ((string === null) !== (fret === null)) throw new Error(`Note ${id} needs both string and fret.`);
+    if (string !== null && (!Number.isInteger(string) || string < 1 || string > 6 || !Number.isInteger(fret) || fret! < 0 || fret! > 24)) {
+      throw new Error(`Note ${id} has an invalid reviewed position.`);
+    }
+    if (string !== null && ({1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40} as Record<number, number>)[string] + fret! !== pitch) {
+      throw new Error(`Note ${id} position does not match its pitch in standard tuning.`);
+    }
+    return {id, onset, duration: length, pitch, velocity, confidence, optional: item.optional === true, string, fret};
   }).sort((left, right) => left.onset - right.onset || left.pitch - right.pitch);
+  const guitarChords: GuitarChord[] = Array.isArray(document.guitar_chords) ? document.guitar_chords.map((raw, index) => {
+    if (!raw || typeof raw !== 'object') throw new Error('The reference has an invalid chord.');
+    const item = raw as Record<string, unknown>;
+    const id = typeof item.id === 'string' ? item.id : '';
+    const name = typeof item.name === 'string' ? item.name.trim() : '';
+    if (!id || id.length > 80 || !name || name.length > 40) throw new Error('A reviewed chord has an invalid name.');
+    const start = finite(item.start, `chord ${name} start`);
+    if (start < 0 || start > duration + 1e-6) throw new Error('A reviewed chord starts outside the clip.');
+    if (!Array.isArray(item.frets) || item.frets.length !== 6) throw new Error('A reviewed chord needs six string frets.');
+    const frets = item.frets.map((value: unknown) => finite(value, `chord ${name} fret`));
+    if (frets.some(value => !Number.isInteger(value) || value < -1 || value > 24) || !frets.some(value => value >= 0)) {
+      throw new Error('A reviewed chord has invalid frets.');
+    }
+    const position = item.position == null ? 1 : finite(item.position, `chord ${name} position`);
+    if (!Number.isInteger(position) || position < 1 || position > 24) throw new Error('A reviewed chord has an invalid base position.');
+    return {id, name, start, frets, position};
+  }) : [];
+  if (new Set(guitarChords.map(chord => chord.id)).size !== guitarChords.length) throw new Error('Reviewed chord ids must be unique.');
   let review: MusicReview;
   if (document.review != null && !Array.isArray(document.review)) {
     if (typeof document.review !== 'object') throw new Error('The reviewed reference has invalid review evidence.');
@@ -106,7 +137,7 @@ export function parseMusicReference(value: unknown): MusicReference {
   else throw new Error('The reviewed reference has no review evidence.');
   if(!document.instrument||typeof document.instrument!=='object'||Array.isArray(document.instrument)||(document.instrument as Record<string,unknown>).instrument!==document.subject)throw new Error('The reference instrument does not match its subject.');
   return {reference_version: 1, subject: document.subject, instrument: {...document.instrument as Record<string, unknown>},
-    duration, events, spans, review};
+    duration, events, spans, guitarChords, review};
 }
 
 export function eventDuration(event: MusicReferenceEvent): number {

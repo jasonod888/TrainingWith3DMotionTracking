@@ -232,6 +232,34 @@ class MusicEvent(Contract):
     velocity: float | None = Field(default=None, ge=0, le=1)
     confidence: float | None = Field(default=None, ge=0, le=1)
     optional: bool = False
+    string: int | None = Field(default=None, ge=1, le=6)
+    fret: int | None = Field(default=None, ge=0, le=24)
+
+    @model_validator(mode='after')
+    def positioned(self):
+        if (self.string is None) != (self.fret is None):
+            raise ValueError('A reviewed position needs both string and fret.')
+        if self.string is not None:
+            open_pitch = {1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40}[self.string]
+            if open_pitch + self.fret != self.pitch:
+                raise ValueError('The reviewed position does not match the note pitch and standard tuning.')
+        return self
+
+
+class GuitarChord(Contract):
+    id: str = Field(min_length=1, max_length=80)
+    name: str = Field(min_length=1, max_length=40)
+    start: float = Field(ge=0)
+    frets: list[int] = Field(min_length=6, max_length=6)
+    position: int = Field(default=1, ge=1, le=24)
+
+    @model_validator(mode='after')
+    def playable(self):
+        if any(fret < -1 or fret > 24 for fret in self.frets):
+            raise ValueError('Chord frets must be muted (-1), open (0) or 1-24.')
+        if all(fret < 0 for fret in self.frets):
+            raise ValueError('A chord needs at least one sounding string.')
+        return self
 
 
 class MusicSpan(Contract):
@@ -266,6 +294,7 @@ class MusicDraftDocument(Contract):
     source_video: Asset | None = None
     events: list[MusicEvent] = Field(default_factory=list, max_length=20000)
     spans: list[MusicSpan] = Field(default_factory=list, max_length=500)
+    guitar_chords: list[GuitarChord] = Field(default_factory=list, max_length=100)
     provenance: DraftProvenance
     warnings: list[str] = Field(default_factory=list, max_length=100)
 

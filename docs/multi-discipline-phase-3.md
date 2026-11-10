@@ -804,3 +804,21 @@ TypeScript/build/bundle pass within budget; **323 API passed, 13 skipped**. Shar
 
 Verification: **324 API passed, 13 skipped**; **285 web passed**; TypeScript, build and
 bundle pass (music screen within budget).
+
+
+## Implementation slice: reviewed guitar positions and chords
+
+10 November 2026. Instructors can author explicit string/fret positions per note and
+reviewed chord shapes; the guide renders them without chord inference.
+
+- Contract: optional `string`/`fret` on note events (paired and standard-tuning validated)
+  and up to 100 reviewed chords (unique ids, six frets low E→high E, base position).
+  Draft/review/edit validation covers bounds, uniqueness and pitch mapping.
+- Editor: guitar-only string/fret controls and chord shape authoring; saving is a new
+  immutable revision, release unchanged until Update shared version.
+- Guide: explicit reviewed positions are preferred over the illustrative fallback; a lazy
+  hand-built SVG chord panel highlights the active chord. Standard tuning only; SVGuitar
+  remains unused.
+- Verification: **325 API passed, 13 skipped**; **286 web passed**; TypeScript/build pass;
+  music screen 15,947 B gzip within the 16,384 budget; guitar authoring browser check
+  passes.

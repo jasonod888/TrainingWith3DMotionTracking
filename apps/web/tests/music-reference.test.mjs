@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   activeEvents, currentSpan, eventDuration, guitarPosition, parseMusicReference, pianoGeometry, pitchName, bindMusicReference,supportsGuitarDiagram,
 } from '../src/music/music-reference.ts';
+import {guitarGuide} from '../src/music/renderers/guide-view-model.ts';
 
 const base = {
   review:{reviewer_id:'fixture-author',reviewed_at:'2026-11-05T12:00:00Z',draft_id:'fixture-draft',source_reference_sha256:'a'.repeat(64)},
@@ -77,4 +78,21 @@ test('guitar positions use standard tuning and the lowest fret', () => {
   assert.deepEqual(guitarPosition(61), {string: 5, fret: 2, label: 'B3'});
   assert.equal(guitarPosition(20), null);
   assert.equal(pitchName(60), 'C4');
+});
+
+test('reviewed guitar positions and chords are validated and preferred', () => {
+  const guitar = {...base, subject: 'guitar', instrument: {instrument: 'guitar'},
+    events: [{id: 'g', onset: 2, duration: 0.3, pitch: 40, string: 6, fret: 0},
+             {id: 'h', onset: 3, duration: 0.3, pitch: 45}],
+    guitar_chords: [{id: 'c', name: 'C', start: 0, frets: [-1, 3, 2, 0, 1, 0], position: 1}]};
+  const reference = parseMusicReference(guitar);
+  assert.equal(reference.events[0].string, 6);
+  assert.equal(reference.guitarChords[0].name, 'C');
+  assert.throws(() => parseMusicReference({...guitar, events: [{...guitar.events[0], fret: 2}]}), /position does not match/);
+  assert.throws(() => parseMusicReference({...guitar, guitar_chords: [{...guitar.guitar_chords[0], frets: [-1, 3]}]}), /six string frets/);
+  assert.throws(() => parseMusicReference({...guitar, guitar_chords: [guitar.guitar_chords[0],
+    {...guitar.guitar_chords[0]}]}), /unique/);
+  const model = guitarGuide(reference.instrument, reference.events.filter(event => event.id === 'g'));
+  assert.deepEqual(model.positions, [{pitch: 40, string: 6, fret: 0, label: 'E2'}]);
+  assert.match(model.notice, /instructor's reviewed positions/);
 });

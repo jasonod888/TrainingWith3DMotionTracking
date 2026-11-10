@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .auth import now
-from .contracts import (Contract, Asset, AssessmentPolicy, MusicDraftDocument, MusicEvent,
+from .contracts import (Contract, Asset, AssessmentPolicy, GuitarChord, MusicDraftDocument, MusicEvent,
                         MusicLessonManifest, MusicSpan, Section, SectionSet)
 from .database import LessonAsset, LessonRevision, MusicDraft, MusicReview
 from .permissions import accept_revision, latest_revision, owned_lesson
@@ -44,6 +44,7 @@ class ReviewMusic(Contract):
     title: str = Field(min_length=1,max_length=200)
     events: list[MusicEvent] = Field(max_length=20000)
     spans: list[MusicSpan] = Field(max_length=500)
+    guitar_chords: list[GuitarChord] = Field(default_factory=list, max_length=100)
     sections: list[Section] = Field(min_length=1,max_length=500)
     confirm_reviewed: Literal[True]
     assessment: ReviewAssessment = Field(default_factory=ReviewAssessment)
@@ -80,7 +81,8 @@ def install_music_review(app,settings,identity,db):
         try:
             proposal=MusicDraftDocument.model_validate({**row.document,
                 'events':[event.model_dump() for event in body.events],
-                'spans':[span.model_dump() for span in body.spans]})
+                'spans':[span.model_dump() for span in body.spans],
+                'guitar_chords':[chord.model_dump() for chord in body.guitar_chords]})
             current=latest_revision(session,lesson)
             version=current.version+1 if current else 1
             sections=SectionSet(id=uuid4().hex,revision=version,duration=proposal.duration,sections=body.sections)
@@ -91,6 +93,7 @@ def install_music_review(app,settings,identity,db):
             'instrument':proposal.instrument.model_dump(),'duration':proposal.duration,
             'events':[event.model_dump() for event in proposal.events],
             'spans':[span.model_dump() for span in proposal.spans],
+            'guitar_chords':[chord.model_dump() for chord in proposal.guitar_chords],
             'provenance':proposal.provenance.model_dump(),
             'review':{'reviewer_id':account.id,'reviewed_at':reviewed_at.isoformat(),
                       'draft_id':row.id,'source_reference_sha256':body.reference_sha256}}

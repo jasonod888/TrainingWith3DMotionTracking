@@ -1,6 +1,7 @@
 import {Component,lazy,Suspense,useMemo,type ReactNode} from 'react';
 import {pianoGeometry,pitchName,type MusicReference,type MusicReferenceEvent} from '../music-reference';
 import {guitarGuide} from './guide-view-model';
+const GuitarChordCards=lazy(()=>import('./GuitarChordCards'));
 import {LegacyInstrumentGuide} from './LegacyInstrumentGuide';
 const PianoGuide=lazy(()=>import('./PianoGuide'));
 const GuitarNeckGuide=lazy(()=>import('./GuitarNeckGuide'));
@@ -9,7 +10,7 @@ class DrawingBoundary extends Component<{fallback:ReactNode;children:ReactNode},
  static getDerivedStateFromError(){return {failed:true};}
  render(){return this.state.failed?<><p className="small muted" role="status">Using the basic guide because the enhanced drawing could not load.</p>{this.props.fallback}</>:this.props.children;}
 }
-export function InstrumentGuideStage({reference,active,pianoLibrary=false,guitarLibrary=false}:{reference:MusicReference;active:MusicReferenceEvent[];pianoLibrary?:boolean;guitarLibrary?:boolean}){
+export function InstrumentGuideStage({reference,active,time=0,pianoLibrary=false,guitarLibrary=false}:{reference:MusicReference;active:MusicReferenceEvent[];time?:number;pianoLibrary?:boolean;guitarLibrary?:boolean}){
  const range=useMemo(()=>pianoGeometry(reference.events),[reference]);
  const pitches=[...new Set(active.map(event=>event.pitch))].sort((a,b)=>a-b);
  const guitar=guitarGuide(reference.instrument,active);
@@ -20,5 +21,6 @@ export function InstrumentGuideStage({reference,active,pianoLibrary=false,guitar
    {reference.subject==='piano'?<PianoGuide low={range.low} high={range.high} pitches={pitches} noteLabel={pitchName}/>:<GuitarNeckGuide positions={guitar.positions}/>}
   </Suspense></DrawingBoundary>:legacy}
   {reference.subject==='guitar'&&<p className="small muted">{guitar.notice}</p>}
+  {reference.subject==='guitar'&&reference.guitarChords.length>0&&<Suspense fallback={null}><GuitarChordCards chords={reference.guitarChords} time={time}/></Suspense>}
  </div>;
 }
