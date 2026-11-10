@@ -33,3 +33,4 @@ web/dist/assets/
 apps/web/public/dev-clips/
 build/
 
+.spike-dist/

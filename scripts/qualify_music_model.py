@@ -10,6 +10,7 @@ import json
 import math
 import statistics
 import sys
+import wave
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -102,6 +103,8 @@ def validate_artifact(value: dict, use: str = 'internal-evaluation') -> dict:
             raise ValueError('Approval must record reviewer, date, scope and evidence sha256.')
         if approval.get('decision') != 'approved':
             raise ValueError('Approval decision must be approved.')
+        if any(not isinstance(approval[key],str) or not approval[key].strip() for key in ('reviewer_id','scope')):
+            raise ValueError('Approval reviewer and scope must be non-empty text.')
         try:
             datetime.fromisoformat(str(approval['approved_at']).replace('Z','+00:00'))
         except ValueError as error:
@@ -110,37 +113,111 @@ def validate_artifact(value: dict, use: str = 'internal-evaluation') -> dict:
         if len(evidence) != 64 or any(character not in '0123456789abcdef' for character in evidence):
             raise ValueError('Approval evidence must be a sha256 digest.')
         result['commercial'] = {key: value[key] for key in COMMERCIAL}
+        for key in ('code_sha256', 'terms_snapshot_sha256'):
+            digest_value=value.get(key)
+            if not isinstance(digest_value,str) or len(digest_value)!=64 or any(c not in '0123456789abcdef' for c in digest_value):
+                raise ValueError(f'Commercial use requires {key}.')
+            result[key]=digest_value
+        for key in ('code_license_url','weights_license_url'):
+            url=value.get(key)
+            if not isinstance(url,str) or urlparse(url).scheme!='https' or not urlparse(url).netloc:
+                raise ValueError(f'Commercial use requires {key}.')
+            result[key]=url
     else:
         result['commercial'] = None
     return result
 
-def corpus_cases(root: Path, tolerance: float, minimum: int) -> dict:
+def case_file(folder, metadata, key):
+    value=metadata.get(key)
+    if not isinstance(value,str) or not value or Path(value).is_absolute() or '\\' in value or any(part in ('..','.') for part in value.split('/')):
+        raise ValueError(f'{folder.name} has an unsafe {key} path.')
+    path=(folder/value).resolve()
+    if not path.is_relative_to(folder.resolve()) or not path.is_file():
+        raise ValueError(f'{folder.name} {key} is missing or outside the case.')
+    digest=metadata.get(key+'_sha256')
+    if not isinstance(digest,str) or file_digest(path)!=digest:
+        raise ValueError(f'{folder.name} {key} does not match its digest.')
+    return path
+
+
+def probe_corpus_audio(path):
+    """Bounded PCM WAV validation; decoded bytes cannot prove acoustic origin."""
+    try:
+        with wave.open(str(path),'rb') as audio:
+            count=audio.getnframes();size=count*audio.getnchannels()*audio.getsampwidth()
+            if audio.getcomptype()!='NONE' or count<=0 or audio.getframerate()<=0 or size>100*1024*1024:
+                raise ValueError('Corpus PCM WAV is empty or exceeds the 100 MiB decoded bound.')
+            if len(audio.readframes(count))!=size:
+                raise ValueError('Corpus audio is truncated.')
+            return {'duration':count/audio.getframerate(),'sample_rate':audio.getframerate(),'channels':audio.getnchannels()}
+    except (wave.Error, EOFError) as error:
+        raise ValueError('Corpus audio must be a valid PCM WAV file.') from error
+
+
+def corpus_cases(root: Path, tolerance: float, minimum: int, artifact_sha256: str | None=None) -> dict:
     """Score a local real-audio corpus. Cases declare their own reviewed reference/proposal."""
+    if type(minimum) is not int or minimum<3:
+        raise ValueError('At least three cases are required; --min-cases cannot lower that floor.')
+    if not isinstance(artifact_sha256,str) or len(artifact_sha256)!=64 or any(c not in '0123456789abcdef' for c in artifact_sha256):
+        raise ValueError('Corpus proposals must declare the evaluated artifact digest.')
     if not root.is_dir():
         raise ValueError('Corpus directory does not exist.')
     cases = []
+    audio_digests=set()
     for folder in sorted(path for path in root.iterdir() if path.is_dir()):
+        if folder.is_symlink() or not folder.resolve().is_relative_to(root.resolve()):
+            raise ValueError('Corpus case folders must remain inside the corpus.')
         metadata_path = folder/'case.json'
-        if not metadata_path.is_file():raise ValueError(f'{folder.name} has no case.json.')
+        if not metadata_path.is_file() or not metadata_path.resolve().is_relative_to(folder.resolve()):
+            raise ValueError(f'{folder.name} has no safe case.json.')
         metadata = json.loads(metadata_path.read_text(encoding='utf-8'))
         if not isinstance(metadata,dict):raise ValueError(f'{folder.name} metadata is invalid.')
         if metadata.get('real_audio') is not True:
             raise ValueError(f'{folder.name} is not declared real audio; synthetic cases cannot be accuracy evidence.')
         if metadata.get('reviewed') is not True:
             raise ValueError(f'{folder.name} reference is not declared reviewed.')
-        audio = folder/str(metadata.get('audio',''))
-        if not audio.is_file() or file_digest(audio)!=str(metadata.get('audio_sha256','')).lower():
-            raise ValueError(f'{folder.name} audio is missing or does not match its digest.')
-        reference = validate_reviewed_reference(json.loads((folder/str(metadata.get('reference',''))).read_text(encoding='utf-8')))
-        proposal = load_events(json.loads((folder/str(metadata.get('proposal',''))).read_text(encoding='utf-8')))
-        cases.append({'case':folder.name,'metrics':score_events(reference,proposal,tolerance)})
+        audio=case_file(folder,metadata,'audio');audio_info=probe_corpus_audio(audio)
+        if metadata['audio_sha256'] in audio_digests:
+            raise ValueError('Corpus cases must use distinct audio files, not duplicated clip bytes.')
+        audio_digests.add(metadata['audio_sha256'])
+        reference_path=case_file(folder,metadata,'reference');proposal_path=case_file(folder,metadata,'proposal')
+        reference_document=json.loads(reference_path.read_text(encoding='utf-8'))
+        reference=validate_reviewed_reference(reference_document)
+        if abs(reference_document['duration']-audio_info['duration'])>.05:
+            raise ValueError(f'{folder.name} reference duration does not match the audio.')
+        provenance=metadata.get('inference')
+        if not isinstance(provenance,dict) or provenance.get('artifact_sha256')!=artifact_sha256 or provenance.get('audio_sha256')!=metadata['audio_sha256'] or provenance.get('proposal_sha256')!=metadata['proposal_sha256'] or not all(isinstance(provenance.get(key),str) and provenance[key].strip() for key in ('run_id','code_version')):
+            raise ValueError(f'{folder.name} inference declaration must bind artifact, audio and proposal digests and a run identity.')
+        proposal = load_events(json.loads(proposal_path.read_text(encoding='utf-8')))
+        if any(note['onset']+(note['duration'] or 0)>audio_info['duration']+1e-6 for note in proposal):
+            raise ValueError(f'{folder.name} proposal notes exceed the audio.')
+        cases.append({'case':folder.name,'metrics':score_events(reference,proposal,tolerance),'audio':audio_info,
+            'identities':{key:metadata[key] for key in ('audio_sha256','reference_sha256','proposal_sha256')},'inference_declaration':provenance})
     if len(cases)<minimum:
         raise ValueError(f'At least {minimum} real-audio cases are required for an accuracy claim.')
     def mean(key):return round(statistics.fmean(case['metrics'][key] for case in cases),4)
-    return {'cases':cases,'case_count':len(cases),'real_audio_cases':len(cases),'reviewed_cases':len(cases),
+    onset_errors=[case['metrics']['onset_mae_seconds'] for case in cases if case['metrics']['onset_mae_seconds'] is not None]
+    return {'cases':cases,'case_count':len(cases),'declared_real_audio_cases':len(cases),'reviewed_cases':len(cases),
             'aggregate':{'precision':mean('precision'),'recall':mean('recall'),'f1':mean('f1'),
-                         'onset_mae_seconds':round(statistics.fmean(case['metrics']['onset_mae_seconds'] for case in cases),4)},
-            'evidence_class':'real-audio-reviewed','not_a_licence_or_model_approval':True}
+                         'onset_mae_seconds':round(statistics.fmean(onset_errors),4) if onset_errors else None,
+                         'onset_mae_cases':len(onset_errors)},
+            'evidence_class':'reviewed-audio-proposal-comparison','audio_origin':'declared-acoustic-not-independently-proven',
+            'inference_verified':False,'not_a_licence_or_model_approval':True}
+
+
+def validate_commercial_files(artifact, code_file, license_file, approval_file):
+    if not code_file or file_digest(code_file)!=artifact['code_sha256']:
+        raise ValueError('Commercial use requires --code-file matching code_sha256.')
+    if file_digest(license_file)!=artifact['terms_snapshot_sha256']:
+        raise ValueError('Licence evidence does not match the approved terms snapshot.')
+    if not approval_file or file_digest(approval_file)!=artifact['commercial']['approval']['evidence_sha256']:
+        raise ValueError('Commercial qualification requires matching --approval-file evidence.')
+    approval=json.loads(approval_file.read_text(encoding='utf-8'))
+    expected={key:artifact[key] for key in ('code_sha256','terms_snapshot_sha256')}
+    expected['artifact_sha256']=artifact['sha256']
+    expected.update({key:artifact['commercial']['approval'][key] for key in ('reviewer_id','approved_at','scope','decision')})
+    if not isinstance(approval,dict) or any(approval.get(key)!=value for key,value in expected.items()):
+        raise ValueError('Approval contents do not bind this exact artifact, code, terms and decision.')
 
 
 def file_digest(path):
@@ -155,7 +232,7 @@ def validate_reviewed_reference(document):
     if document.get('reference_version')!=1 or document.get('subject') not in ('piano','guitar'):
         raise ValueError('A reviewed reference document is required.')
     review=document.get('review')
-    if not isinstance(review,dict) or not all(review.get(key) for key in ('reviewer_id','draft_id','reviewed_at','source_reference_sha256')):
+    if not isinstance(review,dict) or not all(isinstance(review.get(key),str) and review[key].strip() for key in ('reviewer_id','draft_id','reviewed_at','source_reference_sha256')):
         raise ValueError('The reference needs complete review evidence.')
     digest=review['source_reference_sha256']
     if not isinstance(digest,str) or len(digest)!=64 or any(c not in '0123456789abcdef' for c in digest):raise ValueError('Review source identity is invalid.')
@@ -171,6 +248,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--artifact', type=Path, required=True)
     parser.add_argument('--artifact-file',type=Path,required=True,help='Local artifact bytes; never downloaded by this harness')
+    parser.add_argument('--code-file',type=Path,help='Pinned source/runtime bundle bytes; required for commercial evidence')
     parser.add_argument('--license-file',type=Path,required=True,help='Retained licence evidence applying to the code/weights')
     parser.add_argument('--approval-file',type=Path,help='Retained commercial approval evidence; required for --use commercial')
     parser.add_argument('--use',choices=('internal-evaluation','commercial'),default='internal-evaluation')
@@ -181,14 +259,14 @@ def main() -> int:
     parser.add_argument('--tolerance', type=float, default=0.05)
     parser.add_argument('--output', type=Path)
     arguments = parser.parse_args()
-    if bool(arguments.corpus) == bool(arguments.reference or arguments.proposal):
+    if not arguments.corpus and (not arguments.reference or not arguments.proposal):
         print('Provide either --corpus or both --reference and --proposal.', file=sys.stderr)
         return 2
     if arguments.corpus and (arguments.reference or arguments.proposal):
         print('Do not mix a corpus with a single reference/proposal.', file=sys.stderr)
         return 2
-    if arguments.min_cases < 1:
-        print('--min-cases must be positive.', file=sys.stderr)
+    if arguments.min_cases < 3:
+        print('--min-cases must be at least three.', file=sys.stderr)
         return 2
     try:
         artifact = validate_artifact(json.loads(arguments.artifact.read_text(encoding='utf-8')), arguments.use)
@@ -196,6 +274,7 @@ def main() -> int:
         if not arguments.license_file.read_text(encoding='utf-8').strip():raise ValueError('Licence evidence is empty.')
         artifact['license_evidence_sha256']=file_digest(arguments.license_file)
         if arguments.use == 'commercial':
+            validate_commercial_files(artifact, arguments.code_file, arguments.license_file, arguments.approval_file)
             if not arguments.approval_file:raise ValueError('Commercial qualification requires --approval-file.')
             evidence=arguments.approval_file.read_bytes()
             if not evidence.strip():raise ValueError('Approval evidence is empty.')
@@ -203,7 +282,7 @@ def main() -> int:
                 raise ValueError('Approval evidence does not match the recorded sha256.')
             artifact['approval_evidence_sha256']=file_digest(arguments.approval_file)
         if arguments.corpus:
-            metrics=corpus_cases(arguments.corpus, arguments.tolerance, arguments.min_cases)
+            metrics=corpus_cases(arguments.corpus, arguments.tolerance, arguments.min_cases, artifact['sha256'])
             report = {'artifact': artifact, 'corpus': metrics,'artifact_bytes_verified':True,
                       'deployment_eligibility':('commercial-evidence-complete-not-an-approval' if arguments.use=='commercial' else 'internal-evaluation-only'),
                       'qualification_status':'evidence_only_not_model_or_licence_approval'}
@@ -223,7 +302,7 @@ def main() -> int:
     print(text)
     if arguments.corpus:
         aggregate=report['corpus']['aggregate']
-        print(f"\n{report['corpus']['case_count']} real-audio reviewed cases: precision {aggregate['precision']:.3f}, recall {aggregate['recall']:.3f}, F1 {aggregate['f1']:.3f}.")
+        print(f"\n{report['corpus']['case_count']} declared-acoustic reviewed proposal cases: precision {aggregate['precision']:.3f}, recall {aggregate['recall']:.3f}, F1 {aggregate['f1']:.3f}. Inference was not independently verified.")
     else:
         metrics = report['metrics']
         print(f"\n{metrics['matched']}/{metrics['reference_notes']} reference notes matched"

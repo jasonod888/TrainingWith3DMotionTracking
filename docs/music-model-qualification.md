@@ -92,3 +92,79 @@ No transcription artifact is installed or qualified. The fixture engine remains 
 transport test. Before processing is enabled: commercial code/weights approval, a
 real-audio reviewed corpus with acceptable metrics, and model/runtime packaging must all
 be reviewed.
+
+
+## bb780c9 follow-up: corpus integrity and commercial evidence binding
+
+Corrected the following before any real candidate/corpus is qualified:
+
+- Commercial runs pin actual source/runtime bytes through `--code-file`, and the exact
+  terms snapshot through `terms_snapshot_sha256`. Retained approval JSON must bind the
+  actual artifact, code and terms hashes plus the same reviewer/date/decision/scope.
+  See `music-model-licensing.md`; a generic approval file hash alone is insufficient.
+- Corpus audio must decode as bounded **PCM WAV**, not merely exist with a matching hash.
+  Header-only/truncated/empty data is refused; the decoded-data bound is 100 MiB. Other
+  audio formats must be prepared to WAV explicitly for this harness.
+- Each case pins audio, reference and proposal hashes. Relative file paths and symlinks
+  must resolve inside the case; case folders and case.json also stay inside the corpus.
+- At least three distinct audio-byte identities are required. `--min-cases` may raise
+  that floor but cannot lower it. Distinct hashes alone do not prove sample independence,
+  acoustic origin, representative diversity or adequate sample size for deployment.
+- The reference duration must agree with the decoded audio within 50 ms; proposal notes
+  cannot extend beyond that audio. Inference declarations bind the evaluated artifact,
+  audio and proposal hashes plus run ID and code version.
+- Macro onset error averages only cases that have matched attacks, with an explicit
+  contributing-case count. If no case matches, onset MAE is null, not zero or a crash.
+  Precision/recall/F1 still include every case, including misses and silence. These are
+  macro, per-case metrics, not a micro/pooled score.
+- Incomplete single-reference CLI arguments fail cleanly rather than raising a traceback.
+
+Example `case.json` shape (all hashes/IDs below are placeholders, not evidence):
+
+```json
+{
+  "real_audio": true,
+  "reviewed": true,
+  "audio": "clip.wav",
+  "audio_sha256": "<audio bytes digest>",
+  "reference": "reference.json",
+  "reference_sha256": "<reviewed reference bytes digest>",
+  "proposal": "proposal.json",
+  "proposal_sha256": "<proposal bytes digest>",
+  "inference": {
+    "artifact_sha256": "<evaluated artifact bytes digest>",
+    "audio_sha256": "<same audio digest>",
+    "proposal_sha256": "<same proposal digest>",
+    "run_id": "<retained inference run identity>",
+    "code_version": "<frozen adapter/runtime identity>"
+  }
+}
+```
+
+The report is now `reviewed-audio-proposal-comparison`, with
+`declared_real_audio_cases`, `audio_origin: declared-acoustic-not-independently-proven`
+and `inference_verified: false`. The harness compares saved files: it does not run the
+model, authenticate an inference declaration, distinguish recorded versus synthesized
+PCM, establish recording rights or independently verify a human review. The per-case
+identities are retained in reports so actual inference logs and rights/review evidence
+can be checked separately. A verified runner/capture workflow and a real, rights-cleared
+corpus remain necessary before making an artifact-accuracy/deployment claim.
+
+Commercial CLI:
+
+```powershell
+python scripts/qualify_music_model.py --use commercial --artifact artifact.json --artifact-file model.bundle --code-file runtime.bundle --license-file terms.txt --approval-file approval.json --corpus reviewed-corpus --output report.json
+```
+
+Tests generate PCM solely as structural fixtures; they are not acoustic recordings,
+actual model inference or legal approvals. No model, commercial licence approval, real
+corpus, deployment flag or scoring capability was introduced by these corrections.
+
+
+Verification: **20 focused tests passed** (15 qualification tests and 5 transcription
+adapter tests); Python compilation and diff checks pass. Includes a complete commercial
+CLI evidence chain and refusal when a different artifact is substituted in approval
+contents, even after updating the approval-file digest. Full API/web suites were not
+rerun: no application, UI, worker runtime or feature-flag code changed. Synthetic test
+files are not actual recordings, checkpoints or human approvals. Nothing was committed,
+pushed, downloaded or enabled in deployment by this follow-up.

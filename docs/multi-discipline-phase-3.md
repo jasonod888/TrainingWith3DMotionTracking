@@ -625,3 +625,47 @@ continue; scoring stays disabled until physical evidence and threshold decisions
 
 Verification: full API suite **299 passed, 13 skipped** (nine qualification tests); web
 suite unchanged at **279 passed**; the PostgreSQL evidence and harness remain as recorded.
+
+
+## bb780c9 model-qualification review follow-up
+
+Closed retained-evidence binding, unsafe corpus paths, invalid audio acceptance,
+missing reference/proposal hashes, duplicate-case/minimum bypass, null-MAE aggregation
+and incomplete CLI argument handling. Commercial runs now bind actual code/model/terms
+bytes and the contents of a retained approval record. Corpus input is bounded PCM WAV;
+case/run declarations bind hashes but are not authenticated inference evidence.
+Reports explicitly remain proposal comparisons with unverified inference/acoustic origin,
+not model accuracy or rights approvals. Detailed contracts are in the model-licensing
+and qualification documents. Existing application/worker schemas and flags are unchanged.
+No artifact was installed, selected, qualified or legally approved; no real corpus was
+created. Unscored pilot and real-corpus preparation may continue in parallel with the
+blocked physical-keyboard smoke test. Changes remain local and uncommitted.
+
+
+Verification: **20 focused tests passed** (15 qualification tests and 5 transcription
+adapter tests); Python compilation and diff checks pass. Includes a complete commercial
+CLI evidence chain and refusal when a different artifact is substituted in approval
+contents, even after updating the approval-file digest. Full API/web suites were not
+rerun: no application, UI, worker runtime or feature-flag code changed. Synthetic test
+files are not actual recordings, checkpoints or human approvals. Nothing was committed,
+pushed, downloaded or enabled in deployment by this follow-up.
+
+
+## UI-L0: instrument rendering library spike
+
+10 November 2026. Planning-only migration started with an isolated compatibility and cost
+spike; no production route or flag changed.
+
+- Installed exact candidates `react-piano@3.1.3` (MIT), `@moonwave99/fretboard.js@0.2.13`
+  (ISC) and `svguitar@2.10.1` (MIT) with no peer forcing.
+- Fixture passes React 19.2 Strict Mode, TypeScript 5.9 and the Vite spike build: piano
+  highlighting, horizontal neck, hand-authored chord, resize and destroy/re-mount.
+- Costs: piano ~6.98 kB gzip including CSS; fretboard chunk ~15.78 kB; svguitar ~69.93 kB.
+  The application's initial and music-screen closures are unchanged (129,114 B and
+  14,046 B gzip) because nothing in the app imports them.
+- Findings: react-piano has no bundled types and needs `playNote`/`stopNote` plus a sized
+  wrapper; fretboard has no destroy and needs container reset plus `render()` after
+  `setDots`. svguitar is deferred until reviewed chords and a lazy budget exist.
+
+Details: [`music-ui-library-spike.md`](music-ui-library-spike.md);
+[`third-party/README.md`](third-party/README.md). No scoring, hardware or model claim.

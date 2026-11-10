@@ -1,6 +1,8 @@
 # Multi discipline lesson platform implementation plan
 
-Status: revised implementation plan, revision 2, 4 November 2026. Phase 0 and Phase 1 are delivered — see the [Phase 0 baseline](phase-0-multi-discipline-baseline.md) and the [Phase 1 verification record](multi-discipline-phase-1-verification.md). Phase 2 is in progress under [its log](multi-discipline-phase-2.md); its interface changes are not accepted until the movement browser checks run. Phases 3–11 are planned, not implemented. This file is the canonical plan. `requirement/mutli discipline.txt` is a pointer to it and carries no requirements of its own.
+Status update, 10 November 2026: baseline/contracts and shared discovery are implemented; selected upload/worker, review/guide, unscored MIDI and personal-history work from Phases 3–6 and 9 is also implemented. These are partial delivery states, not a claim that the full music release or all phase exit gates are complete. Real model qualification/inference, supported-browser audio preparation, normal music release/sharing, physical-device evidence, microphone feedback and full guitar assessment remain open. See the [current delivery status](music-delivery-status.md) for evidence and remaining milestones.
+
+This remains the canonical product plan; `requirement/mutli discipline.txt` is only a pointer. The new [piano/guitar UI library migration handoff](music-ui-library-migration-plan.md) is an implementation addendum for P4.6–P4.8 and P8.3–P8.5. It replaces custom diagram drawing incrementally inside the existing workflow; it does not restart the project, change login, approve a model or complete the remaining assessment work.
 
 Revision 2 records twelve product and engineering decisions taken after a code-level review of the checkout. Where revision 1 left a boundary undecided, this revision decides it. Sections that changed materially are marked **[R2]**.
 
@@ -20,6 +22,7 @@ Revision 2 records twelve product and engineering decisions taken after a code-l
 | D10 | The instructor-alpha work is part of the agreed baseline or is explicitly isolated before overlapping music changes. No reset, discard or unauthorised commit. Phase 0 continues; Phase 1 waits for a reproducible baseline. "Freeze v1" means preserve the agreed body contract during music delivery. | §6 (P0.9), §23 |
 | D11 | Add the omitted touchpoints: reproducible schema generation, per-artifact drift checks, `database_ready()` coverage, explicit music test discovery, the host before body controller initialisation, and acceptance-shortcut tests for publish and trim. | §3.4, §7, §19, §20 |
 | D12 | One canonical plan, one subject catalogue. `movement_other` stays the compatibility identifier and maps to **Full Body Movement**; existing lessons keep that label until the owner chooses a more specific subject. No inference from titles or tags. | §1, §3.1 |
+| D13 | Use vetted, commercially usable instrument-rendering libraries behind application-owned piano/guitar presentation adapters. Preserve source time, reviewed references, optional MIDI, feedback, history and the body workflow; lazy-load by instrument. See the [migration handoff](music-ui-library-migration-plan.md). | §10 (P4.10), §14 (P8.11), UI-L0–UI-L5 |
 
 ## 1 Purpose and product outcome
 
@@ -238,6 +241,25 @@ Phases are release gates, not dates. Each can contain several small changes. Rea
 
 Phase 2 and phase 3 can progress independently after phase 1. Phase 4 can use approved fixtures while phase 3 is being built. Phase 7 licensing and measurement can begin early, but no unresolved model is released to learners. Piano MIDI can ship before acoustic piano or guitar. Phase 9 core history support is required before commercial release; optional recording/display expansions can remain unavailable per capability.
 
+### Current delivery state and renderer migration
+
+The table above is the intended dependency map, not a completion ledger. Current progress:
+
+| Phase | Delivery state as reviewed 10 November |
+| --- | --- |
+| 0–2 | Baseline/contracts/discovery foundations delivered; device/audio qualification remains open where called for |
+| 3 | Preparation/validation/worker contracts implemented; real model/worker/browser route not qualified |
+| 4 | Reviewed custom guide/player implemented; library-renderer migration now planned |
+| 5 | Private draft review implemented; real transcription, assessable-span/post-review editing and music release still incomplete |
+| 6 | Unscored piano MIDI and history implemented; physical observation/scoring qualification and remaining practice modes incomplete |
+| 7 | Microphone feedback remains to implement/qualify |
+| 8 | Illustrative guitar guide only; reviewed shapes and full guitar assessment remain |
+| 9 | Personal music history/account pagination implemented; other shared-results/session scope remains |
+| 10 | PostgreSQL development checks passed; model/media/device/operating-rollout requirements remain |
+| 11 | Advanced capabilities deferred; not required for the first private piano pilot |
+
+Execute [UI-L0–UI-L3 and UI-L5](music-ui-library-migration-plan.md) as the diagram replacement; UI-L4 adds reviewed chord cards later within Phase 8. The migration may run alongside real piano lesson/model/release work. A graphics change does not require a physical keyboard to be available, and it must not claim hardware qualification.
+
 ## 6 Phase 0 Establish the baseline and delivery controls
 
 ### Work
@@ -375,6 +397,7 @@ Rollback disables new music submissions and drains or cancels music jobs accordi
 - P4.7 Match video, guide and toolbar layout to the existing practice shell. The renderer uses elapsed music time, not body-frame quantisation. Stop animation and release graphics resources on exit.
 - P4.8 **[R2]** Add the separate music controller behind the music module: continuous audio clock, count-in, repeat, section boundaries, four speed presets, and reset on seek, loop, section change and input replacement. Preserve body `Playback`/`PracticeSession` behaviour and their tick semantics unchanged.
 - P4.9 Create deterministic synthetic/MIDI fixtures for visual, timing and editor development. Label these as fixtures, not model-accuracy demonstrations.
+- P4.10 **[UI library addendum]** Replace custom piano key geometry with an isolated, lazy, controlled renderer after the compatibility/licence/bundle spike. Keep the reviewed timeline, video controls, MIDI source and feedback/history behavior intact. Follow UI-L0–UI-L2/UI-L5 in the [handoff](music-ui-library-migration-plan.md).
 
 ### Validation and exit gate
 
@@ -465,6 +488,7 @@ Only release the exercise and device combinations that pass the agreed accuracy 
 - P8.8 Provide a tuner or setup cue and confidence warnings for wrong tuning or background sound. Teacher-approved alternatives determine accepted chord voicings.
 - P8.9 Evaluate Guitar-Transcription's MIT-licensed weights only as optional draft-position assistance. Keep its failure and correction burden separate from Basic Pitch pitch accuracy. Do not make the lesson lifecycle depend on experimental tab inference.
 - P8.10 Run the same mixed-subject navigation, access, revision and device-cleanup checks as piano. Guitar settings must not modify the learner's piano or body configuration. Guitar gets its own route, capability key and kill switch.
+- P8.11 **[UI library addendum]** Replace custom neck drawing through a library adapter with tested string/pitch mapping; add compact chord diagrams only for versioned teacher-reviewed shapes. Unsupported settings and illustrative positions remain explicit. Follow UI-L0/UI-L1/UI-L3–UI-L5 in the [handoff](music-ui-library-migration-plan.md).
 
 ### Validation and exit gate
 

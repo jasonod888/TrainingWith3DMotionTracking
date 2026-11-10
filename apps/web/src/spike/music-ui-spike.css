@@ -1,0 +1,74 @@
+.spike {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  font-family: system-ui, sans-serif;
+  color: #1f2937;
+}
+
+.spike .eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.spike h1 {
+  margin: 4px 0 8px;
+  font-size: 1.5rem;
+}
+
+.spike .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 20px;
+}
+
+.spike button {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.spike .case {
+  margin-top: 20px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.spike .case h2 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
+.spike .guitar,
+.spike .chord {
+  overflow-x: auto;
+}
+
+.spike .piano-wrap {
+  height: 160px;
+}
+
+.spike .ReactPiano__Keyboard {
+  height: 100%;
+}
+
+.spike .chord svg {
+  width: 210px;
+  height: auto;
+}
+
+.spike .ReactPiano__Key--active {
+  background: #2563eb;
+  border-color: #1d4ed8;
+}
+
+.spike .placeholder {
+  color: #64748b;
+  font-size: 0.85rem;
+}

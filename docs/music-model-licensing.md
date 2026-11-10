@@ -77,3 +77,37 @@ Any unresolved answer blocks commercial qualification.
 
 No artifact metadata, approval record or real-audio corpus exists in the repository. The
 fixture engine remains a transport test; processing stays disabled.
+
+
+## bb780c9 review: bind retained evidence to exact bytes
+
+The initial approval-file digest proved retention only; a generic or unrelated approval
+could pass. Commercial evidence now additionally requires `code_sha256`,
+`terms_snapshot_sha256`, `code_license_url` and `weights_license_url`. Supply
+`--code-file` as the pinned source/runtime bundle. Both it and the terms snapshot must
+match their declared hashes, alongside the existing model-artifact byte check.
+
+The retained `--approval-file` is now UTF-8 JSON with these exact bindings:
+
+```json
+{
+  "artifact_sha256": "<model or model-bundle digest>",
+  "code_sha256": "<source/runtime-bundle digest>",
+  "terms_snapshot_sha256": "<retained combined code-and-weights terms digest>",
+  "reviewer_id": "<accountable reviewer>",
+  "approved_at": "<ISO decision date>",
+  "decision": "approved",
+  "scope": "<exact intended deployment scope>"
+}
+```
+
+The three digests must match the supplied files. Reviewer/date/decision/scope must match
+the metadata approval object. Hash this JSON after writing it and place that digest in
+metadata `approval.evidence_sha256`; the approval file does not contain its own digest.
+A changed artifact, code bundle, terms snapshot or mismatched approval contents is refused.
+
+This binds evidence, not authority: hashes and a JSON reviewer name do not authenticate
+a reviewer, interpret the scope or grant legal rights. A human must still establish the
+source terms, applicable code/weights versions, obligations and valid approval. The
+eligible licence-label allowlist is metadata policy, not a legal conclusion. No real
+artifact or approval was created in this follow-up.

@@ -3,11 +3,12 @@ import json
 import hashlib
 import subprocess
 import sys
+import wave
 from pathlib import Path
 
 import pytest
 
-from scripts.qualify_music_model import corpus_cases, score_events, validate_artifact, load_events, validate_reviewed_reference
+from scripts.qualify_music_model import corpus_cases, score_events, validate_artifact, load_events, validate_reviewed_reference, validate_commercial_files
 
 ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT = {'name': 'fixture-transcriber', 'version': '1.0.0', 'license': 'Apache-2.0',
@@ -102,7 +103,8 @@ def test_cli_writes_a_report_and_refuses_an_unapproved_artifact(tmp_path):
     assert refused.returncode == 2 and 'not approved' in refused.stderr
 
 
-COMMERCIAL = {**ARTIFACT, 'commercial_use': 'allowed', 'redistribution': 'allowed',
+COMMERCIAL = {**ARTIFACT, 'code_sha256':'c'*64,'terms_snapshot_sha256':'d'*64,
+              'code_license_url':'https://example.test/code-terms','weights_license_url':'https://example.test/weights-terms', 'commercial_use': 'allowed', 'redistribution': 'allowed',
               'attribution': 'Attribution required.', 'approval': {
                   'reviewer_id': 'legal-reviewer', 'approved_at': '2026-11-10T00:00:00+00:00',
                   'decision': 'approved', 'scope': 'commercial deployment',
@@ -130,25 +132,117 @@ def reviewed_reference(events):
                        'source_reference_sha256': 'c' * 64}}
 
 
-def test_real_audio_corpus_scores_reviewed_cases_and_rejects_synthetic_claims(tmp_path):
+def make_corpus(root, events=None):
     for index in range(3):
-        case = tmp_path / f'case-{index}'
-        case.mkdir()
-        audio = case / 'clip.wav'
-        audio.write_bytes(b'RIFF' + bytes([index]) * 32)
-        import hashlib
-        (case / 'reference.json').write_text(json.dumps(reviewed_reference([note(0.5, 60), note(1.0, 64)])))
-        (case / 'proposal.json').write_text(json.dumps({'events': [note(0.51, 60), note(1.02, 64)]}))
-        (case / 'case.json').write_text(json.dumps({
-            'real_audio': True, 'reviewed': True, 'audio': 'clip.wav',
-            'audio_sha256': hashlib.sha256(audio.read_bytes()).hexdigest(),
-            'reference': 'reference.json', 'proposal': 'proposal.json'}))
-    result = corpus_cases(tmp_path, 0.05, 3)
-    assert result['case_count'] == 3 and result['evidence_class'] == 'real-audio-reviewed'
-    assert result['aggregate']['precision'] == 1
-    synthetic = tmp_path / 'case-0' / 'case.json'
-    metadata = json.loads(synthetic.read_text())
-    metadata['real_audio'] = False
-    synthetic.write_text(json.dumps(metadata))
-    with pytest.raises(ValueError, match='not declared real audio'):
-        corpus_cases(tmp_path, 0.05, 3)
+        case=root/f'case-{index}';case.mkdir()
+        with wave.open(str(case/'clip.wav'),'wb') as audio:
+            audio.setparams((1,2,16000,32000,'NONE','not compressed'))
+            audio.writeframes(bytes([index,0])*32000)
+        (case/'reference.json').write_text(json.dumps(reviewed_reference([note(.5,60),note(1,64)] if events is None else events)),encoding='utf-8')
+        (case/'proposal.json').write_text(json.dumps({'events':[note(.51,60),note(1.02,64)] if events is None else events}),encoding='utf-8')
+        identity={key+'_sha256':hashlib.sha256((case/file).read_bytes()).hexdigest() for key,file in
+                  [('audio','clip.wav'),('reference','reference.json'),('proposal','proposal.json')]}
+        metadata={'real_audio':True,'reviewed':True,'audio':'clip.wav','reference':'reference.json','proposal':'proposal.json',**identity,
+                  'inference':{'artifact_sha256':ARTIFACT['sha256'],'audio_sha256':identity['audio_sha256'],
+                               'proposal_sha256':identity['proposal_sha256'],'run_id':f'test-{index}','code_version':'test-fixture'}}
+        (case/'case.json').write_text(json.dumps(metadata),encoding='utf-8')
+
+
+def corpus(root):return corpus_cases(root,.05,3,ARTIFACT['sha256'])
+
+
+def test_real_audio_corpus_scores_reviewed_cases_and_rejects_synthetic_claims(tmp_path):
+    make_corpus(tmp_path)
+    result=corpus(tmp_path)
+    assert result['case_count']==3 and result['evidence_class']=='reviewed-audio-proposal-comparison'
+    assert result['aggregate']['precision']==1 and result['inference_verified'] is False
+    metadata_path=tmp_path/'case-0/case.json';metadata=json.loads(metadata_path.read_text())
+    metadata['real_audio']=False;metadata_path.write_text(json.dumps(metadata))
+    with pytest.raises(ValueError,match='not declared real audio'):corpus(tmp_path)
+
+
+def test_corpus_handles_silence_and_zero_matches_without_inventing_onset_accuracy(tmp_path):
+    make_corpus(tmp_path,events=[])
+    result=corpus(tmp_path)
+    assert result['aggregate']['f1']==1 and result['aggregate']['onset_mae_seconds'] is None
+    assert result['aggregate']['onset_mae_cases']==0
+    for case in tmp_path.iterdir():
+        proposal=case/'proposal.json';proposal.write_text(json.dumps({'events':[note(.5,72)]}))
+        metadata=json.loads((case/'case.json').read_text());metadata['proposal_sha256']=hashlib.sha256(proposal.read_bytes()).hexdigest()
+        metadata['inference']['proposal_sha256']=metadata['proposal_sha256'];(case/'case.json').write_text(json.dumps(metadata))
+    assert corpus(tmp_path)['aggregate']['onset_mae_seconds'] is None
+    assert corpus(tmp_path)['aggregate']['precision']==0
+
+
+def test_corpus_rejects_unsafe_paths_tampered_files_and_invalid_audio(tmp_path):
+    make_corpus(tmp_path);case=tmp_path/'case-0';metadata_path=case/'case.json';metadata=json.loads(metadata_path.read_text())
+    metadata_path.write_text(json.dumps({**metadata,'reference':'../outside.json'}))
+    with pytest.raises(ValueError,match='unsafe'):corpus(tmp_path)
+    metadata_path.write_text(json.dumps(metadata));reference=case/'reference.json';original=reference.read_bytes();reference.write_bytes(original+b' ')
+    with pytest.raises(ValueError,match='digest'):corpus(tmp_path)
+    reference.write_bytes(original);audio=case/'clip.wav';audio.write_bytes(b'not-wave')
+    metadata['audio_sha256']=hashlib.sha256(audio.read_bytes()).hexdigest();metadata_path.write_text(json.dumps(metadata))
+    with pytest.raises(ValueError,match='valid PCM WAV'):corpus(tmp_path)
+
+
+def test_corpus_requires_three_distinct_cases_and_artifact_bound_declarations(tmp_path):
+    make_corpus(tmp_path)
+    with pytest.raises(ValueError,match='three'):corpus_cases(tmp_path,.05,1,ARTIFACT['sha256'])
+    with pytest.raises(ValueError,match='inference declaration'):corpus_cases(tmp_path,.05,3,'b'*64)
+    case=tmp_path/'case-1';(case/'clip.wav').write_bytes((tmp_path/'case-0/clip.wav').read_bytes())
+    metadata=json.loads((case/'case.json').read_text());metadata['audio_sha256']=hashlib.sha256((case/'clip.wav').read_bytes()).hexdigest()
+    (case/'case.json').write_text(json.dumps(metadata))
+    with pytest.raises(ValueError,match='distinct'):corpus(tmp_path)
+
+
+def test_commercial_approval_binds_actual_code_artifact_and_terms_bytes(tmp_path):
+    code=tmp_path/'code.bin';code.write_bytes(b'synthetic-source-bundle')
+    terms=tmp_path/'LICENSE';terms.write_text('Synthetic terms fixture, not a legal approval.')
+    approval_file=tmp_path/'approval.json'
+    metadata={**COMMERCIAL,'code_sha256':hashlib.sha256(code.read_bytes()).hexdigest(),
+              'terms_snapshot_sha256':hashlib.sha256(terms.read_bytes()).hexdigest()}
+    approval={key:metadata['approval'][key] for key in ('reviewer_id','approved_at','scope','decision')}
+    approval.update(artifact_sha256=metadata['sha256'],code_sha256=metadata['code_sha256'],terms_snapshot_sha256=metadata['terms_snapshot_sha256'])
+    approval_file.write_text(json.dumps(approval));metadata['approval']={**metadata['approval'],'evidence_sha256':hashlib.sha256(approval_file.read_bytes()).hexdigest()}
+    artifact=validate_artifact(metadata,'commercial');validate_commercial_files(artifact,code,terms,approval_file)
+    code.write_bytes(b'wrong-code')
+    with pytest.raises(ValueError,match='code-file'):validate_commercial_files(artifact,code,terms,approval_file)
+    code.write_bytes(b'synthetic-source-bundle');terms.write_text('Changed terms')
+    with pytest.raises(ValueError,match='terms snapshot'):validate_commercial_files(artifact,code,terms,approval_file)
+    terms.write_text('Synthetic terms fixture, not a legal approval.')
+    approval_file.write_text(json.dumps({**approval,'artifact_sha256':'b'*64}))
+    artifact['commercial']['approval']['evidence_sha256']=hashlib.sha256(approval_file.read_bytes()).hexdigest()
+    with pytest.raises(ValueError,match='Approval contents'):validate_commercial_files(artifact,code,terms,approval_file)
+
+
+def test_cli_refuses_incomplete_pair_and_lowered_case_floor_without_traceback(tmp_path):
+    common=[sys.executable,str(ROOT/'scripts/qualify_music_model.py'),'--artifact','missing','--artifact-file','missing','--license-file','missing']
+    for extra in (['--reference','missing'],['--corpus','missing','--min-cases','1']):
+        result=subprocess.run(common+extra,capture_output=True,text=True,cwd=ROOT)
+        assert result.returncode==2 and 'Traceback' not in result.stderr
+
+
+def test_commercial_cli_verifies_the_complete_retained_evidence_chain(tmp_path):
+    model=tmp_path/'model.bin';model.write_bytes(b'synthetic-model-not-a-checkpoint')
+    code=tmp_path/'code.bin';code.write_bytes(b'synthetic-code-not-a-runtime')
+    terms=tmp_path/'terms.txt';terms.write_text('Synthetic licensing test only, not an approval.')
+    approval_file=tmp_path/'approval.json';metadata_file=tmp_path/'artifact.json'
+    metadata={**COMMERCIAL,'sha256':hashlib.sha256(model.read_bytes()).hexdigest(),
+        'code_sha256':hashlib.sha256(code.read_bytes()).hexdigest(),'terms_snapshot_sha256':hashlib.sha256(terms.read_bytes()).hexdigest()}
+    approval={key:metadata['approval'][key] for key in ('reviewer_id','approved_at','scope','decision')}
+    approval.update(artifact_sha256=metadata['sha256'],code_sha256=metadata['code_sha256'],terms_snapshot_sha256=metadata['terms_snapshot_sha256'])
+    approval_file.write_text(json.dumps(approval));metadata['approval']={**metadata['approval'],'evidence_sha256':hashlib.sha256(approval_file.read_bytes()).hexdigest()}
+    metadata_file.write_text(json.dumps(metadata))
+    reference=tmp_path/'reference.json';reference.write_text(json.dumps(reviewed_reference([note(.5,60)])))
+    proposal=tmp_path/'proposal.json';proposal.write_text(json.dumps({'events':[note(.5,60)]}))
+    output=tmp_path/'result.json'
+    args=[sys.executable,str(ROOT/'scripts/qualify_music_model.py'),'--use','commercial','--artifact',str(metadata_file),
+        '--artifact-file',str(model),'--code-file',str(code),'--license-file',str(terms),'--approval-file',str(approval_file),
+        '--reference',str(reference),'--proposal',str(proposal),'--output',str(output)]
+    result=subprocess.run(args,capture_output=True,text=True,cwd=ROOT)
+    assert result.returncode==0,result.stderr
+    assert json.loads(output.read_text())['deployment_eligibility']=='commercial-evidence-complete-not-an-approval'
+    approval['artifact_sha256']='b'*64;approval_file.write_text(json.dumps(approval))
+    metadata['approval']['evidence_sha256']=hashlib.sha256(approval_file.read_bytes()).hexdigest();metadata_file.write_text(json.dumps(metadata))
+    refused=subprocess.run(args,capture_output=True,text=True,cwd=ROOT)
+    assert refused.returncode==2 and 'Approval contents' in refused.stderr
