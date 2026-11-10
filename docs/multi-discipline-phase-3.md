@@ -603,3 +603,25 @@ The PostgreSQL race/recovery harness was independently re-run and passed (quota 
 5,000, identical retries create one row, 0020 downgrade loses history as documented,
 backup restore recovers the exact summaries and revision manifests). Unscored history can
 continue; scoring stays disabled until physical evidence and threshold decisions exist.
+
+
+## Parallel work: model licensing gate and real-audio corpus
+
+10 November 2026. No model is installed and transcription remains disabled.
+
+- **Commercial licensing.** `qualify_music_model.py --use commercial` now requires
+  separately declared and approved code/weights licences, allowed commercial use and
+  redistribution, attribution, an approval record and a retained approval file whose
+  digest matches. The harness reports evidence completeness only; it never grants a
+  licence. The human/legal checklist and record schema are in
+  [`music-model-licensing.md`](music-model-licensing.md).
+- **Real-audio accuracy.** `--corpus` scores reviewed real-audio cases, refuses synthetic
+  or unreviewed cases and digest mismatches, and requires at least three cases. It reports
+  per-case and macro precision/recall/F1/onset error, but no real recordings or model
+  outputs exist yet, so no accuracy claim is made.
+- **Hardware evidence correction.** The blocked keyboard record now separates permission
+  denial from an empty enumerated device list; the blocked result is unchanged. A first
+  one-keyboard/browser smoke test is the next hardware step; scoring stays disabled.
+
+Verification: full API suite **299 passed, 13 skipped** (nine qualification tests); web
+suite unchanged at **279 passed**; the PostgreSQL evidence and harness remain as recorded.

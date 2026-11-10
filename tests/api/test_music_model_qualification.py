@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.qualify_music_model import score_events, validate_artifact, load_events, validate_reviewed_reference
+from scripts.qualify_music_model import corpus_cases, score_events, validate_artifact, load_events, validate_reviewed_reference
 
 ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT = {'name': 'fixture-transcriber', 'version': '1.0.0', 'license': 'Apache-2.0',
@@ -100,3 +100,55 @@ def test_cli_writes_a_report_and_refuses_an_unapproved_artifact(tmp_path):
                               '--artifact', str(artifact), '--artifact-file',str(binary),'--license-file',str(licence),'--reference', str(reference),
                               '--proposal', str(proposal)], capture_output=True, text=True, cwd=ROOT)
     assert refused.returncode == 2 and 'not approved' in refused.stderr
+
+
+COMMERCIAL = {**ARTIFACT, 'commercial_use': 'allowed', 'redistribution': 'allowed',
+              'attribution': 'Attribution required.', 'approval': {
+                  'reviewer_id': 'legal-reviewer', 'approved_at': '2026-11-10T00:00:00+00:00',
+                  'decision': 'approved', 'scope': 'commercial deployment',
+                  'evidence_sha256': 'b' * 64}}
+
+
+def test_commercial_use_requires_allowed_terms_and_recorded_approval():
+    result = validate_artifact(COMMERCIAL, 'commercial')
+    assert result['use'] == 'commercial' and result['commercial']['approval']['reviewer_id'] == 'legal-reviewer'
+    assert validate_artifact(ARTIFACT)['commercial'] is None
+    with pytest.raises(ValueError, match='missing approval'):
+        validate_artifact({**COMMERCIAL, 'approval': {}}, 'commercial')
+    with pytest.raises(ValueError, match='allowed commercial use'):
+        validate_artifact({**COMMERCIAL, 'commercial_use': 'restricted'}, 'commercial')
+    with pytest.raises(ValueError, match='decision'):
+        validate_artifact({**COMMERCIAL, 'approval': {**COMMERCIAL['approval'], 'decision': 'pending'}}, 'commercial')
+    with pytest.raises(ValueError, match='date'):
+        validate_artifact({**COMMERCIAL, 'approval': {**COMMERCIAL['approval'], 'approved_at': 'not-a-date'}}, 'commercial')
+
+
+def reviewed_reference(events):
+    return {'reference_version': 1, 'subject': 'piano', 'instrument': {'instrument': 'piano'}, 'duration': 2,
+            'events': events, 'spans': [{'start': 0, 'end': 2}],
+            'review': {'reviewer_id': 'r', 'draft_id': 'd', 'reviewed_at': '2026-11-10T00:00:00+00:00',
+                       'source_reference_sha256': 'c' * 64}}
+
+
+def test_real_audio_corpus_scores_reviewed_cases_and_rejects_synthetic_claims(tmp_path):
+    for index in range(3):
+        case = tmp_path / f'case-{index}'
+        case.mkdir()
+        audio = case / 'clip.wav'
+        audio.write_bytes(b'RIFF' + bytes([index]) * 32)
+        import hashlib
+        (case / 'reference.json').write_text(json.dumps(reviewed_reference([note(0.5, 60), note(1.0, 64)])))
+        (case / 'proposal.json').write_text(json.dumps({'events': [note(0.51, 60), note(1.02, 64)]}))
+        (case / 'case.json').write_text(json.dumps({
+            'real_audio': True, 'reviewed': True, 'audio': 'clip.wav',
+            'audio_sha256': hashlib.sha256(audio.read_bytes()).hexdigest(),
+            'reference': 'reference.json', 'proposal': 'proposal.json'}))
+    result = corpus_cases(tmp_path, 0.05, 3)
+    assert result['case_count'] == 3 and result['evidence_class'] == 'real-audio-reviewed'
+    assert result['aggregate']['precision'] == 1
+    synthetic = tmp_path / 'case-0' / 'case.json'
+    metadata = json.loads(synthetic.read_text())
+    metadata['real_audio'] = False
+    synthetic.write_text(json.dumps(metadata))
+    with pytest.raises(ValueError, match='not declared real audio'):
+        corpus_cases(tmp_path, 0.05, 3)

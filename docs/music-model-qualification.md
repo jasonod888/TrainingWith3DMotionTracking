@@ -53,3 +53,42 @@ recordings, instructor ground truth, frozen artifact identity and actual inferen
 `tests/api/test_music_model_qualification.py` covers score cases, the greedy-matching
 counterexample, silence, invalid values, the corpus, required code/weights declarations,
 actual file-hash refusal, evidence retention and CLI reports.
+
+
+## Commercial licensing evidence (10 November 2026)
+
+`--use commercial` is stricter than the default internal-evaluation mode. It requires:
+
+- approved code **and** weights licences, each declared separately;
+- `commercial_use` and `redistribution` both `allowed`;
+- a non-empty attribution statement;
+- an `approval` object with `reviewer_id`, `approved_at`, `decision: approved`,
+  `scope` and an `evidence_sha256`;
+- `--approval-file` retained locally, whose bytes hash to that evidence digest;
+- the artifact bytes hash to the declared `sha256`, and HTTPS artifact/licence sources.
+
+The harness reports `commercial-evidence-complete-not-an-approval`; it never grants a
+licence or commercial approval. A human/legal approval record remains authoritative. See
+[`music-model-licensing.md`](music-model-licensing.md) for the review checklist and the
+record schema.
+
+## Real-audio accuracy corpus
+
+`--corpus DIR` scores a local set of cases instead of one reference/proposal pair. Each
+case directory needs `case.json` declaring `real_audio: true`, `reviewed: true`, the audio
+file and its SHA-256, plus reviewed `reference.json` and `proposal.json`. The runner:
+
+- refuses synthetic cases, unreviewed references, missing audio and digest mismatches;
+- requires at least `--min-cases` (default 3) cases;
+- reports per-case metrics and macro precision/recall/F1/onset MAE;
+- labels the result `real-audio-reviewed` only when every case is real and reviewed.
+
+It still measures note agreement, not musical technique or licence suitability. No real
+recordings or model output are in the repository yet, so **no accuracy claim exists**.
+
+## Status
+
+No transcription artifact is installed or qualified. The fixture engine remains a
+transport test. Before processing is enabled: commercial code/weights approval, a
+real-audio reviewed corpus with acceptable metrics, and model/runtime packaging must all
+be reviewed.

@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 APPROVED_LICENSES = {'Apache-2.0', 'MIT', 'BSD-3-Clause', 'BSD-2-Clause', 'ISC', 'CC-BY-4.0'}
 REQUIRED = ('name', 'version', 'license', 'sha256', 'source_url', 'code_license', 'weights_license', 'license_source_url')
+COMMERCIAL = ('commercial_use', 'redistribution', 'attribution', 'approval')
 
 
 def load_events(document: dict) -> list[dict]:
@@ -66,7 +67,9 @@ def score_events(reference: list[dict], proposal: list[dict], tolerance: float =
     }
 
 
-def validate_artifact(value: dict) -> dict:
+def validate_artifact(value: dict, use: str = 'internal-evaluation') -> dict:
+    if use not in ('internal-evaluation', 'commercial'):
+        raise ValueError('Unknown qualification use.')
     if not isinstance(value,dict):raise ValueError('Expected artifact metadata.')
     missing = [key for key in REQUIRED if not value.get(key)]
     if missing:
@@ -81,9 +84,63 @@ def validate_artifact(value: dict) -> dict:
     digest = str(value['sha256']).lower()
     if len(digest) != 64 or any(character not in '0123456789abcdef' for character in digest):
         raise ValueError('Artifact sha256 must be a hex digest.')
-    return {'code_license':value['code_license'],'weights_license':value['weights_license'],'license_source_url':value['license_source_url'],
-            'name': str(value['name']), 'version': str(value['version']), 'license': licence,
-            'sha256': digest, 'source_url': str(value['source_url'])}
+    result = {'code_license':value['code_license'],'weights_license':value['weights_license'],'license_source_url':value['license_source_url'],
+              'name': str(value['name']), 'version': str(value['version']), 'license': licence,
+              'sha256': digest, 'source_url': str(value['source_url']), 'use': use}
+    if use == 'commercial':
+        missing = [key for key in COMMERCIAL if not value.get(key)]
+        if missing:
+            raise ValueError('Commercial use is missing ' + ', '.join(missing) + '.')
+        if value['commercial_use'] != 'allowed' or value['redistribution'] != 'allowed':
+            raise ValueError('Commercial deployment requires allowed commercial use and redistribution.')
+        if not isinstance(value['attribution'], str) or not value['attribution'].strip():
+            raise ValueError('Commercial use requires an attribution statement.')
+        approval = value['approval']
+        if not isinstance(approval, dict):
+            raise ValueError('Commercial use requires a recorded approval object.')
+        if any(not approval.get(key) for key in ('reviewer_id','approved_at','scope','evidence_sha256')):
+            raise ValueError('Approval must record reviewer, date, scope and evidence sha256.')
+        if approval.get('decision') != 'approved':
+            raise ValueError('Approval decision must be approved.')
+        try:
+            datetime.fromisoformat(str(approval['approved_at']).replace('Z','+00:00'))
+        except ValueError as error:
+            raise ValueError('Approval date is invalid.') from error
+        evidence = str(approval['evidence_sha256']).lower()
+        if len(evidence) != 64 or any(character not in '0123456789abcdef' for character in evidence):
+            raise ValueError('Approval evidence must be a sha256 digest.')
+        result['commercial'] = {key: value[key] for key in COMMERCIAL}
+    else:
+        result['commercial'] = None
+    return result
+
+def corpus_cases(root: Path, tolerance: float, minimum: int) -> dict:
+    """Score a local real-audio corpus. Cases declare their own reviewed reference/proposal."""
+    if not root.is_dir():
+        raise ValueError('Corpus directory does not exist.')
+    cases = []
+    for folder in sorted(path for path in root.iterdir() if path.is_dir()):
+        metadata_path = folder/'case.json'
+        if not metadata_path.is_file():raise ValueError(f'{folder.name} has no case.json.')
+        metadata = json.loads(metadata_path.read_text(encoding='utf-8'))
+        if not isinstance(metadata,dict):raise ValueError(f'{folder.name} metadata is invalid.')
+        if metadata.get('real_audio') is not True:
+            raise ValueError(f'{folder.name} is not declared real audio; synthetic cases cannot be accuracy evidence.')
+        if metadata.get('reviewed') is not True:
+            raise ValueError(f'{folder.name} reference is not declared reviewed.')
+        audio = folder/str(metadata.get('audio',''))
+        if not audio.is_file() or file_digest(audio)!=str(metadata.get('audio_sha256','')).lower():
+            raise ValueError(f'{folder.name} audio is missing or does not match its digest.')
+        reference = validate_reviewed_reference(json.loads((folder/str(metadata.get('reference',''))).read_text(encoding='utf-8')))
+        proposal = load_events(json.loads((folder/str(metadata.get('proposal',''))).read_text(encoding='utf-8')))
+        cases.append({'case':folder.name,'metrics':score_events(reference,proposal,tolerance)})
+    if len(cases)<minimum:
+        raise ValueError(f'At least {minimum} real-audio cases are required for an accuracy claim.')
+    def mean(key):return round(statistics.fmean(case['metrics'][key] for case in cases),4)
+    return {'cases':cases,'case_count':len(cases),'real_audio_cases':len(cases),'reviewed_cases':len(cases),
+            'aggregate':{'precision':mean('precision'),'recall':mean('recall'),'f1':mean('f1'),
+                         'onset_mae_seconds':round(statistics.fmean(case['metrics']['onset_mae_seconds'] for case in cases),4)},
+            'evidence_class':'real-audio-reviewed','not_a_licence_or_model_approval':True}
 
 
 def file_digest(path):
@@ -115,33 +172,63 @@ def main() -> int:
     parser.add_argument('--artifact', type=Path, required=True)
     parser.add_argument('--artifact-file',type=Path,required=True,help='Local artifact bytes; never downloaded by this harness')
     parser.add_argument('--license-file',type=Path,required=True,help='Retained licence evidence applying to the code/weights')
-    parser.add_argument('--reference', type=Path, required=True, help='Reviewed reference JSON')
-    parser.add_argument('--proposal', type=Path, required=True, help='Draft/proposal JSON')
+    parser.add_argument('--approval-file',type=Path,help='Retained commercial approval evidence; required for --use commercial')
+    parser.add_argument('--use',choices=('internal-evaluation','commercial'),default='internal-evaluation')
+    parser.add_argument('--reference', type=Path, help='Reviewed reference JSON')
+    parser.add_argument('--proposal', type=Path, help='Draft/proposal JSON')
+    parser.add_argument('--corpus', type=Path, help='Directory of real-audio cases (audio + reviewed reference + proposal)')
+    parser.add_argument('--min-cases', type=int, default=3)
     parser.add_argument('--tolerance', type=float, default=0.05)
     parser.add_argument('--output', type=Path)
     arguments = parser.parse_args()
+    if bool(arguments.corpus) == bool(arguments.reference or arguments.proposal):
+        print('Provide either --corpus or both --reference and --proposal.', file=sys.stderr)
+        return 2
+    if arguments.corpus and (arguments.reference or arguments.proposal):
+        print('Do not mix a corpus with a single reference/proposal.', file=sys.stderr)
+        return 2
+    if arguments.min_cases < 1:
+        print('--min-cases must be positive.', file=sys.stderr)
+        return 2
     try:
-        artifact = validate_artifact(json.loads(arguments.artifact.read_text(encoding='utf-8')))
+        artifact = validate_artifact(json.loads(arguments.artifact.read_text(encoding='utf-8')), arguments.use)
         if file_digest(arguments.artifact_file)!=artifact['sha256']:raise ValueError('Artifact bytes do not match the declared sha256.')
         if not arguments.license_file.read_text(encoding='utf-8').strip():raise ValueError('Licence evidence is empty.')
         artifact['license_evidence_sha256']=file_digest(arguments.license_file)
-        reference = validate_reviewed_reference(json.loads(arguments.reference.read_text(encoding='utf-8')))
-        proposal = load_events(json.loads(arguments.proposal.read_text(encoding='utf-8')))
-        metrics=score_events(reference,proposal,arguments.tolerance)
+        if arguments.use == 'commercial':
+            if not arguments.approval_file:raise ValueError('Commercial qualification requires --approval-file.')
+            evidence=arguments.approval_file.read_bytes()
+            if not evidence.strip():raise ValueError('Approval evidence is empty.')
+            if file_digest(arguments.approval_file)!=artifact['commercial']['approval']['evidence_sha256']:
+                raise ValueError('Approval evidence does not match the recorded sha256.')
+            artifact['approval_evidence_sha256']=file_digest(arguments.approval_file)
+        if arguments.corpus:
+            metrics=corpus_cases(arguments.corpus, arguments.tolerance, arguments.min_cases)
+            report = {'artifact': artifact, 'corpus': metrics,'artifact_bytes_verified':True,
+                      'deployment_eligibility':('commercial-evidence-complete-not-an-approval' if arguments.use=='commercial' else 'internal-evaluation-only'),
+                      'qualification_status':'evidence_only_not_model_or_licence_approval'}
+        else:
+            reference = validate_reviewed_reference(json.loads(arguments.reference.read_text(encoding='utf-8')))
+            proposal = load_events(json.loads(arguments.proposal.read_text(encoding='utf-8')))
+            metrics=score_events(reference,proposal,arguments.tolerance)
+            report = {'artifact': artifact, 'metrics': metrics,'artifact_bytes_verified':True,
+                      'deployment_eligibility':('commercial-evidence-complete-not-an-approval' if arguments.use=='commercial' else 'internal-evaluation-only'),
+                      'qualification_status':'evidence_only_not_model_or_licence_approval'}
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
         print(str(error), file=sys.stderr)
         return 2
-    report = {'artifact': artifact, 'metrics': metrics,'artifact_bytes_verified':True,
-              'qualification_status':'evidence_only_not_model_or_licence_approval'}
     text = json.dumps(report, indent=2)
     if arguments.output:
         arguments.output.write_text(text, encoding='utf-8')
     print(text)
-    metrics = report['metrics']
-    print(f"\n{metrics['matched']}/{metrics['reference_notes']} reference notes matched"
-          f" (precision {metrics['precision']:.3f}, recall {metrics['recall']:.3f}, F1 {metrics['f1']:.3f}).")
+    if arguments.corpus:
+        aggregate=report['corpus']['aggregate']
+        print(f"\n{report['corpus']['case_count']} real-audio reviewed cases: precision {aggregate['precision']:.3f}, recall {aggregate['recall']:.3f}, F1 {aggregate['f1']:.3f}.")
+    else:
+        metrics = report['metrics']
+        print(f"\n{metrics['matched']}/{metrics['reference_notes']} reference notes matched"
+              f" (precision {metrics['precision']:.3f}, recall {metrics['recall']:.3f}, F1 {metrics['f1']:.3f}).")
     return 0
-
 
 if __name__ == '__main__':
     raise SystemExit(main())

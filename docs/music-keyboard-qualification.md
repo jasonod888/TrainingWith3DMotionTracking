@@ -102,9 +102,28 @@ uncertainty, sample counts, interruptions, support result, proposed threshold an
 approval status. Do not add a passed result until hardware evidence exists.
 
 **Status: blocked on 10 November 2026.** No physical MIDI instrument is attached to this
-host; Windows exposes only software MIDI endpoints, and a headed/headless Chromium probe
-reported no available inputs and no MIDI permission grant. The protocol was therefore not
+host; the recorded Windows inventory identified only software MIDI endpoints. The
+headed/headless Chromium request was denied permission, so successful input enumeration
+was not completed (rather than proving an empty enumerated device list). The protocol was therefore not
 executed. Evidence: [`qualification/music-keyboard-2026-11-10-blocked.json`](qualification/music-keyboard-2026-11-10-blocked.json).
 No latency, coverage, false-correction or device-matrix result is recorded. Database
 concurrency/recovery tests are independent and cannot qualify MIDI hardware, model
 accuracy or a scoring rubric.
+
+
+### Review of b70656c
+
+The blocked hardware attempt is an honest non-qualification result. Keep hardware
+inventory, API availability, permission grant and successful input enumeration as
+separate fields; denied access is not an empty enumeration. The recorded probe's empty
+fallback array is retained as raw reported output, while `inputs: null` and
+`enumeration_completed: false` express the supported conclusion. No new probe was run
+for this wording correction.
+
+Proceed with unscored pilot development, history and model benchmarking in parallel.
+A first physical-keyboard smoke test can use one available keyboard/browser before the
+larger device matrix; it is evidence for that combination only, not universal or scored
+qualification. A transcription artifact still requires its own code/weights commercial
+licence evidence and real acoustic benchmark before processing is enabled. Broader
+production load and operational recovery remain rollout work, not a blanket stop on
+private unscored development. No scoring, model or deployment gate was enabled here.
