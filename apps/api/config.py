@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     music_remote_conversion_enabled: bool = False
     music_midi_setup_enabled: bool = False
     music_history_enabled: bool = False
+    music_piano_library_ui_enabled: bool = False
+    music_guitar_library_ui_enabled: bool = False
     music_piano_conversion_target: str = ''
     music_guitar_conversion_target: str = ''
     # Explicit operator gate after the custom full-pipeline deployment is verified.

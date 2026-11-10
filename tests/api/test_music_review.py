@@ -90,7 +90,11 @@ def test_owner_review_creates_exact_private_revision_and_is_idempotent(tmp_path)
         assert client.post('/api/conversions',json={'title':'Different instrument','filename':'guitar.mp4',
             'bytes':source.stat().st_size,'start':0,'duration':2,'subject':'guitar','instrument':'guitar','lesson_id':lesson_id}).status_code==409
         assert client.post('/api/lessons/'+lesson_id+'/publish',json={'revision_id':manifest['revision_id'],
-            'mode':'invite','reviewed':True,'rights_acknowledged':True}).status_code==409
+            'mode':'link','reviewed':True,'rights_acknowledged':True}).status_code==409
+        shared=client.post('/api/lessons/'+lesson_id+'/publish',json={'revision_id':manifest['revision_id'],
+            'mode':'invite','reviewed':True,'rights_acknowledged':True})
+        assert shared.status_code==200,shared.text
+        assert client.get('/api/public/moves/'+lesson_id).status_code==404
 
 
 def test_replacement_drafts_do_not_overwrite_assets_and_stale_review_is_refused(tmp_path):
@@ -148,4 +152,7 @@ def test_review_can_choose_midi_feedback_without_enabling_scoring_or_publishing(
             assert session.query(MusicReview).one().document['assessment'] == body['assessment']
         assert 'score' not in manifest
         assert client.post('/api/lessons/' + lesson_id + '/publish', json={'revision_id': manifest['revision_id'],
-            'mode': 'invite', 'reviewed': True, 'rights_acknowledged': True}).status_code == 409
+            'mode': 'link', 'reviewed': True, 'rights_acknowledged': True}).status_code == 409
+        shared = client.post('/api/lessons/' + lesson_id + '/publish', json={'revision_id': manifest['revision_id'],
+            'mode': 'invite', 'reviewed': True, 'rights_acknowledged': True})
+        assert shared.status_code == 200, shared.text

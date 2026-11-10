@@ -14,6 +14,7 @@ import {LessonWorkspace} from './LessonWorkspace';
 const MusicLessonHome = lazy(() => import('./music/MusicLessonHome'));
 
 type BodyProps = Omit<ComponentProps<typeof LessonWorkspace>, 'lesson'>;
+type LibraryGuideProps={pianoLibrary?:boolean;guitarLibrary?:boolean};
 
 function MusicFallback({onBack}: {onBack: () => void}) {
   return <section className="music-home" aria-busy="true">
@@ -30,10 +31,10 @@ function UnsupportedScreen({onBack}: {onBack: () => void}) {
   </section>;
 }
 
-export function LessonExperienceHost({document, ...body}: {document: LessonDocument} & BodyProps) {
+export function LessonExperienceHost({document,pianoLibrary=false,guitarLibrary=false, ...body}: {document: LessonDocument} & BodyProps & LibraryGuideProps) {
   if (document.kind === 'music') {
     return <Suspense fallback={<MusicFallback onBack={body.onBack}/>}>
-      <MusicLessonHome lesson={document.value} onBack={body.onBack}/>
+      <MusicLessonHome lesson={document.value} onBack={body.onBack} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>
     </Suspense>;
   }
   if (document.kind === 'summary') return <UnsupportedScreen onBack={body.onBack}/>;
@@ -41,8 +42,8 @@ export function LessonExperienceHost({document, ...body}: {document: LessonDocum
 }
 
 /** Preview and practice destinations that a music lesson can occupy. */
-export function MusicLessonScreen({lesson, onBack,midiSetupEnabled=false,musicHistoryEnabled=false}: {lesson: MusicLessonManifest; onBack: () => void;midiSetupEnabled?:boolean;musicHistoryEnabled?:boolean}) {
+export function MusicLessonScreen({lesson, onBack,midiSetupEnabled=false,musicHistoryEnabled=false,pianoLibrary=false,guitarLibrary=false}: {lesson: MusicLessonManifest; onBack: () => void;midiSetupEnabled?:boolean;musicHistoryEnabled?:boolean;pianoLibrary?:boolean;guitarLibrary?:boolean}) {
   return <Suspense fallback={<MusicFallback onBack={onBack}/>}>
-    <MusicLessonHome lesson={lesson} onBack={onBack} midiSetupEnabled={midiSetupEnabled} musicHistoryEnabled={musicHistoryEnabled}/>
+    <MusicLessonHome pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary} lesson={lesson} onBack={onBack} midiSetupEnabled={midiSetupEnabled} musicHistoryEnabled={musicHistoryEnabled}/>
   </Suspense>;
 }

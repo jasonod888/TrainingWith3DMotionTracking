@@ -129,6 +129,9 @@ def install_sharing(app,settings,identity,db):
         if revision.id!=body.revision_id:
             revision=session.get(LessonRevision,body.revision_id) if body.keep_current_release and body.revision_id==lesson.published_revision_id else None
             if not revision or revision.lesson_id!=lesson.id:raise HTTPException(409,'The move has newer edits. Reopen it before sharing.')
+        # Music stays private: the existing invitation workflow is the only release path.
+        if (revision.manifest or {}).get('schema_version')==2 and body.mode!='invite':
+            raise HTTPException(409,'Music lessons can only be shared by private invitation.')
         # Legacy publishers had no explicit acceptance step; record one so every release is accepted.
         ensure_release(session,lesson,revision,account.id,source='publish')
         # Releasing is the act that adopts the current label. A reader keeps whatever the

@@ -16,6 +16,9 @@ with sync_playwright() as p:
     page.on('request', lambda request: requests.append(request.url))
     page.add_init_script("""
       window.deviceRequests=[];
+      window.audioContexts=0;
+      window.AudioContext=class {constructor(){window.audioContexts++;throw Error('Unexpected audio context');}};
+      window.webkitAudioContext=window.AudioContext;
       navigator.mediaDevices.getUserMedia=()=>{deviceRequests.push('camera');throw Error('Unexpected camera');};
       navigator.requestMIDIAccess=()=>{deviceRequests.push('midi');throw Error('Unexpected MIDI');};
       navigator.permissions.query=()=>{deviceRequests.push('permission');throw Error('Unexpected permission');};
@@ -57,6 +60,7 @@ with sync_playwright() as p:
 
     assert errors == [], errors
     assert page.evaluate('window.deviceRequests') == []
+    assert page.evaluate('window.audioContexts') == 0
     forbidden = [url for url in requests if any(token in url.lower() for token in
                  ('.ttf', '.woff', '.mp3', '.wav', '.ogg', 'font', 'soundfont', 'sample'))]
     assert forbidden == [], forbidden

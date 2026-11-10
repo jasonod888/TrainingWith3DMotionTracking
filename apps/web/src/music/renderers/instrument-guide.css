@@ -1,0 +1,6 @@
+.library-guide-scroll {width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;margin:12px 0;}
+.library-piano {height:150px;width:100%;pointer-events:none;}
+.library-piano .ReactPiano__Key--active {background:#849b63;}
+.library-neck {min-width:520px;width:100%;pointer-events:none;}
+.library-neck svg {display:block;max-width:100%;}
+@media(prefers-reduced-motion:reduce){.library-guide-scroll *{transition:none!important;animation:none!important;}}

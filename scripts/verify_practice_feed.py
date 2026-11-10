@@ -24,6 +24,8 @@ with sync_playwright() as p:
  browser=p.chromium.launch(headless=True)
  page=browser.new_page(viewport={'width':390,'height':844})
  errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+ instrument_requests=[]
+ page.on('request',lambda request:instrument_requests.append(request.url) if any(token in request.url for token in ('/renderers/','react-piano','fretboard_js')) else None)
  mode={'signed_in':True,'public_error':False,'empty':False,'jobs':[]}
  def api(route):
   parsed=urlparse(route.request.url);path=parsed.path.split('/api/',1)[1];query=parse_qs(parsed.query)
@@ -33,7 +35,7 @@ with sync_playwright() as p:
   elif path=='lessons/summaries':route.fulfill(json=[] if mode['empty'] else [{'summary_version':1,'lesson_id':v['lesson_id'],'revision_id':v['revision_id'],'title':v['title'],'subject':'movement_other','subject_label':'Full Body Movement','experience_family':'body','instrument':None,'duration':v['duration'],'section_count':len(v['section_set']['sections']),'poster':v.get('thumbnail'),'capabilities':{'preview':True,'practice':True,'live_input':'camera'}} for v in own])
   elif path=='shared-lessons':route.fulfill(json=[] if mode['empty'] else shared)
   elif path=='shared-lessons/summaries':route.fulfill(json=[] if mode['empty'] else [{'summary_version':1,'lesson_id':v['lesson_id'],'revision_id':v['revision_id'],'title':v['title'],'subject':'movement_other','subject_label':'Full Body Movement','experience_family':'body','instrument':None,'duration':v['duration'],'section_count':len(v['section_set']['sections']),'poster':None,'capabilities':{'preview':True,'practice':True,'live_input':'camera'}} for v in shared])
-  elif path=='capabilities':route.fulfill(json={'subject_filter':False,'conversion':True,'processing':{}})
+  elif path=='capabilities':route.fulfill(json={'subject_filter':False,'conversion':True,'processing':{},'music_piano_library_ui':os.environ.get('MUSIC_LIBRARY_UI_TEST_FLAGS')=='1','music_guitar_library_ui':os.environ.get('MUSIC_LIBRARY_UI_TEST_FLAGS')=='1'})
   elif path=='workflow/lessons':route.fulfill(json={'lessons':[{'lesson_id':v['lesson_id'],'accepted_revision_id':v['revision_id'] if i==0 else None,'latest_revision_id':v['revision_id'],'audiences':{'direct':0,'groups':0,'public':i==0}} for i,v in enumerate(own)]})
   elif path=='conversions':route.fulfill(json={'jobs':mode['jobs'],'worker_online':True})
   elif path=='groups':
@@ -219,6 +221,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Shared with me',exact=True).click()
  expect(page.get_by_text('Sign in to see your practices and anything shared with you.',exact=True)).to_be_visible()
  assert not errors,errors
+ assert instrument_requests==[],instrument_requests
  browser.close()
 print('PASS: mixed-source feed; deduplication; source filters; search; pagination; card menus; direct practice entry; return state and scroll; empty states; partial failure; signed-out access; mobile/tablet/desktop layout.')
 

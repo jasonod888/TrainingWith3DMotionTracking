@@ -43,7 +43,7 @@ function Spike() {
     if (!mounted || !chord.current) return undefined;
     chord.current.innerHTML = '';
     const chart = new SVGuitarChord(chord.current);
-    chart.configure({title: 'C'}).chord({fingers: [[1, 3], [2, 2], [3, 0]], barres: []}).draw();
+    chart.configure({title: 'C'}).chord({fingers: [[6, 'x'], [5, 3], [4, 2], [3, 0], [2, 1], [1, 0]], barres: []}).draw();
     return () => { if (chord.current) chord.current.innerHTML = ''; };
   }, [mounted]);
 

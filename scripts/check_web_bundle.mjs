@@ -31,4 +31,19 @@ const music=measure(new Set([...collect(musicKey).files].filter(file=>!files.has
 const baseline=JSON.parse(readFileSync(baselinePath,'utf8'));
 assert.ok(initial.gzip<=baseline.initial.gzip+baseline.headroomGzip,`Initial gzip ${initial.gzip} exceeds ${baseline.initial.gzip+baseline.headroomGzip}`);
 assert.ok(music.gzip<=baseline.musicScreenLimitGzip,`Music screen gzip ${music.gzip} exceeds ${baseline.musicScreenLimitGzip}`);
-console.log(JSON.stringify({initial,musicScreen:music,initialFiles:[...files].sort()},null,2));
+const musicFiles=collect(musicKey).files;
+const renderers={};
+const rendererKeys={};
+for(const name of ['PianoGuide','GuitarNeckGuide']){
+ const key=Object.keys(manifest).find(key=>key.endsWith(`/renderers/${name}.tsx`));
+ assert.ok(key,`${name} must remain an instrument-specific lazy module`);rendererKeys[name]=key;
+ assert.ok(!seen.has(key)&&!collect(musicKey).seen.has(key),`${name} entered the library or music shell`);
+ const closure=collect(key);
+ const extra=measure(new Set([...closure.files].filter(file=>!files.has(file)&&!musicFiles.has(file))));
+ assert.ok(extra.gzip<=baseline.instrumentRendererLimitGzip,`${name} extra gzip ${extra.gzip} exceeds ${baseline.instrumentRendererLimitGzip}`);
+ const active=measure(new Set([...musicFiles,...closure.files].filter(file=>!files.has(file))));
+ renderers[name]={additional:extra,totalActiveMusic:active};
+}
+assert.ok(!collect(rendererKeys.PianoGuide).seen.has(rendererKeys.GuitarNeckGuide),'Piano imports the guitar renderer');
+assert.ok(!collect(rendererKeys.GuitarNeckGuide).seen.has(rendererKeys.PianoGuide),'Guitar imports the piano renderer');
+console.log(JSON.stringify({initial,musicScreen:music,renderers,initialFiles:[...files].sort()},null,2));

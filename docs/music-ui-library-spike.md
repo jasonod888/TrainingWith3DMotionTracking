@@ -92,3 +92,14 @@ Adding svguitar's ~70 kB to that screen is not acceptable for the initial migrat
 No production integration, accessibility audit, chord-shape review, string/fret semantics,
 or long-session/memory test is claimed. React 19 compatibility was exercised through these
 fixture paths, not every react-piano interaction.
+
+
+## Follow-up review
+
+The fixture labelled C originally used non-C positions; it now uses the standard open
+C-major shape (low-to-high x32010). The local piano declaration has moved to the shared
+`src/types/` location with explicit used public props. The check also asserts no audio
+context construction. The real app boundary and initial adapters are now implemented;
+see [music-ui-library-verification.md](music-ui-library-verification.md). The statement
+above about no production imports describes the original UI-L0 checkpoint, not the new
+locally gated integration. No deployed route flag was enabled.

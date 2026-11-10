@@ -27,7 +27,7 @@ scored MIDI result or microphone assessment is approved by the current evidence.
 | Personal music history | Explicit unscored save, stable retries, per-lesson/account pages and deletion | Self-reported aggregate evidence, not grades or observation-coverage proof |
 | PostgreSQL | 0015–0020 execution, real quota/retry races, cursor continuation and full backup restore exercised | Bounded synthetic dataset; deployment-scale load and operational recovery remain separate |
 | Model evidence tooling | Artifact/code/terms/approval binding, PCM corpus validation and proposal comparison checks | No selected/installed/approved model, real acoustic corpus or independently verified inference |
-| Instructor-to-learner music release | Guarded off | Even reviewed music cannot yet be published/shared through normal API use |
+| Instructor-to-learner music release | **Private invitation release delivered 10 November 2026** | Group/link/public music release and a real two-account pilot remain; link and public stay intentionally unavailable |
 | Microphone and full guitar assessment | Not delivered | Separate detector/rights/device/exercise qualification needed |
 
 Phase labels describe workstreams, not a sequential completion certificate. Work from
@@ -59,15 +59,15 @@ a verified inference run.
 
 ### 2. Teacher-to-learner release
 
-Music sharing/publishing is still refused by `ensure_release`, even for a reviewed
-reference. The current owner-only lab and simulated future grants in tests are not a
-working instructor-to-learner distribution journey.
+Reviewed music can now be released privately through the existing email invitation
+workflow. Publishing requires the latest owner-reviewed and accepted revision and is
+restricted to `mode='invite'`; links, groups and public listings remain refused. Recipients
+accept through the existing share endpoints and open the v2 guide; unpublish and revocation
+close access again. See [`music-private-sharing.md`](music-private-sharing.md).
 
-Before a two-account learner pilot, implement a narrow reviewed-music invite/group
-release using the existing sharing flow. Bind access to the accepted revision/reference
-and its policy; test unreleased edits, relabels, revocation, assets and v1-client refusal.
-Keep public listings/derivatives off until their media-rights and projection work is ready.
-This distribution work can proceed alongside model and hardware qualification.
+Remaining: a real two-account pilot, reviewed-music group sharing, and link/public release
+only after media-rights and projection work. This does not enable scoring, public music or
+model processing.
 
 ### 3. Observation and assessment scope
 
@@ -118,8 +118,8 @@ explicit to users. Do not advertise the MIDI pilot as completed piano-and-guitar
    clean-tree and older test counts describe that commit, not the current working tree.
 2. **Build the real private piano lesson milestone.** In parallel: one candidate/code+
    checkpoint commercial review and acoustic benchmark; one supported-browser upload+
-   deployed-worker path; and the narrow invite-only reviewed music release. Instructor
-   and learner should use their existing account and lesson entry paths.
+   deployed-worker path. Instructor and learner should use their existing account and
+   lesson entry paths; the private invitation release is implemented.
 3. **Run the first learner smoke test.** One teacher, one learner, one short clean playing
    passage, one keyboard/browser. Check reference/video sync, note corrections,
    interruptions, explicit history save/delete and clean return to movement practice.
@@ -162,3 +162,54 @@ statement. Initial candidates are React Piano for keys and Fretboard.js for the 
 SVGuitar chord cards follow reviewed shape authoring. No dependency was installed or
 compatibility/bundle result claimed. Product timing, account workflows, MIDI and
 assessment qualification remain separate. No progress percentage is claimed.
+
+
+## ffe1827 continuation: implemented instrument-library boundary
+
+Reviewed the UI-L0 spike and continued into UI-L1 with initial UI-L2/UI-L3 adapters.
+Default-off, independent piano/neck library flags are now wired into the real player,
+with lazy code, checked musical mapping and isolated fallbacks. The C-chord spike fixture
+and overly loose piano declaration were corrected. See
+[music-ui-library-verification.md](music-ui-library-verification.md). This is application
+integration, not merely another fixture; no deployed setting was changed.
+
+### Next software milestones toward the complete platform
+
+1. **Accept the supported diagram slice internally.** Exercise real instructor media,
+   keyboard range/neck scrolling and a longer session; retain the legacy path through
+   one comparison window. Do not wait for a full physical MIDI matrix just to accept
+   a read-only diagram. SVGuitar cards stay deferred until reviewed shape authoring.
+2. **Implement reviewed private music release next.** Remove the blanket music-release
+   refusal only for an explicitly accepted, reviewed music revision/reference. Reuse
+   existing teacher invites/group access with private assets, exact revision/policy
+   binding, revocation, relabel/republication rules and v1-client protection. Keep public
+   music listing/derivatives off. This closes the current gap between an owner's lab
+   and an actual teacher-to-learner journey.
+3. **Complete a real piano processing loop in parallel.** Choose/pin/review one model
+   artifact/runtime, retain commercial evidence, prepare rights-cleared acoustic clips,
+   record actual inference provenance and qualify the isolated worker/browser upload.
+   Verify source-audio/video/reference synchronization, cancellation, resume and retries.
+4. **Add explicit assessable-span review and collect real observation evidence.** Separate
+   explanation from playing. Run one physical keyboard/browser smoke test, then expand.
+   Set and enforce a versioned assessment policy from ground truth before any grades.
+   Policy/reference revisions after review also need a normal instructor edit workflow.
+5. **Finish instrument-specific releases.** Microphone piano/guitar feedback needs its
+   own detector/rights/device qualification. Guitar needs reviewed positions/chords,
+   supported tuning/capo/handedness and strum policies. These do not block a narrow
+   piano MIDI/watch-only release.
+6. **Complete operating rollout and remaining shared results.** Retain notices and media
+   rights, confirm real resource isolation from body jobs, exercise representative load
+   and operational recovery, and finish parent Phase 9 session/result scope. Enable each
+   capability only for the actually supported cohort; advanced Phase 11 remains later.
+
+External evidence still needed: an actual USB-MIDI instrument on a test host,
+rights-cleared recordings and accountable approval of the exact model/code/terms. These
+cannot be replaced with virtual ports or metadata flags; independent software work above
+can continue while they are obtained. This does not restart the existing implementation.
+
+
+Verification of this slice: **306 Python passed / 13 skipped; 282 web passed**. Both builds,
+net bundle checks, library guide and existing guide/history checks pass. All four movement
+scripts pass, plus feed with both library flags on and no instrument imports. Details are
+in `music-ui-library-verification.md`. No package versions, deployed flags, model assets,
+database schema or scoring policy were changed. Code/docs/tests are local and uncommitted.

@@ -116,9 +116,22 @@ def accept_revision(session, lesson, revision, account_id, warnings=None, source
 
 
 def ensure_release(session, lesson, revision, account_id, source='publish'):
-    """Point the shared release at an accepted revision, accepting it when legacy publishers did not."""
+    """Point the shared release at an accepted revision.
+
+    Body revisions may be accepted at publish time for legacy compatibility. A music
+    revision is accepted only by its owner review, and only the latest reviewed revision
+    may become the shared release; this never publishes music publicly.
+    """
     if (revision.manifest or {}).get('schema_version') == 2:
-        raise HTTPException(409, 'A music lesson needs a reviewed reference before it can be shared.')
+        record = accepted(session, lesson.id, revision.id)
+        if not record or record.source != 'music-review':
+            raise HTTPException(409, 'Save the reviewed reference before sharing this music lesson.')
+        if latest_revision(session, lesson).id != revision.id:
+            raise HTTPException(409, 'Review the latest music revision before sharing it.')
+        if not (revision.manifest or {}).get('reference_reviewed'):
+            raise HTTPException(409, 'This music reference is not reviewed.')
+        lesson.published_revision_id = revision.id
+        return record
     record = accept_revision(session, lesson, revision, account_id, warnings=[], source=source)
     lesson.published_revision_id = revision.id
     return record

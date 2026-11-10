@@ -249,7 +249,7 @@ The table above is the intended dependency map, not a completion ledger. Current
 | --- | --- |
 | 0–2 | Baseline/contracts/discovery foundations delivered; device/audio qualification remains open where called for |
 | 3 | Preparation/validation/worker contracts implemented; real model/worker/browser route not qualified |
-| 4 | Reviewed custom guide/player implemented; library-renderer migration now planned |
+| 4 | Reviewed guide/player plus default-off library boundary and initial piano/neck adapters implemented; supported-scope internal acceptance remains |
 | 5 | Private draft review implemented; real transcription, assessable-span/post-review editing and music release still incomplete |
 | 6 | Unscored piano MIDI and history implemented; physical observation/scoring qualification and remaining practice modes incomplete |
 | 7 | Microphone feedback remains to implement/qualify |
@@ -704,3 +704,15 @@ These are deliberately out of the first release and require their own scope, evi
 - Microphone-based guitar assessment beyond the qualified subset.
 - Music recording, export and paired-display audio.
 - Curricula, notation import and export, and hand animation.
+
+
+## UI-L1 implementation update after ffe1827
+
+The [library verification record](music-ui-library-verification.md) covers the real
+InstrumentGuideStage boundary, independent default-off flags, instrument-specific lazy
+renderers and legacy/error fallback. Initial controlled piano and standard guitar neck
+adapters are implemented; reviewed chord cards and full guitar/microphone/scored scope
+are not. Existing source timing, account/history and body workflow remain intact.
+The next software milestone is private reviewed-music release, alongside real model/
+corpus/worker qualification and teacher-confirmed assessable spans. See the current
+[delivery status and completion sequence](music-delivery-status.md).

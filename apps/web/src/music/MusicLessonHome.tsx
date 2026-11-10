@@ -1,12 +1,13 @@
-import {lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
+import {lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Music2, Pause, Play} from 'lucide-react';
 import type {MusicLessonManifest} from '../../../../packages/lesson-schema/index';
 import {assetUrl, request} from '../api';
 import {
-  activeEvents, currentSpan, GUITAR_STRING_LABELS, guitarPosition, parseMusicReference,
-  bindMusicReference, supportsGuitarDiagram, pianoGeometry, pitchName, type MusicReference,
+  activeEvents, currentSpan, parseMusicReference,
+  bindMusicReference, pitchName, type MusicReference,
 } from './music-reference';
 import './music.css';
+import {InstrumentGuideStage} from './renderers/InstrumentGuideStage';
 import {MidiKeyboardCheck} from './MidiKeyboardCheck';
 const MusicHistoryPanel=lazy(()=>import('./MusicHistoryPanel').then(module=>({default:module.MusicHistoryPanel})));
 import {attackSourceTime} from '../../../../packages/music-engine/onsets';
@@ -29,7 +30,7 @@ function timeLabel(seconds: number): string {
  * The reviewed reference is read and validated at runtime. It requests no camera,
  * microphone or MIDI access, offers no scoring, and keeps the original instructor audio.
  */
-export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHistoryEnabled=false}: {lesson: MusicLessonManifest; onBack: () => void;midiSetupEnabled?:boolean;musicHistoryEnabled?:boolean}) {
+export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHistoryEnabled=false,pianoLibrary=false,guitarLibrary=false}: {lesson: MusicLessonManifest; onBack: () => void;midiSetupEnabled?:boolean;musicHistoryEnabled?:boolean;pianoLibrary?:boolean;guitarLibrary?:boolean}) {
   const [loaded,setLoaded]=useState<{identity:string;value:MusicReference}|null>(null);
   const identity=`${lesson.revision_id}:${lesson.reference.key}:${lesson.reference.sha256}`;
   const reference=loaded?.identity===identity?loaded.value:null;
@@ -278,12 +279,6 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   };
 
   const active = useMemo(() => reference ? activeEvents(reference, time) : [], [reference, time]);
-  const activePitches = useMemo(() => new Set(active.map(event => event.pitch)), [active]);
-  const geometry = useMemo(() => reference ? pianoGeometry(reference.events) : null, [reference]);
-  const positions = useMemo(() => active.map(event => ({event, position: guitarPosition(event.pitch)}))
-    .filter(item => item.position), [active]);
-  const guitarSupported=reference? supportsGuitarDiagram(reference.instrument):false;
-  const conflictingStrings=new Set(positions.map(item=>item.position!.string)).size!==new Set(positions.map(item=>item.event.pitch)).size;
   const sectionIndex=sectionsAt(lesson.section_set.sections,time);
   const span = reference ? currentSpan(reference, time) : null;
   const sections = lesson.section_set.sections;
@@ -325,31 +320,7 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
             {active.length ? active.map(event => pitchName(event.pitch)).join(' · ') : 'No note sounding'}
             {span && <span className="music-span"> · {span.start.toFixed(1)}–{span.end.toFixed(1)}s</span>}
           </p>
-          {lesson.subject === 'piano' && geometry
-            ? <div className="piano" role="img" aria-label={`Piano guide with ${geometry.whiteKeys.length} white keys`}
-                style={{'--white-count': geometry.width} as CSSProperties}>
-                {geometry.whiteKeys.map(key => <span key={key.pitch}
-                  className={`piano-white${activePitches.has(key.pitch) ? ' is-active' : ''}`}
-                  style={{left: `${key.whiteIndex * 100 / geometry.width}%`, width: `${100 / geometry.width}%`}}>
-                  {key.pitch % 12 === 0 && <small>{pitchName(key.pitch)}</small>}
-                </span>)}
-                {geometry.blackKeys.map(key => <span key={key.pitch}
-                  className={`piano-black${activePitches.has(key.pitch) ? ' is-active' : ''}`}
-                  style={{left: `${(key.left-.31) * 100 / geometry.width}%`,
-                    width: `${62 / geometry.width}%`}}/>)}
-              </div>
-            : <div className="fretboard" role="img" aria-label="Guitar guide, standard tuning">
-                {GUITAR_STRING_LABELS.map((stringLabel, row) => <div className="fret-row" key={stringLabel}>
-                  <span className="fret-label">{stringLabel}</span>
-                  {Array.from({length: 13}, (_, fret) => {
-                    const hit = guitarSupported&&!conflictingStrings&&positions.find(item => item.position!.string === row + 1 && item.position!.fret === fret);
-                    return <span key={fret} className={`fret-cell${hit ? ' is-active' : ''}`}>
-                      {hit ? pitchName(hit.event.pitch) : fret === 0 ? '0' : String(fret)}
-                    </span>;
-                  })}
-                </div>)}
-              </div>}
-          {lesson.subject==='guitar'&&<p className="small muted">{!guitarSupported?'Fretboard positions are unavailable for this tuning or capo. The reviewed pitches and video remain available.':conflictingStrings?'This passage needs a reviewed fingering; no conflicting string positions are drawn.':'Markers show one possible position, not confirmed instructor fingering.'}</p>}
+          <InstrumentGuideStage key={identity} reference={reference} active={active} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>
           <ol className="music-sections" aria-label="Teaching sections">
             {sections.map(section => <li key={section.id}>
               <button className="secondary" aria-current={sectionIndex===sections.indexOf(section) ? 'step' : undefined}

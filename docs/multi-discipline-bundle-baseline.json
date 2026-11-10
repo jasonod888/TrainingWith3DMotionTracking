@@ -6,5 +6,6 @@
     "gzip": 126758
   },
   "headroomGzip": 16384,
-  "musicScreenLimitGzip": 16384
+  "musicScreenLimitGzip": 16384,
+  "instrumentRendererLimitGzip": 25600
 }

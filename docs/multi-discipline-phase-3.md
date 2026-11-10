@@ -669,3 +669,41 @@ spike; no production route or flag changed.
 
 Details: [`music-ui-library-spike.md`](music-ui-library-spike.md);
 [`third-party/README.md`](third-party/README.md). No scoring, hardware or model claim.
+
+
+## ffe1827 follow-up: UI-L1 boundary and initial UI-L2/UI-L3 renderers
+
+Reviewed the spike; fixed its incorrect C shape and loose declarations. Added the real
+InstrumentGuideStage with independent default-off piano/guitar capabilities, controlled
+read-only piano, mapped standard neck, cleanup, lazy/error fallback and complete bundle
+measurement. Resolved a production chunk cycle discovered during integration. No change
+to controller timing, reference hashes, MIDI evidence, history semantics or body contracts.
+
+306 Python tests passed / 13 skipped; 282 web tests passed. Production/spike builds, all
+four movement scripts, library guides, legacy guide/history and flag-on movement feed
+pass. Per-instrument added gzip is 7,662/16,816 bytes, within the planned caps. See
+`music-ui-library-verification.md` and `music-delivery-status.md` for delivered scope and
+remaining release steps. No deployed flag, model, scoring or schema change. Work remains
+uncommitted and not pushed.
+
+
+## Implementation slice: private reviewed-music sharing
+
+10 November 2026. Reviewed music can be released to named people through the existing
+invitation workflow. No public, link, group, scored or model path was enabled.
+
+- Server: v2 release requires the latest revision accepted via `music-review`,
+  `reference_reviewed`, and `mode='invite'`; link mode is refused and v2 never falls back
+  to a body acceptance. Unpublish and revocation remove access.
+- Recipients use the existing inspect/accept endpoints, receive the v2 manifest, see the
+  lesson in shared summaries when format 2 is advertised, and can open the guide. Public
+  endpoints remain unavailable and recipients cannot publish.
+- Client: owned music cards expose **Share lesson**; the share screen is invitation-only
+  (no Public/Group/Link tabs), publishes on the first invitation, lists pending invitations
+  and people with access, and offers Make private. Join routes v2 to the music guide.
+- Legacy tests that expected all music publishing to be refused now assert link refusal
+  plus successful invitation release.
+
+Verification: **307 API passed, 13 skipped** (one new sharing test); web **282 passed**;
+TypeScript, build, bundle, sharing/feed/summary browser checks pass. Details:
+[`music-private-sharing.md`](music-private-sharing.md).
