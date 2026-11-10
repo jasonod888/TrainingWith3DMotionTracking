@@ -156,3 +156,23 @@ def test_review_can_choose_midi_feedback_without_enabling_scoring_or_publishing(
         shared = client.post('/api/lessons/' + lesson_id + '/publish', json={'revision_id': manifest['revision_id'],
             'mode': 'invite', 'reviewed': True, 'rights_acknowledged': True})
         assert shared.status_code == 200, shared.text
+
+
+def test_review_persists_positions_and_chords(tmp_path):
+    with real_media_app(tmp_path) as (client, app, settings, store, mail):
+        lesson_id, view, lease, base, payload = proposal(client, app, media(tmp_path, 'audio'))
+        body = review_body(view)
+        body['events'][0].update(pitch=60, string=2, fret=1)
+        body['guitar_chords'] = [{'id': 'c', 'name': 'C', 'start': 0,
+                                  'frets': [-1, 3, 2, 0, 1, 0], 'position': 1}]
+        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
+                              'rubric_version': 'music-watch-v1'}
+        url = f'/api/lessons/{lesson_id}/music-draft/review'
+        bad = copy.deepcopy(body)
+        bad['guitar_chords'][0]['frets'][1] = 6
+        assert client.post(url, json=bad).status_code == 422
+        response = client.post(url, json=body)
+        assert response.status_code == 200, response.text
+        reference = json.loads(store.objects[response.json()['reference']['key']])
+        assert reference['events'][0]['string'] == 2 and reference['events'][0]['fret'] == 1
+        assert reference['guitar_chords'][0]['frets'][1] == 3

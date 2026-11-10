@@ -743,3 +743,33 @@ commercial deployment. See [the current real-loop handoff](music-real-piano-loop
 Proceed with Phase 5 reviewed-reference re-editing and assessable-span controls next,
 plus isolated worker packaging. These require no physical keyboard. Obtain real model
 and media evidence in parallel; a watch-only piano pilot does not wait for MIDI hardware.
+
+
+## Progress update after 1ba0497 and review fixes
+
+Completed since the earlier phase notes:
+
+- UI-L1/L2/L3: `InstrumentGuideStage`, independent default-off piano/guitar library flags,
+  lazy instrument-specific imports, fallback behavior and accepted piano/neck diagrams.
+- Reviewed music editing: immutable revisions, preserved release until Update shared
+  version, assessment-policy edits, playing/explanation passages with paired boundary
+  evidence, and metadata-preserving note edits.
+- Guitar authoring: reviewed string/fret positions and chord shapes authored in both the
+  initial draft review and later editor; lazy reviewed chord panel; standard tuning only.
+- Worker transport: exact run profile, fixture lifecycle completion and lease-loss cleanup
+  against a local mock API; isolated image packaging.
+- PostgreSQL 0021 accepted for its tested scope (existing data, concurrent edits, retries).
+- Private invitation-only music sharing with explicit release updates.
+- 326 API tests (13 skipped), 289 web tests, build and bundle checks pass.
+
+Remaining, in order:
+
+1. Assemble an approved transcription candidate (code, weights, runtime lock, commercial
+   evidence, attribution) and run the real watch-only upload → transcription → correction →
+   invitation → learner playback loop. No candidate or rights-cleared recording exists yet.
+2. Capo, alternate tuning and left-handed guitar support (separate change).
+3. Physical MIDI qualification, measured observation coverage and qualified scoring.
+4. Microphone assessment and broader guitar assessment as separate workstreams.
+5. Production-scale load, operating deployment and remaining rollout evidence.
+
+Physical testing is not a prerequisite for items in progress; scoring remains disabled.

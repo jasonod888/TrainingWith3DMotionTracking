@@ -259,6 +259,8 @@ class GuitarChord(Contract):
             raise ValueError('Chord frets must be muted (-1), open (0) or 1-24.')
         if all(fret < 0 for fret in self.frets):
             raise ValueError('A chord needs at least one sounding string.')
+        if any(fret > 0 and not (self.position <= fret <= self.position + 3) for fret in self.frets):
+            raise ValueError('Chord frets must fit the four-fret window at the base position.')
         return self
 
 

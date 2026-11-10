@@ -8,7 +8,7 @@ export function GuitarChordCards({chords,time=0}:{chords:GuitarChord[];time?:num
  const active=[...ordered].reverse().find(chord=>chord.start<=time+1e-6)??null;
  return <section className="guitar-chords" aria-label="Reviewed guitar chords">
   <h3>Reviewed chord shapes</h3>
-  <div className="guitar-chord-list">{ordered.map(chord=><figure key={chord.id} className={active?.id===chord.id?'is-active':''}>
+  <div className="guitar-chord-list" tabIndex={0} aria-label="Chord diagrams, scrollable">{ordered.map(chord=><figure key={chord.id} className={active?.id===chord.id?'is-active':''}>
    <figcaption>{chord.name}<small> · {chord.start.toFixed(1)}s</small></figcaption>
    <svg viewBox="0 0 100 124" role="img" aria-label={`${chord.name} chord diagram, ${chord.frets.map(f=>f<0?'muted':f).join(' ')}`}>
     <rect x="14" y="10" width="72" height="92" fill="none" stroke="currentColor" strokeWidth="1"/>

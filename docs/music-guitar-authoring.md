@@ -14,7 +14,12 @@ reviewed chord shapes; the guide renders those choices instead of inferred finge
 - The edit endpoint persists both into the new immutable reference; the manifest and
   learner release rules are unchanged.
 
-## Editor
+## Authoring during draft review and later editing
+
+Guitar positions and chords can now be authored in the **initial draft review**, not only
+after the lesson is saved: the review form has the same string/fret and chord controls and
+sends them with the reviewed reference. The post-review **Edit lesson** path remains for
+later changes; both create immutable revisions and preserve the shared release.
 
 For guitar lessons, the reviewed-lesson editor adds:
 
@@ -44,9 +49,11 @@ Saving still creates a new revision; learners keep the current shared release un
 | --- | --- |
 | `tests/api/test_music_edit.py` | Positions/chords persist; pitch/position mismatch rejected |
 | `apps/web/tests/music-reference.test.mjs` | Position/chord parsing, duplicate/bounds rejection, explicit guide preference |
-| `scripts/verify_guitar_authoring.py` | Editor saves string/fret and a C chord; preview renders the reviewed neck marker and chord card; no device requests |
-| Web suite | **286 passed**; TypeScript/build pass; music screen 15,947 B gzip (within 16,384) |
-| Full API suite | **325 passed, 13 skipped** |
+| `scripts/verify_guitar_authoring.py` | Post-review editor saves string/fret and a C chord; preview renders marker and chord card; no device requests |
+| `scripts/verify_guitar_review.py` | Initial draft review saves position/chord; chord panel renders, is keyboard-focusable and phone/desktop layouts do not overflow |
+| `tests/api/test_music_review.py` | Draft review persists positions/chords; invalid fret window rejected |
+| Web suite | **289 passed**; TypeScript/build pass; music screen 16,075 B gzip (within 16,384) |
+| Full API suite | **326 passed, 13 skipped** |
 
 ## Limits
 
@@ -56,3 +63,17 @@ Saving still creates a new revision; learners keep the current shared release un
 - No chord inference, microphone/guitar assessment or public/group music release.
 - Positions are authored after review through the editor; the initial review screen does
   not yet expose them.
+
+
+## Review fixes in this slice
+
+- **Validation:** sounding frets must fit the four-fret window at the chord's base
+  position, in addition to bounds/uniqueness/pitch checks.
+- **Fret display:** the SVG diagram uses that window and shows the base position; invalid
+  windows are rejected rather than silently clipped.
+- **Mixed markers:** explicit reviewed positions win; only conflicting fallback markers are
+  hidden, with an honest notice. Fallback-only conflicts remain fully hidden as before.
+- **Feedback order:** corrections now carry their reviewed/performance time and sort by it,
+  not by error seconds (which floated missing/extra entries unpredictably).
+- **Accessibility/responsive:** the chord strip is keyboard-focusable, cards carry ARIA
+  labels, and phone/desktop checks assert no page overflow.

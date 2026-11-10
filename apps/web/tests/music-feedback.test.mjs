@@ -148,3 +148,10 @@ test('boundary exclusions pair a note and its nearby attack in both directions',
   assert.equal(lateAttack.extra, 0);
   assert.equal(lateAttack.unassessed, 1);
 });
+
+test('corrections are ordered by reviewed/performance time', () => {
+  const result = buildRunFeedback({...base, reference, start: 0.5, end: 2, tolerance: 0.15,
+    attacks: [{id: 'extra', pitch: 72, sourceTime: 1.6}, {id: 'b', pitch: 64, sourceTime: 1.4}]});
+  assert.deepEqual(result.notes.map(note => note.status), ['missing', 'matched', 'extra']);
+  assert.deepEqual(result.notes.map(note => note.time), [1, 1.4, 1.6]);
+});

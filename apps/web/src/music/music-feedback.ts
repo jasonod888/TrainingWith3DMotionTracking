@@ -44,6 +44,7 @@ export type FeedbackNote = {
   pitch: number;
   name: string;
   optional: boolean;
+  time: number;
   errorSeconds: number | null;
   timing: 'early' | 'late' | 'on-time' | null;
 };
@@ -130,17 +131,17 @@ export function buildRunFeedback(input: {
     if (!note) continue;
     const errorSeconds = Number(match.errorSeconds.toFixed(3));
     notes.push({status: 'matched', pitch: note.pitch, name: pitchName(note.pitch), optional: match.optional,
-      errorSeconds, timing: Math.abs(errorSeconds) <= 0.06 ? 'on-time' : errorSeconds < 0 ? 'early' : 'late'});
+      time: note.onset, errorSeconds, timing: Math.abs(errorSeconds) <= 0.06 ? 'on-time' : errorSeconds < 0 ? 'early' : 'late'});
   }
   for (const id of result.missing) {
     const note = expected.find(item => item.id === id);
-    if (note) notes.push({status: 'missing', pitch: note.pitch, name: pitchName(note.pitch), optional: false, errorSeconds: null, timing: null});
+    if (note) notes.push({status: 'missing', pitch: note.pitch, name: pitchName(note.pitch), optional: false, time: note.onset, errorSeconds: null, timing: null});
   }
   for (const id of result.extra) {
     const attack = input.attacks.find(item => item.id === id);
-    if (attack) notes.push({status: 'extra', pitch: attack.pitch, name: pitchName(attack.pitch), optional: false, errorSeconds: null, timing: null});
+    if (attack) notes.push({status: 'extra', pitch: attack.pitch, name: pitchName(attack.pitch), optional: false, time: attack.sourceTime, errorSeconds: null, timing: null});
   }
-  notes.sort((left, right) => (left.errorSeconds ?? 0) - (right.errorSeconds ?? 0) || left.pitch - right.pitch);
+  notes.sort((left, right) => left.time - right.time || left.pitch - right.pitch);
   return {version: 1, status: 'complete', reason: null, run: input.run, sectionId: input.sectionId,
     window, matched: result.matches.length, missing: result.missing.length, extra: result.extra.length,
     unassessed: result.unassessed + boundaryUnassessed, total: candidates.length,

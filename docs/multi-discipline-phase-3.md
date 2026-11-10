@@ -822,3 +822,22 @@ reviewed chord shapes; the guide renders them without chord inference.
 - Verification: **325 API passed, 13 skipped**; **286 web passed**; TypeScript/build pass;
   music screen 15,947 B gzip within the 16,384 budget; guitar authoring browser check
   passes.
+
+
+## Implementation slice: initial-review guitar authoring and review fixes
+
+10 November 2026.
+
+- Guitar positions/chords are authored in the initial draft review as well as the
+  post-review editor. The draft contract/parser accepts positions/chords and passage kinds;
+  the review sends them to the existing review endpoint.
+- Chord frets must fit the declared four-fret window; invalid windows are rejected. The
+  chord diagram displays that window/base position.
+- Mixed reviewed/fallback markers hide only conflicting fallback positions with a notice;
+  fallback-only conflicts stay hidden.
+- Feedback corrections carry a reviewed/performance time and sort by it.
+- Accessibility/responsive checks cover keyboard focus, ARIA labels, phone/desktop overflow.
+- No capo/alternate tuning/handedness support yet; standard tuning remains the scope.
+
+Verification: **326 API passed, 13 skipped**; **289 web passed**; TypeScript/build pass;
+music screen 16,075 B gzip (limit 16,384); initial-review/editor/library browser checks pass.

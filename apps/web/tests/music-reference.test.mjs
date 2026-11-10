@@ -96,3 +96,19 @@ test('reviewed guitar positions and chords are validated and preferred', () => {
   assert.deepEqual(model.positions, [{pitch: 40, string: 6, fret: 0, label: 'E2'}]);
   assert.match(model.notice, /instructor's reviewed positions/);
 });
+
+test('mixed reviewed and fallback markers hide only conflicting fallback positions', () => {
+  const mixed = {...base, subject: 'guitar', instrument: {instrument: 'guitar'},
+    events: [{id: 'reviewed', onset: 1, duration: 0.3, pitch: 45, string: 5, fret: 0},
+             {id: 'fallback', onset: 2, duration: 0.3, pitch: 45}],
+    guitar_chords: []};
+  const model = guitarGuide({instrument: 'guitar'}, mixed.events);
+  assert.deepEqual(model.positions.map(item => [item.string, item.fret, item.pitch]), [[5, 0, 45]]);
+  assert.match(model.notice, /hidden because they conflicted/);
+});
+
+test('a reviewed chord must fit its base position window', () => {
+  const chord = {id: 'c', name: 'C', start: 0, frets: [-1, 5, 2, 0, 1, 0], position: 1};
+  assert.throws(() => parseMusicReference({...base, subject: 'guitar', instrument: {instrument: 'guitar'},
+    events: [], guitar_chords: [chord]}), /base position/);
+});

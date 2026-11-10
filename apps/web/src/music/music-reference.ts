@@ -117,6 +117,7 @@ export function parseMusicReference(value: unknown): MusicReference {
     }
     const position = item.position == null ? 1 : finite(item.position, `chord ${name} position`);
     if (!Number.isInteger(position) || position < 1 || position > 24) throw new Error('A reviewed chord has an invalid base position.');
+    if (frets.some(fret => fret > 0 && (fret < position || fret > position + 3))) throw new Error('A reviewed chord does not fit its base position.');
     return {id, name, start, frets, position};
   }) : [];
   if (new Set(guitarChords.map(chord => chord.id)).size !== guitarChords.length) throw new Error('Reviewed chord ids must be unique.');
