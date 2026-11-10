@@ -96,10 +96,17 @@ export function buildRunFeedback(input: {
   const hasSpans = input.reference.spans.length > 0;
   const playing = input.reference.spans.filter(span => span.kind !== 'explanation');
   const assessable = (time: number) => !hasSpans || playing.some(span => time >= span.start - 1e-6 && time < span.end);
-  const expected: ExpectedAttack[] = input.reference.events
-    .filter(event => event.onset >= window.start - 1e-6 && event.onset < window.end && assessable(event.onset))
+  // A note or attack whose tolerance window crosses a passage boundary cannot support a
+  // correction; it is unassessed rather than missing/extra.
+  const fullyInside = (time: number) => !hasSpans
+    || playing.some(span => time - tolerance >= span.start - 1e-6 && time + tolerance <= span.end + 1e-6);
+  const candidates = input.reference.events
+    .filter(event => event.onset >= window.start - 1e-6 && event.onset < window.end && assessable(event.onset));
+  const expected: ExpectedAttack[] = candidates
+    .filter(event => fullyInside(event.onset))
     .map(event => ({id: event.id, pitch: event.pitch, onset: event.onset, optional: event.optional}));
-  const attacks = input.attacks.filter(attack => assessable(attack.sourceTime));
+  const boundaryUnassessed = candidates.length - expected.length;
+  const attacks = input.attacks.filter(attack => assessable(attack.sourceTime) && fullyInside(attack.sourceTime));
   let result;
   try {
     result = matchOnsets(expected, attacks, window, tolerance);
@@ -123,10 +130,11 @@ export function buildRunFeedback(input: {
     if (attack) notes.push({status: 'extra', pitch: attack.pitch, name: pitchName(attack.pitch), optional: false, errorSeconds: null, timing: null});
   }
   notes.sort((left, right) => (left.errorSeconds ?? 0) - (right.errorSeconds ?? 0) || left.pitch - right.pitch);
-  const total = expected.length, assessed = total - result.unassessed;
   return {version: 1, status: 'complete', reason: null, run: input.run, sectionId: input.sectionId,
     window, matched: result.matches.length, missing: result.missing.length, extra: result.extra.length,
-    unassessed: result.unassessed, total, assessed, coverage: total ? assessed / total : 0,
+    unassessed: result.unassessed + boundaryUnassessed, total: candidates.length,
+    assessed: candidates.length - (result.unassessed + boundaryUnassessed),
+    coverage: candidates.length ? (candidates.length - (result.unassessed + boundaryUnassessed)) / candidates.length : 0,
     latencyMeasured: input.latencyMeasured, speed: input.speed, notes};
 }
 

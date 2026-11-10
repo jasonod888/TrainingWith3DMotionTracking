@@ -279,6 +279,10 @@ class MusicDraftDocument(Contract):
             raise ValueError('A draft source must be a supported video.')
         if len({event.id for event in self.events}) != len(self.events):
             raise ValueError('Draft event ids must be unique.')
+        ordered = sorted(self.spans, key=lambda span: span.start)
+        for previous, current in zip(ordered, ordered[1:]):
+            if current.start < previous.end - 1e-6:
+                raise ValueError('Draft passages must not overlap.')
         for span in self.spans:
             if span.end > self.duration + 1e-6:
                 raise ValueError('A draft span must stay inside the clip.')

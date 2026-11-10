@@ -45,6 +45,11 @@ def test_editing_creates_a_new_revision_without_touching_the_shared_release(tmp_
                                'rubric_version': 'music-watch-v1'},
                 'confirm_reviewed': True}
         with patch('apps.api.music_edit.storage_client', return_value=store):
+            overlap = {**edit, 'spans': [{'start': 0, 'end': 2, 'kind': 'playing'},
+                                       {'start': 1, 'end': 3, 'kind': 'explanation'}]}
+        with patch('apps.api.music_edit.storage_client', return_value=store):
+            assert client.post(f'/api/lessons/{lesson_id}/music-revision', json=overlap).status_code == 422
+        with patch('apps.api.music_edit.storage_client', return_value=store):
             edited = client.post(f'/api/lessons/{lesson_id}/music-revision', json=edit)
         assert edited.status_code == 200, edited.text
         second = edited.json()
@@ -81,3 +86,25 @@ def test_editing_creates_a_new_revision_without_touching_the_shared_release(tmp_
             login(learner, 'learner@example.test')
             updated = learner.get(f'/api/lessons/{lesson_id}', headers={'X-Lesson-Formats': '1,2'}).json()
             assert updated['revision_id'] == second['revision_id']
+
+
+def test_title_only_edit_preserves_velocity_and_confidence(tmp_path):
+    with real_media_app(tmp_path) as (client, app, settings, store, mail):
+        lesson_id, view, _lease, _base, _payload = proposal(client, app, media(tmp_path, 'audio'))
+        body = review_body(view)
+        body['events'][0]['velocity'] = 0.5
+        body['events'][0]['confidence'] = 0.9
+        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
+                              'rubric_version': 'music-watch-v1'}
+        reviewed = client.post(f'/api/lessons/{lesson_id}/music-draft/review', json=body)
+        assert reviewed.status_code == 200, reviewed.text
+        first = reviewed.json()
+        edit = {'base_revision_id': first['revision_id'], 'title': 'Renamed only',
+                'events': body['events'], 'spans': body['spans'], 'sections': body['sections'],
+                'assessment': body['assessment'], 'confirm_reviewed': True}
+        with patch('apps.api.music_edit.storage_client', return_value=store):
+            edited = client.post(f'/api/lessons/{lesson_id}/music-revision', json=edit)
+        assert edited.status_code == 200, edited.text
+        reference = json.loads(store.objects[edited.json()['reference']['key']])
+        assert reference['events'][0]['velocity'] == 0.5
+        assert reference['events'][0]['confidence'] == 0.9

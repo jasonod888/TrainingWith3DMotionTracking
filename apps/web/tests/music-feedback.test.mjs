@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {buildRunFeedback, calibrateLatency, feedbackEligibility} from '../src/music/music-feedback.ts';
+import {parseMusicReference} from '../src/music/music-reference.ts';
 
 const reference = {
   reference_version: 1, subject: 'piano', instrument: {instrument: 'piano'}, duration: 4,
@@ -56,7 +57,7 @@ test('matching produces corrections without a score and never grades optional mi
 });
 
 test('extra notes are reported and duplicate evidence invalidates the run', () => {
-  const extra = feedback([{id: 'x', pitch: 60, sourceTime: 1.0}, {id: 'y', pitch: 72, sourceTime: 1.9}]);
+  const extra = feedback([{id: 'x', pitch: 60, sourceTime: 1.0}, {id: 'y', pitch: 72, sourceTime: 1.6}]);
   assert.equal(extra.extra, 1);
   assert.equal(extra.notes.find(note => note.status === 'extra')?.name, 'C5');
   const invalid = feedback([{id: 'same', pitch: 60, sourceTime: 1}, {id: 'same', pitch: 64, sourceTime: 1.4}]);
@@ -108,4 +109,21 @@ test('explanation passages never produce learner corrections', () => {
   assert.equal(result.extra, 0);
   assert.equal(result.total, 1);
   assert.deepEqual(result.notes.map(note => note.name), ['E4']);
+});
+
+test('passages may not overlap and boundary-crossing notes are unassessed', () => {
+  const overlapping = {...reference, spans: [{start: 0, end: 2, kind: 'playing'}, {start: 1.5, end: 3, kind: 'explanation'}]};
+  assert.throws(() => parseMusicReference(overlapping), /must not overlap/);
+  const boundary = {...reference, duration: 4,
+    events: [{id: 'early', onset: 1.6, duration: 0.3, pitch: 60, optional: false},
+             {id: 'inside', onset: 3, duration: 0.3, pitch: 64, optional: false}],
+    spans: [{start: 0, end: 1, kind: 'explanation'}, {start: 1.5, end: 4, kind: 'playing'}]};
+  const result = buildRunFeedback({...base, reference: boundary, start: 0, end: 4, tolerance: 0.15,
+    attacks: [{id: 'a', pitch: 60, sourceTime: 1.6}, {id: 'b', pitch: 64, sourceTime: 3}]});
+  assert.equal(result.matched, 1);
+  assert.equal(result.missing, 0);
+  assert.equal(result.extra, 0);
+  assert.equal(result.unassessed, 1);
+  assert.equal(result.total, 2);
+  assert.equal(result.assessed, 1);
 });

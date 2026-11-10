@@ -30,18 +30,22 @@ release record before using it.
 | `/profile` | read-only | run profile JSON, code bundle/lock digest file, commercial approval |
 | `/models` | read-only | approved weights/checkpoint; no download at runtime |
 | `/config` | read-only | inference configuration referenced by `config_sha256` |
+| `/opt/music-adapter` | read-only | the actual executed adapter binary/source; `--code` must point at this executed artifact, not a lock file |
 | `/work` | writable volume | attempt-local downloads, extraction and adapter outputs |
 
 The examples are in `infra/docker/music-worker-compose.example.yml`: read-only root,
 dropped capabilities, no-new-privileges, a token file mount, CPU/memory/PID limits and an
-outbound-only API URL. Replace the placeholder image digest, hostnames, artifact digests and
+outbound-only API URL. The adapter is mounted read-only at `/opt/music-adapter`, and
+`--code` points at the adapter bytes executed by `--adapter-command`, so the profile's
+`code_sha256` covers the real runner. `/work` is a single writable host mount, not also a
+tmpfs. A `code.lock` file is packaging evidence, not the executed-code digest. Replace the placeholder image digest, hostnames, artifact digests and
 token path before any staging run.
 
 ## Startup and refusal behavior
 
 The worker requires either:
 
-- `--profile ... --weights ... --code ... --config ... --approval ...`, with every file
+- `--profile ... --weights ... --code <executed adapter> --config ... --approval ...`, with every file
   matching the declared digest; or
 - explicit `--fixture` for tests only.
 
@@ -73,3 +77,22 @@ records the profile digest in the draft.
 - Install the approved model/code/weights and adapter; retain commercial evidence.
 - Configure a staging worker token and profile allowlist.
 - Verify real inference with a rights-cleared recording, then record sanitized evidence.
+
+
+## Smoke result (10 November 2026)
+
+The image built locally as `form-music-worker:ui-smoke`
+(`sha256:3be308f3a550a075470d26b3adcf1b5f5f821afacb92ca079dd5cc3c3f1a300d`, ~824 MB).
+
+| Check | Result |
+| --- | --- |
+| `--help` | Usage rendered |
+| Missing token | Exit 2 with `WORKER_TOKEN or WORKER_TOKEN_FILE is required` |
+| Token-file mount + verified profile | Started, loaded `/run/secrets/token`, verified weights/code/config/approval and reached claim |
+| Tampered weights | Exit 2 with `The weights bytes do not match the run profile` |
+| Explicit fixture | `--fixture` accepted; no profile stamped |
+| Live job/cancellation/cleanup | **Not exercised**; the local claim endpoint was unreachable from the container (`ConnectError`) |
+
+The image is not scanned, signed, pushed or deployed. No model or adapter was included;
+the smoke used the image's fixture transcription adapter as the executed code artifact.
+The base image digest and ffmpeg version must be pinned before a real release.

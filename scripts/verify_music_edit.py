@@ -11,7 +11,7 @@ reference = {
     'reference_version': 1, 'subject': 'piano', 'instrument': {'instrument': 'piano'}, 'duration': 4,
     'events': [{'id': 'a', 'onset': 0.5, 'duration': 0.4, 'pitch': 60, 'optional': False},
                {'id': 'b', 'onset': 1.5, 'duration': 0.4, 'pitch': 64, 'optional': False}],
-    'spans': [{'start': 0, 'end': 1, 'kind': 'explanation'}, {'start': 1, 'end': 4, 'kind': 'playing'}],
+    'spans': [{'start': 0, 'end': 1, 'kind': 'explanation'}, {'start': 2, 'end': 4, 'kind': 'playing'}],
     'review': {'reviewer_id': 'owner', 'reviewed_at': '2026-11-10T12:00:00+00:00', 'draft_id': 'base-rev',
                'source_reference_sha256': 'a' * 64},
 }

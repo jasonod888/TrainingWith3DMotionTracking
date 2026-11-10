@@ -60,3 +60,17 @@ not the same as measured observation coverage, and it does not enable scoring.
 - No co-editor roles; only the owner.
 - Policy editing is limited to watch-only/MIDI note feedback with the existing dimensions.
 - Scoring, physical qualification and public/link/group music release remain disabled.
+
+
+## Boundary and metadata corrections (10 November 2026)
+
+- Overlapping passages are rejected by the server contract, the client reference reader
+  and the edit path (422).
+- A note or attack whose onset tolerance window crosses a playing/explanation boundary is
+  **unassessed**, not missing or extra. It is excluded from corrections and from the
+  eligible denominator. Inputs near a boundary are ignored rather than reported as extra.
+- Title-only and other partial edits preserve the instructor's existing `velocity` and
+  `confidence` values; the editor no longer clears or drops them. New notes start with
+  null values until a later editor exposes them.
+- `verify_music_edit.py` and focused API tests cover boundary notes, overlap refusal and a
+  title-only edit retaining velocity/confidence.

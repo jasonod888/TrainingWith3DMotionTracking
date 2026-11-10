@@ -122,3 +122,20 @@ No application code changed in this follow-up, so the full Python/web suites wer
 rerun. The new executable harness itself passed and compiled. Physical-keyboard,
 commercial model and scoring qualification remain separate; all deployed flags remain
 unchanged.
+
+
+## Follow-up: migration 0021 and concurrent edits (10 November 2026)
+
+A second disposable PostgreSQL 16 database was migrated to **0020**, seeded with an
+existing reviewed music lesson, revision and acceptance, then upgraded to **0021**:
+
+- Version became 0021; the existing lesson, revision and acceptance survived unchanged.
+- `music_revision_edits` exists with the expected FKs and unique revision index.
+- The edit API was exercised against PostgreSQL with two concurrent requests for the same
+  base revision: one succeeded (200), the other conflicted (409); exactly one edit row was
+  written and the shared release stayed `NULL`. An identical retry returned the same
+  revision.
+- The fake-storage harness notes that cancellation/cleanup and real object storage were not
+  exercised here.
+
+No production data, downgrade/recovery or deployment configuration was used.

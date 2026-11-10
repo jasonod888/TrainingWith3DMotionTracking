@@ -769,3 +769,19 @@ without changing the shared release; passages distinguish playing from explanati
 
 Verification: edit API/browser tests, explanation-feedback unit test, **283 web** passed,
 TypeScript/build/bundle pass within budget; **323 API passed, 13 skipped**. Share/edit browser checks pass.
+
+
+## Verification slice: corrections, worker image, PostgreSQL 0021, UI acceptance
+
+10 November 2026.
+
+- Passage overlap is rejected; boundary-crossing notes/attacks are unassessed rather than
+  missing/extra. Editing preserves untouched velocity/confidence.
+- Worker compose fixed to point `--code` at the mounted executed adapter, a single `/work`
+  volume and a token-file mount. The image built and passed help/token/profile/tamper
+  smoke; live job cancellation/cleanup was not exercised.
+- PostgreSQL 0021 applied over existing 0020 data; concurrent edits produced one winner
+  and one 409, identical retry reused the revision, shared release stayed NULL.
+- UI-L2/L3 library acceptance passed: independent flags, mappings, lazy isolation,
+  read-only input, resize cleanup, fallback, phone/desktop.
+- Verification: **324 API passed, 13 skipped**; **284 web passed**; TypeScript/build/bundle within budget.

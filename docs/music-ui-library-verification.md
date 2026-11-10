@@ -119,3 +119,20 @@ Final measured gzip bytes: initial **129,279**; music shell **14,566**; piano ad
 All existing caps and the explicit additional-renderer caps pass. No hardware/microphone/
 model or learner-rollout approval is inferred. The checks use mocked reference data and
 browser evidence, not actual commercially qualified transcription.
+
+
+## UI-L2/L3 acceptance (10 November 2026)
+
+`verify_music_library_guides.py` passes end to end in the real application with both
+library flags off then on:
+
+- independent piano/guitar flags and isolated lazy imports (piano does not download the
+  guitar renderer or fretboard, and vice versa);
+- piano active-pitch mapping at reviewed times and guitar string/fret positions including
+  the 1=high E / 6=low E contract;
+- read-only interaction (key presses do not create performance input);
+- resize/re-mount cleanup and the legacy fallback when a lazy import fails;
+- phone and desktop screenshots; no device, audio or history requests.
+
+This accepts the piano and neck renderers behind default-off flags for the existing
+player. It does not accept SVGuitar chord cards, physical MIDI qualification or scoring.

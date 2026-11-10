@@ -6,7 +6,8 @@ import {assetUrl, request} from '../api';
 import {parseMusicReference, pitchName, type MusicReferenceSpan} from './music-reference';
 import './music-review.css';
 
-type EditNote = {id: string; onset: number; duration: number | null; pitch: number; optional: boolean};
+type EditNote = {id: string; onset: number; duration: number | null; pitch: number; optional: boolean;
+  velocity: number | null; confidence: number | null};
 const PAGE = 50;
 
 /** Explicit owner editing of a reviewed lesson; saving creates a new revision but does not release it. */
@@ -47,7 +48,7 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
       setManifest(parsed.value);
       setTitle(parsed.value.title);
       setNotes(reference.events.map(event => ({id: event.id, onset: event.onset, pitch: event.pitch,
-        duration: event.duration, optional: event.optional})));
+        duration: event.duration, optional: event.optional, velocity: event.velocity, confidence: event.confidence})));
       setSpans(reference.spans);
       setSections(parsed.value.section_set.sections);
       setPolicy(parsed.value.assessment.assessment === 'notes' ? 'notes' : 'none');
@@ -72,7 +73,7 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
       const result = await request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-revision`, 'POST', {
         base_revision_id: manifest.revision_id,
         title,
-        events: notes.map(note => ({...note, velocity: null, optional: note.optional})),
+        events: notes,
         spans,
         sections,
         assessment: policy === 'notes'
@@ -89,6 +90,17 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
       setBusy(false);
     }
   };
+
+  const passageGap = (() => {
+    if (!manifest) return null;
+    let cursor = 0;
+    for (const span of [...spans].sort((left, right) => left.start - right.start)) {
+      if (span.start - cursor >= 0.2) return {start: cursor, end: Math.min(span.start, cursor + 1)};
+      cursor = Math.max(cursor, span.end);
+    }
+    if (manifest.duration - cursor >= 0.2) return {start: cursor, end: Math.min(cursor + 1, manifest.duration)};
+    return null;
+  })();
 
   return <section className="music-home music-review" aria-label="Edit reviewed music lesson">
     <button className="back-link" disabled={busy} onClick={onBack}><ArrowLeft size={16}/>Back</button>
@@ -130,7 +142,7 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
         <button type="button" disabled={busy || (page + 1) * PAGE >= notes.length} onClick={() => setPage(value => value + 1)}>Next notes</button>
         <button type="button" disabled={busy || notes.length >= 20000}
           onClick={() => { changed(); setNotes(previous => [...previous, {id: crypto.randomUUID(), onset: 0,
-            duration: Math.min(0.25, manifest.duration), pitch: 60, optional: false}]); }}><Plus size={14}/>Add note</button>
+            duration: Math.min(0.25, manifest.duration), pitch: 60, optional: false, velocity: null, confidence: null}]); }}><Plus size={14}/>Add note</button>
       </div>
       <h2>Assessable passages</h2>
       <p className="small muted">Only <strong>playing</strong> passages produce learner corrections. Explanation passages
@@ -147,8 +159,10 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
         </select></label>
         <button type="button" onClick={() => { changed(); setSpans(previous => previous.filter((_, position) => position !== index)); }}><Trash2 size={14}/>Remove passage {index + 1}</button>
       </fieldset>)}</div>
-      <button type="button" disabled={busy || spans.length >= 500} onClick={() => { changed(); setSpans(previous => [...previous,
-        {start: 0, end: manifest.duration, kind: 'playing' as const}]); }}><Plus size={14}/>Add passage</button>
+      <button type="button" disabled={busy || spans.length >= 500 || !passageGap}
+        onClick={() => { if (!passageGap) return; changed(); setSpans(previous => [...previous,
+          {...passageGap, kind: 'playing' as const}]); }}><Plus size={14}/>Add passage</button>
+      {!passageGap && <p className="small muted">No gap available; adjust existing passage boundaries to add another.</p>}
       <h2>Teaching sections</h2>
       {sections.map((section, index) => <fieldset key={section.id} disabled={busy}><legend>Section {index + 1}</legend>
         <label>Section name<input maxLength={80} value={section.label}

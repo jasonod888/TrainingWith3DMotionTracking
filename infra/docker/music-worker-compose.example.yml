@@ -10,7 +10,6 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=256m,mode=1777
-      - /work:size=512m,mode=1777
     cap_drop:
       - ALL
     security_opt:
@@ -26,6 +25,7 @@ services:
       - /srv/music/profile:/profile:ro
       - /srv/music/artifacts:/models:ro
       - /srv/music/config:/config:ro
+      - /srv/music/adapter:/opt/music-adapter:ro
       - /srv/music/work:/work
     command:
       - --pipeline
@@ -37,7 +37,7 @@ services:
       - --weights
       - /models/model.bin
       - --code
-      - /profile/code.lock
+      - /opt/music-adapter/bin/adapter
       - --config
       - /config/inference.json
       - --approval

@@ -5,6 +5,7 @@ export type MusicReferenceEvent = {
   duration: number | null;
   pitch: number;
   velocity: number | null;
+  confidence: number | null;
   optional: boolean;
 };
 export type MusicReferenceSpan = {start: number; end: number; kind: 'playing' | 'explanation'};
@@ -59,6 +60,12 @@ export function parseMusicReference(value: unknown): MusicReference {
     if (rawKind !== 'playing' && rawKind !== 'explanation') throw new Error('A reviewed passage has an unknown kind.');
     return {start, end, kind: rawKind as 'playing' | 'explanation'};
   });
+  const orderedSpans = [...spans].sort((left, right) => left.start - right.start);
+  for (let index = 1; index < orderedSpans.length; index += 1) {
+    if (orderedSpans[index].start < orderedSpans[index - 1].end - 1e-6) {
+      throw new Error('Reviewed passages must not overlap.');
+    }
+  }
   if (!Array.isArray(document.events)) throw new Error('The reviewed reference has no notes.');
   if (document.events.length > 20000) throw new Error('The reviewed reference has too many notes.');
   const seen = new Set<string>();
@@ -77,8 +84,10 @@ export function parseMusicReference(value: unknown): MusicReference {
     if (length !== null && (length <= 0 || onset + length > duration + 1e-6)) throw new Error(`Note ${id} ends outside the clip.`);
     const velocity = item.velocity == null ? null : finite(item.velocity, `note ${id} velocity`);
     if (velocity !== null && (velocity < 0 || velocity > 1)) throw new Error(`Note ${id} has an invalid velocity.`);
+    const confidence = item.confidence == null ? null : finite(item.confidence, `note ${id} confidence`);
+    if (confidence !== null && (confidence < 0 || confidence > 1)) throw new Error(`Note ${id} has an invalid confidence.`);
     if(item.optional!=null&&typeof item.optional!=='boolean')throw new Error('A note has an invalid optional flag.');
-    return {id, onset, duration: length, pitch, velocity, optional: item.optional === true};
+    return {id, onset, duration: length, pitch, velocity, confidence, optional: item.optional === true};
   }).sort((left, right) => left.onset - right.onset || left.pitch - right.pitch);
   let review: MusicReview;
   if (document.review != null && !Array.isArray(document.review)) {
