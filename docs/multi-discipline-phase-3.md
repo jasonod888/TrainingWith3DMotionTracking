@@ -727,3 +727,45 @@ TypeScript, build, bundle, sharing/feed/summary browser checks pass. Details:
 Verification: **314 API passed, 13 skipped** (run-profile bytes/digest/refusal tests, the
 synthetic private loop, and the existing worker/review/sharing suite); web **282 passed**,
 TypeScript, build and bundle checks pass.
+
+
+## Review correction after be1fcfe
+
+The initial profile slice above verified declared file hashes, but did not prove the
+adapter used those artifacts/settings. The review now binds the actual adapter entry
+point and pinned checkpoint, applies/validates the audio rate and supported onset setting,
+requires a matching adapter receipt, rejects fixture relabeling, and uses an API profile
+allowlist when enforcement is on. Direct reviewed-manifest completion cannot bypass that
+mode's draft/review handoff. Non-finite settings and mismatched configuration are refused.
+
+The private-loop test now runs in explicit fixture mode and is described only as wiring
+evidence. Runtime dependencies and commercial approval are still separate requirements.
+See [the corrected run-profile and next-slice handoff](music-real-piano-loop.md).
+
+Targeted follow-up: **34 passed**, including worker lifecycle/conversion regressions,
+profile artifact/settings binding, pinned prediction arguments and server enforcement.
+Schema artifacts remain current. No frontend files or deployed flags changed.
+
+Full review follow-up suite: **322 passed, 13 skipped**. The final targeted run above
+also covers the subsequently tightened direct-completion guard.
+
+
+## Implementation slice: reviewed edits and assessable passages
+
+10 November 2026. Owners can edit a reviewed music lesson into a new immutable revision
+without changing the shared release; passages distinguish playing from explanation.
+
+- Migration 0021 adds `music_revision_edits`. `POST /music-revision` validates the base
+  revision, sections, notes, passages and policy, writes a new reviewed reference/manifest
+  and acceptance, and leaves `published_revision_id` untouched. Retries are idempotent;
+  changed retries conflict.
+- The lazy **Edit lesson** client opens the latest reviewed lesson, edits notes, title,
+  sections, policy and passages, and previews the saved revision. The share screen's
+  **Update shared version** is the only action that changes learner access.
+- Passages carry `playing`/`explanation`; feedback excludes explanation notes and input
+  from corrections and eligibility. No passages preserves prior behaviour.
+- Worker packaging: isolated Dockerfile, compose example and operating guide added; no
+  image was built or deployed here.
+
+Verification: edit API/browser tests, explanation-feedback unit test, **283 web** passed,
+TypeScript/build/bundle pass within budget; **323 API passed, 13 skipped**. Share/edit browser checks pass.

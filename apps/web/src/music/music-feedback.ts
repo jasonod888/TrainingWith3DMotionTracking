@@ -93,12 +93,16 @@ export function buildRunFeedback(input: {
     return invalidFeedback('Invalid run evidence.', input.run, input.sectionId);
   const tolerance = input.tolerance ?? 0.15;
   const window = {start: input.start, end: input.end};
+  const hasSpans = input.reference.spans.length > 0;
+  const playing = input.reference.spans.filter(span => span.kind !== 'explanation');
+  const assessable = (time: number) => !hasSpans || playing.some(span => time >= span.start - 1e-6 && time < span.end);
   const expected: ExpectedAttack[] = input.reference.events
-    .filter(event => event.onset >= window.start - 1e-6 && event.onset < window.end)
+    .filter(event => event.onset >= window.start - 1e-6 && event.onset < window.end && assessable(event.onset))
     .map(event => ({id: event.id, pitch: event.pitch, onset: event.onset, optional: event.optional}));
+  const attacks = input.attacks.filter(attack => assessable(attack.sourceTime));
   let result;
   try {
-    result = matchOnsets(expected, input.attacks, window, tolerance);
+    result = matchOnsets(expected, attacks, window, tolerance);
   } catch (error) {
     return invalidFeedback(error instanceof Error ? error.message : 'The run could not be analysed.', input.run, input.sectionId);
   }

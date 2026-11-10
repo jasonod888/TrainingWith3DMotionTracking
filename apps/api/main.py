@@ -47,6 +47,8 @@ def create_app(settings: Settings | None = None):
     install_mimic_attempts(app,identity,db)
     from .music_attempts import install_music_attempts
     install_music_attempts(app,settings,identity,db)
+    from .music_edit import install_music_edit
+    install_music_edit(app,settings,identity,db)
 
     from fastapi.exceptions import RequestValidationError
 

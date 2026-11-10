@@ -237,6 +237,7 @@ class MusicEvent(Contract):
 class MusicSpan(Contract):
     start: float = Field(ge=0)
     end: float = Field(gt=0)
+    kind: Literal['playing', 'explanation'] = 'playing'
 
     @model_validator(mode='after')
     def ordered(self):

@@ -9,10 +9,27 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
 
 REQUIRED = ('schema_version', 'model', 'model_version', 'weights_sha256', 'code_sha256',
             'config_sha256', 'commercial_evidence_sha256', 'sample_rate', 'preprocessing', 'thresholds')
+class VerifiedProfile(dict):
+    """Locally verified bytes plus their private execution paths."""
+    def __init__(self, data, paths):
+        super().__init__(data)
+        self.paths = paths
+
+    def reverify(self):
+        canonical = {key: value for key, value in self.items() if key != 'profile_sha256'}
+        digest = hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+        if digest != self.get('profile_sha256'):
+            raise ValueError('Run profile settings changed after verification.')
+        for key, path in self.paths.items():
+            if not path.is_file() or digest_file(path) != self[key + '_sha256']:
+                raise ValueError(f'Run profile {key} bytes changed after verification.')
+
+
 DIGESTS = ('weights_sha256', 'code_sha256', 'config_sha256', 'commercial_evidence_sha256')
 
 
@@ -25,8 +42,8 @@ def digest_file(path: Path) -> str:
 
 
 def load_profile(profile_path: Path, *, weights: Path, code: Path, config: Path, approval: Path) -> dict:
-    data = json.loads(profile_path.read_text(encoding='utf-8'))
-    if not isinstance(data, dict) or data.get('schema_version') != 1:
+    data = json.loads(profile_path.read_text(encoding='utf-8'), parse_constant=lambda value: (_ for _ in ()).throw(ValueError('Non-finite profile value.')))
+    if not isinstance(data, dict) or type(data.get('schema_version')) is not int or data.get('schema_version') != 1:
         raise ValueError('Run profile must be a schema_version 1 object.')
     missing = [key for key in REQUIRED if data.get(key) in (None, '')]
     if missing:
@@ -50,15 +67,20 @@ def load_profile(profile_path: Path, *, weights: Path, code: Path, config: Path,
             raise ValueError(f'The {label} file is missing.')
         if digest_file(path) != data[key]:
             raise ValueError(f'The {label} bytes do not match the run profile.')
-    if not isinstance(data['sample_rate'], int) or not 8000 <= data['sample_rate'] <= 192000:
+    if type(data['sample_rate']) is not int or not 8000 <= data['sample_rate'] <= 192000:
         raise ValueError('Sample rate is outside the supported range.')
-    if not isinstance(data['preprocessing'], str) or not data['preprocessing'] or len(data['preprocessing']) > 500:
-        raise ValueError('Preprocessing description is invalid.')
+    if data['preprocessing'] != 'mono-pcm-s16le':
+        raise ValueError('Only mono-pcm-s16le preprocessing is implemented.')
     if not isinstance(data['thresholds'], dict) or not data['thresholds'] or len(data['thresholds']) > 50:
         raise ValueError('Inference thresholds must be a non-empty bounded object.')
     for key, value in data['thresholds'].items():
-        if not isinstance(key, str) or not key or not isinstance(value, (int, float)) or isinstance(value, bool):
+        if not isinstance(key, str) or not key or not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
             raise ValueError('Inference thresholds must be numeric.')
+    configuration = json.loads(config.read_text(encoding='utf-8'))
+    expected = {key: data[key] for key in ('sample_rate', 'preprocessing', 'thresholds')}
+    if configuration != expected:
+        raise ValueError('Inference configuration must match the run profile settings exactly.')
     canonical = json.dumps(data, sort_keys=True, separators=(',', ':'))
     data['profile_sha256'] = hashlib.sha256(canonical.encode('utf-8')).hexdigest()
-    return data
+    return VerifiedProfile(data, {'weights': weights.resolve(), 'code': code.resolve(),
+        'config': config.resolve(), 'commercial_evidence': approval.resolve()})

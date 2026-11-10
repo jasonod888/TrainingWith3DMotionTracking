@@ -1,6 +1,6 @@
 # Music delivery: current status and next milestones
 
-10 November 2026. Updated through review of `91b55be` and the private-sharing corrections.
+10 November 2026. Updated through review of `be1fcfe` and the profile-execution corrections.
 This is the current status summary; older phase records are historical evidence, not
 an assertion that every phase or production acceptance gate is complete.
 
@@ -21,7 +21,7 @@ scored MIDI result or microphone assessment is approved by the current evidence.
 | --- | --- | --- |
 | Shared account, subject metadata and discovery | Implemented and regression-tested; v1 body/v2 music boundary and shared navigation | Music rollout gates stay off by default |
 | Audio-preserving preparation and music worker | Separate preparation, import recovery, upload identity, server audio validation, leased/attempt-bound worker/draft handoff, verified exact run profiles and a synthetic private loop | No approved model/recording, real deployed worker route or target-device preparation qualification yet |
-| Instructor review | Private draft editing, note corrections, teaching sections, reviewed reference identity and supported watch/MIDI policy | Policy/reference re-editing after finalisation and explicit assessable-span editing remain incomplete |
+| Instructor review | Private draft editing, reviewed reference identity and watch/MIDI policy; **post-review revision editing and playing/explanation passages delivered 10 November 2026** | Diff/rollback UI and co-editor roles remain; assessable-span enforcement still matters for scoring |
 | Guide/player | Instructor video and reviewed-time piano keyboard or illustrative guitar fretboard, section seeking and cleanup | Guitar positions are illustrative; no inferred instructor fingering or general capo/tuning support |
 | Piano MIDI | Opt-in input, sustain/attack normalization, timed practice and approximate local pitch/onset feedback | Virtual tests pass; physical keyboard still not tested; no score or acoustic-piano feedback |
 | Personal music history | Explicit unscored save, stable retries, per-lesson/account pages and deletion | Self-reported aggregate evidence, not grades or observation-coverage proof |
@@ -219,3 +219,17 @@ Continue into the real private piano processing milestone. The ordered implement
 and acceptance criteria are in [the completion sequence](music-platform-completion-sequence.md).
 No physical-keyboard matrix is required for a watch-only teacher/learner playback pilot.
 Hardware evidence remains necessary for claims about MIDI feedback quality or scoring.
+
+
+## Run-profile execution follow-up
+
+The worker profile foundation now applies and checks actual adapter/checkpoint/audio/
+configuration identities and uses an API-approved digest list when enforcement is on.
+It does not qualify the imported dependency environment or grant commercial rights.
+Fixture output remains fixture evidence; the synthetic private path has been labelled
+accordingly. See [the current handoff](music-real-piano-loop.md).
+
+Next independent feature: owner re-editing of reviewed references/policies and explicit
+assessable passages, preserving the published revision until an explicit release update.
+Build isolated music-worker packaging alongside it. Actual model/recording qualification
+and the watch-only private piano run remain open; no keyboard is needed for that run.

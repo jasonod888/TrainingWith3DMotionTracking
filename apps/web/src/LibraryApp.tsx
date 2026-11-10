@@ -14,6 +14,7 @@ const AdminPage=lazy(()=>import('./Admin').then(module=>({default:module.AdminPa
 const MusicHistoryPanel=lazy(()=>import('./music/MusicHistoryPanel').then(module=>({default:module.MusicHistoryPanel})));
 const MusicDraftReview=lazy(()=>import('./music/MusicDraftReview').then(module=>({default:module.MusicDraftReview})));
 const StudioPage=lazy(()=>import('./Studio').then(module=>({default:module.StudioPage})));
+const MusicLessonEditor=lazy(()=>import('./music/MusicLessonEditor').then(module=>({default:module.MusicLessonEditor})));
 import {ShareLesson,JoinLesson,incomingShare} from './ShareLesson';
 import {MusicShareLesson} from './music/MusicShareLesson';
 import type {PracticePreferences} from './practice-types';
@@ -27,12 +28,12 @@ import {FeedSearch} from './FeedSearch';
 import './feed.css';
 import {ApiError,assetUrl,loadCapabilities,loadPublicMove,copyDemo,getSession,loadDemo,loadLesson,loadLessonSummaries,loadMoveStates,loadSharedSummaries,needsCheck,request,saveSections,signIn,signOut,type Account,type MoveState} from './api';
 
-type Page='music-review'|'moves'|'preview'|'compete'|'practice'|'review'|'create'|'account'|'share'|'join'|'receiver'|'check'|'move'|'groups'|'group'|'groupjoin'|'explore'|'public'|'studio'|'admin';
+type Page='music-review'|'music-edit'|'moves'|'preview'|'compete'|'practice'|'review'|'create'|'account'|'share'|'join'|'receiver'|'check'|'move'|'groups'|'group'|'groupjoin'|'explore'|'public'|'studio'|'admin';
 type AuthView='login'|'register'|'forgot'|'reset'|'verify';
 const linkAction=()=>{const match=location.hash.match(/^#(verify|reset)=([A-Za-z0-9_-]{32,128})$/);return match?{view:match[1] as AuthView,token:match[2]}:null;};
 const groupInviteOf=()=>{const match=location.hash.match(/^#group=([A-Za-z0-9_-]{32,128})$/);return match?match[1]:null;};
 
-const routePages=new Set(['music-review','moves','preview','compete','practice','review','create','account','share','join','receiver','check','move','groups','group','groupjoin','explore','public','studio','admin']);
+const routePages=new Set(['music-review','music-edit','moves','preview','compete','practice','review','create','account','share','join','receiver','check','move','groups','group','groupjoin','explore','public','studio','admin']);
 const routeOf=()=>{const q=new URLSearchParams(location.search);return {page:(routePages.has(q.get('page')??'')?q.get('page'):'moves') as Page,id:q.get('id'),source:q.get('source'),adjust:q.get('adjust')};};
 const pending=<T,>(key:string,value?:T):T|null=>{try{if(value!==undefined){sessionStorage.setItem(key,JSON.stringify({value,until:Date.now()+30*60*1000}));return value;}const item=JSON.parse(sessionStorage.getItem(key)??'null');if(item?.until>Date.now())return item.value;sessionStorage.removeItem(key);}catch{}return null;};
 export function App(){
@@ -43,7 +44,7 @@ export function App(){
  const [studioEnabled,setStudioEnabled]=useState(()=>localStorage.getItem('form-studio')==='1');
  const setStudio=(value:boolean)=>{setStudioEnabled(value);localStorage.setItem('form-studio',value?'1':'0');};
  const [incoming,setIncoming]=useState(()=>incomingShare()??(['join','account'].includes(routeOf().page)?pending<ReturnType<typeof incomingShare>>('move-invite'):null)),[shared,setShared]=useState<LessonSummary[]>([]),[lessonOwned,setLessonOwned]=useState(true);
- const [page,setPage]=useState<Page>(initialLink?'account':groupInvite?'groupjoin':incoming?'join':routeOf().page),[account,setAccount]=useState<Account|null>(null),[library,setLibrary]=useState<LessonSummary[]>([]),[demo,setDemo]=useState<LessonManifest|null>(null),[lesson,setLesson]=useState<LessonManifest|null>(null),[music,setMusic]=useState<MusicLessonManifest|null>(null),[midiSetup,setMidiSetup]=useState(false),[musicHistory,setMusicHistory]=useState(false),[pianoLibrary,setPianoLibrary]=useState(false),[guitarLibrary,setGuitarLibrary]=useState(false),[shareMusic,setShareMusic]=useState<LessonSummary|null>(null),[subjectFilter,setSubjectFilter]=useState(false);
+ const [page,setPage]=useState<Page>(initialLink?'account':groupInvite?'groupjoin':incoming?'join':routeOf().page),[account,setAccount]=useState<Account|null>(null),[library,setLibrary]=useState<LessonSummary[]>([]),[demo,setDemo]=useState<LessonManifest|null>(null),[lesson,setLesson]=useState<LessonManifest|null>(null),[music,setMusic]=useState<MusicLessonManifest|null>(null),[midiSetup,setMidiSetup]=useState(false),[musicHistory,setMusicHistory]=useState(false),[pianoLibrary,setPianoLibrary]=useState(false),[guitarLibrary,setGuitarLibrary]=useState(false),[shareMusic,setShareMusic]=useState<LessonSummary|null>(null),[editMusic,setEditMusic]=useState<LessonSummary|null>(null),[subjectFilter,setSubjectFilter]=useState(false);
  useEffect(()=>{setFeedQuery('');setFeedFilter('all');},[account?.id]);
  // History restoration and authentication can change the page without navigate().
  useEffect(()=>{if(!['preview','practice','compete'].includes(page))setMusic(null);},[page]);
@@ -174,7 +175,7 @@ export function App(){
     onOpen={(item,owned,check)=>open(item,check?'check':'practice',owned)}
     onPublic={id=>void run(async()=>{const value=await loadPublicMove(id);setMusic(null);setLesson(value);setLessonOwned(false);navigate('preview');})}
     onManage={(item,action)=>{
-     if(action==='check'||action==='edit'){open(item,action);return;}
+     if(action==='check'||action==='edit'){if(action==='edit'&&item.experience_family==='music'){setEditMusic(item);setLesson(null);navigate('music-edit');return;}open(item,action);return;}
      if(action==='copy'){importDemo();return;}
      if(action==='share'){if(item.experience_family==='music'){setShareMusic(item);setLesson(null);navigate('share');return;}void run(async()=>{setLesson(await loadLesson(item.lesson_id));setLessonOwned(true);navigate('share');});}
      if(action==='remove'&&window.confirm(`Remove “${item.title}” from your practices?`))void run(async()=>{await request(`/lessons/${item.lesson_id}`,'DELETE');setLibrary(previous=>previous.filter(value=>value.lesson_id!==item.lesson_id));});
@@ -193,6 +194,7 @@ export function App(){
    {page==='check'&&lesson&&lessonOwned&&<MoveCheck key={lesson.revision_id} lesson={lesson} onDirty={setDirty} onBack={()=>navigate('moves')} onAccepted={value=>{setLesson(value);setLibrary(previous=>previous.map(item=>item.lesson_id===value.lesson_id?summarizeBody(value,item):item));setDirty(false);void refresh();setPage('move');window.scrollTo({top:0});}} onChooseAnother={()=>{setAdjustFor(null);navigate('create');}}/>}
    {page==='move'&&lesson&&lessonOwned&&<MoveDetail lesson={lesson} state={stateOf(lesson)} onBack={()=>navigate('moves')} onPractice={()=>navigate('preview')} onShare={()=>navigate('share')} onMore={()=>navigate('review')} onAdjust={()=>beginAdjust(lesson)} onRenamed={value=>{setLesson(value);setLibrary(previous=>previous.map(item=>item.lesson_id===value.lesson_id?summarizeBody(value,item):item));}}/>}
    {page==='share'&&lesson&&lessonOwned&&<ShareLesson lesson={lesson} onBack={()=>navigate('move')} onChange={refresh}/>}
+   {page==='music-edit'&&editMusic&&<Suspense fallback={<p role="status">Opening the lesson editor…</p>}><MusicLessonEditor lessonId={editMusic.lesson_id} onBack={()=>{setEditMusic(null);navigate('moves');}} onSaved={value=>{setMusic(value);setLesson(null);setLessonOwned(true);setEditMusic(null);navigate('preview');void refresh();}}/></Suspense>}
    {page==='share'&&!lesson&&shareMusic&&<MusicShareLesson key={shareMusic.lesson_id} lessonId={shareMusic.lesson_id} title={shareMusic.title} onBack={()=>{setShareMusic(null);navigate('moves');}} onChange={refresh}/>}
    {page==='join'&&incoming&&<JoinLesson incoming={incoming} account={account} onSignIn={()=>navigate('account')} onBack={()=>navigate('moves')} onJoined={value=>{if((value as MusicLessonManifest).schema_version===2){setMusic(value as MusicLessonManifest);setLesson(null);}else{setMusic(null);setLesson(value as LessonManifest);}setLessonOwned(false);setIncoming(null);sessionStorage.removeItem('move-invite');void loadSharedSummaries().then(setShared).catch(e=>setError(e.message));navigate('preview');}}/>}
    {page==='create'&&(account?<CreateLesson adjust={adjustFor??undefined} onBack={()=>{setAdjustFor(null);navigate('moves');}} onDone={()=>{setAdjustFor(null);navigate('moves');void refresh();}}/>:<section className="coming-screen"><div className="empty-state"><span className="note-art"><Video size={36}/></span><h1>Your next move.</h1><p className="subtle">Sign in to add a video and keep your moves.</p><button className="primary" onClick={()=>navigate('account')}>Sign in<ArrowRight size={18}/></button></div></section>)}

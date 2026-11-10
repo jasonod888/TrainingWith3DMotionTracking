@@ -7,7 +7,7 @@ export type MusicReferenceEvent = {
   velocity: number | null;
   optional: boolean;
 };
-export type MusicReferenceSpan = {start: number; end: number};
+export type MusicReferenceSpan = {start: number; end: number; kind: 'playing' | 'explanation'};
 export type MusicReview = {
   reviewer_id: string;
   reviewed_at: string;
@@ -55,7 +55,9 @@ export function parseMusicReference(value: unknown): MusicReference {
     const start = finite(item.start, `passage ${index + 1} start`);
     const end = finite(item.end, `passage ${index + 1} end`);
     if (start < 0 || end <= start || end > duration + 1e-6) throw new Error('A reviewed passage is outside the clip.');
-    return {start, end};
+    const rawKind = item.kind == null ? 'playing' : item.kind;
+    if (rawKind !== 'playing' && rawKind !== 'explanation') throw new Error('A reviewed passage has an unknown kind.');
+    return {start, end, kind: rawKind as 'playing' | 'explanation'};
   });
   if (!Array.isArray(document.events)) throw new Error('The reviewed reference has no notes.');
   if (document.events.length > 20000) throw new Error('The reviewed reference has too many notes.');

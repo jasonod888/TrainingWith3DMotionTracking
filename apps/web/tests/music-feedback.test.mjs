@@ -95,3 +95,17 @@ test('coverage reports how much of the reference has a complete assessment windo
   assert.equal(result.coverage, 0.75);
   assert.ok(!result.notes.some(note => note.name === 'C5'), 'an unassessed edge note is not a correction');
 });
+
+test('explanation passages never produce learner corrections', () => {
+  const explained = {...reference, duration: 4,
+    events: [{id: 'x', onset: 1, duration: 0.3, pitch: 60, optional: false},
+             {id: 'y', onset: 2.5, duration: 0.3, pitch: 64, optional: false}],
+    spans: [{start: 0, end: 2, kind: 'explanation'}, {start: 2, end: 4, kind: 'playing'}]};
+  const result = buildRunFeedback({...base, reference: explained, start: 0, end: 4,
+    attacks: [{id: 'a', pitch: 60, sourceTime: 1}, {id: 'b', pitch: 64, sourceTime: 2.5}]});
+  assert.equal(result.matched, 1);
+  assert.equal(result.missing, 0);
+  assert.equal(result.extra, 0);
+  assert.equal(result.total, 1);
+  assert.deepEqual(result.notes.map(note => note.name), ['E4']);
+});

@@ -74,11 +74,43 @@ def test_optional_engine_handles_empty_and_out_of_bounds_notes_without_installin
     package=ModuleType('basic_pitch');package.ICASSP_2022_MODEL_PATH='fixture-only'
     inference=ModuleType('basic_pitch.inference')
     midi=SimpleNamespace(instruments=[])
-    inference.predict=lambda *args,**kwargs:(None,midi,[])
+    calls=[]
+    def predict(*args, **kwargs):
+        calls.append((args, kwargs))
+        return None,midi,[]
+    inference.predict=predict
     with patch.dict(sys.modules,{'basic_pitch':package,'basic_pitch.inference':inference}), \
-         patch('importlib.metadata.version',return_value='test-stub'):
+         patch('importlib.metadata.version',return_value='test-stub'), \
+         patch('scripts.music_transcription.adapter_profile', return_value=({'model':'basic-pitch',
+             'model_version':'test-stub','profile_sha256':'a'*64,'sample_rate':22050,'thresholds':{'onset':0.7}}, Path('pinned-model.onnx'))):
         assert basic_pitch_document(job,audio)['events']==[]
+        assert calls[-1] == ((str(audio), 'pinned-model.onnx'), {'onset_threshold':0.7})
         midi.instruments=[SimpleNamespace(notes=[SimpleNamespace(start=-1,end=3,pitch=60,velocity=100),
                                                  SimpleNamespace(start=3,end=4,pitch=62,velocity=100)])]
         events=basic_pitch_document(job,audio)['events']
         assert len(events)==1 and events[0]['onset']==0 and events[0]['duration']==2
+
+
+def test_adapter_verifies_execution_files_and_analysis_format(tmp_path, monkeypatch):
+    import wave
+    from scripts.music_transcription import adapter_profile
+    from scripts import music_transcription
+    from test_music_run_profile import files, load
+    paths, profile_path, profile = files(tmp_path)
+    paths['code.lock'] = Path(music_transcription.__file__).resolve()
+    profile['code_sha256'] = hashlib.sha256(paths['code.lock'].read_bytes()).hexdigest()
+    profile_path.write_text(json.dumps(profile))
+    verified = load(paths, profile_path)
+    audio = tmp_path/'real-format.wav'
+    with wave.open(str(audio),'wb') as stream:
+        stream.setparams((1,2,22050,0,'NONE','not compressed'));stream.writeframes(b'\0'*400)
+    monkeypatch.setenv('MUSIC_RUN_PROFILE',json.dumps(verified))
+    monkeypatch.setenv('MUSIC_MODEL_WEIGHTS',str(paths['weights.bin']))
+    assert adapter_profile(audio)[1] == paths['weights.bin']
+    with wave.open(str(audio),'wb') as stream:
+        stream.setparams((1,2,16000,0,'NONE','not compressed'));stream.writeframes(b'\0'*400)
+    with pytest.raises(ValueError, match='Analysis audio'):
+        adapter_profile(audio)
+    paths['weights.bin'].write_bytes(b'other checkpoint')
+    with pytest.raises(ValueError, match='weights do not match'):
+        adapter_profile(audio)

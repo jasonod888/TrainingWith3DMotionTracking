@@ -22,9 +22,9 @@ from urllib.parse import urlparse
 import httpx
 
 try:
-    from .music_run_profile import load_profile
+    from .music_run_profile import load_profile, VerifiedProfile
 except ImportError:  # Direct script execution.
-    from music_run_profile import load_profile
+    from music_run_profile import load_profile, VerifiedProfile
 
 PIPELINES = {'music-piano-v1': 'piano', 'music-guitar-v1': 'guitar'}
 
@@ -45,6 +45,14 @@ class MusicWorker:
             raise ValueError('Choose either an exact run profile or explicit fixture mode.')
         if not fixture and not profile:
             raise ValueError('An exact run profile is required; fixture mode must be explicit.')
+        if profile:
+            if not isinstance(profile, VerifiedProfile):
+                raise ValueError('Load a verified profile before starting the worker.')
+            profile.reverify()
+            # The code artifact must be the entry point actually passed to the process.
+            entry = adapter_command[1] if len(adapter_command) > 1 and Path(adapter_command[0]).stem.lower().startswith('python') else adapter_command[0]
+            if Path(entry).resolve() != profile.paths['code']:
+                raise ValueError('The verified code file must be the executed adapter entry point.')
         self.profile, self.fixture = profile, fixture
         self.pipeline, self.adapter_command = pipeline, list(adapter_command)
         self.work_dir = Path(work_dir)
@@ -54,11 +62,15 @@ class MusicWorker:
         self.shutdown = threading.Event()
 
     def claim(self):
+        if self.profile:
+            self.profile.reverify()
         response = self.api.post('/api/worker/claim', headers=self.authorization, json={})
         response.raise_for_status()
         return response.json()
 
     def run(self, job):
+        if self.profile:
+            self.profile.reverify()
         instrument = PIPELINES[self.pipeline]
         if (job.get('provider') != 'local' or job.get('pipeline_version') != self.pipeline
                 or job.get('subject') != instrument or job.get('instrument') != instrument):
@@ -108,7 +120,11 @@ class MusicWorker:
             with log.open('wb') as output:
                 environment={**os.environ,'CUDA_VISIBLE_DEVICES':'-1','OMP_NUM_THREADS':'1',
                              'TF_NUM_INTRAOP_THREADS':'1','TF_NUM_INTEROP_THREADS':'1'}
-                if self.profile:environment['MUSIC_RUN_PROFILE']=json.dumps(self.profile,sort_keys=True)
+                environment.pop('MUSIC_RUN_PROFILE', None)
+                environment.pop('MUSIC_MODEL_WEIGHTS', None)
+                if self.profile:
+                    environment['MUSIC_RUN_PROFILE']=json.dumps(self.profile,sort_keys=True)
+                    environment['MUSIC_MODEL_WEIGHTS']=str(self.profile.paths['weights'])
                 process = subprocess.Popen(arguments, env=environment, stdin=subprocess.DEVNULL, stdout=output, stderr=output,
                     start_new_session=os.name != 'nt',
                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
@@ -152,7 +168,7 @@ class MusicWorker:
             audio = folder/'analysis.wav'
             # A lossless analysis derivative; retain the original source for demonstration export.
             command(['ffmpeg', '-v', 'error', '-xerror', '-threads', '1', '-filter_threads', '1', '-i', str(source), '-map', '0:a:0', '-vn',
-                     '-t', str(job['duration']), '-ar', '22050', '-ac', '1', '-c:a', 'pcm_s16le',
+                     '-t', str(job['duration']), '-ar', str(self.profile['sample_rate'] if self.profile else 22050), '-ac', '1', '-c:a', 'pcm_s16le',
                      '-y', str(audio)], 120)
             job_file = folder/'job.json'
             job_file.write_text(json.dumps({key: job[key] for key in
@@ -170,15 +186,19 @@ class MusicWorker:
                 raise ValueError('Adapter returned neither a draft nor a manifest.')
             if draft is not None:
                 if self.profile:
-                    provenance=draft.setdefault('provenance',{})
-                    provenance['profile_sha256']=self.profile['profile_sha256']
-                    provenance['model']=self.profile['model']
-                    provenance['model_version']=self.profile['model_version']
+                    provenance=draft.get('provenance',{})
+                    if provenance.get('engine') == 'fixture' or any(provenance.get(key) != self.profile[key]
+                            for key in ('profile_sha256','model','model_version')):
+                        raise ValueError('Adapter did not confirm the executed model profile.')
+                    if provenance.get('audio_sha256') != hashlib.sha256(audio.read_bytes()).hexdigest():
+                        raise ValueError('Adapter analysis-audio identity does not match.')
                 # Unreviewed proposals take the draft handoff and can never publish.
                 if draft.get('subject') != instrument or (draft.get('instrument') or {}).get('instrument') != instrument:
                     raise ValueError('Adapter returned the wrong instrument.')
                 document = draft
             else:
+                if self.profile:
+                    raise ValueError('Profiled transcription must hand off an unreviewed draft.')
                 if manifest.get('reference_reviewed') is not True:
                     raise RuntimeError('An unreviewed manifest requires review through the draft handoff.')
                 if manifest.get('subject') != instrument:
@@ -239,7 +259,7 @@ def main():
     parser.add_argument('--once', action='store_true')
     parser.add_argument('--profile', type=Path, help='Exact run profile JSON; required unless --fixture')
     parser.add_argument('--weights', type=Path, help='Pinned model weights file')
-    parser.add_argument('--code', type=Path, help='Pinned code bundle/lock file')
+    parser.add_argument('--code', type=Path, help='Pinned executed adapter script or executable bundle')
     parser.add_argument('--config', type=Path, help='Pinned inference configuration file')
     parser.add_argument('--approval', type=Path, help='Retained commercial evidence file')
     parser.add_argument('--fixture', action='store_true', help='Explicit fixture mode; never for production')
@@ -259,8 +279,13 @@ def main():
                                    config=args.config, approval=args.approval)
         except (OSError, ValueError) as error:
             parser.error(str(error))
+    token = os.environ.get('WORKER_TOKEN', '').strip()
+    if not token and os.environ.get('WORKER_TOKEN_FILE'):
+        token = Path(os.environ['WORKER_TOKEN_FILE']).read_text(encoding='utf-8').strip()
+    if not token:
+        parser.error('WORKER_TOKEN or WORKER_TOKEN_FILE is required.')
     worker = MusicWorker(os.environ.get('WORKER_API_URL', 'http://127.0.0.1:8001'),
-                         os.environ['WORKER_TOKEN'], args.pipeline, args.adapter_command, args.work_dir,
+                         token, args.pipeline, args.adapter_command, args.work_dir,
                          profile=profile, fixture=args.fixture)
     for name in ('SIGINT', 'SIGTERM'):
         signal.signal(getattr(signal, name), lambda *_: worker.shutdown.set())

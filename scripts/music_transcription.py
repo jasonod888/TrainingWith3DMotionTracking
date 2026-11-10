@@ -14,6 +14,8 @@ Engines:
 import argparse
 import hashlib
 import json
+import os
+import wave
 import sys
 from pathlib import Path
 
@@ -74,16 +76,46 @@ def fixture_document(job: dict, audio: Path) -> dict:
     }
 
 
+def adapter_profile(audio: Path) -> tuple[dict, Path]:
+    raw = os.environ.get('MUSIC_RUN_PROFILE')
+    if not raw:
+        raise ValueError('Real transcription requires the verified worker run profile.')
+    profile = json.loads(raw)
+    claimed = profile.get('profile_sha256')
+    canonical = {key: value for key, value in profile.items() if key != 'profile_sha256'}
+    if hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest() != claimed:
+        raise ValueError('Adapter profile digest does not match.')
+    weights = Path(os.environ.get('MUSIC_MODEL_WEIGHTS', ''))
+    if not weights.is_file() or audio_digest(weights) != profile.get('weights_sha256'):
+        raise ValueError('Adapter weights do not match the profile.')
+    if audio_digest(Path(__file__)) != profile.get('code_sha256'):
+        raise ValueError('Adapter code does not match the profile.')
+    if profile.get('preprocessing') != 'mono-pcm-s16le':
+        raise ValueError('Unsupported analysis preprocessing.')
+    with wave.open(str(audio), 'rb') as stream:
+        if (stream.getframerate() != profile.get('sample_rate') or stream.getnchannels() != 1
+                or stream.getsampwidth() != 2 or stream.getcomptype() != 'NONE'):
+            raise ValueError('Analysis audio does not match the run profile.')
+    return profile, weights
+
+
 def basic_pitch_document(job: dict, audio: Path) -> dict:
     try:
         from basic_pitch.inference import predict  # type: ignore
-        from basic_pitch import ICASSP_2022_MODEL_PATH  # type: ignore
         from importlib.metadata import version
     except ImportError as error:
         raise SystemExit('Basic Pitch is not installed in this worker environment; no model was downloaded.') from error
     duration = float(job['duration'])
     instrument = job['instrument']
-    model_output, midi_data, note_events = predict(str(audio), ICASSP_2022_MODEL_PATH, onset_threshold=0.5)
+    profile, weights = adapter_profile(audio)
+    if profile.get('model') != 'basic-pitch' or profile.get('model_version') != version('basic-pitch'):
+        raise ValueError('Installed Basic Pitch identity does not match the run profile.')
+    if profile['sample_rate'] != 22050 or set(profile['thresholds']) != {'onset'}:
+        raise ValueError('Basic Pitch supports 22050 Hz and the onset threshold only in this adapter.')
+    onset = profile['thresholds']['onset']
+    if isinstance(onset, bool) or not isinstance(onset, (int, float)) or not 0 <= onset <= 1:
+        raise ValueError('Onset threshold must be between 0 and 1.')
+    model_output, midi_data, note_events = predict(str(audio), str(weights), onset_threshold=onset)
     events = []
     notes=[note for track in midi_data.instruments for note in track.notes]
     if len(notes)>20000:
@@ -114,6 +146,7 @@ def basic_pitch_document(job: dict, audio: Path) -> dict:
             'engine': 'basic-pitch',
             'model': 'basic-pitch',
             'model_version': version('basic-pitch'),
+            'profile_sha256': profile['profile_sha256'],
             'code_version': CODE_VERSION,
             'audio_sha256': audio_digest(audio),
         },
@@ -137,6 +170,8 @@ def main() -> int:
     if not arguments.input.is_file() or arguments.input.stat().st_size == 0:
         print('Analysis audio is missing.', file=sys.stderr)
         return 2
+    if arguments.engine == 'fixture' and os.environ.get('MUSIC_RUN_PROFILE'):
+        raise ValueError('Fixture transcription cannot run as a profiled model.')
     document = fixture_document(job, arguments.input) if arguments.engine == 'fixture' \
         else basic_pitch_document(job, arguments.input)
     output = arguments.output

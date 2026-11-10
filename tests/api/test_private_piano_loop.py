@@ -1,4 +1,4 @@
-"""Synthetic full loop: prepared clip -> profiled worker draft -> review -> invitation -> learner."""
+"""Synthetic full loop: prepared clip -> fixture worker draft -> review -> invitation -> learner."""
 from fastapi.testclient import TestClient
 
 from scripts.music_worker import MusicWorker
@@ -7,19 +7,16 @@ from test_accounts import login, register
 from test_music_draft_handoff import draft_adapter
 from test_music_media_validation import media, real_media_app, upload
 from test_music_review import review_body
-from test_music_run_profile import files, load
 
 
-def test_profiled_fixture_loop_reaches_a_private_learner(tmp_path):
-    paths, profile_path, _ = files(tmp_path)
-    profile = load(paths, profile_path)
+def test_explicit_fixture_loop_reaches_a_private_learner(tmp_path):
     with real_media_app(tmp_path) as (client, app, settings, store, mail):
         uploaded = upload(client, media(tmp_path, 'audio'))
         assert uploaded.json()['state'] == 'queued'
         music_worker(app, 'loop-worker', pipeline_version='music-piano-v1')
         worker = MusicWorker('http://localhost', 'loop-worker', 'music-piano-v1',
                              draft_adapter(tmp_path), tmp_path / 'attempts', api=client,
-                             heartbeat_seconds=.2, profile=profile)
+                             heartbeat_seconds=.2, fixture=True)
         lesson_id = worker.run(worker.claim())['lesson_id']
 
         view = client.get(f'/api/lessons/{lesson_id}/music-draft').json()

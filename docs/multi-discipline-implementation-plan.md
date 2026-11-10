@@ -731,3 +731,15 @@ The immediate milestone is a real private piano upload → exact-model inference
 correction → invitation → learner playback. Keep movement workflows and login as the shell.
 Library UI acceptance, reference-editing software and hardware preparation can proceed in
 parallel; microphone/full guitar assessment and scoring are later, separately qualified work.
+
+
+## Run-profile review after be1fcfe
+
+The profile foundation now checks actual entry-point bytes, configuration, PCM rate,
+pinned checkpoint use and adapter receipts, with an API-approved profile allowlist.
+The synthetic loop remains explicit fixture evidence; it does not qualify a model or
+commercial deployment. See [the current real-loop handoff](music-real-piano-loop.md).
+
+Proceed with Phase 5 reviewed-reference re-editing and assessable-span controls next,
+plus isolated worker packaging. These require no physical keyboard. Obtain real model
+and media evidence in parallel; a watch-only piano pilot does not wait for MIDI hardware.

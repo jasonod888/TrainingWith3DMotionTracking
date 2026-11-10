@@ -1,0 +1,56 @@
+# Example only: review before use. Replace the placeholder image digest, credentials and
+# artifact digests. This file does not download or bake a model.
+services:
+  music-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/music-worker.Dockerfile
+    # image: your-registry/form-music-worker@sha256:REPLACE_WITH_REVIEWED_DIGEST
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /work:size=512m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    user: '10001:10001'
+    environment:
+      WORKER_API_URL: https://staging.example.invalid
+      WORKER_TOKEN_FILE: /run/secrets/music_worker_token
+      CUDA_VISIBLE_DEVICES: ''
+    secrets:
+      - music_worker_token
+    volumes:
+      - /srv/music/profile:/profile:ro
+      - /srv/music/artifacts:/models:ro
+      - /srv/music/config:/config:ro
+      - /srv/music/work:/work
+    command:
+      - --pipeline
+      - music-piano-v1
+      - --work-dir
+      - /work
+      - --profile
+      - /profile/run-profile.json
+      - --weights
+      - /models/model.bin
+      - --code
+      - /profile/code.lock
+      - --config
+      - /config/inference.json
+      - --approval
+      - /profile/commercial-approval.json
+      - --adapter-command
+      - /opt/music-adapter/bin/adapter
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2g
+          pids: 128
+
+secrets:
+  music_worker_token:
+    file: /srv/music/secrets/worker_token

@@ -304,6 +304,18 @@ class MusicDraft(Base):
     document: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+class MusicRevisionEdit(Base):
+    """Explicit owner edit of a reviewed music revision; never changes the shared pointer."""
+    __tablename__ = 'music_revision_edits'
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), index=True)
+    base_revision_id: Mapped[str] = mapped_column(ForeignKey('lesson_revisions.id'), index=True)
+    revision_id: Mapped[str] = mapped_column(ForeignKey('lesson_revisions.id'), unique=True, index=True)
+    editor_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'))
+    document: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class MusicReview(Base):
     __tablename__ = 'music_reviews'
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
@@ -357,5 +369,6 @@ def database_ready(engine):
         connection.execute(text('SELECT group_id, lesson_id FROM group_lessons LIMIT 0'))
         connection.execute(text('SELECT group_id, lesson_id FROM group_public_moves LIMIT 0'))
         connection.execute(text('SELECT id, job_id, lesson_id, owner_id, subject, instrument, status, document FROM music_drafts LIMIT 0'))
+        connection.execute(text('SELECT id, lesson_id, base_revision_id, revision_id, editor_id, document FROM music_revision_edits LIMIT 0'))
         connection.execute(text('SELECT id, draft_id, lesson_id, revision_id, reviewer_id, reviewed_at, document FROM music_reviews LIMIT 0'))
         connection.execute(text('SELECT id, account_id, lesson_id, revision_id, summary FROM music_practice_attempts LIMIT 0'))

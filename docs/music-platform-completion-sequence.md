@@ -5,7 +5,7 @@ This supplements the [canonical plan](multi-discipline-implementation-plan.md), 
 remains the source of requirements. Existing login, instructor creation, library,
 invitation and learner navigation stay the shared workflow. No new phase numbering.
 
-## 1. Next implementation slice: exact-model private piano loop (Phases 3, 5, 10)
+## 1. Exact-model private piano loop (Phases 3, 5, 10)
 
 **Status 10 November 2026: infrastructure delivered; real inference blocked.** The worker
 now requires a verified run profile (weights/code/config/commercial-evidence digests) or an
@@ -14,6 +14,12 @@ in draft provenance. A synthetic test exercises prepared clip → profiled draft
 review → invitation → learner access. The real model, rights-cleared recording, commercial
 approval and deployed staging worker are still required before steps 1–7 below can run. See
 [`music-real-piano-loop.md`](music-real-piano-loop.md).
+
+Profile execution plumbing is now implemented with fail-closed adapter checks; real
+model/dependency/commercial qualification and an actual end-to-end run remain open.
+See [the current handoff](music-real-piano-loop.md). Normal reviewed-reference/span
+editing in section 2 is the next independent software slice; staging worker packaging
+can proceed alongside it.
 
 Start with one instructor, one learner and a short, rights-cleared piano clip. Use a
 watch-only reviewed policy first. A physical keyboard is unnecessary for this milestone.
@@ -50,6 +56,13 @@ use the recordings. Implementation of profiles and the runner can continue while
 are gathered. Do not label the model commercially approved until that evidence exists.
 
 ## 2. Finish diagrams and normal reference editing (Phases 4, 5; UI-L2/L3/L5)
+
+**Status 10 November 2026: editing/passages delivered; diagrams partly delivered.**
+Owners can reopen a reviewed lesson, edit notes/sections/policy, mark playing versus
+explanation passages and save a new immutable revision; learners keep the current release
+until **Update shared version**. Explanation passages produce no learner corrections.
+Library piano/guitar adapters remain behind default-off flags. See
+[`music-reviewed-editing.md`](music-reviewed-editing.md).
 
 - Accept piano and guitar-neck adapters at supported screen sizes, with dense notes,
   ranges/scrolling, seeks/repeats, repeated mount/unmount and text alternatives. Retain
