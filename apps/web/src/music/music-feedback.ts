@@ -109,10 +109,15 @@ export function buildRunFeedback(input: {
   const boundaryAttacks = new Set(observed.filter(attack => !fullyInside(attack.sourceTime)).map(attack => attack.id));
   const nearby = (note: {pitch: number; onset: number}, attack: {pitch: number; sourceTime: number}) =>
     note.pitch === attack.pitch && Math.abs(note.onset - attack.sourceTime) <= tolerance;
-  for (const note of candidates) for (const attack of observed) {
-    if (!nearby(note, attack)) continue;
-    if (boundaryNotes.has(note.id)) boundaryAttacks.add(attack.id);
-    if (boundaryAttacks.has(attack.id)) boundaryNotes.add(note.id);
+  // Propagate boundary status through every proximity edge to a fixed point. A single
+  // ordered pass made the result depend on note/attack order.
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const note of candidates) for (const attack of observed) {
+      if (!nearby(note, attack)) continue;
+      if (boundaryNotes.has(note.id) && !boundaryAttacks.has(attack.id)) { boundaryAttacks.add(attack.id); changed = true; }
+      if (boundaryAttacks.has(attack.id) && !boundaryNotes.has(note.id)) { boundaryNotes.add(note.id); changed = true; }
+    }
   }
   const expected: ExpectedAttack[] = candidates
     .filter(event => !boundaryNotes.has(event.id))

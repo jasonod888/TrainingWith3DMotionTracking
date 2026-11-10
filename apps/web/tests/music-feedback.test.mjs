@@ -155,3 +155,17 @@ test('corrections are ordered by reviewed/performance time', () => {
   assert.deepEqual(result.notes.map(note => note.status), ['missing', 'matched', 'extra']);
   assert.deepEqual(result.notes.map(note => note.time), [1, 1.4, 1.6]);
 });
+
+test('boundary propagation is identical when note and attack arrays are reversed', () => {
+  const spans = [{start: 0, end: 1, kind: 'explanation'}, {start: 1, end: 4, kind: 'playing'}];
+  const events = [{id: 'near', onset: 1.12, duration: 0.3, pitch: 60, optional: false, velocity: null, confidence: null, string: null, fret: null},
+                  {id: 'inside', onset: 1.3, duration: 0.3, pitch: 60, optional: false, velocity: null, confidence: null, string: null, fret: null}];
+  const attacks = [{id: 'a60', pitch: 60, sourceTime: 1.2}, {id: 'a64', pitch: 64, sourceTime: 1.05}];
+  const run = (e, a) => buildRunFeedback({...base, reference: {...reference, spans, events: e}, start: 0, end: 4,
+    speed: 1, tolerance: 0.15, attacks: a});
+  const forward = run(events, attacks);
+  const reversed = run([...events].reverse(), [...attacks].reverse());
+  assert.deepEqual([forward.matched, forward.missing, forward.extra, forward.unassessed],
+                   [reversed.matched, reversed.missing, reversed.extra, reversed.unassessed]);
+  assert.deepEqual([forward.matched, forward.missing, forward.extra, forward.unassessed], [0, 0, 0, 2]);
+});

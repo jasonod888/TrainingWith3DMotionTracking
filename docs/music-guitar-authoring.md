@@ -6,11 +6,11 @@ reviewed chord shapes; the guide renders those choices instead of inferred finge
 ## Data contract
 
 - Each music note event may carry `string` (1 = high E … 6 = low E) and `fret` (0–24).
-  They must appear together and must match the note pitch in standard tuning
+  They must appear together, use frets 0–12 and match the note pitch in standard tuning
   `E2 A2 D3 G3 B3 E4`; a mismatch is rejected (422). Omitting both keeps the old fallback.
 - A reviewed reference may carry up to 100 `guitar_chords`, each with a unique id, name,
-  start time, six frets ordered **low E to high E** (`-1` muted, `0` open, `1–24` fretted)
-  and a base position. The draft/review/edit contracts validate bounds and uniqueness.
+  start time, six frets ordered **low E to high E** (`-1` muted, `0` open, `1–12` fretted)
+  and a base position of 1–9 (the four-fret window stays on the 0–12 neck). The draft/review/edit contracts validate bounds and uniqueness.
 - The edit endpoint persists both into the new immutable reference; the manifest and
   learner release rules are unchanged.
 
@@ -57,8 +57,8 @@ Saving still creates a new revision; learners keep the current shared release un
 
 ## Limits
 
-- Standard tuning only; capo, alternate tunings and left-handed positions remain
-  unsupported and are refused/hidden rather than guessed.
+- Standard tuning only, frets 0–12 and chord base positions 1–9. Capo, alternate tunings and
+  left-handed positions remain unsupported and are refused/hidden rather than guessed.
 - Chord shapes are reviewed display data, not strum/voicing assessment; no scoring.
 - No chord inference, microphone/guitar assessment or public/group music release.
 - Positions are authored after review through the editor; the initial review screen does
@@ -73,7 +73,8 @@ Saving still creates a new revision; learners keep the current shared release un
   windows are rejected rather than silently clipped.
 - **Mixed markers:** explicit reviewed positions win; only conflicting fallback markers are
   hidden, with an honest notice. Fallback-only conflicts remain fully hidden as before.
-- **Feedback order:** corrections now carry their reviewed/performance time and sort by it,
-  not by error seconds (which floated missing/extra entries unpredictably).
+- **Feedback order:** boundary status now propagates through all note/attack proximity edges to a
+  fixed point, so reversing the same notes/attacks cannot change matched/missing/extra/unassessed.
+  Corrections also carry reviewed/performance time for display ordering.
 - **Accessibility/responsive:** the chord strip is keyboard-focusable, cards carry ARIA
   labels, and phone/desktop checks assert no page overflow.

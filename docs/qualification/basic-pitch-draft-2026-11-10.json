@@ -1,0 +1,567 @@
+{
+  "draft_version": 1,
+  "subject": "piano",
+  "instrument": {
+    "instrument": "piano"
+  },
+  "duration": 12.0,
+  "reference": {
+    "key": "attempts/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/reference.json",
+    "mime": "application/json",
+    "bytes": 7303,
+    "sha256": "bd80d7af0fac6148144ed0d9822af7ae3b238bb9b2c26af055c78ca326876cee"
+  },
+  "events": [
+    {
+      "id": "bp-1",
+      "onset": 0.3367,
+      "duration": 0.5573,
+      "pitch": 52,
+      "velocity": 0.7173,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-2",
+      "onset": 0.894,
+      "duration": 1.4758,
+      "pitch": 52,
+      "velocity": 0.5399,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-3",
+      "onset": 0.894,
+      "duration": 1.0797,
+      "pitch": 71,
+      "velocity": 0.5869,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-4",
+      "onset": 1.4164,
+      "duration": 1.0462,
+      "pitch": 73,
+      "velocity": 0.5544,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-5",
+      "onset": 1.9505,
+      "duration": 0.5005,
+      "pitch": 68,
+      "velocity": 0.7472,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-6",
+      "onset": 2.451,
+      "duration": 0.743,
+      "pitch": 69,
+      "velocity": 0.5756,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-7",
+      "onset": 2.4626,
+      "duration": 0.3367,
+      "pitch": 73,
+      "velocity": 0.5816,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-8",
+      "onset": 2.7993,
+      "duration": 0.5805,
+      "pitch": 73,
+      "velocity": 0.4193,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-9",
+      "onset": 2.9386,
+      "duration": 0.4876,
+      "pitch": 71,
+      "velocity": 0.5797,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-10",
+      "onset": 3.194,
+      "duration": 0.5108,
+      "pitch": 69,
+      "velocity": 0.7171,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-11",
+      "onset": 3.4262,
+      "duration": 0.9765,
+      "pitch": 71,
+      "velocity": 0.6158,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-12",
+      "onset": 3.7049,
+      "duration": 0.4425,
+      "pitch": 69,
+      "velocity": 0.7619,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-13",
+      "onset": 4.1473,
+      "duration": 0.4296,
+      "pitch": 66,
+      "velocity": 0.5575,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-14",
+      "onset": 4.1473,
+      "duration": 0.2438,
+      "pitch": 69,
+      "velocity": 0.5719,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-15",
+      "onset": 4.3911,
+      "duration": 0.2438,
+      "pitch": 68,
+      "velocity": 0.6311,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-16",
+      "onset": 4.4027,
+      "duration": 0.2206,
+      "pitch": 71,
+      "velocity": 0.5678,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-17",
+      "onset": 4.6233,
+      "duration": 0.2554,
+      "pitch": 71,
+      "velocity": 0.7991,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-18",
+      "onset": 4.6349,
+      "duration": 0.4528,
+      "pitch": 68,
+      "velocity": 0.5344,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-19",
+      "onset": 4.8671,
+      "duration": 0.2554,
+      "pitch": 76,
+      "velocity": 0.6955,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-20",
+      "onset": 4.8788,
+      "duration": 0.2206,
+      "pitch": 71,
+      "velocity": 0.6249,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-21",
+      "onset": 5.1226,
+      "duration": 0.2322,
+      "pitch": 75,
+      "velocity": 0.5934,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-22",
+      "onset": 5.3548,
+      "duration": 0.2438,
+      "pitch": 73,
+      "velocity": 0.6486,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-23",
+      "onset": 5.587,
+      "duration": 0.3715,
+      "pitch": 71,
+      "velocity": 0.623,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-24",
+      "onset": 5.7031,
+      "duration": 0.209,
+      "pitch": 73,
+      "velocity": 0.3585,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-25",
+      "onset": 5.8308,
+      "duration": 0.2451,
+      "pitch": 69,
+      "velocity": 0.8066,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-26",
+      "onset": 6.0759,
+      "duration": 0.2554,
+      "pitch": 68,
+      "velocity": 0.7211,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-27",
+      "onset": 6.3313,
+      "duration": 0.267,
+      "pitch": 69,
+      "velocity": 0.8379,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-28",
+      "onset": 6.5983,
+      "duration": 0.418,
+      "pitch": 68,
+      "velocity": 0.5354,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-29",
+      "onset": 6.8421,
+      "duration": 0.2438,
+      "pitch": 66,
+      "velocity": 0.5434,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-30",
+      "onset": 7.0743,
+      "duration": 0.5224,
+      "pitch": 64,
+      "velocity": 0.6111,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-31",
+      "onset": 7.3297,
+      "duration": 0.6631,
+      "pitch": 66,
+      "velocity": 0.4966,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-32",
+      "onset": 7.5736,
+      "duration": 0.2554,
+      "pitch": 52,
+      "velocity": 0.5471,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-33",
+      "onset": 7.829,
+      "duration": 0.5005,
+      "pitch": 51,
+      "velocity": 0.4981,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-34",
+      "onset": 8.0625,
+      "duration": 0.5341,
+      "pitch": 49,
+      "velocity": 0.5916,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-35",
+      "onset": 8.3295,
+      "duration": 0.418,
+      "pitch": 51,
+      "velocity": 0.5783,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-36",
+      "onset": 8.5733,
+      "duration": 0.2438,
+      "pitch": 54,
+      "velocity": 0.7464,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-37",
+      "onset": 8.8171,
+      "duration": 0.2902,
+      "pitch": 47,
+      "velocity": 0.5828,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-38",
+      "onset": 8.8171,
+      "duration": 0.2322,
+      "pitch": 54,
+      "velocity": 0.5757,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-39",
+      "onset": 8.8171,
+      "duration": 0.3483,
+      "pitch": 59,
+      "velocity": 0.5487,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-40",
+      "onset": 9.0841,
+      "duration": 0.2438,
+      "pitch": 51,
+      "velocity": 0.6747,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-41",
+      "onset": 9.1074,
+      "duration": 0.1393,
+      "pitch": 47,
+      "velocity": 0.4217,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-42",
+      "onset": 9.3279,
+      "duration": 0.5224,
+      "pitch": 52,
+      "velocity": 0.5772,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-43",
+      "onset": 9.5718,
+      "duration": 0.2322,
+      "pitch": 69,
+      "velocity": 0.768,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-44",
+      "onset": 9.804,
+      "duration": 0.5005,
+      "pitch": 68,
+      "velocity": 0.5677,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-45",
+      "onset": 9.8504,
+      "duration": 0.814,
+      "pitch": 40,
+      "velocity": 0.4809,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-46",
+      "onset": 9.8504,
+      "duration": 0.2915,
+      "pitch": 52,
+      "velocity": 0.4379,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-47",
+      "onset": 10.0607,
+      "duration": 0.476,
+      "pitch": 66,
+      "velocity": 0.4972,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-48",
+      "onset": 10.3045,
+      "duration": 0.8475,
+      "pitch": 68,
+      "velocity": 0.574,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-49",
+      "onset": 10.3393,
+      "duration": 0.5457,
+      "pitch": 52,
+      "velocity": 0.4759,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-50",
+      "onset": 10.5367,
+      "duration": 0.2902,
+      "pitch": 66,
+      "velocity": 0.6088,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-51",
+      "onset": 10.8037,
+      "duration": 0.5224,
+      "pitch": 54,
+      "velocity": 0.6372,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-52",
+      "onset": 10.8037,
+      "duration": 0.2322,
+      "pitch": 64,
+      "velocity": 0.6007,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-53",
+      "onset": 11.0243,
+      "duration": 0.1625,
+      "pitch": 75,
+      "velocity": 0.2612,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-54",
+      "onset": 11.0359,
+      "duration": 0.2322,
+      "pitch": 63,
+      "velocity": 0.6427,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-55",
+      "onset": 11.2681,
+      "duration": 0.4876,
+      "pitch": 64,
+      "velocity": 0.6278,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-56",
+      "onset": 11.2797,
+      "duration": 0.267,
+      "pitch": 56,
+      "velocity": 0.6972,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-57",
+      "onset": 11.5467,
+      "duration": 0.3715,
+      "pitch": 56,
+      "velocity": 0.5285,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-58",
+      "onset": 11.5467,
+      "duration": 0.2438,
+      "pitch": 68,
+      "velocity": 0.6211,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-59",
+      "onset": 11.7673,
+      "duration": 0.1509,
+      "pitch": 66,
+      "velocity": 0.6706,
+      "confidence": null,
+      "optional": false
+    }
+  ],
+  "spans": [
+    {
+      "start": 0,
+      "end": 12.0,
+      "kind": "playing"
+    }
+  ],
+  "guitar_chords": [],
+  "provenance": {
+    "adapter": "basic-pitch-adapter",
+    "engine": "onnx",
+    "model": "basic-pitch",
+    "model_version": "0.4.0",
+    "code_version": "basic-pitch-adapter-v1",
+    "profile_sha256": "7394ede7b1b7851bdc652b128f8598d5b3c6c2b41a53a3255e2f6b765b06a234",
+    "audio_sha256": "a54fbd236b4b5fd1ca8d5c7e50e466e091aa7babdb7eda48285ccde4885357ed"
+  },
+  "warnings": [
+    "Basic Pitch proposal; every note requires instructor review."
+  ]
+}

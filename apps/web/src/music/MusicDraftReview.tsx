@@ -57,8 +57,8 @@ export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:
       <label>String<select aria-label={`Note ${index+1} string`} value={event.string??''} onChange={e=>{const string=e.target.value===''?null:Number(e.target.value);edit(index,string===null?{string:null,fret:null}:{string,fret:event.fret??0,pitch:OPEN_STRING[string]+(event.fret??0)});}}>
        <option value="">Not reviewed</option>{[6,5,4,3,2,1].map(string=><option key={string} value={string}>{string} ({noteName(OPEN_STRING[string])})</option>)}
       </select></label>
-      <label>Fret<input aria-label={`Note ${index+1} fret`} type="number" min={0} max={24} value={event.fret??''} disabled={event.string===null}
-       onChange={e=>{if(event.string===null)return;const fret=Math.max(0,Math.min(24,Number(e.target.value)||0));edit(index,{fret,pitch:OPEN_STRING[event.string]+fret});}}/></label>
+      <label>Fret<input aria-label={`Note ${index+1} fret`} type="number" min={0} max={12} value={event.fret??''} disabled={event.string===null}
+       onChange={e=>{if(event.string===null)return;const fret=Math.max(0,Math.min(12,Number(e.target.value)||0));edit(index,{fret,pitch:OPEN_STRING[event.string]+fret});}}/></label>
      </>}
      <label>Start (seconds)<input aria-label={`Note ${index+1} start`} type="number" min={0} max={draft.duration} step="any" value={event.onset} onChange={e=>edit(index,{onset:Number(e.target.value)})}/></label>
      <label>Length (seconds)<input aria-label={`Note ${index+1} length`} type="number" min={.001} max={draft.duration} step="any" value={event.duration??''} onChange={e=>edit(index,{duration:e.target.value===''?null:Number(e.target.value)})}/></label>
@@ -74,8 +74,8 @@ export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:
      {chords.map((chord,index)=><fieldset key={chord.id} disabled={busy}><legend>Chord {index+1}</legend>
       <label>Name<input aria-label={`Chord ${index+1} name`} maxLength={40} value={chord.name} onChange={e=>{changed();setChords(previous=>previous.map((item,i)=>i===index?{...item,name:e.target.value}:item));}}/></label>
       <label>Start (seconds)<input aria-label={`Chord ${index+1} start`} type="number" min={0} max={draft.duration} step="any" value={chord.start} onChange={e=>{changed();setChords(previous=>previous.map((item,i)=>i===index?{...item,start:Number(e.target.value)}:item));}}/></label>
-      <label>Base position<input aria-label={`Chord ${index+1} position`} type="number" min={1} max={24} value={chord.position} onChange={e=>{changed();setChords(previous=>previous.map((item,i)=>i===index?{...item,position:Math.max(1,Math.min(24,Number(e.target.value)||1))}:item));}}/></label>
-      {chord.frets.map((fret,string)=><label key={string}>{['low E','A','D','G','B','high E'][string]}<input aria-label={`Chord ${index+1} fret ${string+1}`} type="number" min={-1} max={24} value={fret} onChange={e=>{changed();setChords(previous=>previous.map((item,i)=>i===index?{...item,frets:item.frets.map((value,slot)=>slot===string?Math.max(-1,Math.min(24,Number(e.target.value))):value)}:item));}}/></label>)}
+      <label>Base position<input aria-label={`Chord ${index+1} position`} type="number" min={1} max={9} value={chord.position} onChange={e=>{changed();setChords(previous=>previous.map((item,i)=>i===index?{...item,position:Math.max(1,Math.min(12,Number(e.target.value)||1))}:item));}}/></label>
+      {chord.frets.map((fret,string)=><label key={string}>{['low E','A','D','G','B','high E'][string]}<input aria-label={`Chord ${index+1} fret ${string+1}`} type="number" min={-1} max={12} value={fret} onChange={e=>{changed();setChords(previous=>previous.map((item,i)=>i===index?{...item,frets:item.frets.map((value,slot)=>slot===string?Math.max(-1,Math.min(12,Number(e.target.value))):value)}:item));}}/></label>)}
       <button type="button" onClick={()=>{changed();setChords(previous=>previous.filter((_,i)=>i!==index));}}>Remove chord {index+1}</button>
      </fieldset>)}
      <button type="button" disabled={busy||chords.length>=100} onClick={()=>{changed();setChords(previous=>[...previous,{id:crypto.randomUUID(),name:'C',start:0,frets:[-1,3,2,0,1,0],position:1}]);}}>Add chord</button>

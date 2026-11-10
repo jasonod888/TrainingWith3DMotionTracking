@@ -1,47 +1,66 @@
-# Transcription candidate dossier (required before real inference)
+# Transcription candidate: Basic Pitch 0.4.0
 
-10 November 2026. **No candidate is selected or installed.** This dossier defines the
-exact evidence needed to assemble one for review; the repository contains only the
-selection/benchmark tooling, run-profile verifier, worker transport and fixture adapter.
+10 November 2026. **Candidate assembled; commercial approval is pending.** Actual ONNX
+inference has run through the isolated worker on a rights-cleared recording.
 
-## Required artifact
+## Candidate identity
 
-One candidate must supply all of the following as immutable, retained evidence:
-
-| Item | Evidence |
+| Item | Value |
 | --- | --- |
-| Code | Repository/package identity, exact commit or wheel digest, executed adapter entry point |
-| Weights | Checkpoint file, SHA-256, source URL, model card/version |
-| Runtime | Python/runtime lock, OS/driver assumptions, deterministic CPU/GPU settings |
-| Preprocessing | Exact mono/PCM/sample-rate pipeline and resampling library |
-| Thresholds | Onset/frame/pitch thresholds and post-processing configuration |
-| Commercial terms | Code licence and **weights** licence, commercial-use/redistribution/attribution clauses, retained terms snapshot |
-| Approval | Accountable reviewer, date, decision, scope, retained approval evidence digest |
-| Attribution | Exact required notice for product/docs |
-| Benchmark | Rights-cleared reviewed acoustic corpus, per-case references/proposals, metrics and reviewer |
+| Model | Basic Pitch 0.4.0 (Spotify AB) |
+| Code | `basic-pitch==0.4.0` wheel, SHA-256 `738adb503aae7fdfc7d1e1511aa0ce35052315f260a19531ef4c356708425db0` |
+| Weights | `nmp.onnx` ICASSP 2022 checkpoint shipped in the wheel, SHA-256 `2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec` |
+| Adapter | [`scripts/music_basic_pitch_adapter.py`](../scripts/music_basic_pitch_adapter.py), SHA-256 `ee3d17f2564431b7dc2219ac976a505494878fa80008170be5af7c754d604b3a` |
+| Profile | `7394ede7b1b7851bdc652b128f8598d5b3c6c2b41a53a3255e2f6b765b06a234` |
+| Runtime | Python 3.12.2; ONNX Runtime 1.31.1; librosa 0.10.2.post1; NumPy 2.5.4; SciPy 1.18.1; pretty_midi 0.2.11.post0; mir_eval 0.8.2; resampy 0.4.3; scikit-learn 1.9.1; numba 0.68.1 |
+| Preprocessing | mono PCM s16le at 22,050 Hz; thresholds onset 0.5, frame 0.3, minimum note 127.7 ms |
 
-The existing `scripts/music_run_profile.py`, `scripts/qualify_music_model.py` and
-`docs/music-model-licensing.md` enforce/record these fields. A package version alone is
-not sufficient.
+The candidate uses Basic Pitch's bundled ONNX graph rather than TensorFlow; the package's
+declared TensorFlow dependency is not installed. This is the same released checkpoint, but
+the approval must cover the ONNX path and the exact runtime above.
 
-## Assembly procedure
+## Licence and attribution
 
-1. Obtain the code and weights through the approved channel; record digests before use.
-2. Build the isolated worker environment from `music-requirements-lock.txt` plus the
-   candidate's runtime dependencies; retain the resolved lock.
-3. Create `inference.json` containing exactly the profile's `sample_rate`,
-   `preprocessing: mono-pcm-s16le` and numeric `thresholds`.
-4. Create `run-profile.json` with model/version and all four digests.
-5. Create the commercial approval JSON and mount it read-only; enable
-   `MUSIC_REQUIRE_RUN_PROFILE` and `MUSIC_ALLOWED_RUN_PROFILES` on the server.
-6. Run the worker in the built image with the profile and the real adapter; verify the
-   draft provenance records the profile digest and model identity.
-7. Run the three-case real reviewed acoustic benchmark and retain the report.
+- Code and bundled weights: Apache License 2.0, Spotify AB. Retained at
+  [`basic-pitch-0.4.0-LICENSE`](basic-pitch-0.4.0-LICENSE) and
+  [`basic-pitch-0.4.0-NOTICE`](basic-pitch-0.4.0-NOTICE).
+- Attribution: “Basic Pitch by Spotify AB, Apache License 2.0.”
+- Commercial evidence file SHA-256: `2cefb2850e07b5d72f7bc08afef26272aa28586bcdb265042eb9165f4ac03377`.
+- **Status: evidence assembled, legal/commercial approval pending.** The retained file is
+  not an approval.
 
-## Current blockers
+## Recording used for inference
 
-- No approved code/weights or commercial evidence.
-- No rights-cleared recordings or reviewed acoustic references.
-- No real adapter installed; the fixture adapter is explicitly non-production.
+- J.S. Bach, Well-Tempered Clavier Book 2, Prelude and Fugue in E major (BWV 878), excerpt
+  0–12 s.
+- Performed by Randolph Hokanson; recorded by Al Swanson on 18 June 2006 at the University
+  of Washington.
+- Source: [Wikimedia Commons File:JSBach WTC2 Prelude and Fugue Emaj.oga](https://commons.wikimedia.org/wiki/File:JSBach_WTC2_Prelude_and_Fugue_Emaj.oga),
+  CC-BY-SA-2.0. The audio is not committed; the derivative excerpt remains CC-BY-SA-2.0.
 
-Until these exist, the private loop remains synthetic and no accuracy claim is made.
+## Actual inference result
+
+- Transport: `music_worker.py` with the verified profile against a local mock API; source
+  download, ffmpeg extraction, Basic Pitch ONNX inference, reference upload and draft
+  handoff completed; the attempt directory was removed.
+- Output: **59 note events** over 12 s, pitches 36–84; provenance records
+  `model=basic-pitch`, `model_version=0.4.0`, `engine=onnx`, the profile digest and the
+  analysis-audio digest.
+- Retained draft: [`basic-pitch-draft-2026-11-10.json`](basic-pitch-draft-2026-11-10.json).
+- Retained run report: [`basic-pitch-run-2026-11-10.json`](basic-pitch-run-2026-11-10.json).
+
+This is a real transcription, not a fixture. It is unreviewed and no accuracy claim is
+made. The real draft now passes the API journey through review, private release,
+invitation and a learner fetch (`tests/api/test_real_transcription_journey.py`). A real
+browser upload and playback session has not been recorded; that is the remaining UI
+acceptance step, not a model gap.
+
+## Reproduce
+
+1. Install the exact runtime versions and `basic-pitch==0.4.0` (no TensorFlow needed for
+   the ONNX graph).
+2. Assemble weights, adapter, config and evidence; generate the run profile with
+   `music_run_profile.load_profile`.
+3. Run `music_worker.py` with `--profile/--weights/--code/--config/--approval` and
+   `--adapter-command <python> adapter.py`; provide the source through the normal job.
+4. Retain the draft and verify provenance/profile/audio digests.

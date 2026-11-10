@@ -1,0 +1,1 @@
+{"preprocessing":"mono-pcm-s16le","sample_rate":22050,"thresholds":{"frame_threshold":0.3,"minimum_note_length":127.7,"onset_threshold":0.5}}

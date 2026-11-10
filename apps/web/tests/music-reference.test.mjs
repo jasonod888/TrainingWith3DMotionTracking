@@ -112,3 +112,12 @@ test('a reviewed chord must fit its base position window', () => {
   assert.throws(() => parseMusicReference({...base, subject: 'guitar', instrument: {instrument: 'guitar'},
     events: [], guitar_chords: [chord]}), /base position/);
 });
+
+test('authoring range is restricted to frets 0-12 and base positions 1-9', () => {
+  const guitar = {...base, subject: 'guitar', instrument: {instrument: 'guitar'},
+    events: [{id: 'high', onset: 1, duration: 0.3, pitch: 52, string: 6, fret: 12}],
+    guitar_chords: [{id: 'c', name: 'C', start: 0, frets: [-1, 3, 2, 0, 1, 0], position: 1}]};
+  assert.equal(parseMusicReference(guitar).events[0].fret, 12);
+  assert.throws(() => parseMusicReference({...guitar, events: [{...guitar.events[0], fret: 13, pitch: 53}]}), /invalid reviewed position/);
+  assert.throws(() => parseMusicReference({...guitar, guitar_chords: [{...guitar.guitar_chords[0], position: 10}]}), /base position/);
+});

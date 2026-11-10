@@ -839,5 +839,23 @@ reviewed chord shapes; the guide renders them without chord inference.
 - Accessibility/responsive checks cover keyboard focus, ARIA labels, phone/desktop overflow.
 - No capo/alternate tuning/handedness support yet; standard tuning remains the scope.
 
-Verification: **326 API passed, 13 skipped**; **289 web passed**; TypeScript/build pass;
-music screen 16,075 B gzip (limit 16,384); initial-review/editor/library browser checks pass.
+Verification: **327 API passed, 13 skipped**; **291 web passed**; TypeScript/build pass;
+music screen 16,101 B gzip (limit 16,384); initial-review/editor/library browser checks pass.
+
+
+## Candidate and real-inference slice: Basic Pitch 0.4.0
+
+10 November 2026.
+
+- Assembled Basic Pitch 0.4.0 (ONNX checkpoint) with exact wheel/model/adapter digests,
+  runtime versions, Apache-2.0 licence/notice and CC-BY-SA-2.0 recording attribution.
+  Commercial status is **evidence assembled, approval pending**.
+- Ran actual ONNX inference through the isolated worker on a 12 s rights-cleared Bach
+  excerpt: 59 notes, draft handoff completed, attempt directory cleaned. Draft and run
+  report retained under `docs/qualification/`.
+- No fixture was used. No accuracy claim is made. The real draft passes the API journey
+  through review, release, invitation and learner fetch; a real browser upload/playback
+  session is still the remaining UI acceptance step.
+- Boundary matching is now order-independent (fixed-point propagation), with both
+  reproduced cases and reversed-array regression. Guitar authoring is restricted to frets
+  0–12 and chord base positions 1–9 to match the displayed neck.

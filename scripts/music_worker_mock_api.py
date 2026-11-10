@@ -13,9 +13,11 @@ from pathlib import Path
 SOURCE = Path(os.environ.get('MOCK_SOURCE', '/data/source.mp4')).read_bytes()
 DIGEST = hashlib.sha256(SOURCE).hexdigest()
 MODE = os.environ.get('MOCK_MODE', 'complete')
+DURATION = float(os.environ.get('MOCK_DURATION', '2'))
 JOB_ID = 'a' * 32
 TOKEN = 'b' * 48
 STATE = {'claimed': False, 'heartbeats': 0, 'drafts': 0}
+DRAFT_PATH = Path(os.environ.get('MOCK_DRAFT', 'mock-draft.json'))
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -28,6 +30,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        print('POST', self.path, flush=True)
         length = int(self.headers.get('Content-Length') or 0)
         body = self.rfile.read(length) if length else b''
         path = self.path.split('?')[0]
@@ -37,7 +40,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             STATE['claimed'] = True
             self.reply(200, {'id': JOB_ID, 'title': 'Mock piano', 'bytes': len(SOURCE), 'sha256': DIGEST,
-                             'start': 0, 'duration': 2, 'attempt_token': TOKEN, 'provider': 'local',
+                             'start': 0, 'duration': DURATION, 'attempt_token': TOKEN, 'provider': 'local',
                              'pipeline_version': 'music-piano-v1', 'subject': 'piano', 'instrument': 'piano',
                              'output_roles': {'reference': {'name': 'reference.json', 'mime': 'application/json'}},
                              'provider_target': '', 'submission_state': 'none'})
@@ -51,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path.endswith('/draft'):
             STATE['drafts'] += 1
-            Path('/tmp/mock-draft.json').write_bytes(body)
+            DRAFT_PATH.write_bytes(body)
             self.reply(200, {'draft': True, 'lesson_id': JOB_ID})
             return
         if path.endswith('/fail'):
@@ -60,6 +63,10 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404, {'detail': 'Not found'})
 
     def do_GET(self):
+        print('GET', self.path, flush=True)
+        if self.path.split('?')[0] == '/state':
+            self.reply(200, STATE)
+            return
         if self.path.split('?')[0].endswith('/source'):
             self.send_response(200)
             self.send_header('Content-Type', 'video/mp4')

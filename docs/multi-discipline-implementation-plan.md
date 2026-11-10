@@ -760,7 +760,10 @@ Completed since the earlier phase notes:
   against a local mock API; isolated image packaging.
 - PostgreSQL 0021 accepted for its tested scope (existing data, concurrent edits, retries).
 - Private invitation-only music sharing with explicit release updates.
-- 326 API tests (13 skipped), 289 web tests, build and bundle checks pass.
+- Basic Pitch 0.4.0 candidate assembled and exercised with actual ONNX inference; 59-note
+  draft retained. Commercial approval and the browser end-to-end journey remain.
+- Boundary propagation is order-independent and guitar authoring matches the 0–12 neck.
+- 327 API tests (13 skipped), 291 web tests, build and bundle checks pass.
 
 Remaining, in order:
 

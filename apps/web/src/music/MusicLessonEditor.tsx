@@ -141,11 +141,11 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
               <option value="">Not reviewed</option>
               {[6, 5, 4, 3, 2, 1].map(string => <option key={string} value={string}>{string} ({pitchName(OPEN_STRING[string])})</option>)}
             </select></label>
-            <label>Fret<input aria-label={`Note ${index + 1} fret`} type="number" min={0} max={24}
+            <label>Fret<input aria-label={`Note ${index + 1} fret`} type="number" min={0} max={12}
               value={note.fret ?? ''} disabled={note.string === null}
               onChange={event => {
                 if (note.string === null) return;
-                const fret = Math.max(0, Math.min(24, Number(event.target.value) || 0));
+                const fret = Math.max(0, Math.min(12, Number(event.target.value) || 0));
                 update(index, {fret, pitch: OPEN_STRING[note.string] + fret});
               }}/></label>
           </>}
@@ -195,12 +195,12 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
             onChange={event => { changed(); setChords(previous => previous.map((item, position) => position === index ? {...item, name: event.target.value} : item)); }}/></label>
           <label>Start (seconds)<input aria-label={`Chord ${index + 1} start`} type="number" min={0} max={manifest.duration} step="any" value={chord.start}
             onChange={event => { changed(); setChords(previous => previous.map((item, position) => position === index ? {...item, start: Number(event.target.value)} : item)); }}/></label>
-          <label>Base position<input aria-label={`Chord ${index + 1} position`} type="number" min={1} max={24} value={chord.position}
-            onChange={event => { changed(); setChords(previous => previous.map((item, position) => position === index ? {...item, position: Math.max(1, Math.min(24, Number(event.target.value) || 1))} : item)); }}/></label>
+          <label>Base position<input aria-label={`Chord ${index + 1} position`} type="number" min={1} max={9} value={chord.position}
+            onChange={event => { changed(); setChords(previous => previous.map((item, position) => position === index ? {...item, position: Math.max(1, Math.min(9, Number(event.target.value) || 1))} : item)); }}/></label>
           {chord.frets.map((fret, string) => <label key={string}>{['low E', 'A', 'D', 'G', 'B', 'high E'][string]}
-            <input aria-label={`Chord ${index + 1} fret ${string + 1}`} type="number" min={-1} max={24} value={fret}
+            <input aria-label={`Chord ${index + 1} fret ${string + 1}`} type="number" min={-1} max={12} value={fret}
               onChange={event => { changed(); setChords(previous => previous.map((item, position) => position === index
-                ? {...item, frets: item.frets.map((value, slot) => slot === string ? Math.max(-1, Math.min(24, Number(event.target.value))) : value)} : item)); }}/></label>)}
+                ? {...item, frets: item.frets.map((value, slot) => slot === string ? Math.max(-1, Math.min(12, Number(event.target.value))) : value)} : item)); }}/></label>)}
           <button type="button" onClick={() => { changed(); setChords(previous => previous.filter((_, position) => position !== index)); }}><Trash2 size={14}/>Remove chord {index + 1}</button>
         </fieldset>)}
         <button type="button" disabled={busy || chords.length >= 100} onClick={() => { changed(); setChords(previous => [...previous,

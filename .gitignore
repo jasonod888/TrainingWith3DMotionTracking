@@ -34,3 +34,6 @@ apps/web/public/dev-clips/
 build/
 
 .spike-dist/
+
+.venv-music/
+music-candidate-run/

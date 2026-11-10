@@ -94,7 +94,7 @@ export function parseMusicReference(value: unknown): MusicReference {
     const string = item.string == null ? null : finite(item.string, `note ${id} string`);
     const fret = item.fret == null ? null : finite(item.fret, `note ${id} fret`);
     if ((string === null) !== (fret === null)) throw new Error(`Note ${id} needs both string and fret.`);
-    if (string !== null && (!Number.isInteger(string) || string < 1 || string > 6 || !Number.isInteger(fret) || fret! < 0 || fret! > 24)) {
+    if (string !== null && (!Number.isInteger(string) || string < 1 || string > 6 || !Number.isInteger(fret) || fret! < 0 || fret! > 12)) {
       throw new Error(`Note ${id} has an invalid reviewed position.`);
     }
     if (string !== null && ({1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40} as Record<number, number>)[string] + fret! !== pitch) {
@@ -112,11 +112,11 @@ export function parseMusicReference(value: unknown): MusicReference {
     if (start < 0 || start > duration + 1e-6) throw new Error('A reviewed chord starts outside the clip.');
     if (!Array.isArray(item.frets) || item.frets.length !== 6) throw new Error('A reviewed chord needs six string frets.');
     const frets = item.frets.map((value: unknown) => finite(value, `chord ${name} fret`));
-    if (frets.some(value => !Number.isInteger(value) || value < -1 || value > 24) || !frets.some(value => value >= 0)) {
+    if (frets.some(value => !Number.isInteger(value) || value < -1 || value > 12) || !frets.some(value => value >= 0)) {
       throw new Error('A reviewed chord has invalid frets.');
     }
     const position = item.position == null ? 1 : finite(item.position, `chord ${name} position`);
-    if (!Number.isInteger(position) || position < 1 || position > 24) throw new Error('A reviewed chord has an invalid base position.');
+    if (!Number.isInteger(position) || position < 1 || position > 9) throw new Error('A reviewed chord has an invalid base position.');
     if (frets.some(fret => fret > 0 && (fret < position || fret > position + 3))) throw new Error('A reviewed chord does not fit its base position.');
     return {id, name, start, frets, position};
   }) : [];
