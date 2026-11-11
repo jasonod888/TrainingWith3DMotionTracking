@@ -84,3 +84,26 @@ as extra when its expected note was excluded. Exclusion is now paired by same pi
 tolerance proximity in both directions. Both reproduced cases (expected 1.20/played 1.10
 and expected 1.10/played 1.20 across a playing boundary) now yield unassessed evidence
 with no missing/extra correction, and are covered by regression tests.
+
+
+## Editable notation (11 November 2026)
+
+Piano editing now opens with an editable grand-staff score linked to the performance roll,
+keyboard and source video. The notation is a separate document saved inside the reviewed
+reference; it never replaces the exact Basic Pitch seconds. Pitch, written duration,
+chords, rests, ties, voices and staff assignment are editable, with one undo/redo history
+for all three views. Selecting a note seeks nothing by itself, but **Play from this note**
+uses its performance onset against the source video.
+
+The save path is unchanged at the API boundary: a new immutable revision and reference
+file, with the existing publication semantics. The reference gains an optional `notation`
+field, so older references continue to open and are interpreted from their events on first
+edit. The server rejects notation whose performance links disagree with the reviewed
+events, malformed measures, overlapping voices and out-of-clip events.
+
+- Model and policy: [`music-notation-model.md`](music-notation-model.md)
+- Candidate evaluation: [`music-notation-editor-evaluation.md`](music-notation-editor-evaluation.md)
+- Verification and unsupported cases: [`music-notation-verification.md`](music-notation-verification.md)
+
+This is an owner authoring surface, not a change to learner playback or scoring. The
+notation document is unscored and does not enable public/group release.

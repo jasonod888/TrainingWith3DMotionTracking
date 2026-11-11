@@ -35,6 +35,34 @@ Phases 3–6 and history has landed while real transcription/release and device 
 still open. Do not declare all of Phase 5 or Phase 6 finished on the basis of the current
 fixture and database tests.
 
+## Editable notation prototype (11 November 2026)
+
+Piano lessons now have an owner-only editable grand staff linked to the existing piano
+roll, keyboard and source video. The prototype adds a shared notation/timing document
+(measures, written durations, rests, ties, two voices per staff, editable staff assignment,
+pitch spelling and a performance-event mapping), one undo/redo history, save/reopen through
+the existing immutable revision flow, and MusicXML export. Basic Pitch seconds remain the
+source of truth for video alignment; written-duration edits follow an explicit timing
+policy, and tempo changes affect notation playback only.
+
+The first-step evaluation pinned and tested Smoosic 2.0.3 and RiffScore 1.0.0-alpha.18.
+RiffScore is the recommended library foundation but is not embedded: alpha.18 is
+one-voice-per-staff and does not yet move notes, while Smoosic is 7.1 MB gzip, global
+jQuery-based and mouse-only. The delivered editor is an in-house implementation behind an
+adapter boundary, not a claim that either candidate met the requirement set.
+
+Verification: **306 web tests**, **267 API tests**, production build and bundle budgets
+pass, and three Chromium checks cover touch selection, chord pitch edit, duration/ties,
+undo/redo, save/reopen and MusicXML export. The existing 12 s / 59-note Basic Pitch draft
+renders as six measures with both staves, both voices and 18 ties. RiffScore imports the
+export; a second voice on one staff is dropped with its documented warning. Physical
+iOS/Android devices, screen readers, long-lesson stress and MusicXML import remain
+unverified.
+
+- [`music-notation-model.md`](music-notation-model.md)
+- [`music-notation-editor-evaluation.md`](music-notation-editor-evaluation.md)
+- [`music-notation-verification.md`](music-notation-verification.md)
+
 ## Material gaps, in priority order
 
 ### 1. Real lesson path and exact inference provenance

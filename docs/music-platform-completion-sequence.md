@@ -57,6 +57,16 @@ are gathered. Do not label the model commercially approved until that evidence e
 
 ## 2. Finish diagrams and normal reference editing (Phases 4, 5; UI-L2/L3/L5)
 
+**Status 11 November 2026: editable notation prototype delivered.** Piano owners now edit a
+linked grand-staff score, piano roll and keyboard with shared selection and undo/redo;
+notation is saved with the reviewed reference and exports to MusicXML. The Phase 1
+candidate comparison and the model/timing policy are recorded in
+[`music-notation-editor-evaluation.md`](music-notation-editor-evaluation.md),
+[`music-notation-model.md`](music-notation-model.md) and
+[`music-notation-verification.md`](music-notation-verification.md). Physical iOS/Android,
+real transcription round-trips and MusicXML import remain open, so this is not a claim that
+the diagram/editing workstream is finished.
+
 **Status 10 November 2026: editing/passages delivered; diagrams partly delivered.**
 Owners can reopen a reviewed lesson, edit notes/sections/policy, mark playing versus
 explanation passages and save a new immutable revision; learners keep the current release

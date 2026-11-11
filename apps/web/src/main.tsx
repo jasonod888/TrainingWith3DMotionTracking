@@ -4,6 +4,7 @@ import {App} from './LibraryApp';
 import {loadSetupPolicy} from './camera-setup-policy';
 import './style.css';
 import './workflow.css';
+import './create.css';
 // Server-controlled camera setup policy. Not awaited: the default is "enabled",
 // so a slow or failed request keeps the real flow rather than unlocking the
 // bypass by accident. Entry handlers read it synchronously when pressed.

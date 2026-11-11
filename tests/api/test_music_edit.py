@@ -88,6 +88,66 @@ def test_editing_creates_a_new_revision_without_touching_the_shared_release(tmp_
             assert updated['revision_id'] == second['revision_id']
 
 
+def _notation_for(events, duration=2.0, bpm=120):
+    """A minimal but complete notation document matching the reviewed performance."""
+    ppq = 480
+    grid = 120
+    seconds_per_tick = 60 / (bpm * ppq)
+    measures = [{'id': 'measure-1', 'index': 0, 'start': 0, 'duration': 1920}]
+    noted = []
+    for index, event in enumerate(sorted(events, key=lambda item: (item['onset'], item['pitch']))):
+        start = max(0, round(event['onset'] / seconds_per_tick / grid) * grid)
+        end = max(start + grid, round((event['onset'] + (event.get('duration') or 0.25)) / seconds_per_tick / grid) * grid)
+        noted.append({
+            'id': f'score-{index}', 'staff': 'treble', 'voice': 1, 'start': start,
+            'duration': max(grid, end - start), 'rest': False, 'source': 'performance',
+            'notes': [{'id': f'note-{index}', 'pitch': event['pitch'],
+                       'spelling': {60: 'C4', 64: 'E4', 65: 'F4'}.get(event['pitch'], 'C4'),
+                       'accidental': 'natural', 'performance_ids': [event['id']]}],
+        })
+    return {
+        'notation_version': 1, 'subject': 'piano', 'duration': duration, 'ppq': ppq,
+        'tempo': {'bpm': bpm, 'beat_unit': 4, 'mode': 'notation', 'source': 'estimated'},
+        'time_signature': {'numerator': 4, 'denominator': 4}, 'key_signature': 'C',
+        'staff_split_pitch': 60, 'measures': measures, 'events': noted,
+        'segments': [], 'ties': [], 'performance': [dict(event) for event in events],
+        'performance_map': {}, 'created_from': 'performance',
+    }
+
+
+def test_edit_persists_notation_and_refuses_a_mismatched_performance(tmp_path):
+    with real_media_app(tmp_path) as (client, app, settings, store, mail):
+        lesson_id, view, _lease, _base, _payload = proposal(client, app, media(tmp_path, 'audio'))
+        body = review_body(view)
+        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
+                              'rubric_version': 'music-watch-v1'}
+        reviewed = client.post(f'/api/lessons/{lesson_id}/music-draft/review', json=body)
+        assert reviewed.status_code == 200, reviewed.text
+        first = reviewed.json()
+        edit = {'base_revision_id': first['revision_id'], 'title': 'Notated piano',
+                'events': body['events'], 'notation': _notation_for(body['events']),
+                'spans': body['spans'], 'sections': body['sections'], 'assessment': body['assessment'],
+                'confirm_reviewed': True}
+        with patch('apps.api.music_edit.storage_client', return_value=store):
+            saved = client.post(f'/api/lessons/{lesson_id}/music-revision', json=edit)
+        assert saved.status_code == 200, saved.text
+        reference = json.loads(store.objects[saved.json()['reference']['key']])
+        assert reference['notation']['notation_version'] == 1
+        assert reference['notation']['measures'][0]['duration'] == 1920
+        assert reference['notation']['events'][0]['notes'][0]['pitch'] in (60, 64)
+        assert reference['notation']['performance'][0]['velocity'] == body['events'][0]['velocity']
+        assert reference['events'][0]['velocity'] == body['events'][0]['velocity']
+
+        # The stored notation must not claim a different performance than the review.
+        bad = json.loads(json.dumps(edit))
+        bad['base_revision_id'] = saved.json()['revision_id']
+        bad['notation']['performance'][0]['pitch'] = 127
+        with patch('apps.api.music_edit.storage_client', return_value=store):
+            refused = client.post(f'/api/lessons/{lesson_id}/music-revision', json=bad)
+        assert refused.status_code == 422
+        assert 'performance' in refused.text
+
+
 def test_title_only_edit_preserves_velocity_and_confidence(tmp_path):
     with real_media_app(tmp_path) as (client, app, settings, store, mail):
         lesson_id, view, _lease, _base, _payload = proposal(client, app, media(tmp_path, 'audio'))

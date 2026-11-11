@@ -1,0 +1,394 @@
+{
+  "benchmark_version": 1,
+  "weights_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+  "scope": "Sample-rendered known notes, overlapping tails; not human-performed ground truth.",
+  "settings": {
+    "baseline": {
+      "thresholds": {
+        "onset_threshold": 0.5,
+        "frame_threshold": 0.3,
+        "minimum_note_length": 127.7
+      },
+      "decoding": {
+        "decoding_version": "basic-pitch-0.4.0/decoding-v1",
+        "infer_onsets": true,
+        "melodia_trick": false,
+        "include_pitch_bends": false,
+        "multiple_pitch_bends": false,
+        "midi_tempo": 120,
+        "minimum_frequency": null,
+        "maximum_frequency": null
+      }
+    },
+    "piano_peaks": {
+      "thresholds": {
+        "onset_threshold": 0.6,
+        "frame_threshold": 0.3,
+        "minimum_note_length": 80.0,
+        "onset_prominence": 0.2,
+        "minimum_attack_spacing_ms": 70.0
+      },
+      "decoding": {
+        "decoding_version": "basic-pitch-0.4.0/piano-peaks-v1",
+        "infer_onsets": false,
+        "melodia_trick": false,
+        "include_pitch_bends": false,
+        "multiple_pitch_bends": false,
+        "midi_tempo": 120,
+        "minimum_frequency": null,
+        "maximum_frequency": null
+      }
+    },
+    "lower_threshold": {
+      "thresholds": {
+        "onset_threshold": 0.35,
+        "frame_threshold": 0.3,
+        "minimum_note_length": 127.7
+      },
+      "decoding": {
+        "decoding_version": "basic-pitch-0.4.0/decoding-v1",
+        "infer_onsets": true,
+        "melodia_trick": false,
+        "include_pitch_bends": false,
+        "multiple_pitch_bends": false,
+        "midi_tempo": 120,
+        "minimum_frequency": null,
+        "maximum_frequency": null
+      }
+    },
+    "inferred_off": {
+      "thresholds": {
+        "onset_threshold": 0.5,
+        "frame_threshold": 0.3,
+        "minimum_note_length": 127.7
+      },
+      "decoding": {
+        "decoding_version": "basic-pitch-0.4.0/decoding-v1",
+        "infer_onsets": false,
+        "melodia_trick": false,
+        "include_pitch_bends": false,
+        "multiple_pitch_bends": false,
+        "midi_tempo": 120,
+        "minimum_frequency": null,
+        "maximum_frequency": null
+      }
+    }
+  },
+  "sample_identities": [
+    {
+      "filename": "A0.mp3",
+      "sha256": "f62d50bd977679e1316063866ece754604b8c214d73b7e3033372c75d9064c03"
+    },
+    {
+      "filename": "A1.mp3",
+      "sha256": "17fa1e363f9fad67c3357be54a6defc4fca5a5c2aada21de84b30254f9cb2f5b"
+    },
+    {
+      "filename": "A2.mp3",
+      "sha256": "20601d890f44a3c22499c7b61f52e571795df1fe5a01fac553dded7b6379e1d4"
+    },
+    {
+      "filename": "A3.mp3",
+      "sha256": "8e108fe228e34e32f6b4e61efff732eec53058a9e6f05a8d8e719598b132c4f9"
+    },
+    {
+      "filename": "A4.mp3",
+      "sha256": "a62df24a2c84cea8d18c1fa8aca7c18c877ba2b76a00a591256fa74d3ce54ac3"
+    },
+    {
+      "filename": "A5.mp3",
+      "sha256": "9e5cee1fe9cf68b7193623d46a27c8956e572c1ff234ca0e11599b556050dec6"
+    },
+    {
+      "filename": "A6.mp3",
+      "sha256": "b6064a657592c63c03561d2ce1092607c14e1d8091445d50065d0ec819ff6fbc"
+    },
+    {
+      "filename": "A7.mp3",
+      "sha256": "751c0a0acd00bad6e52749063dac56a0def9870242b053c68ab45cbe8d083fc1"
+    },
+    {
+      "filename": "C1.mp3",
+      "sha256": "caba05f0be4d9f6030adcc033208b49ac54e47d58edc57b743085b095b4ea395"
+    },
+    {
+      "filename": "C2.mp3",
+      "sha256": "7029a9e84f748433bc33d067ee13d37d0b866768f09ae6c7dac8e2e98e1e53ca"
+    },
+    {
+      "filename": "C3.mp3",
+      "sha256": "bb70dd921d81b3dda561c19b5c029292ae5a6fba1947e364bf274218ce19a9d1"
+    },
+    {
+      "filename": "C4.mp3",
+      "sha256": "689eaa4c2fd7f29a2cc0e386eec462156d523a87d701269e5e2458e66056f4f6"
+    },
+    {
+      "filename": "C5.mp3",
+      "sha256": "2f5b0f7422063010fb379e684bfdf2daa3911dcd2251413d79fa2a53029fdc30"
+    },
+    {
+      "filename": "C6.mp3",
+      "sha256": "0d3232edd13ba69fd5caf4a295060ae0fd533b8a1433ae0a038644d70715c907"
+    },
+    {
+      "filename": "C7.mp3",
+      "sha256": "694b512fac99ba7f7290c045d9c18e94724a7ebcc319b937baabc62125814283"
+    },
+    {
+      "filename": "C8.mp3",
+      "sha256": "b4b5f321751b544ee7f0d6d3e3f1ef52873dd4a6aee91ba41e6c8e61e17a084c"
+    },
+    {
+      "filename": "Ds1.mp3",
+      "sha256": "1c02b816b85d2fa938815fdf04d7d327ff20068f1aadc3c97052144c735afa0c"
+    },
+    {
+      "filename": "Ds2.mp3",
+      "sha256": "a106cdec93aa4e767e36809fc9cdaa6b92453fb9f18d5fc28ac4eb0f9f239ecd"
+    },
+    {
+      "filename": "Ds3.mp3",
+      "sha256": "4fe73ea3f2c59a1dbfb35cff1d9d8a9e38cb12ef39a91a13083729544cdafed5"
+    },
+    {
+      "filename": "Ds4.mp3",
+      "sha256": "663e8bb3e2d0fa23a30526dcd7ab0e42609c193c07025647ef46badcf81ec211"
+    },
+    {
+      "filename": "Ds5.mp3",
+      "sha256": "bf71096e653ab7ceca3914b9fd44d8c27fe83c162564c5db34bd06b94eb14b8c"
+    },
+    {
+      "filename": "Ds6.mp3",
+      "sha256": "eb643014d9f926f1a5f9f51fc4a1ed8c07c6da36ce164d5b221d7b878a53f142"
+    },
+    {
+      "filename": "Ds7.mp3",
+      "sha256": "d51f4c51bed719f51e75ad22d5b9ac4b4d1a4749d02ef31ea03696de46fa5e77"
+    },
+    {
+      "filename": "Fs1.mp3",
+      "sha256": "5cbb51d2a0a55a9ef3656671ca72e336856813949055bb6c189cf990655335cf"
+    },
+    {
+      "filename": "Fs2.mp3",
+      "sha256": "dd34c708274eeba35da1fd99fc31ef904e390ff02f6864aefe8a13261f8a8327"
+    },
+    {
+      "filename": "Fs3.mp3",
+      "sha256": "960fefd90f56608b7edf958dadfeca893cff5744ab9034d61e419401fe45ce9c"
+    },
+    {
+      "filename": "Fs4.mp3",
+      "sha256": "613652f5c96e35736ce6a46bc4ddb6ba1076d1fb16a35a4c22c14e67efdde57c"
+    },
+    {
+      "filename": "Fs5.mp3",
+      "sha256": "ed2fdf543274ea72ddd4eb634a16356531a5f4040b2a60d34fb12a5c72cbf22f"
+    },
+    {
+      "filename": "Fs6.mp3",
+      "sha256": "c584d2b4e96a37b12c920ed3212d149abedf25342389bfdc557b2fac847ab11c"
+    },
+    {
+      "filename": "Fs7.mp3",
+      "sha256": "e9ce71e0f7dc39c1d0033d656cf57e3aa8b303127147f194cc92b04e2b648a9f"
+    }
+  ],
+  "summary": {
+    "selection": {
+      "baseline": {
+        "matched": 423,
+        "extra": 150,
+        "missing": 45,
+        "onset_error_sum": 4.938962477968242,
+        "precision": 0.7382198952879581,
+        "recall": 0.9038461538461539,
+        "f1": 0.8126801152737753,
+        "onset_mae_ms": 11.676034226875275
+      },
+      "piano_peaks": {
+        "matched": 437,
+        "extra": 69,
+        "missing": 31,
+        "onset_error_sum": 4.828424918134975,
+        "precision": 0.8636363636363636,
+        "recall": 0.9337606837606838,
+        "f1": 0.8973305954825462,
+        "onset_mae_ms": 11.04902727262008
+      },
+      "lower_threshold": {
+        "matched": 412,
+        "extra": 300,
+        "missing": 56,
+        "onset_error_sum": 4.832756815560943,
+        "precision": 0.5786516853932584,
+        "recall": 0.8803418803418803,
+        "f1": 0.6983050847457627,
+        "onset_mae_ms": 11.729992270778988
+      },
+      "inferred_off": {
+        "matched": 425,
+        "extra": 141,
+        "missing": 43,
+        "onset_error_sum": 5.079683422867858,
+        "precision": 0.7508833922261484,
+        "recall": 0.9081196581196581,
+        "f1": 0.8220502901353965,
+        "onset_mae_ms": 11.952196289100842
+      }
+    },
+    "diagnostic": {
+      "baseline": {
+        "matched": 422,
+        "extra": 124,
+        "missing": 46,
+        "onset_error_sum": 5.078084196416491,
+        "precision": 0.7728937728937729,
+        "recall": 0.9017094017094017,
+        "f1": 0.8323471400394478,
+        "onset_mae_ms": 12.03337487302486
+      },
+      "piano_peaks": {
+        "matched": 434,
+        "extra": 57,
+        "missing": 34,
+        "onset_error_sum": 4.989213784370826,
+        "precision": 0.8839103869653768,
+        "recall": 0.9273504273504274,
+        "f1": 0.9051094890510949,
+        "onset_mae_ms": 11.495884295785313
+      },
+      "lower_threshold": {
+        "matched": 413,
+        "extra": 292,
+        "missing": 55,
+        "onset_error_sum": 5.046335588976167,
+        "precision": 0.5858156028368794,
+        "recall": 0.8824786324786325,
+        "f1": 0.7041773231031543,
+        "onset_mae_ms": 12.218730239651737
+      },
+      "inferred_off": {
+        "matched": 425,
+        "extra": 116,
+        "missing": 43,
+        "onset_error_sum": 5.224451540202659,
+        "precision": 0.7855822550831792,
+        "recall": 0.9081196581196581,
+        "f1": 0.8424182358771061,
+        "onset_mae_ms": 12.292827153418022
+      }
+    },
+    "holdout": {
+      "baseline": {
+        "matched": 408,
+        "extra": 145,
+        "missing": 60,
+        "onset_error_sum": 4.861961389392828,
+        "precision": 0.7377938517179023,
+        "recall": 0.8717948717948718,
+        "f1": 0.7992164544564153,
+        "onset_mae_ms": 11.91657203282556
+      },
+      "piano_peaks": {
+        "matched": 420,
+        "extra": 60,
+        "missing": 48,
+        "onset_error_sum": 4.723578932582981,
+        "precision": 0.875,
+        "recall": 0.8974358974358975,
+        "f1": 0.8860759493670886,
+        "onset_mae_ms": 11.246616506149955
+      },
+      "lower_threshold": {
+        "matched": 404,
+        "extra": 292,
+        "missing": 64,
+        "onset_error_sum": 4.831471612575809,
+        "precision": 0.5804597701149425,
+        "recall": 0.8632478632478633,
+        "f1": 0.6941580756013745,
+        "onset_mae_ms": 11.959088149940122
+      },
+      "inferred_off": {
+        "matched": 408,
+        "extra": 139,
+        "missing": 60,
+        "onset_error_sum": 4.987779850577272,
+        "precision": 0.7458866544789763,
+        "recall": 0.8717948717948718,
+        "f1": 0.8039408866995074,
+        "onset_mae_ms": 12.224950614159981
+      }
+    }
+  },
+  "case_count": 36,
+  "notes_per_split": 468,
+  "split_seeds": {
+    "selection": [
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111
+    ],
+    "diagnostic": [
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123
+    ],
+    "holdout": [
+      1024,
+      1025,
+      1026,
+      1027,
+      1028,
+      1029,
+      1030,
+      1031,
+      1032,
+      1033,
+      1034,
+      1035
+    ]
+  },
+  "clip_check": {
+    "source_sha256": "25f188df04837bf24bb38a597c85ed926ef135337939127e19359f4704927633",
+    "duration": 14.677369614512472,
+    "baseline_notes": 46,
+    "piano_peak_notes": 34,
+    "independent_model": "Kong/ByteDance piano_transcription_inference 0.0.6",
+    "independent_weights_sha256": "c3fa9730725bf4a762f1c14bc80cd5986eacda01b026f5a4a2525cd607876141",
+    "independent_note_count": 37,
+    "baseline_agreement": {
+      "matched": 33,
+      "unmatched_basic_pitch": 13,
+      "unmatched_independent": 4
+    },
+    "piano_peaks_agreement": {
+      "matched": 32,
+      "unmatched_basic_pitch": 2,
+      "unmatched_independent": 5
+    },
+    "warning": "Independent model agreement is not human ground truth. The second model is diagnostic only and not used by the app."
+  },
+  "profile_sha256": "476275668da0669b250dff26942b70a2f9bab1d463817fc42fe8803845836931"
+}

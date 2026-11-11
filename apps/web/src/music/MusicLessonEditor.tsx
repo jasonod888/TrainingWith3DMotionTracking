@@ -1,16 +1,25 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {ArrowLeft, Plus, Trash2} from 'lucide-react';
 import type {MusicLessonManifest, Section} from '../../../../packages/lesson-schema/index';
 import {parseMusicLessonManifest} from '../../../../packages/lesson-schema/parse';
+import {parseNotationDocument, type NotationDocument} from '../../../../packages/music-notation/index.ts';
 import {assetUrl, request} from '../api';
 import {parseMusicReference, pitchName, type GuitarChord, type MusicReferenceSpan} from './music-reference';
 import {VelocityInput} from './VelocityInput';
+import {NotationEditor, createNotation} from './notation/NotationEditor';
 import './music-review.css';
+import './notation/notation.css';
 
 type EditNote = {id: string; onset: number; duration: number | null; pitch: number; optional: boolean;
   velocity: number | null; confidence: number | null; string: number | null; fret: number | null};
 const OPEN_STRING: Record<number, number> = {1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40};
 const PAGE = 50;
+
+function editNotesFrom(events: {id: string; onset: number; duration: number | null; pitch: number; optional: boolean;
+  velocity: number | null; confidence: number | null; string: number | null; fret: number | null}[]): EditNote[] {
+  return events.map(event => ({id: event.id, onset: event.onset, pitch: event.pitch, duration: event.duration,
+    optional: event.optional, velocity: event.velocity, confidence: event.confidence, string: event.string, fret: event.fret}));
+}
 
 /** Explicit owner editing of a reviewed lesson; saving creates a new revision but does not release it. */
 export function MusicLessonEditor({lessonId, onBack, onSaved}: {
@@ -18,6 +27,8 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
 }) {
   const [manifest, setManifest] = useState<MusicLessonManifest | null>(null);
   const [notes, setNotes] = useState<EditNote[]>([]);
+  const [notation, setNotation] = useState<NotationDocument | null>(null);
+  const notationRef = useRef<NotationDocument | null>(null);
   const [spans, setSpans] = useState<MusicReferenceSpan[]>([]);
   const [chords, setChords] = useState<GuitarChord[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -46,13 +57,18 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
       const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
         .map(part => part.toString(16).padStart(2, '0')).join('');
       if (digest !== parsed.value.reference.sha256) throw new Error('The reference does not match its reviewed file.');
-      const reference = parseMusicReference(JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes)));
+      const reference = parseMusicReference(JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes)), {includeNotation: true});
       if (stopped) return;
+      const score = parsed.value.subject === 'piano'
+        ? reference.notation !== undefined
+          ? parseNotationDocument(reference.notation)
+          : createNotation(reference.events, reference.duration)
+        : null;
       setManifest(parsed.value);
       setTitle(parsed.value.title);
-      setNotes(reference.events.map(event => ({id: event.id, onset: event.onset, pitch: event.pitch,
-        duration: event.duration, optional: event.optional, velocity: event.velocity, confidence: event.confidence,
-        string: event.string, fret: event.fret})));
+      notationRef.current = score;
+      setNotation(score);
+      setNotes(editNotesFrom(score ? score.performance : reference.events));
       setChords(reference.guitarChords);
       setSpans(reference.spans);
       setSections(parsed.value.section_set.sections);
@@ -66,6 +82,13 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
     setNotes(previous => previous.map((note, position) => position === index ? {...note, ...patch} : note));
   };
 
+  const updateNotation = (next: NotationDocument) => {
+    notationRef.current = next;
+    setNotation(next);
+    setNotes(editNotesFrom(next.performance));
+    changed();
+  };
+
   const save = async () => {
     if (!manifest || !confirmed || busy) return;
     if (sections[0]?.start !== 0 || sections[sections.length - 1]?.end !== manifest.duration
@@ -74,11 +97,14 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
       return;
     }
     setBusy(true); setError(''); setNotice('');
+    const score = notationRef.current;
+    const events = score ? editNotesFrom(score.performance) : notes;
     try {
       const result = await request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-revision`, 'POST', {
         base_revision_id: manifest.revision_id,
         title,
-        events: notes,
+        events,
+        notation: score ?? undefined,
         spans,
         guitar_chords: chords,
         sections,
@@ -125,52 +151,57 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
         <p className="small muted">Scoring stays disabled. Watch-only remains safe for this milestone.</p>
       </fieldset>
       <h2>Notes</h2>
-      <div className="music-review-notes">{notes.slice(page * PAGE, (page + 1) * PAGE).map((note, offset) => {
-        const index = page * PAGE + offset;
-        return <fieldset key={note.id} disabled={busy}><legend>Note {index + 1}</legend>
-          <label>Note<select aria-label={`Note ${index + 1} pitch`} value={note.pitch}
-            onChange={event => update(index, {pitch: Number(event.target.value), string: null, fret: null})}>
-            {Array.from({length: 128}, (_, pitch) => <option key={pitch} value={pitch}>{pitchName(pitch)}</option>)}
-          </select></label>
-          {manifest.subject === 'guitar' && <>
-            <label>String<select aria-label={`Note ${index + 1} string`} value={note.string ?? ''}
-              onChange={event => {
-                const string = event.target.value === '' ? null : Number(event.target.value);
-                update(index, string === null ? {string: null, fret: null}
-                  : {string, fret: note.fret ?? 0, pitch: OPEN_STRING[string] + (note.fret ?? 0)});
-              }}>
-              <option value="">Not reviewed</option>
-              {[6, 5, 4, 3, 2, 1].map(string => <option key={string} value={string}>{string} ({pitchName(OPEN_STRING[string])})</option>)}
-            </select></label>
-            <label>Fret<input aria-label={`Note ${index + 1} fret`} type="number" min={0} max={12}
-              value={note.fret ?? ''} disabled={note.string === null}
-              onChange={event => {
-                if (note.string === null) return;
-                const fret = Math.max(0, Math.min(12, Number(event.target.value) || 0));
-                update(index, {fret, pitch: OPEN_STRING[note.string] + fret});
-              }}/></label>
-          </>}
-          <label>Start (seconds)<input aria-label={`Note ${index + 1} start`} type="number" min={0} max={manifest.duration}
-            step="any" value={note.onset} onChange={event => update(index, {onset: Number(event.target.value)})}/></label>
-          <label>Length (seconds)<input aria-label={`Note ${index + 1} length`} type="number" min={0.001} max={manifest.duration}
-            step="any" value={note.duration ?? ''} onChange={event => update(index, {duration: event.target.value === '' ? null : Number(event.target.value)})}/></label>
-          <label className="review-checkbox"><input type="checkbox" checked={note.optional}
-            onChange={event => update(index, {optional: event.target.checked})}/>Optional</label>
-          <VelocityInput label={`Note ${index + 1} intensity`} value={note.velocity} disabled={busy}
-            onChange={velocity => update(index, {velocity})}/>
-          <button type="button" onClick={() => { changed(); setNotes(previous => previous.filter((_, position) => position !== index)); }}>
-            <Trash2 size={14}/>Remove note {index + 1}</button>
-        </fieldset>;
-      })}</div>
-      <div className="music-review-actions">
-        <button type="button" disabled={busy || page === 0} onClick={() => setPage(value => value - 1)}>Previous notes</button>
-        <span>Page {page + 1} of {Math.max(1, Math.ceil(notes.length / PAGE))}</span>
-        <button type="button" disabled={busy || (page + 1) * PAGE >= notes.length} onClick={() => setPage(value => value + 1)}>Next notes</button>
-        <button type="button" disabled={busy || notes.length >= 20000}
-          onClick={() => { changed(); setNotes(previous => [...previous, {id: crypto.randomUUID(), onset: 0,
-            duration: Math.min(0.25, manifest.duration), pitch: 60, optional: false, velocity: null, confidence: null,
-            string: null, fret: null}]); }}><Plus size={14}/>Add note</button>
-      </div>
+      {manifest.subject === 'piano'
+        ? notation
+          ? <NotationEditor title={title} document={notation} onChange={updateNotation} disabled={busy}
+              sourceVideoUrl={manifest.source_video ? assetUrl(manifest.source_video.key) : undefined}/>
+          : <p role="status">Preparing the notation from the reviewed performance…</p>
+        : <>
+          <div className="music-review-notes">{notes.slice(page * PAGE, (page + 1) * PAGE).map((note, offset) => {
+            const index = page * PAGE + offset;
+            return <fieldset key={note.id} disabled={busy}><legend>Note {index + 1}</legend>
+              <label>Note<select aria-label={`Note ${index + 1} pitch`} value={note.pitch}
+                onChange={event => update(index, {pitch: Number(event.target.value), string: null, fret: null})}>
+                {Array.from({length: 128}, (_, pitch) => <option key={pitch} value={pitch}>{pitchName(pitch)}</option>)}
+              </select></label>
+              <label>String<select aria-label={`Note ${index + 1} string`} value={note.string ?? ''}
+                onChange={event => {
+                  const string = event.target.value === '' ? null : Number(event.target.value);
+                  update(index, string === null ? {string: null, fret: null}
+                    : {string, fret: note.fret ?? 0, pitch: OPEN_STRING[string] + (note.fret ?? 0)});
+                }}>
+                <option value="">Not reviewed</option>
+                {[6, 5, 4, 3, 2, 1].map(string => <option key={string} value={string}>{string} ({pitchName(OPEN_STRING[string])})</option>)}
+              </select></label>
+              <label>Fret<input aria-label={`Note ${index + 1} fret`} type="number" min={0} max={12}
+                value={note.fret ?? ''} disabled={note.string === null}
+                onChange={event => {
+                  if (note.string === null) return;
+                  const fret = Math.max(0, Math.min(12, Number(event.target.value) || 0));
+                  update(index, {fret, pitch: OPEN_STRING[note.string] + fret});
+                }}/></label>
+              <label>Start (seconds)<input aria-label={`Note ${index + 1} start`} type="number" min={0} max={manifest.duration}
+                step="any" value={note.onset} onChange={event => update(index, {onset: Number(event.target.value)})}/></label>
+              <label>Length (seconds)<input aria-label={`Note ${index + 1} length`} type="number" min={0.001} max={manifest.duration}
+                step="any" value={note.duration ?? ''} onChange={event => update(index, {duration: event.target.value === '' ? null : Number(event.target.value)})}/></label>
+              <label className="review-checkbox"><input type="checkbox" checked={note.optional}
+                onChange={event => update(index, {optional: event.target.checked})}/>Optional</label>
+              <VelocityInput label={`Note ${index + 1} intensity`} value={note.velocity} disabled={busy}
+                onChange={velocity => update(index, {velocity})}/>
+              <button type="button" onClick={() => { changed(); setNotes(previous => previous.filter((_, position) => position !== index)); }}>
+                <Trash2 size={14}/>Remove note {index + 1}</button>
+            </fieldset>;
+          })}</div>
+          <div className="music-review-actions">
+            <button type="button" disabled={busy || page === 0} onClick={() => setPage(value => value - 1)}>Previous notes</button>
+            <span>Page {page + 1} of {Math.max(1, Math.ceil(notes.length / PAGE))}</span>
+            <button type="button" disabled={busy || (page + 1) * PAGE >= notes.length} onClick={() => setPage(value => value + 1)}>Next notes</button>
+            <button type="button" disabled={busy || notes.length >= 20000}
+              onClick={() => { changed(); setNotes(previous => [...previous, {id: crypto.randomUUID(), onset: 0,
+                duration: Math.min(0.25, manifest.duration), pitch: 60, optional: false, velocity: null, confidence: null,
+                string: null, fret: null}]); }}><Plus size={14}/>Add note</button>
+          </div>
+        </>}
       <h2>Assessable passages</h2>
       <p className="small muted">Only <strong>playing</strong> passages produce learner corrections. Explanation passages
         are ignored by feedback and timing comparison.</p>

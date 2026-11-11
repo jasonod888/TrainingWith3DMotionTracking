@@ -1,0 +1,4628 @@
+{
+  "notation_version": 1,
+  "subject": "piano",
+  "duration": 12,
+  "ppq": 480,
+  "tempo": {
+    "bpm": 120,
+    "beat_unit": 4,
+    "mode": "notation",
+    "source": "instructor"
+  },
+  "time_signature": {
+    "numerator": 4,
+    "denominator": 4
+  },
+  "key_signature": "C",
+  "staff_split_pitch": 60,
+  "measures": [
+    {
+      "id": "measure-1",
+      "index": 0,
+      "start": 0,
+      "duration": 1920
+    },
+    {
+      "id": "measure-2",
+      "index": 1,
+      "start": 1920,
+      "duration": 1920
+    },
+    {
+      "id": "measure-3",
+      "index": 2,
+      "start": 3840,
+      "duration": 1920
+    },
+    {
+      "id": "measure-4",
+      "index": 3,
+      "start": 5760,
+      "duration": 1920
+    },
+    {
+      "id": "measure-5",
+      "index": 4,
+      "start": 7680,
+      "duration": 1920
+    },
+    {
+      "id": "measure-6",
+      "index": 5,
+      "start": 9600,
+      "duration": 1920
+    }
+  ],
+  "events": [
+    {
+      "id": "ev-bass-1-360-36-bp-1",
+      "staff": "bass",
+      "voice": 1,
+      "start": 360,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-1",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-1"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-840-37-bp-2",
+      "staff": "bass",
+      "voice": 1,
+      "start": 840,
+      "duration": 1440,
+      "notes": [
+        {
+          "id": "n-bp-2",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-2"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-840-0-bp-3",
+      "staff": "treble",
+      "voice": 1,
+      "start": 840,
+      "duration": 1080,
+      "notes": [
+        {
+          "id": "n-bp-3",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-3"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-1320-1-bp-4",
+      "staff": "treble",
+      "voice": 2,
+      "start": 1320,
+      "duration": 1080,
+      "notes": [
+        {
+          "id": "n-bp-4",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-4"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-1920-2-bp-5",
+      "staff": "treble",
+      "voice": 1,
+      "start": 1920,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-5",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-5"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-2400-3-bp-6",
+      "staff": "treble",
+      "voice": 1,
+      "start": 2400,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-6",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-6"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-2400-4-bp-7",
+      "staff": "treble",
+      "voice": 2,
+      "start": 2400,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-7",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-7"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-2640-5-bp-8",
+      "staff": "treble",
+      "voice": 2,
+      "start": 2640,
+      "duration": 600,
+      "notes": [
+        {
+          "id": "n-bp-8",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-8"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-2880-6-bp-9",
+      "staff": "treble",
+      "voice": 1,
+      "start": 2880,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-9",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-9"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-3120-7-bp-10",
+      "staff": "treble",
+      "voice": 1,
+      "start": 3120,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-10",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-10"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-3240-8-bp-11",
+      "staff": "treble",
+      "voice": 2,
+      "start": 3240,
+      "duration": 960,
+      "notes": [
+        {
+          "id": "n-bp-11",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-11"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-3600-9-bp-12",
+      "staff": "treble",
+      "voice": 1,
+      "start": 3600,
+      "duration": 360,
+      "notes": [
+        {
+          "id": "n-bp-12",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-12"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-3960-10-bp-13",
+      "staff": "treble",
+      "voice": 1,
+      "start": 3960,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-13",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-13"
+          ]
+        },
+        {
+          "id": "n-bp-14",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-14"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-4200-11-bp-15",
+      "staff": "treble",
+      "voice": 2,
+      "start": 4200,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-15",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-15"
+          ]
+        },
+        {
+          "id": "n-bp-16",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-16"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-4440-12-bp-18",
+      "staff": "treble",
+      "voice": 1,
+      "start": 4440,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-18",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-18"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-4440-13-bp-17",
+      "staff": "treble",
+      "voice": 2,
+      "start": 4440,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-17",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-17"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-4680-14-bp-19",
+      "staff": "treble",
+      "voice": 2,
+      "start": 4680,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-20",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-20"
+          ]
+        },
+        {
+          "id": "n-bp-19",
+          "pitch": 76,
+          "spelling": "E5",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-19"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-4920-15-bp-21",
+      "staff": "treble",
+      "voice": 1,
+      "start": 4920,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-21",
+          "pitch": 75,
+          "spelling": "D#5",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-21"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-5160-16-bp-22",
+      "staff": "treble",
+      "voice": 1,
+      "start": 5160,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-22",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-22"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-5400-17-bp-23",
+      "staff": "treble",
+      "voice": 1,
+      "start": 5400,
+      "duration": 360,
+      "notes": [
+        {
+          "id": "n-bp-23",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-23"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-5520-18-bp-24",
+      "staff": "treble",
+      "voice": 2,
+      "start": 5520,
+      "duration": 120,
+      "notes": [
+        {
+          "id": "n-bp-24",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-24"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-5640-19-bp-25",
+      "staff": "treble",
+      "voice": 2,
+      "start": 5640,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-25",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-25"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-5880-20-bp-26",
+      "staff": "treble",
+      "voice": 1,
+      "start": 5880,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-26",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-26"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-6120-21-bp-27",
+      "staff": "treble",
+      "voice": 1,
+      "start": 6120,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-27",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-27"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-6360-22-bp-28",
+      "staff": "treble",
+      "voice": 1,
+      "start": 6360,
+      "duration": 360,
+      "notes": [
+        {
+          "id": "n-bp-28",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-28"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-6600-23-bp-29",
+      "staff": "treble",
+      "voice": 2,
+      "start": 6600,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-29",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-29"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-6840-24-bp-30",
+      "staff": "treble",
+      "voice": 1,
+      "start": 6840,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-30",
+          "pitch": 64,
+          "spelling": "E4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-30"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-7080-25-bp-31",
+      "staff": "treble",
+      "voice": 2,
+      "start": 7080,
+      "duration": 600,
+      "notes": [
+        {
+          "id": "n-bp-31",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-31"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-7320-38-bp-32",
+      "staff": "bass",
+      "voice": 1,
+      "start": 7320,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-32",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-32"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-7560-39-bp-33",
+      "staff": "bass",
+      "voice": 1,
+      "start": 7560,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-33",
+          "pitch": 51,
+          "spelling": "D#3",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-33"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-2-7800-40-bp-34",
+      "staff": "bass",
+      "voice": 2,
+      "start": 7800,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-34",
+          "pitch": 49,
+          "spelling": "C#3",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-34"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-8040-41-bp-35",
+      "staff": "bass",
+      "voice": 1,
+      "start": 8040,
+      "duration": 360,
+      "notes": [
+        {
+          "id": "n-bp-35",
+          "pitch": 51,
+          "spelling": "D#3",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-35"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-2-8280-42-bp-36",
+      "staff": "bass",
+      "voice": 2,
+      "start": 8280,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-36",
+          "pitch": 54,
+          "spelling": "F#3",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-36"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-8520-43-bp-37",
+      "staff": "bass",
+      "voice": 1,
+      "start": 8520,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-37",
+          "pitch": 47,
+          "spelling": "B2",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-37"
+          ]
+        },
+        {
+          "id": "n-bp-39",
+          "pitch": 59,
+          "spelling": "B3",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-39"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-2-8520-44-bp-38",
+      "staff": "bass",
+      "voice": 2,
+      "start": 8520,
+      "duration": 120,
+      "notes": [
+        {
+          "id": "n-bp-38",
+          "pitch": 54,
+          "spelling": "F#3",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-38"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-8760-45-bp-40",
+      "staff": "bass",
+      "voice": 1,
+      "start": 8760,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-40",
+          "pitch": 51,
+          "spelling": "D#3",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-40"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-2-8760-46-bp-41",
+      "staff": "bass",
+      "voice": 2,
+      "start": 8760,
+      "duration": 120,
+      "notes": [
+        {
+          "id": "n-bp-41",
+          "pitch": 47,
+          "spelling": "B2",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-41"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-9000-47-bp-42",
+      "staff": "bass",
+      "voice": 1,
+      "start": 9000,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-42",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-42"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-9240-26-bp-43",
+      "staff": "treble",
+      "voice": 1,
+      "start": 9240,
+      "duration": 120,
+      "notes": [
+        {
+          "id": "n-bp-43",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-43"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-9360-27-bp-44",
+      "staff": "treble",
+      "voice": 1,
+      "start": 9360,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-44",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-44"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-9480-48-bp-45",
+      "staff": "bass",
+      "voice": 1,
+      "start": 9480,
+      "duration": 720,
+      "notes": [
+        {
+          "id": "n-bp-45",
+          "pitch": 40,
+          "spelling": "E2",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-45"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-2-9480-49-bp-46",
+      "staff": "bass",
+      "voice": 2,
+      "start": 9480,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-46",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-46"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-9600-28-bp-47",
+      "staff": "treble",
+      "voice": 2,
+      "start": 9600,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-47",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-47"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-9840-29-bp-48",
+      "staff": "treble",
+      "voice": 1,
+      "start": 9840,
+      "duration": 840,
+      "notes": [
+        {
+          "id": "n-bp-48",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-48"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-2-9960-50-bp-49",
+      "staff": "bass",
+      "voice": 2,
+      "start": 9960,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-49",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-49"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-10080-30-bp-50",
+      "staff": "treble",
+      "voice": 2,
+      "start": 10080,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-50",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-50"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-10320-51-bp-51",
+      "staff": "bass",
+      "voice": 1,
+      "start": 10320,
+      "duration": 600,
+      "notes": [
+        {
+          "id": "n-bp-51",
+          "pitch": 54,
+          "spelling": "F#3",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-51"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-10320-31-bp-52",
+      "staff": "treble",
+      "voice": 2,
+      "start": 10320,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-52",
+          "pitch": 64,
+          "spelling": "E4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-52"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-10560-32-bp-53",
+      "staff": "treble",
+      "voice": 2,
+      "start": 10560,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-54",
+          "pitch": 63,
+          "spelling": "D#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-54"
+          ]
+        },
+        {
+          "id": "n-bp-53",
+          "pitch": 75,
+          "spelling": "D#5",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-53"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-2-10800-52-bp-56",
+      "staff": "bass",
+      "voice": 2,
+      "start": 10800,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-56",
+          "pitch": 56,
+          "spelling": "G#3",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-56"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-10800-33-bp-55",
+      "staff": "treble",
+      "voice": 1,
+      "start": 10800,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-bp-55",
+          "pitch": 64,
+          "spelling": "E4",
+          "accidental": "natural",
+          "performance_ids": [
+            "bp-55"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-11040-53-bp-57",
+      "staff": "bass",
+      "voice": 1,
+      "start": 11040,
+      "duration": 360,
+      "notes": [
+        {
+          "id": "n-bp-57",
+          "pitch": 56,
+          "spelling": "G#3",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-57"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-11040-34-bp-58",
+      "staff": "treble",
+      "voice": 2,
+      "start": 11040,
+      "duration": 240,
+      "notes": [
+        {
+          "id": "n-bp-58",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-58"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-11280-35-bp-59",
+      "staff": "treble",
+      "voice": 1,
+      "start": 11280,
+      "duration": 120,
+      "notes": [
+        {
+          "id": "n-bp-59",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "performance_ids": [
+            "bp-59"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    }
+  ],
+  "segments": [
+    {
+      "id": "grest:bass:1:0:360",
+      "event_id": "",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "bass",
+      "voice": 1,
+      "start": 0,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:bass:2:0:1920",
+      "event_id": "",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "bass",
+      "voice": 2,
+      "start": 0,
+      "duration": 1920,
+      "value": "whole",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:treble:1:0:720",
+      "event_id": "",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 1,
+      "start": 0,
+      "duration": 720,
+      "value": "quarter",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:treble:2:0:960",
+      "event_id": "",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 2,
+      "start": 0,
+      "duration": 960,
+      "value": "half",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-360-36-bp-1:0",
+      "event_id": "ev-bass-1-360-36-bp-1",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "bass",
+      "voice": 1,
+      "start": 360,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-1:0",
+          "logical_note_id": "n-bp-1",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:1:720:120",
+      "event_id": "",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 1,
+      "start": 720,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-840-37-bp-2:0",
+      "event_id": "ev-bass-1-840-37-bp-2",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "bass",
+      "voice": 1,
+      "start": 840,
+      "duration": 960,
+      "value": "half",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-2:0",
+          "logical_note_id": "n-bp-2",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-840-0-bp-3:0",
+      "event_id": "ev-treble-1-840-0-bp-3",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 1,
+      "start": 840,
+      "duration": 960,
+      "value": "half",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-3:0",
+          "logical_note_id": "n-bp-3",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:2:960:360",
+      "event_id": "",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 2,
+      "start": 960,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-2-1320-1-bp-4:0",
+      "event_id": "ev-treble-2-1320-1-bp-4",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 2,
+      "start": 1320,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-4:0",
+          "logical_note_id": "n-bp-4",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-4"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-1-840-37-bp-2:1",
+      "event_id": "ev-bass-1-840-37-bp-2",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "bass",
+      "voice": 1,
+      "start": 1800,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-2:1",
+          "logical_note_id": "n-bp-2",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-840-0-bp-3:1",
+      "event_id": "ev-treble-1-840-0-bp-3",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 1,
+      "start": 1800,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-3:1",
+          "logical_note_id": "n-bp-3",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-1320-1-bp-4:1",
+      "event_id": "ev-treble-2-1320-1-bp-4",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 2,
+      "start": 1800,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-4:1",
+          "logical_note_id": "n-bp-4",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": true,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-4"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-1-840-37-bp-2:2",
+      "event_id": "ev-bass-1-840-37-bp-2",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "bass",
+      "voice": 1,
+      "start": 1920,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-2:2",
+          "logical_note_id": "n-bp-2",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:2:1920:1920",
+      "event_id": "",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "bass",
+      "voice": 2,
+      "start": 1920,
+      "duration": 1920,
+      "value": "whole",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-1920-2-bp-5:0",
+      "event_id": "ev-treble-1-1920-2-bp-5",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 1,
+      "start": 1920,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-5:0",
+          "logical_note_id": "n-bp-5",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-5"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-1320-1-bp-4:2",
+      "event_id": "ev-treble-2-1320-1-bp-4",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 2,
+      "start": 1920,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-4:2",
+          "logical_note_id": "n-bp-4",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-4"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:1:2280:1440",
+      "event_id": "",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "bass",
+      "voice": 1,
+      "start": 2280,
+      "duration": 1440,
+      "value": "half",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-2400-3-bp-6:0",
+      "event_id": "ev-treble-1-2400-3-bp-6",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 1,
+      "start": 2400,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-6:0",
+          "logical_note_id": "n-bp-6",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-6"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-2400-4-bp-7:0",
+      "event_id": "ev-treble-2-2400-4-bp-7",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 2,
+      "start": 2400,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-7:0",
+          "logical_note_id": "n-bp-7",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-7"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-2640-5-bp-8:0",
+      "event_id": "ev-treble-2-2640-5-bp-8",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 2,
+      "start": 2640,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-8:0",
+          "logical_note_id": "n-bp-8",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-8"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-2880-6-bp-9:0",
+      "event_id": "ev-treble-1-2880-6-bp-9",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 1,
+      "start": 2880,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-9:0",
+          "logical_note_id": "n-bp-9",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-9"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-3120-7-bp-10:0",
+      "event_id": "ev-treble-1-3120-7-bp-10",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 1,
+      "start": 3120,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-10:0",
+          "logical_note_id": "n-bp-10",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-10"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-2640-5-bp-8:1",
+      "event_id": "ev-treble-2-2640-5-bp-8",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 2,
+      "start": 3120,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-8:1",
+          "logical_note_id": "n-bp-8",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-8"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-3240-8-bp-11:0",
+      "event_id": "ev-treble-2-3240-8-bp-11",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 2,
+      "start": 3240,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-11:0",
+          "logical_note_id": "n-bp-11",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-11"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-3600-9-bp-12:0",
+      "event_id": "ev-treble-1-3600-9-bp-12",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 1,
+      "start": 3600,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-12:0",
+          "logical_note_id": "n-bp-12",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-12"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:1:3720:120",
+      "event_id": "",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "bass",
+      "voice": 1,
+      "start": 3720,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-2-3240-8-bp-11:1",
+      "event_id": "ev-treble-2-3240-8-bp-11",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 2,
+      "start": 3720,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-11:1",
+          "logical_note_id": "n-bp-11",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-11"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:1:3840:1920",
+      "event_id": "",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "bass",
+      "voice": 1,
+      "start": 3840,
+      "duration": 1920,
+      "value": "whole",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:bass:2:3840:1920",
+      "event_id": "",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "bass",
+      "voice": 2,
+      "start": 3840,
+      "duration": 1920,
+      "value": "whole",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-3600-9-bp-12:1",
+      "event_id": "ev-treble-1-3600-9-bp-12",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 1,
+      "start": 3840,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-12:1",
+          "logical_note_id": "n-bp-12",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-12"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-3240-8-bp-11:2",
+      "event_id": "ev-treble-2-3240-8-bp-11",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 2,
+      "start": 3840,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-11:2",
+          "logical_note_id": "n-bp-11",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-11"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-3960-10-bp-13:0",
+      "event_id": "ev-treble-1-3960-10-bp-13",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 1,
+      "start": 3960,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-13:0",
+          "logical_note_id": "n-bp-13",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-13"
+          ]
+        },
+        {
+          "id": "n-bp-14:0",
+          "logical_note_id": "n-bp-14",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-14"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-4200-11-bp-15:0",
+      "event_id": "ev-treble-2-4200-11-bp-15",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 2,
+      "start": 4200,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-15:0",
+          "logical_note_id": "n-bp-15",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-15"
+          ]
+        },
+        {
+          "id": "n-bp-16:0",
+          "logical_note_id": "n-bp-16",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-16"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-4440-12-bp-18:0",
+      "event_id": "ev-treble-1-4440-12-bp-18",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 1,
+      "start": 4440,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-18:0",
+          "logical_note_id": "n-bp-18",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-18"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-4440-13-bp-17:0",
+      "event_id": "ev-treble-2-4440-13-bp-17",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 2,
+      "start": 4440,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-17:0",
+          "logical_note_id": "n-bp-17",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-17"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-4680-14-bp-19:0",
+      "event_id": "ev-treble-2-4680-14-bp-19",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 2,
+      "start": 4680,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-20:0",
+          "logical_note_id": "n-bp-20",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-20"
+          ]
+        },
+        {
+          "id": "n-bp-19:0",
+          "logical_note_id": "n-bp-19",
+          "pitch": 76,
+          "spelling": "E5",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-19"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-4920-15-bp-21:0",
+      "event_id": "ev-treble-1-4920-15-bp-21",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 1,
+      "start": 4920,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-21:0",
+          "logical_note_id": "n-bp-21",
+          "pitch": 75,
+          "spelling": "D#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-21"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:2:4920:480",
+      "event_id": "",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 2,
+      "start": 4920,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-5160-16-bp-22:0",
+      "event_id": "ev-treble-1-5160-16-bp-22",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 1,
+      "start": 5160,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-22:0",
+          "logical_note_id": "n-bp-22",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-22"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-5400-17-bp-23:0",
+      "event_id": "ev-treble-1-5400-17-bp-23",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 1,
+      "start": 5400,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-23:0",
+          "logical_note_id": "n-bp-23",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-23"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:2:5400:120",
+      "event_id": "",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 2,
+      "start": 5400,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-2-5520-18-bp-24:0",
+      "event_id": "ev-treble-2-5520-18-bp-24",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 2,
+      "start": 5520,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-24:0",
+          "logical_note_id": "n-bp-24",
+          "pitch": 73,
+          "spelling": "C#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-5640-19-bp-25:0",
+      "event_id": "ev-treble-2-5640-19-bp-25",
+      "measure_id": "measure-3",
+      "measure_index": 2,
+      "staff": "treble",
+      "voice": 2,
+      "start": 5640,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-25:0",
+          "logical_note_id": "n-bp-25",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-25"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:1:5760:1440",
+      "event_id": "",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "bass",
+      "voice": 1,
+      "start": 5760,
+      "duration": 1440,
+      "value": "half",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:bass:2:5760:1920",
+      "event_id": "",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "bass",
+      "voice": 2,
+      "start": 5760,
+      "duration": 1920,
+      "value": "whole",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:treble:1:5760:120",
+      "event_id": "",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 1,
+      "start": 5760,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-2-5640-19-bp-25:1",
+      "event_id": "ev-treble-2-5640-19-bp-25",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 2,
+      "start": 5760,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-25:1",
+          "logical_note_id": "n-bp-25",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-25"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-5880-20-bp-26:0",
+      "event_id": "ev-treble-1-5880-20-bp-26",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 1,
+      "start": 5880,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-26:0",
+          "logical_note_id": "n-bp-26",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-26"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:2:5880:720",
+      "event_id": "",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 2,
+      "start": 5880,
+      "duration": 720,
+      "value": "quarter",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-6120-21-bp-27:0",
+      "event_id": "ev-treble-1-6120-21-bp-27",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 1,
+      "start": 6120,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-27:0",
+          "logical_note_id": "n-bp-27",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-27"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-6360-22-bp-28:0",
+      "event_id": "ev-treble-1-6360-22-bp-28",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 1,
+      "start": 6360,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-28:0",
+          "logical_note_id": "n-bp-28",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-28"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-6600-23-bp-29:0",
+      "event_id": "ev-treble-2-6600-23-bp-29",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 2,
+      "start": 6600,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-29:0",
+          "logical_note_id": "n-bp-29",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-29"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:1:6720:120",
+      "event_id": "",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 1,
+      "start": 6720,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-6840-24-bp-30:0",
+      "event_id": "ev-treble-1-6840-24-bp-30",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 1,
+      "start": 6840,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-30:0",
+          "logical_note_id": "n-bp-30",
+          "pitch": 64,
+          "spelling": "E4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-30"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:2:6840:240",
+      "event_id": "",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 2,
+      "start": 6840,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-2-7080-25-bp-31:0",
+      "event_id": "ev-treble-2-7080-25-bp-31",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 2,
+      "start": 7080,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-31:0",
+          "logical_note_id": "n-bp-31",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-31"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:1:7200:120",
+      "event_id": "",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "bass",
+      "voice": 1,
+      "start": 7200,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-7320-38-bp-32:0",
+      "event_id": "ev-bass-1-7320-38-bp-32",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "bass",
+      "voice": 1,
+      "start": 7320,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-32:0",
+          "logical_note_id": "n-bp-32",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-32"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:1:7320:360",
+      "event_id": "",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 1,
+      "start": 7320,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-7560-39-bp-33:0",
+      "event_id": "ev-bass-1-7560-39-bp-33",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "bass",
+      "voice": 1,
+      "start": 7560,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-33:0",
+          "logical_note_id": "n-bp-33",
+          "pitch": 51,
+          "spelling": "D#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-33"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-7080-25-bp-31:1",
+      "event_id": "ev-treble-2-7080-25-bp-31",
+      "measure_id": "measure-4",
+      "measure_index": 3,
+      "staff": "treble",
+      "voice": 2,
+      "start": 7560,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-31:1",
+          "logical_note_id": "n-bp-31",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-31"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-1-7560-39-bp-33:1",
+      "event_id": "ev-bass-1-7560-39-bp-33",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 1,
+      "start": 7680,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-33:1",
+          "logical_note_id": "n-bp-33",
+          "pitch": 51,
+          "spelling": "D#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-33"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:2:7680:120",
+      "event_id": "",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 2,
+      "start": 7680,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:treble:1:7680:1440",
+      "event_id": "",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "treble",
+      "voice": 1,
+      "start": 7680,
+      "duration": 1440,
+      "value": "half",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:treble:2:7680:1920",
+      "event_id": "",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "treble",
+      "voice": 2,
+      "start": 7680,
+      "duration": 1920,
+      "value": "whole",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-2-7800-40-bp-34:0",
+      "event_id": "ev-bass-2-7800-40-bp-34",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 2,
+      "start": 7800,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-34:0",
+          "logical_note_id": "n-bp-34",
+          "pitch": 49,
+          "spelling": "C#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-34"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-1-8040-41-bp-35:0",
+      "event_id": "ev-bass-1-8040-41-bp-35",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 1,
+      "start": 8040,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-35:0",
+          "logical_note_id": "n-bp-35",
+          "pitch": 51,
+          "spelling": "D#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-35"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-2-8280-42-bp-36:0",
+      "event_id": "ev-bass-2-8280-42-bp-36",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 2,
+      "start": 8280,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-36:0",
+          "logical_note_id": "n-bp-36",
+          "pitch": 54,
+          "spelling": "F#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-36"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:1:8400:120",
+      "event_id": "",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 1,
+      "start": 8400,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-8520-43-bp-37:0",
+      "event_id": "ev-bass-1-8520-43-bp-37",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 1,
+      "start": 8520,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-37:0",
+          "logical_note_id": "n-bp-37",
+          "pitch": 47,
+          "spelling": "B2",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-37"
+          ]
+        },
+        {
+          "id": "n-bp-39:0",
+          "logical_note_id": "n-bp-39",
+          "pitch": 59,
+          "spelling": "B3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-39"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-2-8520-44-bp-38:0",
+      "event_id": "ev-bass-2-8520-44-bp-38",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 2,
+      "start": 8520,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-38:0",
+          "logical_note_id": "n-bp-38",
+          "pitch": 54,
+          "spelling": "F#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-38"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:2:8640:120",
+      "event_id": "",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 2,
+      "start": 8640,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-8760-45-bp-40:0",
+      "event_id": "ev-bass-1-8760-45-bp-40",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 1,
+      "start": 8760,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-40:0",
+          "logical_note_id": "n-bp-40",
+          "pitch": 51,
+          "spelling": "D#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-40"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-2-8760-46-bp-41:0",
+      "event_id": "ev-bass-2-8760-46-bp-41",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 2,
+      "start": 8760,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-41:0",
+          "logical_note_id": "n-bp-41",
+          "pitch": 47,
+          "spelling": "B2",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-41"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:2:8880:480",
+      "event_id": "",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 2,
+      "start": 8880,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-9000-47-bp-42:0",
+      "event_id": "ev-bass-1-9000-47-bp-42",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 1,
+      "start": 9000,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-42:0",
+          "logical_note_id": "n-bp-42",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-42"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:1:9120:120",
+      "event_id": "",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "treble",
+      "voice": 1,
+      "start": 9120,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-9240-26-bp-43:0",
+      "event_id": "ev-treble-1-9240-26-bp-43",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "treble",
+      "voice": 1,
+      "start": 9240,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-43:0",
+          "logical_note_id": "n-bp-43",
+          "pitch": 69,
+          "spelling": "A4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-43"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:2:9360:120",
+      "event_id": "",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 2,
+      "start": 9360,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-9360-27-bp-44:0",
+      "event_id": "ev-treble-1-9360-27-bp-44",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "treble",
+      "voice": 1,
+      "start": 9360,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-44:0",
+          "logical_note_id": "n-bp-44",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-44"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-1-9480-48-bp-45:0",
+      "event_id": "ev-bass-1-9480-48-bp-45",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 1,
+      "start": 9480,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-45:0",
+          "logical_note_id": "n-bp-45",
+          "pitch": 40,
+          "spelling": "E2",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-45"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-2-9480-49-bp-46:0",
+      "event_id": "ev-bass-2-9480-49-bp-46",
+      "measure_id": "measure-5",
+      "measure_index": 4,
+      "staff": "bass",
+      "voice": 2,
+      "start": 9480,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-46:0",
+          "logical_note_id": "n-bp-46",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-46"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-1-9480-48-bp-45:1",
+      "event_id": "ev-bass-1-9480-48-bp-45",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 1,
+      "start": 9600,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-45:1",
+          "logical_note_id": "n-bp-45",
+          "pitch": 40,
+          "spelling": "E2",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-45"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-2-9480-49-bp-46:1",
+      "event_id": "ev-bass-2-9480-49-bp-46",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 2,
+      "start": 9600,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-46:1",
+          "logical_note_id": "n-bp-46",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-46"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-9360-27-bp-44:1",
+      "event_id": "ev-treble-1-9360-27-bp-44",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 1,
+      "start": 9600,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-44:1",
+          "logical_note_id": "n-bp-44",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-44"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-9600-28-bp-47:0",
+      "event_id": "ev-treble-2-9600-28-bp-47",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 2,
+      "start": 9600,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-47:0",
+          "logical_note_id": "n-bp-47",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-47"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:2:9720:240",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 2,
+      "start": 9720,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-9840-29-bp-48:0",
+      "event_id": "ev-treble-1-9840-29-bp-48",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 1,
+      "start": 9840,
+      "duration": 720,
+      "value": "quarter",
+      "dotted": true,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-48:0",
+          "logical_note_id": "n-bp-48",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-48"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-2-9960-50-bp-49:0",
+      "event_id": "ev-bass-2-9960-50-bp-49",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 2,
+      "start": 9960,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-49:0",
+          "logical_note_id": "n-bp-49",
+          "pitch": 52,
+          "spelling": "E3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-49"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-1-9480-48-bp-45:2",
+      "event_id": "ev-bass-1-9480-48-bp-45",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 1,
+      "start": 10080,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-45:2",
+          "logical_note_id": "n-bp-45",
+          "pitch": 40,
+          "spelling": "E2",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-45"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-10080-30-bp-50:0",
+      "event_id": "ev-treble-2-10080-30-bp-50",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 2,
+      "start": 10080,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-50:0",
+          "logical_note_id": "n-bp-50",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-50"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:1:10200:120",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 1,
+      "start": 10200,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-10320-51-bp-51:0",
+      "event_id": "ev-bass-1-10320-51-bp-51",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 1,
+      "start": 10320,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-51:0",
+          "logical_note_id": "n-bp-51",
+          "pitch": 54,
+          "spelling": "F#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "bp-51"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-10320-31-bp-52:0",
+      "event_id": "ev-treble-2-10320-31-bp-52",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 2,
+      "start": 10320,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-52:0",
+          "logical_note_id": "n-bp-52",
+          "pitch": 64,
+          "spelling": "E4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-52"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:2:10440:360",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 2,
+      "start": 10440,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-9840-29-bp-48:1",
+      "event_id": "ev-treble-1-9840-29-bp-48",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 1,
+      "start": 10560,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-48:1",
+          "logical_note_id": "n-bp-48",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-48"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-10560-32-bp-53:0",
+      "event_id": "ev-treble-2-10560-32-bp-53",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 2,
+      "start": 10560,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-54:0",
+          "logical_note_id": "n-bp-54",
+          "pitch": 63,
+          "spelling": "D#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-54"
+          ]
+        },
+        {
+          "id": "n-bp-53:0",
+          "logical_note_id": "n-bp-53",
+          "pitch": 75,
+          "spelling": "D#5",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-53"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:1:10680:120",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 1,
+      "start": 10680,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-10320-51-bp-51:1",
+      "event_id": "ev-bass-1-10320-51-bp-51",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 1,
+      "start": 10800,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-51:1",
+          "logical_note_id": "n-bp-51",
+          "pitch": 54,
+          "spelling": "F#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-51"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-2-10800-52-bp-56:0",
+      "event_id": "ev-bass-2-10800-52-bp-56",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 2,
+      "start": 10800,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-56:0",
+          "logical_note_id": "n-bp-56",
+          "pitch": 56,
+          "spelling": "G#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-56"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-10800-33-bp-55:0",
+      "event_id": "ev-treble-1-10800-33-bp-55",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 1,
+      "start": 10800,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-55:0",
+          "logical_note_id": "n-bp-55",
+          "pitch": 64,
+          "spelling": "E4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-55"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:2:10800:240",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 2,
+      "start": 10800,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:bass:1:10920:120",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 1,
+      "start": 10920,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-bass-1-11040-53-bp-57:0",
+      "event_id": "ev-bass-1-11040-53-bp-57",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 1,
+      "start": 11040,
+      "duration": 360,
+      "value": "eighth",
+      "dotted": true,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-57:0",
+          "logical_note_id": "n-bp-57",
+          "pitch": 56,
+          "spelling": "G#3",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-57"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:bass:2:11040:480",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 2,
+      "start": 11040,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-2-11040-34-bp-58:0",
+      "event_id": "ev-treble-2-11040-34-bp-58",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 2,
+      "start": 11040,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-58:0",
+          "logical_note_id": "n-bp-58",
+          "pitch": 68,
+          "spelling": "G#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-58"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-11280-35-bp-59:0",
+      "event_id": "ev-treble-1-11280-35-bp-59",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 1,
+      "start": 11280,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bp-59:0",
+          "logical_note_id": "n-bp-59",
+          "pitch": 66,
+          "spelling": "F#4",
+          "accidental": "sharp",
+          "display_accidental": true,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bp-59"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:2:11280:240",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 2,
+      "start": 11280,
+      "duration": 240,
+      "value": "eighth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:bass:1:11400:120",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "bass",
+      "voice": 1,
+      "start": 11400,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:treble:1:11400:120",
+      "event_id": "",
+      "measure_id": "measure-6",
+      "measure_index": 5,
+      "staff": "treble",
+      "voice": 1,
+      "start": 11400,
+      "duration": 120,
+      "value": "sixteenth",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    }
+  ],
+  "ties": [
+    {
+      "id": "tie:n-bp-2:0:n-bp-2:1",
+      "from_segment_note_id": "n-bp-2:0",
+      "to_segment_note_id": "n-bp-2:1",
+      "pitch": 52
+    },
+    {
+      "id": "tie:n-bp-2:1:n-bp-2:2",
+      "from_segment_note_id": "n-bp-2:1",
+      "to_segment_note_id": "n-bp-2:2",
+      "pitch": 52
+    },
+    {
+      "id": "tie:n-bp-3:0:n-bp-3:1",
+      "from_segment_note_id": "n-bp-3:0",
+      "to_segment_note_id": "n-bp-3:1",
+      "pitch": 71
+    },
+    {
+      "id": "tie:n-bp-4:0:n-bp-4:1",
+      "from_segment_note_id": "n-bp-4:0",
+      "to_segment_note_id": "n-bp-4:1",
+      "pitch": 73
+    },
+    {
+      "id": "tie:n-bp-4:1:n-bp-4:2",
+      "from_segment_note_id": "n-bp-4:1",
+      "to_segment_note_id": "n-bp-4:2",
+      "pitch": 73
+    },
+    {
+      "id": "tie:n-bp-8:0:n-bp-8:1",
+      "from_segment_note_id": "n-bp-8:0",
+      "to_segment_note_id": "n-bp-8:1",
+      "pitch": 73
+    },
+    {
+      "id": "tie:n-bp-11:0:n-bp-11:1",
+      "from_segment_note_id": "n-bp-11:0",
+      "to_segment_note_id": "n-bp-11:1",
+      "pitch": 71
+    },
+    {
+      "id": "tie:n-bp-11:1:n-bp-11:2",
+      "from_segment_note_id": "n-bp-11:1",
+      "to_segment_note_id": "n-bp-11:2",
+      "pitch": 71
+    },
+    {
+      "id": "tie:n-bp-12:0:n-bp-12:1",
+      "from_segment_note_id": "n-bp-12:0",
+      "to_segment_note_id": "n-bp-12:1",
+      "pitch": 69
+    },
+    {
+      "id": "tie:n-bp-25:0:n-bp-25:1",
+      "from_segment_note_id": "n-bp-25:0",
+      "to_segment_note_id": "n-bp-25:1",
+      "pitch": 69
+    },
+    {
+      "id": "tie:n-bp-31:0:n-bp-31:1",
+      "from_segment_note_id": "n-bp-31:0",
+      "to_segment_note_id": "n-bp-31:1",
+      "pitch": 66
+    },
+    {
+      "id": "tie:n-bp-33:0:n-bp-33:1",
+      "from_segment_note_id": "n-bp-33:0",
+      "to_segment_note_id": "n-bp-33:1",
+      "pitch": 51
+    },
+    {
+      "id": "tie:n-bp-44:0:n-bp-44:1",
+      "from_segment_note_id": "n-bp-44:0",
+      "to_segment_note_id": "n-bp-44:1",
+      "pitch": 68
+    },
+    {
+      "id": "tie:n-bp-45:0:n-bp-45:1",
+      "from_segment_note_id": "n-bp-45:0",
+      "to_segment_note_id": "n-bp-45:1",
+      "pitch": 40
+    },
+    {
+      "id": "tie:n-bp-45:1:n-bp-45:2",
+      "from_segment_note_id": "n-bp-45:1",
+      "to_segment_note_id": "n-bp-45:2",
+      "pitch": 40
+    },
+    {
+      "id": "tie:n-bp-46:0:n-bp-46:1",
+      "from_segment_note_id": "n-bp-46:0",
+      "to_segment_note_id": "n-bp-46:1",
+      "pitch": 52
+    },
+    {
+      "id": "tie:n-bp-48:0:n-bp-48:1",
+      "from_segment_note_id": "n-bp-48:0",
+      "to_segment_note_id": "n-bp-48:1",
+      "pitch": 68
+    },
+    {
+      "id": "tie:n-bp-51:0:n-bp-51:1",
+      "from_segment_note_id": "n-bp-51:0",
+      "to_segment_note_id": "n-bp-51:1",
+      "pitch": 54
+    }
+  ],
+  "performance": [
+    {
+      "id": "bp-1",
+      "onset": 0.3367,
+      "duration": 0.5573,
+      "pitch": 52,
+      "velocity": 0.7173,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-2",
+      "onset": 0.894,
+      "duration": 1.4758,
+      "pitch": 52,
+      "velocity": 0.5399,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-3",
+      "onset": 0.894,
+      "duration": 1.0797,
+      "pitch": 71,
+      "velocity": 0.5869,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-4",
+      "onset": 1.4164,
+      "duration": 1.0462,
+      "pitch": 73,
+      "velocity": 0.5544,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-5",
+      "onset": 1.9505,
+      "duration": 0.5005,
+      "pitch": 68,
+      "velocity": 0.7472,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-6",
+      "onset": 2.451,
+      "duration": 0.743,
+      "pitch": 69,
+      "velocity": 0.5756,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-7",
+      "onset": 2.4626,
+      "duration": 0.3367,
+      "pitch": 73,
+      "velocity": 0.5816,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-8",
+      "onset": 2.7993,
+      "duration": 0.5805,
+      "pitch": 73,
+      "velocity": 0.4193,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-9",
+      "onset": 2.9386,
+      "duration": 0.4876,
+      "pitch": 71,
+      "velocity": 0.5797,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-10",
+      "onset": 3.194,
+      "duration": 0.5108,
+      "pitch": 69,
+      "velocity": 0.7171,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-11",
+      "onset": 3.4262,
+      "duration": 0.9765,
+      "pitch": 71,
+      "velocity": 0.6158,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-12",
+      "onset": 3.7049,
+      "duration": 0.4425,
+      "pitch": 69,
+      "velocity": 0.7619,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-13",
+      "onset": 4.1473,
+      "duration": 0.4296,
+      "pitch": 66,
+      "velocity": 0.5575,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-14",
+      "onset": 4.1473,
+      "duration": 0.2438,
+      "pitch": 69,
+      "velocity": 0.5719,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-15",
+      "onset": 4.3911,
+      "duration": 0.2438,
+      "pitch": 68,
+      "velocity": 0.6311,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-16",
+      "onset": 4.4027,
+      "duration": 0.2206,
+      "pitch": 71,
+      "velocity": 0.5678,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-17",
+      "onset": 4.6233,
+      "duration": 0.2554,
+      "pitch": 71,
+      "velocity": 0.7991,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-18",
+      "onset": 4.6349,
+      "duration": 0.4528,
+      "pitch": 68,
+      "velocity": 0.5344,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-19",
+      "onset": 4.8671,
+      "duration": 0.2554,
+      "pitch": 76,
+      "velocity": 0.6955,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-20",
+      "onset": 4.8788,
+      "duration": 0.2206,
+      "pitch": 71,
+      "velocity": 0.6249,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-21",
+      "onset": 5.1226,
+      "duration": 0.2322,
+      "pitch": 75,
+      "velocity": 0.5934,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-22",
+      "onset": 5.3548,
+      "duration": 0.2438,
+      "pitch": 73,
+      "velocity": 0.6486,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-23",
+      "onset": 5.587,
+      "duration": 0.3715,
+      "pitch": 71,
+      "velocity": 0.623,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-24",
+      "onset": 5.7031,
+      "duration": 0.209,
+      "pitch": 73,
+      "velocity": 0.3585,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-25",
+      "onset": 5.8308,
+      "duration": 0.2451,
+      "pitch": 69,
+      "velocity": 0.8066,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-26",
+      "onset": 6.0759,
+      "duration": 0.2554,
+      "pitch": 68,
+      "velocity": 0.7211,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-27",
+      "onset": 6.3313,
+      "duration": 0.267,
+      "pitch": 69,
+      "velocity": 0.8379,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-28",
+      "onset": 6.5983,
+      "duration": 0.418,
+      "pitch": 68,
+      "velocity": 0.5354,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-29",
+      "onset": 6.8421,
+      "duration": 0.2438,
+      "pitch": 66,
+      "velocity": 0.5434,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-30",
+      "onset": 7.0743,
+      "duration": 0.5224,
+      "pitch": 64,
+      "velocity": 0.6111,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-31",
+      "onset": 7.3297,
+      "duration": 0.6631,
+      "pitch": 66,
+      "velocity": 0.4966,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-32",
+      "onset": 7.5736,
+      "duration": 0.2554,
+      "pitch": 52,
+      "velocity": 0.5471,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-33",
+      "onset": 7.829,
+      "duration": 0.5005,
+      "pitch": 51,
+      "velocity": 0.4981,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-34",
+      "onset": 8.0625,
+      "duration": 0.5341,
+      "pitch": 49,
+      "velocity": 0.5916,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-35",
+      "onset": 8.3295,
+      "duration": 0.418,
+      "pitch": 51,
+      "velocity": 0.5783,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-36",
+      "onset": 8.5733,
+      "duration": 0.2438,
+      "pitch": 54,
+      "velocity": 0.7464,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-37",
+      "onset": 8.8171,
+      "duration": 0.2902,
+      "pitch": 47,
+      "velocity": 0.5828,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-38",
+      "onset": 8.8171,
+      "duration": 0.2322,
+      "pitch": 54,
+      "velocity": 0.5757,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-39",
+      "onset": 8.8171,
+      "duration": 0.3483,
+      "pitch": 59,
+      "velocity": 0.5487,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-40",
+      "onset": 9.0841,
+      "duration": 0.2438,
+      "pitch": 51,
+      "velocity": 0.6747,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-41",
+      "onset": 9.1074,
+      "duration": 0.1393,
+      "pitch": 47,
+      "velocity": 0.4217,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-42",
+      "onset": 9.3279,
+      "duration": 0.5224,
+      "pitch": 52,
+      "velocity": 0.5772,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-43",
+      "onset": 9.5718,
+      "duration": 0.2322,
+      "pitch": 69,
+      "velocity": 0.768,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-44",
+      "onset": 9.804,
+      "duration": 0.5005,
+      "pitch": 68,
+      "velocity": 0.5677,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-45",
+      "onset": 9.8504,
+      "duration": 0.814,
+      "pitch": 40,
+      "velocity": 0.4809,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-46",
+      "onset": 9.8504,
+      "duration": 0.2915,
+      "pitch": 52,
+      "velocity": 0.4379,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-47",
+      "onset": 10.0607,
+      "duration": 0.476,
+      "pitch": 66,
+      "velocity": 0.4972,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-48",
+      "onset": 10.3045,
+      "duration": 0.8475,
+      "pitch": 68,
+      "velocity": 0.574,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-49",
+      "onset": 10.3393,
+      "duration": 0.5457,
+      "pitch": 52,
+      "velocity": 0.4759,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-50",
+      "onset": 10.5367,
+      "duration": 0.2902,
+      "pitch": 66,
+      "velocity": 0.6088,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-51",
+      "onset": 10.8037,
+      "duration": 0.5224,
+      "pitch": 54,
+      "velocity": 0.6372,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-52",
+      "onset": 10.8037,
+      "duration": 0.2322,
+      "pitch": 64,
+      "velocity": 0.6007,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-53",
+      "onset": 11.0243,
+      "duration": 0.1625,
+      "pitch": 75,
+      "velocity": 0.2612,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-54",
+      "onset": 11.0359,
+      "duration": 0.2322,
+      "pitch": 63,
+      "velocity": 0.6427,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-55",
+      "onset": 11.2681,
+      "duration": 0.4876,
+      "pitch": 64,
+      "velocity": 0.6278,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-56",
+      "onset": 11.2797,
+      "duration": 0.267,
+      "pitch": 56,
+      "velocity": 0.6972,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-57",
+      "onset": 11.5467,
+      "duration": 0.3715,
+      "pitch": 56,
+      "velocity": 0.5285,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-58",
+      "onset": 11.5467,
+      "duration": 0.2438,
+      "pitch": 68,
+      "velocity": 0.6211,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "bp-59",
+      "onset": 11.7673,
+      "duration": 0.1509,
+      "pitch": 66,
+      "velocity": 0.6706,
+      "confidence": null,
+      "optional": false
+    }
+  ],
+  "performance_map": {
+    "bp-1": "n-bp-1",
+    "bp-2": "n-bp-2",
+    "bp-3": "n-bp-3",
+    "bp-4": "n-bp-4",
+    "bp-5": "n-bp-5",
+    "bp-6": "n-bp-6",
+    "bp-7": "n-bp-7",
+    "bp-8": "n-bp-8",
+    "bp-9": "n-bp-9",
+    "bp-10": "n-bp-10",
+    "bp-11": "n-bp-11",
+    "bp-12": "n-bp-12",
+    "bp-13": "n-bp-13",
+    "bp-14": "n-bp-14",
+    "bp-15": "n-bp-15",
+    "bp-16": "n-bp-16",
+    "bp-18": "n-bp-18",
+    "bp-17": "n-bp-17",
+    "bp-20": "n-bp-20",
+    "bp-19": "n-bp-19",
+    "bp-21": "n-bp-21",
+    "bp-22": "n-bp-22",
+    "bp-23": "n-bp-23",
+    "bp-24": "n-bp-24",
+    "bp-25": "n-bp-25",
+    "bp-26": "n-bp-26",
+    "bp-27": "n-bp-27",
+    "bp-28": "n-bp-28",
+    "bp-29": "n-bp-29",
+    "bp-30": "n-bp-30",
+    "bp-31": "n-bp-31",
+    "bp-32": "n-bp-32",
+    "bp-33": "n-bp-33",
+    "bp-34": "n-bp-34",
+    "bp-35": "n-bp-35",
+    "bp-36": "n-bp-36",
+    "bp-37": "n-bp-37",
+    "bp-39": "n-bp-39",
+    "bp-38": "n-bp-38",
+    "bp-40": "n-bp-40",
+    "bp-41": "n-bp-41",
+    "bp-42": "n-bp-42",
+    "bp-43": "n-bp-43",
+    "bp-44": "n-bp-44",
+    "bp-45": "n-bp-45",
+    "bp-46": "n-bp-46",
+    "bp-47": "n-bp-47",
+    "bp-48": "n-bp-48",
+    "bp-49": "n-bp-49",
+    "bp-50": "n-bp-50",
+    "bp-51": "n-bp-51",
+    "bp-52": "n-bp-52",
+    "bp-54": "n-bp-54",
+    "bp-53": "n-bp-53",
+    "bp-56": "n-bp-56",
+    "bp-55": "n-bp-55",
+    "bp-57": "n-bp-57",
+    "bp-58": "n-bp-58",
+    "bp-59": "n-bp-59"
+  },
+  "created_from": "saved"
+}

@@ -92,6 +92,18 @@ def load_profile(profile_path: Path, *, weights: Path, code: Path, config: Path,
         tempo=decoding.get('midi_tempo')
         if isinstance(tempo,bool) or not isinstance(tempo,(int,float)) or not math.isfinite(tempo) or not 20<=tempo<=400:
             raise ValueError('Decoding midi_tempo must be numeric.')
+        if decoding['decoding_version'] == 'basic-pitch-0.4.0/piano-peaks-v1':
+            limits = {'onset_threshold': (0, 1), 'frame_threshold': (0, 1),
+                      'minimum_note_length': (1, 1000), 'onset_prominence': (0, 1),
+                      'minimum_attack_spacing_ms': (1, 250)}
+            if data['model'] != 'basic-pitch' or data['sample_rate'] != 22050:
+                raise ValueError('Piano peak decoding requires Basic Pitch at 22050 Hz.')
+            for key, (low, high) in limits.items():
+                value = data['thresholds'].get(key)
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not low <= value <= high:
+                    raise ValueError(f'Piano decoding {key} is missing or outside its range.')
+            if decoding['infer_onsets'] or decoding['melodia_trick']:
+                raise ValueError('Piano peak decoding requires explicit onsets and no Melodia.')
     configuration = json.loads(config.read_text(encoding='utf-8'))
     expected = {key: data[key] for key in ('sample_rate', 'preprocessing', 'thresholds')}
     if 'decoding' in data: expected['decoding']=data['decoding']

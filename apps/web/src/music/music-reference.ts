@@ -27,6 +27,8 @@ export type MusicReference = {
   spans: MusicReferenceSpan[];
   guitarChords: GuitarChord[];
   review: MusicReview;
+  /** Optional saved notation document; validated by the owner editor, not the read-only guide. */
+  notation?: unknown;
 };
 
 const WHITE = new Set([0, 2, 4, 5, 7, 9, 11]);
@@ -45,7 +47,7 @@ function finite(value: unknown, name: string): number {
   return value;
 }
 
-export function parseMusicReference(value: unknown): MusicReference {
+export function parseMusicReference(value: unknown, options: {includeNotation?: boolean} = {}): MusicReference {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('The reviewed reference is not a document.');
   const document = value as Record<string, unknown>;
   if (document.reference_version !== 1) throw new Error('This reviewed reference has an unsupported version.');
@@ -138,7 +140,7 @@ export function parseMusicReference(value: unknown): MusicReference {
   else throw new Error('The reviewed reference has no review evidence.');
   if(!document.instrument||typeof document.instrument!=='object'||Array.isArray(document.instrument)||(document.instrument as Record<string,unknown>).instrument!==document.subject)throw new Error('The reference instrument does not match its subject.');
   return {reference_version: 1, subject: document.subject, instrument: {...document.instrument as Record<string, unknown>},
-    duration, events, spans, guitarChords, review};
+    duration, events, spans, guitarChords, review, notation: options.includeNotation ? document.notation : undefined};
 }
 
 export function eventDuration(event: MusicReferenceEvent): number {

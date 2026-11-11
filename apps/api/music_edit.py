@@ -6,7 +6,7 @@ keep the previously published revision until the owner explicitly updates it.
 import hashlib
 import io
 import json
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,6 +18,7 @@ from .auth import now
 from .contracts import (Asset, Contract, GuitarChord, MusicDraftDocument, MusicEvent, MusicLessonManifest,
                         MusicSpan, Section, SectionSet)
 from .database import LessonAsset, LessonRevision, MusicRevisionEdit
+from .music_notation import validate_notation
 from .music_review import ReviewAssessment, canonical
 from .permissions import accept_revision, accepted, latest_revision, owned_lesson
 from .storage import storage_client
@@ -27,6 +28,9 @@ class EditMusic(Contract):
     base_revision_id: str = Field(min_length=1, max_length=80)
     title: str = Field(min_length=1, max_length=200)
     events: list[MusicEvent] = Field(max_length=20000)
+    # Optional so existing clients and guitar references stay valid. The server
+    # validates the notation against the reviewed events and clip duration.
+    notation: dict[str, Any] | None = None
     spans: list[MusicSpan] = Field(max_length=500)
     guitar_chords: list[GuitarChord] = Field(default_factory=list, max_length=100)
     sections: list[Section] = Field(min_length=1, max_length=500)
@@ -58,6 +62,8 @@ def install_music_edit(app, settings, identity, db):
             raise HTTPException(409, 'Save the reviewed reference before editing it.')
         if body.assessment.assessment == 'notes' and (lesson.instrument or lesson.subject) != 'piano':
             raise HTTPException(422, 'MIDI note feedback is only available for piano lessons.')
+        if body.notation is not None and (lesson.instrument or lesson.subject) != 'piano':
+            raise HTTPException(422, 'Piano notation is only available for piano lessons.')
 
         store = storage_client(settings)
         source = store.get_object(Bucket=settings.storage_bucket, Key=current.manifest['reference']['key'])['Body']
@@ -79,6 +85,12 @@ def install_music_edit(app, settings, identity, db):
             sections = SectionSet(id=uuid4().hex, revision=version, duration=proposal.duration, sections=body.sections)
         except ValidationError as exc:
             raise HTTPException(422, 'Keep notes, spans and contiguous sections inside the clip.') from exc
+        notation = None
+        if body.notation is not None:
+            try:
+                notation = validate_notation(body.notation, proposal.events, proposal.duration)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
 
         reviewed_at = now()
         reference_document = {
@@ -88,6 +100,7 @@ def install_music_edit(app, settings, identity, db):
             'spans': [span.model_dump() for span in proposal.spans],
             'guitar_chords': [chord.model_dump() for chord in proposal.guitar_chords],
             'provenance': proposal.provenance.model_dump(),
+            **({'notation': notation} if notation is not None else {}),
             'review': {'reviewer_id': account.id, 'reviewed_at': reviewed_at.isoformat(),
                        'draft_id': current.id, 'source_reference_sha256': current.manifest['reference']['sha256'],
                        'edited_from_revision': current.id},

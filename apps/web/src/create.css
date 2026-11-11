@@ -1,0 +1,106 @@
+/* Reserve room for task controls; media fills the remaining space. */
+.app.feed-app.creating-move{height:var(--create-viewport-height,100dvh);min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.app.feed-app.creating-move>main{flex:1;min-height:0;align-self:stretch;margin-right:0;padding:12px 24px max(12px,env(safe-area-inset-bottom));display:flex;flex-direction:column;overflow:hidden}
+.creating-move .create-screen{flex:1;min-height:0;width:100%;max-width:1600px;margin:0 auto;padding:0;display:flex;flex-direction:column;gap:10px}
+.creating-move .create-screen>.back-link{align-self:flex-start;min-height:32px}
+.creating-move .create-heading{padding:0;flex:none}
+.creating-move .create-heading h1{font-size:clamp(24px,2.7vw,38px);line-height:1.15;letter-spacing:-1px;margin:5px 0 7px;overflow-wrap:anywhere}
+.creating-move .create-heading .eyebrow{font-size:10px;margin:0}
+.creating-move .create-heading .subtle{margin:0;font-size:12px;line-height:1.4}
+.creating-move .has-clip>.back-link,.creating-move .has-clip .create-heading .eyebrow,.creating-move .has-clip .create-heading .subtle{display:none}
+.creating-move .subject-choice{flex:none}
+.creating-move .subject-choice label{display:flex;align-items:center;gap:12px;font-size:12px}
+.creating-move .subject-choice select{min-width:0;max-width:100%;min-height:44px;padding:8px 30px 8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:16px}
+.creating-move .create-screen>p{margin:0;font-size:12px;line-height:1.4;flex:none}
+.creating-move .create-layout{flex:1;min-height:0;grid-template-columns:minmax(0,1fr) minmax(260px,330px);gap:24px}
+.creating-move .clip-editor{display:flex;flex-direction:column;gap:10px;min-height:0}
+.creating-move .upload-preview{flex:1;min-height:0;position:relative;border-radius:12px;justify-content:center}
+.creating-move .upload-preview video{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:contain}
+.creating-move .create-options{min-height:0;gap:16px;padding:20px;border:1px solid var(--line);border-radius:12px;align-self:start;background:var(--surface);max-height:100%;overflow:auto}
+.creating-move .create-options label{gap:6px}
+.creating-move .create-options .subject-choice label{flex-direction:column;align-items:stretch;gap:6px}
+.creating-move .create-options .small{line-height:1.5}
+.creating-move .create-trim-tools{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+.create-trim-heading{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
+.create-trim-heading span{color:var(--muted);font-size:11px}
+.creating-move .video-timeline{grid-column:1/-1;margin:0;padding:10px 10px 0}
+.creating-move .trim-filmstrip .timeline-track,.creating-move .trim-filmstrip .timeline-handle{height:44px}
+.creating-move .trim-filmstrip .timeline-handle.scrub-head{height:64px}
+.creating-move .trim-filmstrip-times{margin-top:12px}
+.creating-move .clip-preview-actions{margin:0;justify-content:flex-start}
+.creating-move .clip-preview-actions>span{display:none}
+.creating-move .clip-time-fields{margin:0;gap:8px}
+.creating-move .clip-time-fields label{gap:3px;font-size:10px}
+.creating-move .clip-time-fields input{padding:6px 8px;font-size:16px;min-height:44px}
+.create-footer{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid var(--line);padding-top:10px}
+.create-footer-summary{display:flex;flex-direction:column;gap:4px;font-size:12px}
+.create-footer-summary span{font-size:11px;color:var(--muted)}
+.create-submit{display:flex;align-items:center;gap:16px;position:relative}
+.create-submit>.primary{min-height:48px;min-width:200px;justify-content:center}
+.create-submit>.back-link{min-height:44px;font-size:12px}
+.create-submit progress{position:absolute;left:0;bottom:0;width:200px;height:3px;accent-color:#839c54}
+.create-panel-switch,.create-continue{display:none}
+.creating-move .upload-drop{flex:1;min-height:0;gap:12px}
+.creating-move .upload-drop h2{font-size:24px}
+.creating-move .upload-drop:focus-within{outline:2px solid #738b35;outline-offset:-4px}
+.creating-move .error-notice{max-height:76px;overflow:auto;padding:8px 12px}
+@media(max-width:760px), (max-height:500px) and (max-width:1100px){
+ .app.feed-app.creating-move>main{padding:8px max(12px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+ .creating-move .create-screen{gap:8px}
+ .creating-move .has-clip[data-panel=trim]>.subject-choice{display:none}
+ .creating-move .has-clip>.back-link,.creating-move .has-clip .create-heading .eyebrow,.creating-move .has-clip .create-heading .subtle{display:none}
+ .creating-move .create-heading h1{font-size:24px;margin:0;letter-spacing:-.7px}
+ .creating-move .subject-choice label{justify-content:space-between;gap:8px;font-size:11px}
+ .creating-move .subject-choice select{flex:1;width:0;max-width:65%;padding-left:8px}
+ .create-panel-switch{display:flex;flex:none;gap:4px;background:#edf1e5;padding:3px;border-radius:10px}
+ .create-panel-switch button{flex:1;min-height:44px;border-radius:8px;font-size:12px;color:var(--muted)}
+ .create-panel-switch button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px #15271d18}
+ .creating-move .create-layout{display:flex;flex-direction:column;gap:10px}
+ .creating-move .clip-editor{flex:1;gap:8px;min-height:0}
+ .creating-move .create-options{flex:none;align-self:stretch;padding:12px;gap:8px;max-height:none}
+ .creating-move .create-options .subject-choice select{flex:none;width:100%;max-width:100%}
+ .creating-move [data-panel=trim] .create-options,.creating-move [data-panel=details] .create-trim-tools{display:none}
+ .creating-move [data-panel=trim] .create-submit{display:none}
+ .creating-move [data-panel=trim] .create-continue{display:flex;align-items:center;justify-content:center;gap:12px;min-height:48px;min-width:140px}
+ .creating-move .create-trim-tools{gap:6px 12px}
+ .create-trim-heading{font-size:11px}
+ .creating-move .clip-preview-actions .secondary{font-size:11px;padding:8px;min-height:44px}
+ .creating-move .clip-time-fields{gap:6px}
+ .create-submit{flex:1;flex-direction:column;gap:0;align-items:stretch}
+ .create-submit>.primary{min-width:0;width:100%}
+ .create-submit>.back-link{min-height:32px;justify-content:center}
+ .create-submit progress{width:100%;bottom:32px}
+ .create-footer{gap:12px;padding-top:8px}
+ .create-footer-summary{min-width:85px;font-size:11px}
+ .create-footer-summary span{font-size:10px}
+}
+@media(max-width:499px) and (max-height:650px){
+ .creating-move [data-panel=details] .clip-editor{display:none}
+ .creating-move [data-panel=details] .create-options{flex:1;min-height:0}
+}
+@media(max-height:650px) and (min-width:761px){
+ .creating-move .has-clip>.back-link,.creating-move .has-clip .create-heading .eyebrow,.creating-move .has-clip .create-heading .subtle{display:none}
+ .creating-move .create-heading h1{font-size:24px;margin:0}
+ .creating-move .create-screen{gap:6px}
+}
+@media(max-height:500px) and (max-width:1100px) and (min-width:500px){
+ .creating-move .has-clip .create-heading{display:none}
+ .creating-move .has-clip{display:grid;grid-template-columns:minmax(0,1fr) 260px;grid-template-rows:auto minmax(0,1fr) auto;gap:8px 12px}
+ .creating-move .has-clip>.subject-choice,.creating-move .has-clip>p{grid-column:1/-1}
+ .creating-move .create-panel-switch{grid-column:2;grid-row:2;align-self:start}
+ .creating-move .create-layout{display:contents}
+ .creating-move .clip-editor{display:contents}
+ .creating-move .upload-preview{grid-column:1;grid-row:2/4}
+ .creating-move .create-trim-tools,.creating-move .create-options{grid-column:2;grid-row:2;margin-top:56px;align-self:start;max-height:calc(100% - 56px);overflow:auto}
+ .creating-move .create-trim-tools{grid-template-columns:1fr}
+ .creating-move .clip-preview-actions{display:none}
+ .creating-move .create-footer{grid-column:2;grid-row:3}
+ .creating-move .create-trim-heading{display:none}
+ .creating-move [data-panel=details] .upload-preview{display:none}
+ .creating-move [data-panel=details] .create-options{grid-column:1;grid-row:2/4;margin-top:0;max-height:100%;align-self:stretch}
+}
+
+.app.feed-app.creating-move>.header{width:100%;flex-shrink:0}
+.creating-move.create-keyboard-open [data-panel=details] .clip-editor{display:none}
+.creating-move.create-keyboard-open .has-clip .create-heading{display:none}
+.creating-move.create-keyboard-open [data-panel=details] .create-options{max-height:100%;overflow:auto}

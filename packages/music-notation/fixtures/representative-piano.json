@@ -1,0 +1,538 @@
+{
+  "notation_version": 1,
+  "subject": "piano",
+  "duration": 4,
+  "ppq": 480,
+  "tempo": {
+    "bpm": 120,
+    "beat_unit": 4,
+    "mode": "notation",
+    "source": "instructor"
+  },
+  "time_signature": {
+    "numerator": 4,
+    "denominator": 4
+  },
+  "key_signature": "C",
+  "staff_split_pitch": 60,
+  "measures": [
+    {
+      "id": "measure-1",
+      "index": 0,
+      "start": 0,
+      "duration": 1920
+    },
+    {
+      "id": "measure-2",
+      "index": 1,
+      "start": 1920,
+      "duration": 1920
+    }
+  ],
+  "events": [
+    {
+      "id": "ev-bass-1-0-4-bass-c",
+      "staff": "bass",
+      "voice": 1,
+      "start": 0,
+      "duration": 1920,
+      "notes": [
+        {
+          "id": "n-bass-c",
+          "pitch": 48,
+          "spelling": "C3",
+          "accidental": "natural",
+          "performance_ids": [
+            "bass-c"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-1-480-0-treble-hold",
+      "staff": "treble",
+      "voice": 1,
+      "start": 480,
+      "duration": 1920,
+      "notes": [
+        {
+          "id": "n-treble-hold",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "performance_ids": [
+            "treble-hold"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-480-1-treble-e",
+      "staff": "treble",
+      "voice": 2,
+      "start": 480,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-treble-e",
+          "pitch": 64,
+          "spelling": "E4",
+          "accidental": "natural",
+          "performance_ids": [
+            "treble-e"
+          ]
+        },
+        {
+          "id": "n-treble-g",
+          "pitch": 67,
+          "spelling": "G4",
+          "accidental": "natural",
+          "performance_ids": [
+            "treble-g"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-960-2-treble-c",
+      "staff": "treble",
+      "voice": 2,
+      "start": 960,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-treble-c",
+          "pitch": 72,
+          "spelling": "C5",
+          "accidental": "natural",
+          "performance_ids": [
+            "treble-c"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-treble-2-1440-3-treble-d",
+      "staff": "treble",
+      "voice": 2,
+      "start": 1440,
+      "duration": 480,
+      "notes": [
+        {
+          "id": "n-treble-d",
+          "pitch": 74,
+          "spelling": "D5",
+          "accidental": "natural",
+          "performance_ids": [
+            "treble-d"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    },
+    {
+      "id": "ev-bass-1-1920-5-bass-g",
+      "staff": "bass",
+      "voice": 1,
+      "start": 1920,
+      "duration": 1920,
+      "notes": [
+        {
+          "id": "n-bass-g",
+          "pitch": 43,
+          "spelling": "G2",
+          "accidental": "natural",
+          "performance_ids": [
+            "bass-g"
+          ]
+        }
+      ],
+      "rest": false,
+      "source": "performance"
+    }
+  ],
+  "segments": [
+    {
+      "id": "ev-bass-1-0-4-bass-c:0",
+      "event_id": "ev-bass-1-0-4-bass-c",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "bass",
+      "voice": 1,
+      "start": 0,
+      "duration": 1920,
+      "value": "whole",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bass-c:0",
+          "logical_note_id": "n-bass-c",
+          "pitch": 48,
+          "spelling": "C3",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bass-c"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:1:0:480",
+      "event_id": "",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 1,
+      "start": 0,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:treble:2:0:480",
+      "event_id": "",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 2,
+      "start": 0,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "ev-treble-1-480-0-treble-hold:0",
+      "event_id": "ev-treble-1-480-0-treble-hold",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 1,
+      "start": 480,
+      "duration": 1440,
+      "value": "half",
+      "dotted": true,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-treble-hold:0",
+          "logical_note_id": "n-treble-hold",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": true,
+          "performance_ids": [
+            "treble-hold"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-480-1-treble-e:0",
+      "event_id": "ev-treble-2-480-1-treble-e",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 2,
+      "start": 480,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-treble-e:0",
+          "logical_note_id": "n-treble-e",
+          "pitch": 64,
+          "spelling": "E4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "treble-e"
+          ]
+        },
+        {
+          "id": "n-treble-g:0",
+          "logical_note_id": "n-treble-g",
+          "pitch": 67,
+          "spelling": "G4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "treble-g"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-960-2-treble-c:0",
+      "event_id": "ev-treble-2-960-2-treble-c",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 2,
+      "start": 960,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-treble-c:0",
+          "logical_note_id": "n-treble-c",
+          "pitch": 72,
+          "spelling": "C5",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "treble-c"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-2-1440-3-treble-d:0",
+      "event_id": "ev-treble-2-1440-3-treble-d",
+      "measure_id": "measure-1",
+      "measure_index": 0,
+      "staff": "treble",
+      "voice": 2,
+      "start": 1440,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-treble-d:0",
+          "logical_note_id": "n-treble-d",
+          "pitch": 74,
+          "spelling": "D5",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "treble-d"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-bass-1-1920-5-bass-g:0",
+      "event_id": "ev-bass-1-1920-5-bass-g",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "bass",
+      "voice": 1,
+      "start": 1920,
+      "duration": 1920,
+      "value": "whole",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-bass-g:0",
+          "logical_note_id": "n-bass-g",
+          "pitch": 43,
+          "spelling": "G2",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": false,
+          "tie_to": false,
+          "performance_ids": [
+            "bass-g"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ev-treble-1-480-0-treble-hold:1",
+      "event_id": "ev-treble-1-480-0-treble-hold",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 1,
+      "start": 1920,
+      "duration": 480,
+      "value": "quarter",
+      "dotted": false,
+      "rest": false,
+      "generated_rest": false,
+      "notes": [
+        {
+          "id": "n-treble-hold:1",
+          "logical_note_id": "n-treble-hold",
+          "pitch": 71,
+          "spelling": "B4",
+          "accidental": "natural",
+          "display_accidental": false,
+          "tie_from": true,
+          "tie_to": false,
+          "performance_ids": [
+            "treble-hold"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grest:treble:2:1920:1920",
+      "event_id": "",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 2,
+      "start": 1920,
+      "duration": 1920,
+      "value": "whole",
+      "dotted": false,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    },
+    {
+      "id": "grest:treble:1:2400:1440",
+      "event_id": "",
+      "measure_id": "measure-2",
+      "measure_index": 1,
+      "staff": "treble",
+      "voice": 1,
+      "start": 2400,
+      "duration": 1440,
+      "value": "half",
+      "dotted": true,
+      "rest": true,
+      "generated_rest": true,
+      "notes": []
+    }
+  ],
+  "ties": [
+    {
+      "id": "tie:n-treble-hold:0:n-treble-hold:1",
+      "from_segment_note_id": "n-treble-hold:0",
+      "to_segment_note_id": "n-treble-hold:1",
+      "pitch": 71
+    }
+  ],
+  "performance": [
+    {
+      "id": "bass-c",
+      "onset": 0,
+      "duration": 2,
+      "pitch": 48,
+      "velocity": 0.72,
+      "confidence": 0.9,
+      "optional": false,
+      "string": null,
+      "fret": null
+    },
+    {
+      "id": "treble-e",
+      "onset": 0.5,
+      "duration": 0.5,
+      "pitch": 64,
+      "velocity": 0.58,
+      "confidence": 0.9,
+      "optional": false,
+      "string": null,
+      "fret": null
+    },
+    {
+      "id": "treble-g",
+      "onset": 0.5,
+      "duration": 0.5,
+      "pitch": 67,
+      "velocity": 0.55,
+      "confidence": 0.9,
+      "optional": false,
+      "string": null,
+      "fret": null
+    },
+    {
+      "id": "treble-hold",
+      "onset": 0.5,
+      "duration": 2,
+      "pitch": 71,
+      "velocity": 0.61,
+      "confidence": 0.9,
+      "optional": false,
+      "string": null,
+      "fret": null
+    },
+    {
+      "id": "treble-c",
+      "onset": 1,
+      "duration": 0.5,
+      "pitch": 72,
+      "velocity": 0.64,
+      "confidence": 0.9,
+      "optional": false,
+      "string": null,
+      "fret": null
+    },
+    {
+      "id": "treble-d",
+      "onset": 1.5,
+      "duration": 0.5,
+      "pitch": 74,
+      "velocity": 0.6,
+      "confidence": 0.9,
+      "optional": false,
+      "string": null,
+      "fret": null
+    },
+    {
+      "id": "bass-g",
+      "onset": 2,
+      "duration": 2,
+      "pitch": 43,
+      "velocity": 0.5,
+      "confidence": 0.9,
+      "optional": false,
+      "string": null,
+      "fret": null
+    }
+  ],
+  "performance_map": {
+    "bass-c": "n-bass-c",
+    "treble-hold": "n-treble-hold",
+    "treble-e": "n-treble-e",
+    "treble-g": "n-treble-g",
+    "treble-c": "n-treble-c",
+    "treble-d": "n-treble-d",
+    "bass-g": "n-bass-g"
+  },
+  "created_from": "saved"
+}

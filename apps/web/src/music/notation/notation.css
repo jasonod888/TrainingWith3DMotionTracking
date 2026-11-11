@@ -1,0 +1,215 @@
+/* Editable piano notation. Loaded only by the owner editor chunk. */
+.notation-editor {
+  --notation-ink: #29372d;
+  --notation-line: #49574c;
+  --notation-accent: #b45309;
+  --notation-soft: #eef1e7;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 6px 0 28px;
+  color: var(--ink);
+}
+
+.notation-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.notation-head h2 { margin: 0 0 4px; }
+.notation-head p { margin: 0; max-width: 720px; }
+.notation-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.notation-video {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+  gap: 12px;
+  align-items: start;
+  margin: 10px 0 14px;
+}
+
+.notation-video video {
+  display: block;
+  width: 100%;
+  max-height: 300px;
+  border-radius: 10px;
+  background: #10251c;
+}
+
+.notation-video-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.notation-video-actions .small { font-variant-numeric: tabular-nums; }
+
+.notation-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: flex-end;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--surface);
+  margin-bottom: 12px;
+  position: sticky;
+  top: 4px;
+  z-index: 8;
+}
+
+.notation-tool-group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.notation-tool-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); width: 100%; }
+.notation-tool-group button {
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.notation-tool-group button:hover:not(:disabled) { background: #eef2e2; }
+.notation-tool-group button.is-active { background: var(--ink); color: #f7f9ef; border-color: var(--ink); }
+.notation-zoom { font-size: 11px; min-width: 38px; text-align: center; font-variant-numeric: tabular-nums; }
+
+.notation-tabs { display: flex; gap: 5px; margin: 0 0 10px; background: #e9ecdf; border-radius: 24px; padding: 3px; }
+.notation-tabs button { flex: 1; min-height: 44px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.notation-tabs button.is-active { background: var(--surface); box-shadow: 0 1px 3px #0002; }
+
+.notation-measure-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; }
+.notation-measure-nav button { min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 11px; }
+.notation-measure-nav span { font-size: 12px; font-weight: 600; }
+
+.notation-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.notation-main { min-width: 0; }
+
+.notation-sheet-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #cfd6c6;
+  border-radius: 10px;
+  background: #fbfaf3;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+  box-shadow: inset 0 1px 0 #fff;
+}
+
+.notation-sheet { display: block; height: auto; max-width: none; }
+.notation-paper { fill: #fffdf7; }
+.notation-staff-line { stroke: var(--notation-line); stroke-width: 1; }
+.notation-barline { stroke: var(--notation-line); stroke-width: 1.6; }
+.notation-system-line { stroke: var(--notation-line); stroke-width: 2; }
+.notation-brace { fill: none; stroke: var(--notation-line); stroke-width: 2.4; }
+.notation-clef { fill: var(--notation-ink); font-family: Bravura, 'Segoe UI Symbol', 'Noto Music', serif; font-size: 46px; }
+.notation-time { fill: var(--notation-ink); font-family: Georgia, serif; font-size: 18px; font-weight: 700; text-anchor: middle; }
+.notation-key, .notation-tempo, .notation-measure-number { fill: #5d6a5e; font-size: 10px; }
+.notation-measure-number { font-variant-numeric: tabular-nums; }
+.notation-stem { stroke: var(--notation-ink); stroke-width: 1.6; }
+.notation-flag { fill: none; stroke: var(--notation-ink); stroke-width: 1.8; stroke-linecap: round; }
+.notation-ledger { stroke: var(--notation-line); stroke-width: 1; }
+.notation-notehead { fill: var(--notation-ink); stroke: var(--notation-ink); stroke-width: 0.4; }
+.notation-notehead.is-selected { fill: var(--notation-accent); stroke: #7c3606; }
+.notation-notehead.is-tied { opacity: 0.95; }
+.notation-accidental { fill: var(--notation-ink); font-family: Georgia, 'Segoe UI Symbol', serif; font-size: 17px; }
+.notation-tie { fill: none; stroke: var(--notation-ink); stroke-width: 1.4; }
+.notation-tie-continuation { fill: var(--notation-ink); font-size: 12px; }
+.notation-rest-glyph { fill: var(--notation-ink); font-family: Bravura, 'Segoe UI Symbol', 'Noto Music', serif; font-size: 26px; text-anchor: middle; }
+.notation-rest-glyph.is-selected { fill: var(--notation-accent); }
+.notation-note-hit { cursor: pointer; touch-action: none; }
+.notation-note-hit:focus-visible { outline: 2px solid #738b35; outline-offset: 2px; }
+.notation-drag-label { fill: var(--notation-accent); font-size: 11px; font-weight: 700; background: #fff; }
+
+.notation-lower { display: grid; gap: 12px; margin-top: 12px; }
+
+.piano-roll-wrap { position: relative; border: 1px solid #cfd6c6; border-radius: 10px; background: #fbfaf3; overflow: hidden; }
+.piano-roll { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.roll-bg { fill: #f5f6ee; }
+.roll-measure { stroke: #7f8c78; stroke-width: 1; }
+.roll-beat { stroke: #dfe5d8; stroke-width: 0.8; }
+.roll-octave { stroke: #e5e9df; stroke-width: 0.7; }
+.roll-measure-label { fill: #74806e; font-size: 8px; }
+.roll-label { fill: #7a8574; font-size: 7px; text-anchor: end; }
+.roll-note { fill: #6f8f5f; stroke: #557346; stroke-width: 0.7; cursor: grab; touch-action: none; }
+.roll-note.is-selected { fill: var(--notation-accent, #b45309); stroke: #7c3606; }
+.roll-note.is-dragging { opacity: 0.55; }
+.roll-resize { fill: #ffffff55; cursor: ew-resize; touch-action: none; }
+.roll-playhead { stroke: #b45309; stroke-width: 1.6; pointer-events: none; }
+.roll-drag-status { position: absolute; left: 46px; top: 4px; margin: 0; font-size: 10px; padding: 2px 6px; background: #fffefa; border: 1px solid #d7ddcd; border-radius: 4px; }
+
+.keyboard-editor { border: 1px solid #cfd6c6; border-radius: 10px; background: #fbfaf3; padding: 8px 10px 6px; }
+.keyboard-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.keyboard-toolbar button { min-height: 32px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 11px; }
+.keyboard-octave { font-size: 11px; font-weight: 700; min-width: 22px; text-align: center; }
+.keyboard-svg { display: block; width: 100%; height: auto; touch-action: manipulation; }
+.keyboard-bg { fill: #26332a; }
+.keyboard-white { fill: #fffef8; stroke: #687668; stroke-width: 1; cursor: pointer; }
+.keyboard-white.is-active { fill: #dbead0; }
+.keyboard-white.is-selected { fill: #f0c68e; stroke: #9a4f0a; stroke-width: 2; }
+.keyboard-black { fill: #1f2a23; stroke: #111; cursor: pointer; }
+.keyboard-black.is-active { fill: #547d45; }
+.keyboard-black.is-selected { fill: #b45309; stroke: #f3c98f; stroke-width: 2; }
+.keyboard-label { fill: #687668; font-size: 8px; }
+.keyboard-hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.keyboard-hint button { min-height: 30px; border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 2px 8px; font-size: 10px; }
+
+.notation-inspector {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 14px;
+  position: sticky;
+  top: 4px;
+  display: grid;
+  gap: 10px;
+  max-height: calc(100dvh - 20px);
+  overflow: auto;
+}
+.notation-inspector h3 { margin: 0; font-size: 20px; }
+.notation-inspector .notation-field { display: grid; gap: 3px; font-size: 11px; }
+.notation-inspector .notation-field > span { display: flex; justify-content: space-between; color: #5d6a5e; }
+.notation-inspector input[type='number'], .notation-inspector select {
+  min-height: 38px; width: 100%; padding: 6px 8px; border: 1px solid #bdc8b8; border-radius: 6px; background: #fffefa; font-size: 13px;
+}
+.notation-inspector input[type='range'] { width: 100%; accent-color: #6f8f5f; min-height: 30px; }
+.notation-selection-facts { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 11px; }
+.notation-selection-facts div { display: flex; justify-content: space-between; gap: 6px; border-bottom: 1px dotted #dbe1d3; padding: 3px 0; }
+.notation-selection-facts dt { color: #707c6c; }
+.notation-selection-facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.notation-chord-list { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.notation-chord-list button { min-height: 34px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 11px; }
+.notation-chord-list button.is-active { background: var(--ink); color: #f7f9ef; }
+.notation-step-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.notation-step-buttons button { min-height: 38px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 11px; }
+.notation-step-buttons button:hover:not(:disabled) { background: #eef2e2; }
+.notation-inspector-actions { display: grid; gap: 6px; }
+.notation-inspector-actions button { min-height: 40px; }
+.notation-settings { border-top: 1px solid var(--line); padding-top: 8px; }
+.notation-settings summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; font-size: 11px; font-weight: 600; }
+.notation-settings p { margin-top: 6px; }
+
+@media (max-width: 980px) {
+  .notation-workspace { grid-template-columns: minmax(0, 1fr); }
+  .notation-inspector { position: static; max-height: none; }
+}
+
+@media (max-width: 760px) {
+  .notation-editor { padding: 0 0 18px; }
+  .notation-video { grid-template-columns: 1fr; }
+  .notation-video video { max-height: 210px; }
+  .notation-toolbar { position: static; padding: 8px; gap: 6px; }
+  .notation-tool-group { flex: 1 1 100%; }
+  .notation-tool-group button { flex: 1 1 auto; min-height: 44px; }
+  .notation-tool-label { display: none; }
+  .notation-head h2 { font-size: 22px; }
+  .notation-inspector h3 { font-size: 18px; }
+  .notation-sheet-scroll { border-radius: 8px; }
+  .piano-roll, .keyboard-svg { min-height: 180px; }
+}
+
+@media (max-width: 420px) {
+  .notation-tool-group button { font-size: 10px; padding: 6px; }
+  .notation-tool-group button svg { display: none; }
+}
