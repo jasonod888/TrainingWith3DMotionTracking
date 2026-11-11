@@ -24,3 +24,13 @@
 .draft-key-black.is-active{fill:#4f7d3f}
 .draft-key-label{fill:#67755f;font-size:9px}
 @media(max-width:700px){.review-source video{max-height:30vh}.draft-preview-head button{width:100%}.draft-preview-head{display:block}.draft-preview-head button{margin-top:10px}}
+
+.velocity-input{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1 1 100%;padding-top:8px;border-top:1px dashed #d8e0d5}
+.velocity-input-head{display:flex;flex:1 1 180px;justify-content:space-between;gap:8px;font-size:.85rem}
+.velocity-input-head strong{font-weight:600}
+.velocity-input input[type=range]{flex:1 1 180px;accent-color:#527a46}
+.velocity-input input[type=number]{width:72px;min-height:36px}
+.velocity-input p{flex:1 1 100%;margin:0}
+.draft-preview-controls{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.draft-preview-controls label{display:flex;align-items:center;gap:6px}
+.draft-preview-controls input[type=range]{width:100px;accent-color:#527a46}

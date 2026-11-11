@@ -839,7 +839,7 @@ reviewed chord shapes; the guide renders them without chord inference.
 - Accessibility/responsive checks cover keyboard focus, ARIA labels, phone/desktop overflow.
 - No capo/alternate tuning/handedness support yet; standard tuning remains the scope.
 
-Verification: **327 API passed, 13 skipped**; **291 web passed**; TypeScript/build pass;
+Verification: **327 API passed, 13 skipped**; **294 web passed**; TypeScript/build pass;
 music screen 16,101 B gzip (limit 16,384); initial-review/editor/library browser checks pass.
 
 
@@ -879,7 +879,11 @@ music screen 16,101 B gzip (limit 16,384); initial-review/editor/library browser
   still lacks a human-verified reference.
 - Audio extraction is confirmed 22,050 Hz mono s16le with no additional offset; the ~0.94 s
   clip difference is pre-upload trimming.
-- Review audition now uses a harmonic piano-like tone, audio-clock-aligned playhead, and
-  schedules all displayed notes; the 1,000-note cap is explicitly disclosed.
+- Review audition now uses a harmonic piano-like tone with a tested velocity response
+  (loudness and brightness), a safe compressor/master ceiling, audio-clock-aligned playhead,
+  and schedules all displayed notes; the 1,000-note cap is explicitly disclosed.
+- Velocity is preserved and instructor-editable through review, saving and audition.
+  Measured current-settings velocity MAE is 0.24 overall, 0.45 for soft notes and 0.08 for
+  loud notes on the aligned fixtures; soft dynamics remain approximate.
 
-Verification: **327 API passed, 13 skipped**; **291 web passed**; TypeScript/build pass.
+Verification: **327 API passed, 13 skipped**; **294 web passed**; TypeScript/build pass.

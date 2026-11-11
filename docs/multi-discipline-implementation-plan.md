@@ -785,5 +785,5 @@ retained in an owner-only analysis artifact, every decoding choice is explicit i
 verified profile, pitch-bend extraction is disabled with measured event equality, and
 re-decode/retention tooling exists. Five aligned synthetic fixtures and the existing
 14.677 s clip were compared. No threshold/Melodia default was changed; human-verified
-piano references remain the blocking evidence for accuracy claims. 327 API tests and 291
+piano references remain the blocking evidence for accuracy claims. 327 API tests and 294
 web tests pass.

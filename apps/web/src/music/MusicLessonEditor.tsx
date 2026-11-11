@@ -4,6 +4,7 @@ import type {MusicLessonManifest, Section} from '../../../../packages/lesson-sch
 import {parseMusicLessonManifest} from '../../../../packages/lesson-schema/parse';
 import {assetUrl, request} from '../api';
 import {parseMusicReference, pitchName, type GuitarChord, type MusicReferenceSpan} from './music-reference';
+import {VelocityInput} from './VelocityInput';
 import './music-review.css';
 
 type EditNote = {id: string; onset: number; duration: number | null; pitch: number; optional: boolean;
@@ -155,6 +156,8 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
             step="any" value={note.duration ?? ''} onChange={event => update(index, {duration: event.target.value === '' ? null : Number(event.target.value)})}/></label>
           <label className="review-checkbox"><input type="checkbox" checked={note.optional}
             onChange={event => update(index, {optional: event.target.checked})}/>Optional</label>
+          <VelocityInput label={`Note ${index + 1} intensity`} value={note.velocity} disabled={busy}
+            onChange={velocity => update(index, {velocity})}/>
           <button type="button" onClick={() => { changed(); setNotes(previous => previous.filter((_, position) => position !== index)); }}>
             <Trash2 size={14}/>Remove note {index + 1}</button>
         </fieldset>;

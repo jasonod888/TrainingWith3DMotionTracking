@@ -40,7 +40,7 @@ def decode(model_output, config):
         infer_onsets=config['infer_onsets'], min_note_len=min_note_len,
         include_pitch_bends=config['include_pitch_bends'],
         multiple_pitch_bends=False, melodia_trick=config['melodia_trick'], midi_tempo=120)
-    return [{'onset': float(note[0]), 'end': float(note[1]), 'pitch': int(note[2])}
+    return [{'onset': float(note[0]), 'end': float(note[1]), 'pitch': int(note[2]), 'velocity': float(note[3])}
             for note in notes if math.isfinite(float(note[0])) and math.isfinite(float(note[1]))]
 
 
@@ -59,7 +59,8 @@ def score(reference, predicted):
         used.add(index)
         predicted_duration = max(0, item['end'] - item['onset'])
         matched_refs.add(ref_index)
-        matched.append({'pitch': note['pitch'], 'ref_index': ref_index, 'onset_error': item['onset'] - note['onset'],
+        matched.append({'pitch': note['pitch'], 'ref_index': ref_index, 'ref_velocity': note.get('velocity'),
+                        'pred_velocity': item.get('velocity'), 'onset_error': item['onset'] - note['onset'],
                         'offset_error': item['end'] - (note['onset'] + note['duration']),
                         'duration_error': predicted_duration - note['duration']})
     missing = len(reference) - len(matched)
@@ -67,10 +68,21 @@ def score(reference, predicted):
     errors = [abs(item['onset_error']) for item in matched]
     offsets = [abs(item['offset_error']) for item in matched]
     durations = [abs(item['duration_error']) for item in matched]
+    velocity_pairs = [(float(item['ref_velocity']), float(item['pred_velocity'])) for item in matched
+                      if item.get('ref_velocity') is not None and item.get('pred_velocity') is not None]
+    velocity_mae = round(sum(abs(a-b) for a,b in velocity_pairs)/len(velocity_pairs), 4) if velocity_pairs else None
+    velocity_corr = None
+    if len(velocity_pairs) > 1 and len({a for a,_ in velocity_pairs}) > 1 and len({b for _,b in velocity_pairs}) > 1:
+        velocity_corr = round(float(np.corrcoef([a for a,_ in velocity_pairs],[b for _,b in velocity_pairs])[0,1]), 3)
+    soft = [(a,b) for a,b in velocity_pairs if a < .34]
+    loud = [(a,b) for a,b in velocity_pairs if a >= .6]
+    def mae(values): return round(sum(abs(a-b) for a,b in values)/len(values), 4) if values else None
     repeated = sum(1 for before, after in zip(refs, refs[1:]) if before['pitch'] == after['pitch'])
     repeated_hits = sum(1 for index, (before, after) in enumerate(zip(refs, refs[1:]))
                         if before['pitch'] == after['pitch'] and index in matched_refs and index + 1 in matched_refs)
     return {'reference': len(reference), 'detected': len(predicted), 'matched': len(matched),
+            'velocity_mae': velocity_mae, 'velocity_correlation': velocity_corr,
+            'soft_velocity_mae': mae(soft), 'loud_velocity_mae': mae(loud),
             'missing': missing, 'extra': extra,
             'onset_mae_ms': round(1000 * sum(errors) / len(errors), 2) if errors else None,
             'offset_mae_ms': round(1000 * sum(offsets) / len(offsets), 2) if offsets else None,
@@ -95,7 +107,7 @@ def main():
               'note': 'Synthetic aligned MIDI+audio fixtures; not human performances.'}
     for name, config in CONFIGS.items():
         aggregate = {'reference': 0, 'detected': 0, 'matched': 0, 'missing': 0, 'extra': 0,
-                     'onset_mae_ms': [], 'offset_mae_ms': [], 'duration_mae_ms': [],
+                     'onset_mae_ms': [], 'offset_mae_ms': [], 'duration_mae_ms': [], 'velocity_mae': [], 'soft_velocity_mae': [], 'loud_velocity_mae': [],
                      'repeated_reference_pairs': 0, 'repeated_pairs_recovered': 0}
         for ref in references:
             model_output, _ = raw[ref['name']]
@@ -106,10 +118,10 @@ def main():
             for key in ('reference', 'detected', 'matched', 'missing', 'extra', 'repeated_reference_pairs',
                         'repeated_pairs_recovered'):
                 aggregate[key] += score_value[key]
-            for key in ('onset_mae_ms', 'offset_mae_ms', 'duration_mae_ms'):
+            for key in ('onset_mae_ms', 'offset_mae_ms', 'duration_mae_ms', 'velocity_mae', 'soft_velocity_mae', 'loud_velocity_mae'):
                 if score_value[key] is not None:
                     aggregate[key].append(score_value[key])
-        for key in ('onset_mae_ms', 'offset_mae_ms', 'duration_mae_ms'):
+        for key in ('onset_mae_ms', 'offset_mae_ms', 'duration_mae_ms', 'velocity_mae', 'soft_velocity_mae', 'loud_velocity_mae'):
             values = aggregate[key]
             aggregate[key] = round(float(np.mean(values)), 2) if values else None
         aggregate['config'] = config
@@ -121,18 +133,20 @@ def main():
         for fixture in report['fixtures'])
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(report, indent=2), encoding='utf-8')
-    rows = ['| Configuration | Ref | Detected | Matched | Missing | Extra | Onset MAE | Offset MAE | Duration MAE |',
-            '|---|---:|---:|---:|---:|---:|---:|---:|---:|']
+    rows = ['| Configuration | Ref | Detected | Matched | Missing | Extra | Onset MAE | Offset MAE | Duration MAE | Velocity MAE | Soft MAE | Loud MAE |',
+            '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
     for name, value in report['configs'].items():
         rows.append(f"| {name} | {value['reference']} | {value['detected']} | {value['matched']} | "
                     f"{value['missing']} | {value['extra']} | {value['onset_mae_ms']} ms | "
-                    f"{value['offset_mae_ms']} ms | {value['duration_mae_ms']} ms |")
+                    f"{value['offset_mae_ms']} ms | {value['duration_mae_ms']} ms | "
+                    f"{value['velocity_mae']} | {value['soft_velocity_mae']} | {value['loud_velocity_mae']} |")
     Path(args.markdown).write_text(
         '# Basic Pitch decoder comparison\n\n'
         'Synthetic aligned MIDI+audio fixtures, not human performances. Matching is '
         f'one-to-one by exact pitch within {TOLERANCE*1000:.0f} ms; offset/duration are reported separately.\n\n'
         + '\n'.join(rows) +
-        f"\n\nPitch-bend configuration leaves the extracted pitch/onset events identical: "
+        f"\n\nVelocity MAE is separate from pitch/timing; soft <0.34 and loud >=0.60 groups.\n"
+        f"Pitch-bend configuration leaves the extracted pitch/onset events identical: "
         f"**{report['bends_events_equal']}**.\n", encoding='utf-8')
     print('wrote', args.output)
 

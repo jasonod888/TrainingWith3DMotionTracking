@@ -1,14 +1,15 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import type {MusicDraftEvent} from '../../../../packages/lesson-schema/index';
+import {MASTER_GAIN, velocityCutoff, velocityDecay, velocityGain, velocityPartials, velocityValue} from './music-velocity';
 
 type Scheduled = {oscillator: OscillatorNode; gain: GainNode};
 const BLACK = new Set([1, 3, 6, 8, 10]);
 
 /** Piano-roll, keyboard and synthesized audition for the unreviewed note proposal. */
 export function DraftNotePreview({events,duration}:{events:MusicDraftEvent[];duration:number}){
- const [time,setTime]=useState(0),[playing,setPlaying]=useState(false);
+ const [time,setTime]=useState(0),[playing,setPlaying]=useState(false),[volume,setVolume]=useState(70);
  const MAX_AUDITION=1000;
- const audio=useRef<AudioContext|null>(null),scheduled=useRef<Scheduled[]>([]),frame=useRef(0),startedAt=useRef(0);
+ const audio=useRef<AudioContext|null>(null),master=useRef<GainNode|null>(null),scheduled=useRef<Scheduled[]>([]),frame=useRef(0),startedAt=useRef(0);
  const notes=useMemo(()=>events.filter(event=>event.onset<duration).slice(0,MAX_AUDITION),[events,duration]);
  const truncated=events.filter(event=>event.onset<duration).length>MAX_AUDITION;
  const pitches=notes.map(event=>event.pitch);
@@ -40,10 +41,11 @@ export function DraftNotePreview({events,duration}:{events:MusicDraftEvent[];dur
   if(frame.current)cancelAnimationFrame(frame.current);frame.current=0;
   for(const {oscillator,gain} of scheduled.current){try{oscillator.stop()}catch{}try{gain.disconnect()}catch{}}
   scheduled.current=[];
-  if(audio.current){void audio.current.close().catch(()=>{});audio.current=null;}
+  if(audio.current){void audio.current.close().catch(()=>{});audio.current=null;}master.current=null;
   setPlaying(false);setTime(0);
  };
  useEffect(()=>()=>{if(frame.current)cancelAnimationFrame(frame.current);for(const {oscillator} of scheduled.current){try{oscillator.stop()}catch{}}if(audio.current)void audio.current.close().catch(()=>{});},[]);
+ useEffect(()=>{if(master.current)master.current.gain.value=MASTER_GAIN*(volume/100);},[volume]);
 
  const play=async()=>{
   if(playing){stop();return;}
@@ -53,14 +55,22 @@ export function DraftNotePreview({events,duration}:{events:MusicDraftEvent[];dur
   if(!Ctor){return;}
   const context=new Ctor();await context.resume();audio.current=context;
   const base=context.currentTime+.05;
-  const wave=context.createPeriodicWave(new Float32Array([0,1,.55,.3,.16,.09]),new Float32Array(6));
+  const output=context.createGain();output.gain.value=MASTER_GAIN*(volume/100);master.current=output;
+  const compressor=context.createDynamicsCompressor();compressor.threshold.value=-18;compressor.knee.value=12;
+  compressor.ratio.value=8;compressor.attack.value=.003;compressor.release.value=.25;
+  compressor.connect(output).connect(context.destination);
   for(const note of notes){
-   const oscillator=context.createOscillator(),gain=context.createGain();
-   oscillator.setPeriodicWave(wave);oscillator.frequency.value=440*2**((note.pitch-69)/12);
-   const begin=base+note.onset,length=Math.max(.06,note.duration??.25),volume=Math.min(.09,.035+(note.velocity??.6)*.04);
-   gain.gain.setValueAtTime(.0001,begin);gain.gain.exponentialRampToValueAtTime(volume,begin+.015);
+   const oscillator=context.createOscillator(),gain=context.createGain(),filter=context.createBiquadFilter();
+   const partials=velocityPartials(note.velocity);
+   oscillator.setPeriodicWave(context.createPeriodicWave(new Float32Array([0,...partials]),new Float32Array(partials.length+1)));
+   oscillator.frequency.value=440*2**((note.pitch-69)/12);
+   filter.type='lowpass';filter.frequency.value=velocityCutoff(note.velocity);filter.Q.value=.7;
+   const begin=base+note.onset,length=Math.max(.06,note.duration??.25),level=velocityGain(note.velocity);
+   const decay=Math.min(length,Math.max(.08,velocityDecay(note.velocity)));
+   gain.gain.setValueAtTime(.0001,begin);gain.gain.exponentialRampToValueAtTime(level,begin+.008);
+   gain.gain.exponentialRampToValueAtTime(Math.max(.0002,level*.45),begin+decay);
    gain.gain.exponentialRampToValueAtTime(.0001,begin+length);
-   oscillator.connect(gain).connect(context.destination);oscillator.start(begin);oscillator.stop(begin+length+.02);
+   oscillator.connect(filter).connect(gain).connect(compressor);oscillator.start(begin);oscillator.stop(begin+length+.02);
    scheduled.current.push({oscillator,gain});
   }
   startedAt.current=performance.now()+50;setPlaying(true);
@@ -68,8 +78,8 @@ export function DraftNotePreview({events,duration}:{events:MusicDraftEvent[];dur
   tick();
  };
  return <section className="draft-note-preview" aria-label="Proposed note preview">
-  <div className="draft-preview-head"><div><h2>Proposed notes preview</h2><p className="small muted">The roll and keyboard show what the transcription currently claims. Play a synthesized audition; the original video stays pinned above.</p></div>
-   <button type="button" className={playing?'secondary':'primary'} onClick={()=>void play()} disabled={!notes.length} aria-pressed={playing}>{playing?'Stop audition':'Play proposed notes'}</button></div>
+  <div className="draft-preview-head"><div><h2>Proposed notes preview</h2><p className="small muted">The roll and keyboard show what the transcription currently claims. Play a harmonic piano audition; velocity changes loudness and brightness. The original video stays pinned above.</p></div>
+   <div className="draft-preview-controls"><label className="small muted">Preview volume<input aria-label="Preview volume" type="range" min={0} max={100} value={volume} onChange={e=>setVolume(Number(e.target.value))}/><span>{volume}%</span></label><button type="button" className={playing?'secondary':'primary'} onClick={()=>void play()} disabled={!notes.length} aria-pressed={playing}>{playing?'Stop audition':'Play proposed notes'}</button></div></div>
   <div className="draft-roll-scroll">
    <svg className="draft-roll" viewBox={`0 0 ${rollW} ${rollH}`} role="img" aria-label={`Piano roll, ${notes.length} proposed notes, ${duration.toFixed(1)} seconds`} data-note-count={notes.length}>
     <rect x={left} y={top} width={plotW} height={plotH} className="draft-roll-bg"/>

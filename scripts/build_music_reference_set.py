@@ -40,7 +40,7 @@ def render(name, notes, duration, pedal=False):
         handle.setnchannels(1); handle.setsampwidth(2); handle.setframerate(RATE)
         handle.writeframes((data * 32767).astype('<i2').tobytes())
     reference = {'name': name, 'audio': path.name, 'sample_rate': RATE, 'duration': duration,
-                 'notes': [{key: note[key] for key in ('onset', 'duration', 'pitch')} for note in notes]}
+                 'notes': [{key: note[key] for key in ('onset', 'duration', 'pitch', 'velocity')} for note in notes]}
     return reference
 
 

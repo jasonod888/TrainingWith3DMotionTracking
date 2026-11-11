@@ -71,10 +71,14 @@ original recording is the user's pre-upload trim, not a second timeline offset.
 ## 5. Audition
 
 The review preview now uses a harmonic `PeriodicWave` with a decay envelope rather than
-plain sine/triangle oscillators. The visual playhead starts when the scheduled audio clock
-starts (50 ms schedule delay), not immediately. All displayed notes up to the 1,000-note
-audition cap are scheduled; above the cap the UI explicitly says that only the first 1,000
-are shown/auditioned. The source video remains sticky.
+plain sine/triangle oscillators. Velocity drives both loudness (`velocityGain`) and
+brightness (partials plus low-pass cutoff), with a shared compressor/master ceiling and a
+preview volume control. The visual playhead starts when the scheduled audio clock starts
+(50 ms schedule delay), not immediately. All displayed notes up to the 1,000-note audition
+cap are scheduled; above the cap the UI explicitly says that only the first 1,000 are
+shown/auditioned. The source video remains sticky. Instructors can inspect and adjust
+each note’s approximate intensity in both the draft review and later editor;
+null/manual values fall back to a defined audition default without being written back.
 
 ## Remaining errors and limits
 

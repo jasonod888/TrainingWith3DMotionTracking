@@ -3,6 +3,7 @@ import type {MusicDraftEvent,MusicDraftGuitarChord,MusicDraftView,MusicLessonMan
 import {parseMusicDraftView,parseMusicLessonManifest} from '../../../../packages/lesson-schema/parse';
 import {assetUrl,request} from '../api';
 import {DraftNotePreview} from './DraftNotePreview';
+import {VelocityInput} from './VelocityInput';
 import './music.css';
 import './music-review.css';
 
@@ -65,6 +66,7 @@ export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:
      <label>Start (seconds)<input aria-label={`Note ${index+1} start`} type="number" min={0} max={draft.duration} step="any" value={event.onset} onChange={e=>edit(index,{onset:Number(e.target.value)})}/></label>
      <label>Length (seconds)<input aria-label={`Note ${index+1} length`} type="number" min={.001} max={draft.duration} step="any" value={event.duration??''} onChange={e=>edit(index,{duration:e.target.value===''?null:Number(e.target.value)})}/></label>
      <label className="review-checkbox"><input type="checkbox" checked={event.optional} onChange={e=>edit(index,{optional:e.target.checked})}/>Optional</label>
+     <VelocityInput label={`Note ${index+1} intensity`} value={event.velocity} disabled={busy} onChange={velocity=>edit(index,{velocity})}/>
      <button type="button" onClick={()=>{if(video.current){video.current.currentTime=event.onset;void video.current.play().catch(()=>{});}}} disabled={!draft.source_video}>Listen from note {index+1}</button>
      <button type="button" onClick={()=>remove(index)}>Remove note {index+1}</button>
     </fieldset>;})}</div>

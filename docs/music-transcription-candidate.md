@@ -19,7 +19,9 @@ inference has run through the isolated worker on a rights-cleared recording.
 The candidate uses Basic Pitch's bundled ONNX graph rather than TensorFlow; the package's
 declared TensorFlow dependency is not installed. This is the same released checkpoint, but
 the approval must cover the ONNX path and the exact runtime above. Every decoding choice is
-recorded in the profile and in the retained analysis metadata.
+recorded in the profile and in the retained analysis metadata. Basic Pitch velocity is
+retained as an approximate note amplitude; it is editable by the instructor and is not
+presented as key pressure or calibrated MIDI velocity.
 
 ## Licence and attribution
 
