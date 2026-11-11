@@ -1,1 +1,1 @@
-{"preprocessing":"mono-pcm-s16le","sample_rate":22050,"thresholds":{"frame_threshold":0.3,"minimum_note_length":127.7,"onset_threshold":0.5}}
+{"decoding":{"decoding_version":"basic-pitch-0.4.0/decoding-v1","include_pitch_bends":false,"infer_onsets":true,"maximum_frequency":null,"melodia_trick":false,"midi_tempo":120,"minimum_frequency":null,"multiple_pitch_bends":false},"preprocessing":"mono-pcm-s16le","sample_rate":22050,"thresholds":{"frame_threshold":0.3,"minimum_note_length":127.7,"onset_threshold":0.5}}

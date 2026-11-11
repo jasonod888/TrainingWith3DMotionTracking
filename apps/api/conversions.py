@@ -20,6 +20,7 @@ from .auth import digest, now
 from .contracts import Asset, LessonManifest, MusicDraftDocument, MusicLessonManifest
 from .database import Account, Conversion, Lesson, LessonAsset, LessonRevision, MusicDraft, WorkerCredential
 from .storage import storage_client
+from botocore.exceptions import ClientError
 from .processing import ENGINE_VERSION, PIPELINE_VERSION, Provider, processing_status
 from .media_probe import MediaProbeError, probe_audio_media
 from . import processing_routes, subjects
@@ -35,14 +36,15 @@ FILES={**{name:mime for name,mime in (
         ('reference.glb','model/gltf-binary'),('reference.json','application/json'),
         ('preview.mp4','video/mp4'),('thumbnail.jpg','image/jpeg'),('instructor.mp4','video/mp4'),
         ('instructor-alpha.webm','video/webm'),('source.mp4','video/mp4'),('waveform.json','application/json'),
-        ('midi.mid','audio/midi'),('poster.png','image/png'))},
+        ('midi.mid','audio/midi'),('poster.png','image/png'),('analysis.zip','application/zip'))},
     'avatar-male.glb':'model/gltf-binary','avatar-female.glb':'model/gltf-binary',
     'avatar-report.json':'application/json'}
 
 # Asset role to upload name, per completion contract. Declared once here and used by
 # completion, delivery and cleanup instead of scattered filename allowlists.
 MUSIC_ROLES=(('reference','reference.json'),('source_video','source.mp4'),('preview_video','preview.mp4'),
-             ('waveform','waveform.json'),('midi_export','midi.mid'),('public_poster','poster.png'))
+             ('waveform','waveform.json'),('midi_export','midi.mid'),('public_poster','poster.png'),
+             ('analysis','analysis.zip'))
 
 
 class Preparation(BaseModel):
@@ -421,6 +423,8 @@ def install_conversions(app,engine,settings,identity,db):
         store=storage_client(settings)
         assets=[]
         for role,name in MUSIC_ROLES:
+            if role=='analysis':
+                continue
             asset=getattr(manifest,role)
             if asset is None:
                 if role=='reference':raise HTTPException(422,'Conversion outputs are incomplete.')
@@ -514,6 +518,21 @@ def install_conversions(app,engine,settings,identity,db):
                           CopySource={'Bucket':settings.storage_bucket,'Key':expected})
         body.reference.key=key
         session.add(LessonAsset(lesson_id=lesson_id,**body.reference.model_dump()))
+        if body.analysis:
+            expected_analysis=f'attempts/{job.id}/{token}/analysis.zip'
+            if body.analysis.key!=expected_analysis or body.analysis.mime!='application/zip':
+                raise HTTPException(422,'Analysis artifact is outside this processing attempt.')
+            try:
+                analysis_head=store.head_object(Bucket=settings.storage_bucket,Key=expected_analysis)
+            except ClientError as exc:
+                raise HTTPException(422,'Analysis artifact is missing.') from exc
+            if analysis_head['ContentLength']!=body.analysis.bytes or analysis_head.get('Metadata',{}).get('sha256')!=body.analysis.sha256:
+                raise HTTPException(422,'Analysis artifact checksum/size mismatch.')
+            analysis_key=f'lessons/{lesson_id}/{draft_id}-analysis.zip'
+            store.copy_object(Bucket=settings.storage_bucket,Key=analysis_key,
+                              CopySource={'Bucket':settings.storage_bucket,'Key':expected_analysis})
+            body.analysis.key=analysis_key
+            session.add(LessonAsset(lesson_id=lesson_id,**body.analysis.model_dump()))
         # Preserve private instructor media before upload/attempt retention removes it.
         webm='webm' in ((job.media_findings or {}).get('container') or '') or job.filename.lower().endswith('.webm')
         source_key=f'lessons/{lesson_id}/{draft_id}-source.'+('webm' if webm else 'mp4')
@@ -529,6 +548,7 @@ def install_conversions(app,engine,settings,identity,db):
         try:
             store.delete_object(Bucket=settings.storage_bucket,Key=job.source_key)
             store.delete_object(Bucket=settings.storage_bucket,Key=expected)
+            if body.analysis: store.delete_object(Bucket=settings.storage_bucket,Key=f'attempts/{job.id}/{token}/analysis.zip')
         except Exception:
             import logging
             logging.getLogger('form').warning('Music draft cleanup pending for job %s',job.id)

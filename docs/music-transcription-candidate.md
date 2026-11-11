@@ -10,14 +10,16 @@ inference has run through the isolated worker on a rights-cleared recording.
 | Model | Basic Pitch 0.4.0 (Spotify AB) |
 | Code | `basic-pitch==0.4.0` wheel, SHA-256 `738adb503aae7fdfc7d1e1511aa0ce35052315f260a19531ef4c356708425db0` |
 | Weights | `nmp.onnx` ICASSP 2022 checkpoint shipped in the wheel, SHA-256 `2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec` |
-| Adapter | [`scripts/music_basic_pitch_adapter.py`](../scripts/music_basic_pitch_adapter.py), SHA-256 `ee3d17f2564431b7dc2219ac976a505494878fa80008170be5af7c754d604b3a` |
-| Profile | `7394ede7b1b7851bdc652b128f8598d5b3c6c2b41a53a3255e2f6b765b06a234` |
+| Adapter | [`scripts/music_basic_pitch_adapter.py`](../scripts/music_basic_pitch_adapter.py), SHA-256 `a5a3412fcbc0de07eb0ebf0ddf2548d963c1e3642b0876187c32bf71034668ee` |
+| Profile | `b55aceaa68d76b60b14b21266a9c4b678607776606465893b4f2eefd9f2a16d4` (decoding v1) |
 | Runtime | Python 3.12.2; ONNX Runtime 1.31.1; librosa 0.10.2.post1; NumPy 2.5.4; SciPy 1.18.1; pretty_midi 0.2.11.post0; mir_eval 0.8.2; resampy 0.4.3; scikit-learn 1.9.1; numba 0.68.1 |
-| Preprocessing | mono PCM s16le at 22,050 Hz; thresholds onset 0.5, frame 0.3, minimum note 127.7 ms |
+| Preprocessing | mono PCM s16le at 22,050 Hz |
+| Decoding | onset 0.5, frame 0.3, minimum note 127.7 ms; inferred onsets on; Melodia off; pitch bends off; MIDI tempo 120 |
 
 The candidate uses Basic Pitch's bundled ONNX graph rather than TensorFlow; the package's
 declared TensorFlow dependency is not installed. This is the same released checkpoint, but
-the approval must cover the ONNX path and the exact runtime above.
+the approval must cover the ONNX path and the exact runtime above. Every decoding choice is
+recorded in the profile and in the retained analysis metadata.
 
 ## Licence and attribution
 
@@ -47,6 +49,10 @@ the approval must cover the ONNX path and the exact runtime above.
   `model=basic-pitch`, `model_version=0.4.0`, `engine=onnx`, the profile digest and the
   analysis-audio digest.
 - Retained draft: [`basic-pitch-draft-2026-11-10.json`](basic-pitch-draft-2026-11-10.json).
+- Retained raw artifacts: the worker now writes an owner-only `analysis.zip` containing
+  `raw.npz` (note/onset/contour activations), `proposal.mid`, `proposed-reference.json` and
+  `metadata.json` (audio/weights/profile hashes, config, decoding, array shapes). Retention
+  is 30 days by default and pruned with `scripts/prune_music_analysis.py`.
 - Retained run report: [`basic-pitch-run-2026-11-10.json`](basic-pitch-run-2026-11-10.json).
 
 This is a real transcription, not a fixture. It is unreviewed and no accuracy claim is

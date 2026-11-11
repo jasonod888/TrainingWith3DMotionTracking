@@ -2,10 +2,10 @@
   "candidate": "Basic Pitch 0.4.0 (Spotify AB)",
   "wheel_sha256": "738adb503aae7fdfc7d1e1511aa0ce35052315f260a19531ef4c356708425db0",
   "model_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
-  "adapter_sha256": "ee3d17f2564431b7dc2219ac976a505494878fa80008170be5af7c754d604b3a",
-  "config_sha256": "fa2153ea6da6b92771f28458c23a7136f9666411916c911f4564a37e6c13e2f1",
+  "adapter_sha256": "a5a3412fcbc0de07eb0ebf0ddf2548d963c1e3642b0876187c32bf71034668ee",
+  "config_sha256": "cc3724950ba0662fa4de3ec85c7cd1e9b19116f9725148c39a9c547b7f746052",
   "commercial_evidence_sha256": "2cefb2850e07b5d72f7bc08afef26272aa28586bcdb265042eb9165f4ac03377",
-  "profile_sha256": "7394ede7b1b7851bdc652b128f8598d5b3c6c2b41a53a3255e2f6b765b06a234",
+  "profile_sha256": "b55aceaa68d76b60b14b21266a9c4b678607776606465893b4f2eefd9f2a16d4",
   "runtime": {
     "python": "3.12.2",
     "numpy": "2.5.4",
@@ -52,5 +52,15 @@
       "profile_sha256": "7394ede7b1b7851bdc652b128f8598d5b3c6c2b41a53a3255e2f6b765b06a234",
       "audio_sha256": "a54fbd236b4b5fd1ca8d5c7e50e466e091aa7babdb7eda48285ccde4885357ed"
     }
+  },
+  "decoding": {
+    "decoding_version": "basic-pitch-0.4.0/decoding-v1",
+    "infer_onsets": true,
+    "melodia_trick": false,
+    "include_pitch_bends": false,
+    "multiple_pitch_bends": false,
+    "midi_tempo": 120,
+    "minimum_frequency": null,
+    "maximum_frequency": null
   }
 }

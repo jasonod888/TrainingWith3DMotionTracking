@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     music_history_enabled: bool = False
     music_require_run_profile: bool = False
     music_allowed_run_profiles: str = ''  # Comma-separated operator-approved profile digests.
+    music_analysis_retention_days: int = 30
     music_piano_library_ui_enabled: bool = False
     music_guitar_library_ui_enabled: bool = False
     music_piano_conversion_target: str = ''

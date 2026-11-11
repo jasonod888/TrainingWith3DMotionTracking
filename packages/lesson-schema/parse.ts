@@ -374,7 +374,7 @@ export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
  if(!isRecord(value)||value.draft_version!==1||!isId(value.draft_id)||!isId(value.lesson_id)||!isTitle(value.title)||
    !['draft','reviewed'].includes(String(value.status))||!isNumber(value.duration)||value.duration<=0||
    (value.subject!=='piano'&&value.subject!=='guitar'))return bad();
- const keys=['draft_version','draft_id','lesson_id','revision_id','title','status','subject','instrument','duration','reference','source_video','events','spans','guitar_chords','provenance','warnings'];
+ const keys=['draft_version','draft_id','lesson_id','revision_id','title','status','subject','instrument','duration','reference','source_video','events','spans','guitar_chords','analysis','provenance','warnings'];
  if(Object.keys(value).some(key=>!keys.includes(key)))return bad();
  const instrument=readInstrument(value.instrument),reference=readAsset(value.reference),source=readAsset(value.source_video??null);
  if(!instrument||instrument.instrument!==value.subject||!reference||reference.mime!=='application/json'||source===undefined||source&&!isVideo(source))return bad();
@@ -397,6 +397,8 @@ export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
     span.kind!=null&&span.kind!=='playing'&&span.kind!=='explanation')return bad();
   spans.push({start:span.start,end:span.end,kind:(span.kind as 'playing'|'explanation')??'playing'});
  }
+ const analysis=readAsset(value.analysis??null);
+ if(analysis===undefined)return bad();
  const chords:MusicDraftView['guitar_chords']=[];
  const chordValues=value.guitar_chords??[];
  if(!Array.isArray(chordValues)||chordValues.length>100)return bad();
@@ -411,11 +413,11 @@ export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
  }
  if(new Set(chords.map(chord=>chord.id)).size!==chords.length)return bad();
  const provenance=value.provenance;
- if(!isRecord(provenance)||Object.keys(provenance).some(key=>!['adapter','engine','model','model_version','code_version','audio_sha256'].includes(key)))return bad();
+ if(!isRecord(provenance)||Object.keys(provenance).some(key=>!['adapter','engine','model','model_version','code_version','audio_sha256','profile_sha256'].includes(key)))return bad();
  for(const key of ['adapter','engine','code_version'])if(!isText(provenance[key])||(provenance[key] as string).length>80)return bad();
  for(const [key,max] of [['model',120],['model_version',80]] as const)if(provenance[key]!=null&&(!isText(provenance[key])||provenance[key].length>max))return bad();
  if(typeof provenance.audio_sha256!=='string'||! /^[a-f0-9]{64}$/.test(provenance.audio_sha256)||!isStringArray(value.warnings)||value.warnings.length>100)return bad();
  return {ok:true,value:{draft_version:1,draft_id:value.draft_id,lesson_id:value.lesson_id,title:value.title,status:value.status as 'draft'|'reviewed',
-  subject:value.subject,instrument,duration:value.duration,reference,source_video:source,events,spans,guitar_chords:chords,warnings:[...value.warnings],
-  provenance:{adapter:String(provenance.adapter),engine:String(provenance.engine),code_version:String(provenance.code_version),model:provenance.model as string|null??null,model_version:provenance.model_version as string|null??null,audio_sha256:provenance.audio_sha256}}};
+  subject:value.subject,instrument,duration:value.duration,reference,source_video:source,events,spans,guitar_chords:chords,analysis:analysis??null,warnings:[...value.warnings],
+  provenance:{adapter:String(provenance.adapter),engine:String(provenance.engine),code_version:String(provenance.code_version),model:provenance.model as string|null??null,model_version:provenance.model_version as string|null??null,audio_sha256:provenance.audio_sha256,profile_sha256:provenance.profile_sha256 as string|null??null}}};
 }

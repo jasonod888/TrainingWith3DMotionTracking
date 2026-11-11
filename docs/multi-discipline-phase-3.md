@@ -859,3 +859,27 @@ music screen 16,101 B gzip (limit 16,384); initial-review/editor/library browser
 - Boundary matching is now order-independent (fixed-point propagation), with both
   reproduced cases and reversed-array regression. Guitar authoring is restricted to frets
   0–12 and chord base positions 1–9 to match the displayed neck.
+
+
+## Basic Pitch integration audit and tuning slice
+
+11 November 2026.
+
+- Adapter now decodes explicitly from one raw ONNX inference and retains
+  `raw.npz` note/onset/contour activations, MIDI, original proposal and metadata in an
+  owner-only 30-day analysis artifact. Re-decode and prune tooling were added.
+- All decoding choices are in the verified profile (`decoding-v1`): onset 0.5, frame 0.3,
+  minimum 127.7 ms, inferred onsets on, Melodia off, pitch bends off, MIDI tempo 120.
+  Pitch-bend extraction was measured to leave note events unchanged.
+- Five aligned synthetic fixtures cover short/single notes, chords, repeated strikes,
+  soft-under-loud and pedal sustain. Current 19/19 matched with 13 extras; no default
+  threshold or Melodia change was selected. Offset/duration is reported separately.
+- Existing 14.677 s clip reproduces 46/77/40/73 counts; D3 onset peaks below 0.5 are
+  documented, and onset 0.35 recovers them at the cost of 31 extra detections. This clip
+  still lacks a human-verified reference.
+- Audio extraction is confirmed 22,050 Hz mono s16le with no additional offset; the ~0.94 s
+  clip difference is pre-upload trimming.
+- Review audition now uses a harmonic piano-like tone, audio-clock-aligned playhead, and
+  schedules all displayed notes; the 1,000-note cap is explicitly disclosed.
+
+Verification: **327 API passed, 13 skipped**; **291 web passed**; TypeScript/build pass.

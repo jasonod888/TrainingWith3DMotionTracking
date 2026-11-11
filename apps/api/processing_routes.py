@@ -19,7 +19,7 @@ CompletionContract = Literal['body-v1', 'music-v2']
 BODY_REQUIRED_ASSETS = ('reference.glb', 'reference.json', 'preview.mp4', 'thumbnail.jpg')
 BODY_OPTIONAL_ASSETS = ('instructor.mp4', 'instructor-alpha.webm')
 MUSIC_REQUIRED_ASSETS = ('reference.json',)
-MUSIC_OPTIONAL_ASSETS = ('source.mp4', 'preview.mp4', 'waveform.json', 'midi.mid', 'poster.png')
+MUSIC_OPTIONAL_ASSETS = ('source.mp4', 'preview.mp4', 'waveform.json', 'midi.mid', 'poster.png', 'analysis.zip')
 
 
 @dataclass(frozen=True)

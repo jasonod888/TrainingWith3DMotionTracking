@@ -776,3 +776,14 @@ Remaining, in order:
 5. Production-scale load, operating deployment and remaining rollout evidence.
 
 Physical testing is not a prerequisite for items in progress; scoring remains disabled.
+
+
+## Basic Pitch audit update (11 November 2026)
+
+Basic Pitch 0.4.0 ONNX is now audited as an existing decoder: raw activations/MIDI are
+retained in an owner-only analysis artifact, every decoding choice is explicit in the
+verified profile, pitch-bend extraction is disabled with measured event equality, and
+re-decode/retention tooling exists. Five aligned synthetic fixtures and the existing
+14.677 s clip were compared. No threshold/Melodia default was changed; human-verified
+piano references remain the blocking evidence for accuracy claims. 327 API tests and 291
+web tests pass.

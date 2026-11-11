@@ -48,7 +48,7 @@ def load_profile(profile_path: Path, *, weights: Path, code: Path, config: Path,
     missing = [key for key in REQUIRED if data.get(key) in (None, '')]
     if missing:
         raise ValueError('Run profile is missing ' + ', '.join(missing) + '.')
-    unknown = set(data) - set(REQUIRED)
+    unknown = set(data) - set(REQUIRED) - {'decoding'}
     if unknown:
         raise ValueError('Run profile has unknown fields: ' + ', '.join(sorted(unknown)) + '.')
     if not isinstance(data['model'], str) or not data['model'] or len(data['model']) > 120:
@@ -76,8 +76,25 @@ def load_profile(profile_path: Path, *, weights: Path, code: Path, config: Path,
     for key, value in data['thresholds'].items():
         if not isinstance(key, str) or not key or not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
             raise ValueError('Inference thresholds must be numeric.')
+    if 'decoding' in data:
+        decoding=data['decoding']
+        if not isinstance(decoding,dict) or set(decoding)-{'decoding_version','infer_onsets','melodia_trick','include_pitch_bends','multiple_pitch_bends','midi_tempo','minimum_frequency','maximum_frequency'}:
+            raise ValueError('Decoding settings have unknown or missing fields.')
+        if not isinstance(decoding.get('decoding_version'),str) or not decoding['decoding_version'] or len(decoding['decoding_version'])>80:
+            raise ValueError('Decoding version is invalid.')
+        for key in ('infer_onsets','melodia_trick','include_pitch_bends','multiple_pitch_bends'):
+            if type(decoding.get(key)) is not bool:
+                raise ValueError(f'Decoding {key} must be boolean.')
+        for key in ('minimum_frequency','maximum_frequency'):
+            value=decoding.get(key)
+            if value is not None and (isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<=0):
+                raise ValueError(f'Decoding {key} must be positive or null.')
+        tempo=decoding.get('midi_tempo')
+        if isinstance(tempo,bool) or not isinstance(tempo,(int,float)) or not math.isfinite(tempo) or not 20<=tempo<=400:
+            raise ValueError('Decoding midi_tempo must be numeric.')
     configuration = json.loads(config.read_text(encoding='utf-8'))
     expected = {key: data[key] for key in ('sample_rate', 'preprocessing', 'thresholds')}
+    if 'decoding' in data: expected['decoding']=data['decoding']
     if configuration != expected:
         raise ValueError('Inference configuration must match the run profile settings exactly.')
     canonical = json.dumps(data, sort_keys=True, separators=(',', ':'))

@@ -1,0 +1,1639 @@
+{
+  "fixtures": {
+    "single-short": {
+      "notes": [
+        {
+          "onset": 0.25,
+          "duration": 0.12,
+          "pitch": 60
+        },
+        {
+          "onset": 0.75,
+          "duration": 0.12,
+          "pitch": 64
+        },
+        {
+          "onset": 1.25,
+          "duration": 0.2,
+          "pitch": 67
+        }
+      ],
+      "category": "single-short",
+      "current": {
+        "reference": 3,
+        "detected": 3,
+        "matched": 3,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 10.83,
+        "offset_mae_ms": 32.13,
+        "duration_mae_ms": 42.96,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.230657596371882,
+            "end": 1.474467120181406,
+            "pitch": 67
+          },
+          {
+            "onset": 0.7430385487528345,
+            "end": 0.905578231292517,
+            "pitch": 64
+          },
+          {
+            "onset": 0.2438095238095238,
+            "end": 0.40634920634920635,
+            "pitch": 60
+          }
+        ]
+      },
+      "onset_0.35": {
+        "reference": 3,
+        "detected": 4,
+        "matched": 3,
+        "missing": 0,
+        "extra": 1,
+        "onset_mae_ms": 10.83,
+        "offset_mae_ms": 32.13,
+        "duration_mae_ms": 42.96,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8575963718820863,
+            "pitch": 28
+          },
+          {
+            "onset": 1.230657596371882,
+            "end": 1.474467120181406,
+            "pitch": 67
+          },
+          {
+            "onset": 0.7430385487528345,
+            "end": 0.905578231292517,
+            "pitch": 64
+          },
+          {
+            "onset": 0.2438095238095238,
+            "end": 0.40634920634920635,
+            "pitch": 60
+          }
+        ]
+      },
+      "frame_0.40": {
+        "reference": 3,
+        "detected": 3,
+        "matched": 3,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 10.83,
+        "offset_mae_ms": 20.52,
+        "duration_mae_ms": 31.35,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.230657596371882,
+            "end": 1.4628571428571429,
+            "pitch": 67
+          },
+          {
+            "onset": 0.7430385487528345,
+            "end": 0.893968253968254,
+            "pitch": 64
+          },
+          {
+            "onset": 0.2438095238095238,
+            "end": 0.3947392290249433,
+            "pitch": 60
+          }
+        ]
+      },
+      "melodia_on": {
+        "reference": 3,
+        "detected": 4,
+        "matched": 3,
+        "missing": 0,
+        "extra": 1,
+        "onset_mae_ms": 10.83,
+        "offset_mae_ms": 32.13,
+        "duration_mae_ms": 42.96,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.230657596371882,
+            "end": 1.474467120181406,
+            "pitch": 67
+          },
+          {
+            "onset": 0.7430385487528345,
+            "end": 0.905578231292517,
+            "pitch": 64
+          },
+          {
+            "onset": 0.2438095238095238,
+            "end": 0.40634920634920635,
+            "pitch": 60
+          },
+          {
+            "onset": 1.7414965986394557,
+            "end": 1.8924263038548752,
+            "pitch": 32
+          }
+        ]
+      },
+      "infer_onsets_off": {
+        "reference": 3,
+        "detected": 3,
+        "matched": 3,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 6.96,
+        "offset_mae_ms": 32.13,
+        "duration_mae_ms": 39.09,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.242267573696145,
+            "end": 1.474467120181406,
+            "pitch": 67
+          },
+          {
+            "onset": 0.7430385487528345,
+            "end": 0.905578231292517,
+            "pitch": 64
+          },
+          {
+            "onset": 0.2438095238095238,
+            "end": 0.40634920634920635,
+            "pitch": 60
+          }
+        ]
+      },
+      "pitch_bends_on": {
+        "reference": 3,
+        "detected": 3,
+        "matched": 3,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 10.83,
+        "offset_mae_ms": 32.13,
+        "duration_mae_ms": 42.96,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.230657596371882,
+            "end": 1.474467120181406,
+            "pitch": 67
+          },
+          {
+            "onset": 0.7430385487528345,
+            "end": 0.905578231292517,
+            "pitch": 64
+          },
+          {
+            "onset": 0.2438095238095238,
+            "end": 0.40634920634920635,
+            "pitch": 60
+          }
+        ]
+      }
+    },
+    "chords-overlap": {
+      "notes": [
+        {
+          "onset": 0.3,
+          "duration": 1.2,
+          "pitch": 48
+        },
+        {
+          "onset": 0.3,
+          "duration": 1.2,
+          "pitch": 52
+        },
+        {
+          "onset": 0.3,
+          "duration": 1.2,
+          "pitch": 55
+        },
+        {
+          "onset": 0.8,
+          "duration": 0.8,
+          "pitch": 60
+        },
+        {
+          "onset": 1.0,
+          "duration": 1.0,
+          "pitch": 72
+        }
+      ],
+      "category": "chords-overlap",
+      "current": {
+        "reference": 5,
+        "detected": 12,
+        "matched": 5,
+        "missing": 0,
+        "extra": 7,
+        "onset_mae_ms": 3.53,
+        "offset_mae_ms": 347.55,
+        "duration_mae_ms": 346.25,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 2.021419954648526,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6486167800453515,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6137868480725623,
+            "pitch": 60
+          },
+          {
+            "onset": 0.9868480725623583,
+            "end": 1.1609977324263039,
+            "pitch": 84
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 72
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 60
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 1.497687074829932,
+            "pitch": 48
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5224489795918368,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.592108843537415,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4628571428571429,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4628571428571429,
+            "pitch": 52
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.7894784580498866,
+            "pitch": 48
+          }
+        ]
+      },
+      "onset_0.35": {
+        "reference": 5,
+        "detected": 13,
+        "matched": 5,
+        "missing": 0,
+        "extra": 8,
+        "onset_mae_ms": 3.53,
+        "offset_mae_ms": 482.22,
+        "duration_mae_ms": 480.93,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 2.021419954648526,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6486167800453515,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6137868480725623,
+            "pitch": 60
+          },
+          {
+            "onset": 0.9868480725623583,
+            "end": 1.1609977324263039,
+            "pitch": 84
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 72
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 60
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 1.4628571428571429,
+            "pitch": 55
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 1.497687074829932,
+            "pitch": 48
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5224489795918368,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.592108843537415,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.7894784580498866,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4628571428571429,
+            "pitch": 52
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.7894784580498866,
+            "pitch": 48
+          }
+        ]
+      },
+      "frame_0.40": {
+        "reference": 5,
+        "detected": 10,
+        "matched": 5,
+        "missing": 0,
+        "extra": 5,
+        "onset_mae_ms": 3.53,
+        "offset_mae_ms": 361.48,
+        "duration_mae_ms": 360.18,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 2.009809977324263,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6486167800453515,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.5905668934240362,
+            "pitch": 60
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 72
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 60
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 1.4628571428571429,
+            "pitch": 48
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5224489795918368,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4280272108843537,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4280272108843537,
+            "pitch": 52
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.7894784580498866,
+            "pitch": 48
+          }
+        ]
+      },
+      "melodia_on": {
+        "reference": 5,
+        "detected": 12,
+        "matched": 5,
+        "missing": 0,
+        "extra": 7,
+        "onset_mae_ms": 3.53,
+        "offset_mae_ms": 347.55,
+        "duration_mae_ms": 346.25,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 2.021419954648526,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6486167800453515,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6137868480725623,
+            "pitch": 60
+          },
+          {
+            "onset": 0.9868480725623583,
+            "end": 1.1609977324263039,
+            "pitch": 84
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 72
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 60
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 1.497687074829932,
+            "pitch": 48
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5224489795918368,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.592108843537415,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4628571428571429,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4628571428571429,
+            "pitch": 52
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.7894784580498866,
+            "pitch": 48
+          }
+        ]
+      },
+      "infer_onsets_off": {
+        "reference": 5,
+        "detected": 11,
+        "matched": 5,
+        "missing": 0,
+        "extra": 6,
+        "onset_mae_ms": 3.53,
+        "offset_mae_ms": 281.55,
+        "duration_mae_ms": 280.87,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 0.9984580498866213,
+            "end": 2.021419954648526,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6137868480725623,
+            "pitch": 60
+          },
+          {
+            "onset": 0.9868480725623583,
+            "end": 1.1609977324263039,
+            "pitch": 84
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 72
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 60
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 1.497687074829932,
+            "pitch": 48
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5224489795918368,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.592108843537415,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4628571428571429,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4628571428571429,
+            "pitch": 52
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.7894784580498866,
+            "pitch": 48
+          }
+        ]
+      },
+      "pitch_bends_on": {
+        "reference": 5,
+        "detected": 12,
+        "matched": 5,
+        "missing": 0,
+        "extra": 7,
+        "onset_mae_ms": 3.53,
+        "offset_mae_ms": 347.55,
+        "duration_mae_ms": 346.25,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 2.021419954648526,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6486167800453515,
+            "pitch": 72
+          },
+          {
+            "onset": 0.9984580498866213,
+            "end": 1.6137868480725623,
+            "pitch": 60
+          },
+          {
+            "onset": 0.9868480725623583,
+            "end": 1.1609977324263039,
+            "pitch": 84
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 72
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 0.9984580498866213,
+            "pitch": 60
+          },
+          {
+            "onset": 0.7894784580498866,
+            "end": 1.497687074829932,
+            "pitch": 48
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5224489795918368,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.592108843537415,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4628571428571429,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 1.4628571428571429,
+            "pitch": 52
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.7894784580498866,
+            "pitch": 48
+          }
+        ]
+      }
+    },
+    "repeated-pitch": {
+      "notes": [
+        {
+          "onset": 0.3,
+          "duration": 0.18,
+          "pitch": 60
+        },
+        {
+          "onset": 0.8,
+          "duration": 0.18,
+          "pitch": 60
+        },
+        {
+          "onset": 1.3,
+          "duration": 0.18,
+          "pitch": 60
+        },
+        {
+          "onset": 1.8,
+          "duration": 0.18,
+          "pitch": 60
+        }
+      ],
+      "category": "repeated-pitch",
+      "current": {
+        "reference": 4,
+        "detected": 4,
+        "matched": 4,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 6.35,
+        "offset_mae_ms": 30.0,
+        "duration_mae_ms": 29.3,
+        "repeated_reference_pairs": 3,
+        "repeated_pairs_recovered": 3,
+        "detections": [
+          {
+            "onset": 1.811156462585034,
+            "end": 2.009809977324263,
+            "pitch": 60
+          },
+          {
+            "onset": 1.2887074829931973,
+            "end": 1.509297052154195,
+            "pitch": 60
+          },
+          {
+            "onset": 0.8010884353741496,
+            "end": 1.0100680272108844,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5108390022675737,
+            "pitch": 60
+          }
+        ]
+      },
+      "onset_0.35": {
+        "reference": 4,
+        "detected": 4,
+        "matched": 4,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 6.35,
+        "offset_mae_ms": 30.0,
+        "duration_mae_ms": 29.3,
+        "repeated_reference_pairs": 3,
+        "repeated_pairs_recovered": 3,
+        "detections": [
+          {
+            "onset": 1.811156462585034,
+            "end": 2.009809977324263,
+            "pitch": 60
+          },
+          {
+            "onset": 1.2887074829931973,
+            "end": 1.509297052154195,
+            "pitch": 60
+          },
+          {
+            "onset": 0.8010884353741496,
+            "end": 1.0100680272108844,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5108390022675737,
+            "pitch": 60
+          }
+        ]
+      },
+      "frame_0.40": {
+        "reference": 4,
+        "detected": 4,
+        "matched": 4,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 6.35,
+        "offset_mae_ms": 18.39,
+        "duration_mae_ms": 17.69,
+        "repeated_reference_pairs": 3,
+        "repeated_pairs_recovered": 3,
+        "detections": [
+          {
+            "onset": 1.811156462585034,
+            "end": 1.9981999999999998,
+            "pitch": 60
+          },
+          {
+            "onset": 1.2887074829931973,
+            "end": 1.497687074829932,
+            "pitch": 60
+          },
+          {
+            "onset": 0.8010884353741496,
+            "end": 0.9984580498866213,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.4992290249433107,
+            "pitch": 60
+          }
+        ]
+      },
+      "melodia_on": {
+        "reference": 4,
+        "detected": 4,
+        "matched": 4,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 6.35,
+        "offset_mae_ms": 30.0,
+        "duration_mae_ms": 29.3,
+        "repeated_reference_pairs": 3,
+        "repeated_pairs_recovered": 3,
+        "detections": [
+          {
+            "onset": 1.811156462585034,
+            "end": 2.009809977324263,
+            "pitch": 60
+          },
+          {
+            "onset": 1.2887074829931973,
+            "end": 1.509297052154195,
+            "pitch": 60
+          },
+          {
+            "onset": 0.8010884353741496,
+            "end": 1.0100680272108844,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5108390022675737,
+            "pitch": 60
+          }
+        ]
+      },
+      "infer_onsets_off": {
+        "reference": 4,
+        "detected": 4,
+        "matched": 4,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 3.61,
+        "offset_mae_ms": 30.0,
+        "duration_mae_ms": 26.4,
+        "repeated_reference_pairs": 3,
+        "repeated_pairs_recovered": 3,
+        "detections": [
+          {
+            "onset": 1.811156462585034,
+            "end": 2.009809977324263,
+            "pitch": 60
+          },
+          {
+            "onset": 1.3003174603174603,
+            "end": 1.509297052154195,
+            "pitch": 60
+          },
+          {
+            "onset": 0.8010884353741496,
+            "end": 1.0100680272108844,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5108390022675737,
+            "pitch": 60
+          }
+        ]
+      },
+      "pitch_bends_on": {
+        "reference": 4,
+        "detected": 4,
+        "matched": 4,
+        "missing": 0,
+        "extra": 0,
+        "onset_mae_ms": 6.35,
+        "offset_mae_ms": 30.0,
+        "duration_mae_ms": 29.3,
+        "repeated_reference_pairs": 3,
+        "repeated_pairs_recovered": 3,
+        "detections": [
+          {
+            "onset": 1.811156462585034,
+            "end": 2.009809977324263,
+            "pitch": 60
+          },
+          {
+            "onset": 1.2887074829931973,
+            "end": 1.509297052154195,
+            "pitch": 60
+          },
+          {
+            "onset": 0.8010884353741496,
+            "end": 1.0100680272108844,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 0.5108390022675737,
+            "pitch": 60
+          }
+        ]
+      }
+    },
+    "soft-under-loud": {
+      "notes": [
+        {
+          "onset": 0.3,
+          "duration": 1.5,
+          "pitch": 36
+        },
+        {
+          "onset": 0.3,
+          "duration": 1.5,
+          "pitch": 43
+        },
+        {
+          "onset": 0.6,
+          "duration": 0.8,
+          "pitch": 72
+        },
+        {
+          "onset": 1.1,
+          "duration": 0.8,
+          "pitch": 76
+        }
+      ],
+      "category": "soft-under-loud",
+      "current": {
+        "reference": 4,
+        "detected": 8,
+        "matched": 4,
+        "missing": 0,
+        "extra": 4,
+        "onset_mae_ms": 9.01,
+        "offset_mae_ms": 87.11,
+        "duration_mae_ms": 82.43,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8343764172335602,
+            "pitch": 48
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.822766439909297,
+            "pitch": 43
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8808163265306121,
+            "pitch": 36
+          },
+          {
+            "onset": 1.0913378684807256,
+            "end": 1.9040362811791383,
+            "pitch": 76
+          },
+          {
+            "onset": 0.592108843537415,
+            "end": 1.3583673469387756,
+            "pitch": 72
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 48
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 43
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 36
+          }
+        ]
+      },
+      "onset_0.35": {
+        "reference": 4,
+        "detected": 12,
+        "matched": 3,
+        "missing": 1,
+        "extra": 9,
+        "onset_mae_ms": 8.77,
+        "offset_mae_ms": 546.74,
+        "duration_mae_ms": 537.97,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.9040362811791383,
+            "pitch": 76
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8343764172335602,
+            "pitch": 48
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.822766439909297,
+            "pitch": 43
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8808163265306121,
+            "pitch": 36
+          },
+          {
+            "onset": 1.0913378684807256,
+            "end": 1.6486167800453515,
+            "pitch": 76
+          },
+          {
+            "onset": 0.592108843537415,
+            "end": 1.3583673469387756,
+            "pitch": 72
+          },
+          {
+            "onset": 0.5688888888888889,
+            "end": 1.6486167800453515,
+            "pitch": 36
+          },
+          {
+            "onset": 0.4527891156462585,
+            "end": 1.6486167800453515,
+            "pitch": 43
+          },
+          {
+            "onset": 0.4179591836734694,
+            "end": 0.5688888888888889,
+            "pitch": 36
+          },
+          {
+            "onset": 0.33668934240362813,
+            "end": 1.6486167800453515,
+            "pitch": 48
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 0.4527891156462585,
+            "pitch": 43
+          },
+          {
+            "onset": 0.19736961451247165,
+            "end": 0.4179591836734694,
+            "pitch": 36
+          }
+        ]
+      },
+      "frame_0.40": {
+        "reference": 4,
+        "detected": 8,
+        "matched": 4,
+        "missing": 0,
+        "extra": 4,
+        "onset_mae_ms": 9.01,
+        "offset_mae_ms": 96.7,
+        "duration_mae_ms": 87.69,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.799546485260771,
+            "pitch": 48
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.799546485260771,
+            "pitch": 43
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8343764172335602,
+            "pitch": 36
+          },
+          {
+            "onset": 1.0913378684807256,
+            "end": 1.8808163265306121,
+            "pitch": 76
+          },
+          {
+            "onset": 0.592108843537415,
+            "end": 1.3351473922902495,
+            "pitch": 72
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 48
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 43
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 36
+          }
+        ]
+      },
+      "melodia_on": {
+        "reference": 4,
+        "detected": 9,
+        "matched": 4,
+        "missing": 0,
+        "extra": 5,
+        "onset_mae_ms": 9.01,
+        "offset_mae_ms": 87.11,
+        "duration_mae_ms": 82.43,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8343764172335602,
+            "pitch": 48
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.822766439909297,
+            "pitch": 43
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8808163265306121,
+            "pitch": 36
+          },
+          {
+            "onset": 1.0913378684807256,
+            "end": 1.9040362811791383,
+            "pitch": 76
+          },
+          {
+            "onset": 0.592108843537415,
+            "end": 1.3583673469387756,
+            "pitch": 72
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 48
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 43
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 36
+          },
+          {
+            "onset": 0.7198185941043084,
+            "end": 0.905578231292517,
+            "pitch": 60
+          }
+        ]
+      },
+      "infer_onsets_off": {
+        "reference": 4,
+        "detected": 5,
+        "matched": 4,
+        "missing": 0,
+        "extra": 1,
+        "onset_mae_ms": 9.01,
+        "offset_mae_ms": 37.31,
+        "duration_mae_ms": 42.38,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.0913378684807256,
+            "end": 1.9040362811791383,
+            "pitch": 76
+          },
+          {
+            "onset": 0.592108843537415,
+            "end": 1.3583673469387756,
+            "pitch": 72
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.8343764172335602,
+            "pitch": 48
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.822766439909297,
+            "pitch": 43
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.8808163265306121,
+            "pitch": 36
+          }
+        ]
+      },
+      "pitch_bends_on": {
+        "reference": 4,
+        "detected": 8,
+        "matched": 4,
+        "missing": 0,
+        "extra": 4,
+        "onset_mae_ms": 9.01,
+        "offset_mae_ms": 87.11,
+        "duration_mae_ms": 82.43,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8343764172335602,
+            "pitch": 48
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.822766439909297,
+            "pitch": 43
+          },
+          {
+            "onset": 1.6486167800453515,
+            "end": 1.8808163265306121,
+            "pitch": 36
+          },
+          {
+            "onset": 1.0913378684807256,
+            "end": 1.9040362811791383,
+            "pitch": 76
+          },
+          {
+            "onset": 0.592108843537415,
+            "end": 1.3583673469387756,
+            "pitch": 72
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 48
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 43
+          },
+          {
+            "onset": 0.29024943310657597,
+            "end": 1.6486167800453515,
+            "pitch": 36
+          }
+        ]
+      }
+    },
+    "pedal-sustain": {
+      "notes": [
+        {
+          "onset": 0.3,
+          "duration": 2.4,
+          "pitch": 48
+        },
+        {
+          "onset": 0.3,
+          "duration": 2.4,
+          "pitch": 55
+        },
+        {
+          "onset": 0.3,
+          "duration": 2.4,
+          "pitch": 64
+        }
+      ],
+      "category": "pedal-sustain",
+      "current": {
+        "reference": 3,
+        "detected": 5,
+        "matched": 3,
+        "missing": 0,
+        "extra": 2,
+        "onset_mae_ms": 1.86,
+        "offset_mae_ms": 14.15,
+        "duration_mae_ms": 12.29,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 0.301859410430839,
+            "end": 0.44117913832199546,
+            "pitch": 76
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.671578684807256,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7064086167800454,
+            "pitch": 48
+          }
+        ]
+      },
+      "onset_0.35": {
+        "reference": 3,
+        "detected": 5,
+        "matched": 3,
+        "missing": 0,
+        "extra": 2,
+        "onset_mae_ms": 1.86,
+        "offset_mae_ms": 14.15,
+        "duration_mae_ms": 12.29,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 0.301859410430839,
+            "end": 0.44117913832199546,
+            "pitch": 76
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.671578684807256,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7064086167800454,
+            "pitch": 48
+          }
+        ]
+      },
+      "frame_0.40": {
+        "reference": 3,
+        "detected": 4,
+        "matched": 3,
+        "missing": 0,
+        "extra": 1,
+        "onset_mae_ms": 1.86,
+        "offset_mae_ms": 9.07,
+        "duration_mae_ms": 10.93,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 0.301859410430839,
+            "end": 2.694798639455782,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.288449433106576,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.694798639455782,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.6831886621315193,
+            "pitch": 48
+          }
+        ]
+      },
+      "melodia_on": {
+        "reference": 3,
+        "detected": 6,
+        "matched": 3,
+        "missing": 0,
+        "extra": 3,
+        "onset_mae_ms": 1.86,
+        "offset_mae_ms": 14.15,
+        "duration_mae_ms": 12.29,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 0.301859410430839,
+            "end": 0.44117913832199546,
+            "pitch": 76
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.671578684807256,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7064086167800454,
+            "pitch": 48
+          },
+          {
+            "onset": 0.4179591836734694,
+            "end": 0.5572789115646258,
+            "pitch": 36
+          }
+        ]
+      },
+      "infer_onsets_off": {
+        "reference": 3,
+        "detected": 5,
+        "matched": 3,
+        "missing": 0,
+        "extra": 2,
+        "onset_mae_ms": 1.86,
+        "offset_mae_ms": 14.15,
+        "duration_mae_ms": 12.29,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 0.301859410430839,
+            "end": 0.44117913832199546,
+            "pitch": 76
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.671578684807256,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7064086167800454,
+            "pitch": 48
+          }
+        ]
+      },
+      "pitch_bends_on": {
+        "reference": 3,
+        "detected": 5,
+        "matched": 3,
+        "missing": 0,
+        "extra": 2,
+        "onset_mae_ms": 1.86,
+        "offset_mae_ms": 14.15,
+        "duration_mae_ms": 12.29,
+        "repeated_reference_pairs": 0,
+        "repeated_pairs_recovered": 0,
+        "detections": [
+          {
+            "onset": 0.301859410430839,
+            "end": 0.44117913832199546,
+            "pitch": 76
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 64
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.671578684807256,
+            "pitch": 60
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7180185941043082,
+            "pitch": 55
+          },
+          {
+            "onset": 0.301859410430839,
+            "end": 2.7064086167800454,
+            "pitch": 48
+          }
+        ]
+      }
+    }
+  },
+  "configs": {
+    "current": {
+      "reference": 19,
+      "detected": 32,
+      "matched": 19,
+      "missing": 0,
+      "extra": 13,
+      "onset_mae_ms": 6.32,
+      "offset_mae_ms": 102.19,
+      "duration_mae_ms": 102.65,
+      "repeated_reference_pairs": 3,
+      "repeated_pairs_recovered": 3,
+      "config": {
+        "onset_threshold": 0.5,
+        "frame_threshold": 0.3,
+        "minimum_note_length": 127.7,
+        "infer_onsets": true,
+        "melodia_trick": false,
+        "include_pitch_bends": false
+      }
+    },
+    "onset_0.35": {
+      "reference": 19,
+      "detected": 38,
+      "matched": 18,
+      "missing": 1,
+      "extra": 20,
+      "onset_mae_ms": 6.27,
+      "offset_mae_ms": 221.05,
+      "duration_mae_ms": 220.69,
+      "repeated_reference_pairs": 3,
+      "repeated_pairs_recovered": 3,
+      "config": {
+        "onset_threshold": 0.35,
+        "frame_threshold": 0.3,
+        "minimum_note_length": 127.7,
+        "infer_onsets": true,
+        "melodia_trick": false,
+        "include_pitch_bends": false
+      }
+    },
+    "frame_0.40": {
+      "reference": 19,
+      "detected": 29,
+      "matched": 19,
+      "missing": 0,
+      "extra": 10,
+      "onset_mae_ms": 6.32,
+      "offset_mae_ms": 101.23,
+      "duration_mae_ms": 101.57,
+      "repeated_reference_pairs": 3,
+      "repeated_pairs_recovered": 3,
+      "config": {
+        "onset_threshold": 0.5,
+        "frame_threshold": 0.4,
+        "minimum_note_length": 127.7,
+        "infer_onsets": true,
+        "melodia_trick": false,
+        "include_pitch_bends": false
+      }
+    },
+    "melodia_on": {
+      "reference": 19,
+      "detected": 35,
+      "matched": 19,
+      "missing": 0,
+      "extra": 16,
+      "onset_mae_ms": 6.32,
+      "offset_mae_ms": 102.19,
+      "duration_mae_ms": 102.65,
+      "repeated_reference_pairs": 3,
+      "repeated_pairs_recovered": 3,
+      "config": {
+        "onset_threshold": 0.5,
+        "frame_threshold": 0.3,
+        "minimum_note_length": 127.7,
+        "infer_onsets": true,
+        "melodia_trick": true,
+        "include_pitch_bends": false
+      }
+    },
+    "infer_onsets_off": {
+      "reference": 19,
+      "detected": 28,
+      "matched": 19,
+      "missing": 0,
+      "extra": 9,
+      "onset_mae_ms": 4.99,
+      "offset_mae_ms": 79.03,
+      "duration_mae_ms": 80.21,
+      "repeated_reference_pairs": 3,
+      "repeated_pairs_recovered": 3,
+      "config": {
+        "onset_threshold": 0.5,
+        "frame_threshold": 0.3,
+        "minimum_note_length": 127.7,
+        "infer_onsets": false,
+        "melodia_trick": false,
+        "include_pitch_bends": false
+      }
+    },
+    "pitch_bends_on": {
+      "reference": 19,
+      "detected": 32,
+      "matched": 19,
+      "missing": 0,
+      "extra": 13,
+      "onset_mae_ms": 6.32,
+      "offset_mae_ms": 102.19,
+      "duration_mae_ms": 102.65,
+      "repeated_reference_pairs": 3,
+      "repeated_pairs_recovered": 3,
+      "config": {
+        "onset_threshold": 0.5,
+        "frame_threshold": 0.3,
+        "minimum_note_length": 127.7,
+        "infer_onsets": true,
+        "melodia_trick": false,
+        "include_pitch_bends": true
+      }
+    }
+  },
+  "tolerance_ms": 80.0,
+  "note": "Synthetic aligned MIDI+audio fixtures; not human performances.",
+  "bends_events_equal": true
+}

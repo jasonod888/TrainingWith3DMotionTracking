@@ -7,8 +7,10 @@ const BLACK = new Set([1, 3, 6, 8, 10]);
 /** Piano-roll, keyboard and synthesized audition for the unreviewed note proposal. */
 export function DraftNotePreview({events,duration}:{events:MusicDraftEvent[];duration:number}){
  const [time,setTime]=useState(0),[playing,setPlaying]=useState(false);
+ const MAX_AUDITION=1000;
  const audio=useRef<AudioContext|null>(null),scheduled=useRef<Scheduled[]>([]),frame=useRef(0),startedAt=useRef(0);
- const notes=useMemo(()=>events.filter(event=>event.onset<duration).slice(0,1000),[events,duration]);
+ const notes=useMemo(()=>events.filter(event=>event.onset<duration).slice(0,MAX_AUDITION),[events,duration]);
+ const truncated=events.filter(event=>event.onset<duration).length>MAX_AUDITION;
  const pitches=notes.map(event=>event.pitch);
  const low=pitches.length?Math.min(...pitches):48,high=pitches.length?Math.max(...pitches):72;
  const rowLow=Math.max(0,low-1),rowHigh=Math.min(127,high+1),rows=rowHigh-rowLow+1;
@@ -50,18 +52,19 @@ export function DraftNotePreview({events,duration}:{events:MusicDraftEvent[];dur
   const Ctor=window.AudioContext??(window as typeof window&{webkitAudioContext?:typeof AudioContext}).webkitAudioContext;
   if(!Ctor){return;}
   const context=new Ctor();await context.resume();audio.current=context;
-  const base=context.currentTime+.06;
-  for(const note of notes.slice(0,500)){
+  const base=context.currentTime+.05;
+  const wave=context.createPeriodicWave(new Float32Array([0,1,.55,.3,.16,.09]),new Float32Array(6));
+  for(const note of notes){
    const oscillator=context.createOscillator(),gain=context.createGain();
-   oscillator.type=note.pitch<60?'triangle':'sine';oscillator.frequency.value=440*2**((note.pitch-69)/12);
+   oscillator.setPeriodicWave(wave);oscillator.frequency.value=440*2**((note.pitch-69)/12);
    const begin=base+note.onset,length=Math.max(.06,note.duration??.25),volume=Math.min(.09,.035+(note.velocity??.6)*.04);
    gain.gain.setValueAtTime(.0001,begin);gain.gain.exponentialRampToValueAtTime(volume,begin+.015);
    gain.gain.exponentialRampToValueAtTime(.0001,begin+length);
    oscillator.connect(gain).connect(context.destination);oscillator.start(begin);oscillator.stop(begin+length+.02);
    scheduled.current.push({oscillator,gain});
   }
-  startedAt.current=performance.now();setPlaying(true);
-  const tick=()=>{const elapsed=(performance.now()-startedAt.current)/1000;setTime(Math.min(duration,elapsed));if(elapsed<duration)frame.current=requestAnimationFrame(tick);else stop();};
+  startedAt.current=performance.now()+50;setPlaying(true);
+  const tick=()=>{const elapsed=Math.max(0,(performance.now()-startedAt.current)/1000);setTime(Math.min(duration,elapsed));if(elapsed<duration)frame.current=requestAnimationFrame(tick);else stop();};
   tick();
  };
  return <section className="draft-note-preview" aria-label="Proposed note preview">
@@ -79,6 +82,7 @@ export function DraftNotePreview({events,duration}:{events:MusicDraftEvent[];dur
    </svg>
   </div>
   <div className="draft-preview-status" role="status" aria-live="polite">{playing?`Auditioning ${time.toFixed(1)} of ${duration.toFixed(1)} seconds.`:'Ready to audition. The video at the top stays visible while you edit.'}</div>
+  <p className="small muted draft-preview-limit">{truncated?`Showing and auditioning the first ${MAX_AUDITION} notes of this proposal; remaining notes are still editable below.`:`All ${notes.length} proposed notes are shown and auditioned.`}</p>
   <svg className="draft-keyboard" viewBox="0 0 720 92" role="img" aria-label="Piano keyboard, lit keys follow the audition">
    {keyboard.whites.map((pitch,index)=><g key={pitch}>
     <rect x={index*keyboard.whiteW} y="4" width={keyboard.whiteW-1} height="80" rx="2" className={activePitches.has(pitch)?'draft-key-white is-active':'draft-key-white'}/>

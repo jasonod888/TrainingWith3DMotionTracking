@@ -297,6 +297,7 @@ class MusicDraftDocument(Contract):
     events: list[MusicEvent] = Field(default_factory=list, max_length=20000)
     spans: list[MusicSpan] = Field(default_factory=list, max_length=500)
     guitar_chords: list[GuitarChord] = Field(default_factory=list, max_length=100)
+    analysis: Asset | None = None
     provenance: DraftProvenance
     warnings: list[str] = Field(default_factory=list, max_length=100)
 

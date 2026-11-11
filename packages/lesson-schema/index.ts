@@ -67,8 +67,8 @@ export type MusicDraftGuitarChord={id:string;name:string;start:number;frets:numb
 export type MusicDraftEvent={id:string;onset:number;duration:number|null;pitch:number;velocity:number|null;confidence:number|null;optional:boolean;string:number|null;fret:number|null};
 export type MusicDraftView={draft_version:1;draft_id:string;lesson_id:string;title:string;status:'draft'|'reviewed';
  subject:'piano'|'guitar';instrument:InstrumentConfig;duration:number;reference:Asset;source_video:Asset|null;
- events:MusicDraftEvent[];spans:{start:number;end:number;kind:'playing'|'explanation'}[];guitar_chords:MusicDraftGuitarChord[];warnings:string[];
- provenance:{adapter:string;engine:string;model:string|null;model_version:string|null;code_version:string;audio_sha256:string}};
+ events:MusicDraftEvent[];spans:{start:number;end:number;kind:'playing'|'explanation'}[];guitar_chords:MusicDraftGuitarChord[];analysis:{key:string;mime:string;bytes:number;sha256:string}|null;warnings:string[];
+ provenance:{adapter:string;engine:string;model:string|null;model_version:string|null;code_version:string;audio_sha256:string;profile_sha256?:string|null}};
 
 export type MusicLessonManifest = {
   schema_version: 2;

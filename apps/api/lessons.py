@@ -487,6 +487,38 @@ def install_lessons(app, engine, settings, identity, db):
         session.commit()
         return {'message': 'Lesson removed from your library.'}
 
+    @router.get('/{lesson_id}/music-analysis')
+    def music_analysis(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
+        """Owner-only metadata for the retained raw prediction artifact."""
+        lesson=owned_lesson(session,lesson_id,account.id)
+        record=session.scalar(select(LessonAsset).where(
+            LessonAsset.lesson_id==lesson_id,
+            LessonAsset.key.like(f'lessons/{lesson_id}/%-analysis.zip')).order_by(LessonAsset.key.desc()))
+        if not record:raise HTTPException(404,'No retained analysis for this lesson.')
+        return {'key':record.key,'mime':record.mime,'bytes':record.bytes,'sha256':record.sha256,
+                'retention_days':settings.music_analysis_retention_days,
+                'note':'Internal diagnostic artifact. Owner access only; expires by retention policy.'}
+
+    @router.get('/{lesson_id}/music-analysis/artifact')
+    def music_analysis_artifact(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
+        lesson=owned_lesson(session,lesson_id,account.id)
+        record=session.scalar(select(LessonAsset).where(
+            LessonAsset.lesson_id==lesson_id,
+            LessonAsset.key.like(f'lessons/{lesson_id}/%-analysis.zip')).order_by(LessonAsset.key.desc()))
+        if not record:raise HTTPException(404,'No retained analysis for this lesson.')
+        try:
+            obj=storage_client(settings).get_object(Bucket=settings.storage_bucket,Key=record.key)
+        except ClientError as exc:
+            raise HTTPException(404,'Analysis artifact unavailable.') from exc
+        def stream():
+            try:
+                yield from obj['Body'].iter_chunks(chunk_size=256*1024)
+            finally:
+                obj['Body'].close()
+        return StreamingResponse(stream(),media_type='application/zip',headers={
+            'Content-Length':str(obj['ContentLength']),'Cache-Control':'private, no-store',
+            'Content-Disposition':'attachment; filename="basic-pitch-analysis.zip"'})
+
     @router.get('/{lesson_id}/assets/{name}')
     def asset(lesson_id: str, name: str, request: Request, account=Depends(identity), session: Session = Depends(db)):
         lesson,reasons=access_reasons(session,lesson_id,account.id)
