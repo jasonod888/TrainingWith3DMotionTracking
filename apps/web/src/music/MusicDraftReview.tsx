@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import type {MusicDraftEvent,MusicDraftGuitarChord,MusicDraftView,MusicLessonManifest,Section} from '../../../../packages/lesson-schema/index';
 import {parseMusicDraftView,parseMusicLessonManifest} from '../../../../packages/lesson-schema/parse';
 import {assetUrl,request} from '../api';
+import {DraftNotePreview} from './DraftNotePreview';
 import './music.css';
 import './music-review.css';
 
@@ -41,7 +42,7 @@ export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:
   {!draft?!error&&<p role="status">Opening your proposal…</p>:draft.status==='reviewed'?<p role="status">This proposal has already been reviewed. Open the lesson from your library.</p>:<>
    <p>Listen to the instructor video, check the proposed notes and organise your teaching sections. Saving creates a private, unscored reference. Sharing and live feedback are not enabled here.</p>
    {draft.provenance.engine==='fixture'&&<p className="inline-notice" role="status">Synthetic fixture proposal for testing. These notes are not a transcription of the video.</p>}
-   {draft.source_video?<video ref={video} src={assetUrl(draft.source_video.key)} controls playsInline preload="metadata" aria-label="Instructor video for reference review"/>:<p className="inline-notice">Instructor video is unavailable for this older draft.</p>}
+   <div className="review-source">{draft.source_video?<><video ref={video} src={assetUrl(draft.source_video.key)} controls playsInline preload="metadata" aria-label="Instructor video for reference review"/><p className="small muted review-source-note">This video stays pinned while you scroll and edit the proposed notes below.</p></>:<p className="inline-notice">Instructor video is unavailable for this older draft.</p>}</div>
    <form onSubmit={event=>{event.preventDefault();void save();}}>
     <label>Lesson title<input required maxLength={200} value={title} disabled={busy} onChange={e=>{changed();setTitle(e.target.value);}}/></label>
     <fieldset className="music-review-policy"><legend>Assessment</legend>
@@ -50,7 +51,8 @@ export function MusicDraftReview({lessonId,onBack,onReviewed,onDirty}:{lessonId:
      {draft.subject!=='piano'&&<p className="small muted">MIDI note feedback is available for piano only. This guitar reference stays watch only.</p>}
      {policy==='notes'?<p className="small muted">Local pitch and timing corrections only. No score, grade, upload or persistence. Requires a connected MIDI keyboard; scoring stays disabled.</p>:<p className="small muted">Learners watch and use the guide; no corrections are produced.</p>}
     </fieldset>
-    <h2>Proposed notes</h2><p>{events.length} notes. Changes reset the review confirmation.</p>
+    <DraftNotePreview events={events} duration={draft.duration}/>
+    <h2>Edit proposed notes</h2><p>{events.length} notes. Changes reset the review confirmation.</p>
     <div className="music-review-notes">{events.slice(page*PAGE_SIZE,(page+1)*PAGE_SIZE).map((event,i)=>{const index=page*PAGE_SIZE+i;return <fieldset key={event.id} disabled={busy}><legend>Note {index+1}</legend>
      <label>Note<select aria-label={`Note ${index+1} pitch`} value={event.pitch} onChange={e=>edit(index,{pitch:Number(e.target.value),string:null,fret:null})}>{Array.from({length:128},(_,pitch)=><option key={pitch} value={pitch}>{noteName(pitch)}</option>)}</select></label>
      {draft.subject==='guitar'&&<>

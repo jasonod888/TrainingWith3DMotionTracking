@@ -1,1 +1,26 @@
 .music-review{max-width:1100px;margin:auto}.music-review>video{display:block;width:100%;max-height:420px;margin:20px 0;background:#10251c;border-radius:12px}.music-review h2{margin:24px 0 12px}.music-review form>label{display:flex;flex-direction:column;gap:8px;margin:16px 0}.music-review input:not([type=checkbox]),.music-review select{width:100%;min-width:0;min-height:40px;padding:8px;border:1px solid #bac5b8;border-radius:6px;background:var(--surface,#fff)}.music-review fieldset{min-width:0;padding:12px;border:1px solid #bac5b8;border-radius:8px;margin:10px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:end}.music-review fieldset label{display:flex;flex:1 1 130px;min-width:0;flex-direction:column;gap:6px}.music-review .review-checkbox{display:flex;flex-direction:row;align-items:flex-start;gap:10px;line-height:1.5}.music-review .review-checkbox input{width:20px;height:20px;flex:0 0 20px;margin:0}.music-review button{min-height:44px;padding:8px 12px}.music-review-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.review-source{position:sticky;top:0;z-index:20;margin:18px 0 20px;padding:10px 0 8px;background:var(--surface,#fff);border-bottom:1px solid #d8e0d5}
+.review-source video{display:block;width:100%;max-height:min(38vh,380px);background:#10251c;border-radius:12px}
+.review-source-note{margin:6px 0 0}
+.draft-note-preview{border:1px solid #c6d2c1;border-radius:12px;padding:14px;margin:18px 0 8px;background:#f8faf6}
+.draft-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.draft-preview-head h2{margin:0 0 4px;font-size:1.05rem}
+.draft-preview-head p{margin:0;max-width:620px}
+.draft-preview-head button{flex:0 0 auto}
+.draft-roll-scroll{overflow-x:auto;border:1px solid #d8e0d5;border-radius:8px;background:#fff}
+.draft-roll{display:block;width:100%;min-width:560px;height:auto}
+.draft-roll-bg{fill:#f3f6ef}
+.draft-roll-grid{stroke:#dce5d8;stroke-width:1}
+.draft-roll-label{fill:#5c6b58;font-size:11px}
+.draft-roll-note{fill:#7b9a6d}
+.draft-roll-note.is-active{fill:#245c3b}
+.draft-roll-playhead{stroke:#b45309;stroke-width:2}
+.draft-preview-status{font-size:.85rem;color:#53614f;margin:8px 0 4px;min-height:1.4em}
+.draft-keyboard{display:block;width:100%;min-width:560px;height:auto;margin-top:4px}
+.draft-key-white{fill:#fff;stroke:#86947f;stroke-width:1}
+.draft-key-white.is-active{fill:#b8d8a8}
+.draft-key-black{fill:#26332a;stroke:#111;stroke-width:1}
+.draft-key-black.is-active{fill:#4f7d3f}
+.draft-key-label{fill:#67755f;font-size:9px}
+@media(max-width:700px){.review-source video{max-height:30vh}.draft-preview-head button{width:100%}.draft-preview-head{display:block}.draft-preview-head button{margin-top:10px}}
