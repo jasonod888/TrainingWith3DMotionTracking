@@ -153,6 +153,7 @@ export function PianoWorkspaceHarness() {
   const [saveMessage, setSaveMessage] = useState('');
   const [saveError, setSaveError] = useState('');
   const [saveConflict, setSaveConflict] = useState(false);
+  const [conflictKind, setConflictKind] = useState<'stale'|'verification'|'other'>('other');
   const [reopenMessage, setReopenMessage] = useState('');
   const [recoveryOffer, setRecoveryOffer] = useState<RecoveryCheckpoint | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState('');
@@ -378,6 +379,53 @@ export function PianoWorkspaceHarness() {
     [accountId, lessonId, draftId, sourceSha256],
   );
 
+  const applyRestoredReference = useCallback((restored: Extract<ReturnType<typeof restoreFromReference>, {ok: true}>['value'],
+    revisionId: string, manifest: {section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
+      assessment?: unknown; piano_preview?: Asset | null} | null) => {
+    setBaseline(restored.document);
+    setState(createWorkspaceState(restored.document));
+    setSpans(restored.spans);
+    setOffsetSeconds(restored.offsetSeconds);
+    setAnchors(restored.alignment?.anchors ?? []);
+    setStoredAlignment(restored.alignment?.passages?.length ? {
+      alignment_version: 1, mode: restored.alignment.mode, basis: restored.alignment.basis,
+      passages: restored.alignment.passages,
+    } : null);
+    setAnchorPast([]); setAnchorFuture([]);
+    setSavedRevisionId(revisionId);
+    setSavedSections(manifest?.section_set?.sections ?? null);
+    setSavedAssessment(manifest?.assessment ?? null);
+    setPreviewAsset((manifest?.piano_preview as Asset | null) ?? null);
+    // The preview is valid only for the performance it was rendered from.
+    setPreviewBaseline(manifest?.piano_preview ? restored.document : null);
+    if (restored.title) setTitle(restored.title);
+    pendingSavedSignature.current = true;
+  }, []);
+
+  // A saved lesson opens from its stored reference, not from a regenerated draft.
+  useEffect(() => {
+    let stopped = false;
+    if (!lessonId) return () => { stopped = true; };
+    (async () => {
+      try {
+        const manifest = await request<{revision_id: string; reference: {key: string};
+          section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
+          assessment?: unknown; piano_preview?: Asset | null} | null>(`/lessons/${encodeURIComponent(lessonId)}`);
+        if (stopped || !manifest?.revision_id || !manifest.reference?.key) return;
+        const response = await fetch(assetUrl(manifest.reference.key), {credentials: 'same-origin'});
+        if (!response.ok) return;
+        const restored = restoreFromReference(await response.json());
+        if (stopped || !restored.ok) return;
+        applyRestoredReference(restored.value, manifest.revision_id, manifest);
+        setReopenMessage(`Opened saved revision ${manifest.revision_id.slice(0, 8)} from ${
+          restored.value.source === 'notation' ? 'the authored notation' : 'performance only (legacy reference)'}.`);
+      } catch {
+        // No saved reference: the draft path below opens the proposal.
+      }
+    })();
+    return () => { stopped = true; };
+  }, [lessonId, applyRestoredReference]);
+
   useEffect(() => {
     getSession().then(session => { if (session) setAccountId(session.account.id); }).catch(() => {});
   }, []);
@@ -549,7 +597,17 @@ export function PianoWorkspaceHarness() {
       // base is a conflict with an explicit resolution, never silent data loss.
       if (cause instanceof ApiError && cause.status === 409) {
         setSaveConflict(true);
-        setSaveError('This lesson has a newer saved revision. Your edits are kept locally.');
+        const message = cause.message ?? '';
+        if (/verification|working notes/i.test(message)) {
+          setConflictKind('verification');
+          setSaveError('The verification decisions changed. Your edits are kept; reload the saved revision to review them.');
+        } else if (/already been reviewed|already edited|newer saved revision|newer revision/i.test(message)) {
+          setConflictKind('stale');
+          setSaveError('This lesson has a newer saved revision. Your edits are kept locally.');
+        } else {
+          setConflictKind('other');
+          setSaveError(`${message || 'The save conflicted with the saved lesson.'} Your edits are kept locally.`);
+        }
       } else {
         setSaveError(cause instanceof Error ? cause.message : 'The save failed; your edits are kept.');
       }
@@ -581,32 +639,16 @@ export function PianoWorkspaceHarness() {
       if (!response.ok) throw new Error('The saved reference could not be read.');
       const restored = restoreFromReference(await response.json());
       if (!restored.ok) throw new Error(restored.message);
-      setBaseline(restored.value.document);
-      setPreviewBaseline(restored.value.document);
-      setState(createWorkspaceState(restored.value.document));
-      setSpans(restored.value.spans);
-      setOffsetSeconds(restored.value.offsetSeconds);
-      setAnchors(restored.value.alignment?.anchors ?? []);
-      setStoredAlignment(restored.value.alignment?.passages?.length ? {
-        alignment_version: 1, mode: restored.value.alignment.mode, basis: restored.value.alignment.basis,
-        passages: restored.value.alignment.passages,
-      } : null);
-      setAnchorPast([]); setAnchorFuture([]);
-      setSavedRevisionId(lesson.revision_id);
-      const manifest = lesson as { section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
-        assessment?: unknown; piano_preview?: Asset | null };
-      setSavedSections(manifest.section_set?.sections ?? null);
-      setSavedAssessment(manifest.assessment ?? null);
-      setPreviewAsset((manifest.piano_preview as Asset | null) ?? null);
-      pendingSavedSignature.current = true;
-      if (restored.value.title) setTitle(restored.value.title);
+      applyRestoredReference(restored.value, lesson.revision_id,
+        lesson as {section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
+          assessment?: unknown; piano_preview?: Asset | null});
       setConfirmReviewed(false);
       setReopenMessage(`Reopened revision ${lesson.revision_id.slice(0, 8)} from ${
         restored.value.source === 'notation' ? 'the authored notation' : 'performance only (legacy reference)'}.`);
     } catch (cause) {
       setReopenMessage(cause instanceof Error ? cause.message : 'The saved revision could not be reopened.');
     }
-  }, [lessonId]);
+  }, [lessonId, applyRestoredReference]);
 
   const restoreCheckpoint = useCallback(() => {
     if (!recoveryOffer) return;
@@ -765,8 +807,9 @@ export function PianoWorkspaceHarness() {
       </span>
       {saveMessage && <span className="ws-report" data-save-state="saved">{saveMessage}</span>}
       {saveError && <span className="ws-report is-bad" data-save-state="error">{saveError}</span>}
-      {saveConflict && <span className="ws-report" data-save-state="conflict">
-        <button type="button" onClick={saveOnLatestRevision}>Save on latest revision</button>
+      {saveConflict && <span className="ws-report" data-save-state="conflict" data-conflict={conflictKind}>
+        {conflictKind !== 'verification' &&
+          <button type="button" onClick={saveOnLatestRevision}>Save on latest revision</button>}
         <button type="button" onClick={reopen}>Reload saved revision</button>
       </span>}
       {reopenMessage && <span className="ws-report" data-reopen-state="message">{reopenMessage}</span>}

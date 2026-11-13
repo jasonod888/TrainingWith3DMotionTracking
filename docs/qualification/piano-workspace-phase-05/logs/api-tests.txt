@@ -1,2 +1,2 @@
-﻿# pytest tests/api/test_music_alignment.py — Phase 5
-# 4 passed (server persistence round trip)
+﻿# pytest cross-language + API — Phase 5 corrections
+# 14 passed (client contract, alignment, review, edit)

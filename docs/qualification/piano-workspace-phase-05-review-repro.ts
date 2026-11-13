@@ -10,8 +10,10 @@ import {buildSaveBody, restoreFromReference} from '../../apps/web/src/music/work
 async function main() {
   const fixture = JSON.parse(readFileSync('docs/qualification/piano-workspace-phase-01/fixtures/phase1-draft-fixture.json','utf8'));
   const document = buildNotation(fixture.events, {bpm:120, duration:fixture.duration});
+  // The real review contract needs the draft identity; a workspace always has it.
   const body = buildSaveBody({title:'Reviewer fixture', document, spans:fixture.spans,
-    alignment:estimatedAlignment(document), anchors:[], offsetSeconds:0});
+    alignment:estimatedAlignment(document), anchors:[], offsetSeconds:0,
+    draftId:'reviewer-draft', referenceSha256:fixture.reference?.sha256 ?? 'a'.repeat(64)});
   const python = `import json,sys
 from apps.api.music_review import ReviewMusic
 from apps.api.music_alignment import validate_alignment
