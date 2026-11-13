@@ -28,6 +28,7 @@ import {
   type WorkspaceAction, type WorkspaceState,
 } from './workspace-state';
 import {useElementWidth} from './useElementWidth';
+import {createClock, useClockTime, type ClockStore} from './clock';
 
 const DURATION_CHOICES = [
   {label: 'Whole', ticks: 1920},
@@ -113,6 +114,7 @@ export function PianoWorkspaceHarness() {
   const [rollReveal, setRollReveal] = useState<{occurrenceId: string; token: number} | null>(null);
   const [scoreReveal, setScoreReveal] = useState<{tick: number; token: number} | null>(null);
   const revealToken = useRef(0);
+  const clockRef = useRef(createClock());
 
   const dispatch = useCallback((action: WorkspaceAction) => {
     setState(previous => (previous ? workspaceReducer(previous, action) : previous));
@@ -206,14 +208,15 @@ export function PianoWorkspaceHarness() {
     const media = videoRef.current;
     if (!media) return;
     let frame = 0;
-    let lastPaint = 0;
+    let lastState = 0;
     const update = (force = false) => {
       frame = 0;
+      // The visual clock is mirrored every frame; only the low-frequency state the
+      // inspector reads is throttled, so cursor layers stay frame-accurate.
+      clockRef.current.set(media.currentTime);
       const now = performance.now();
-      // Paint the shared clock at ~20 fps rather than every frame: the visual layers are
-      // cheap but the surrounding inspector and forms should not re-render at 60 Hz.
-      if (force || now - lastPaint >= 50) {
-        lastPaint = now;
+      if (force || now - lastState >= 250) {
+        lastState = now;
         setPlayhead(media.currentTime);
         setPlaying(!media.paused && !media.ended);
       }
@@ -241,6 +244,7 @@ export function PianoWorkspaceHarness() {
     const media = videoRef.current;
     const clamped = Math.max(0, Math.min(state?.document.duration ?? seconds, seconds));
     setPlayhead(clamped);
+    clockRef.current.set(clamped);
     if (media) media.currentTime = clamped;
   }, [state?.document.duration]);
 
@@ -442,7 +446,7 @@ export function PianoWorkspaceHarness() {
         <span>Fixture clock</span>
         <input type="range" min={0} max={document.duration} step={0.01} value={playhead}
           aria-label="Fixture clock"
-          onChange={event => { setPlayhead(Number(event.target.value)); setPlaying(false); }}/>
+          onChange={event => { const value = Number(event.target.value); setPlayhead(value); clockRef.current.set(value); setPlaying(false); }}/>
       </label>}
       <span className="ws-alignment" data-alignment-mode={alignment?.mode ?? 'none'} data-playhead-tick={playheadTick ?? ''}
         data-ticks-per-second={alignment ? Math.round((1 / secondsPerTick) * 1000) / 1000 : ''}>
@@ -459,7 +463,8 @@ export function PianoWorkspaceHarness() {
       <div className="ws-edit">
         <section className="ws-panel ws-surface" aria-label="Keyboard">
           <div ref={keyboardRef}>
-            <KeyboardEditor document={document} selectedPitch={selected?.pitch ?? null} activePitches={activePitches}
+            <LiveKeyboard document={document} clock={clockRef.current} intervals={intervals}
+              selectedPitch={selected?.pitch ?? null}
               onKey={pitch => audition([pitch], 0.4)} onSelectKey={selectKey}
               width={compactKeyboard ? 640 : 1040} semitones={compactKeyboard ? 36 : 60}
               toolbarHint="Tap to audition. With a note selected, tap a key to select that pitch at the playhead; it never edits a note."
@@ -471,6 +476,7 @@ export function PianoWorkspaceHarness() {
           <TimeRoll document={document} window={window} onWindowChange={next => changeWindow(next, 'reveal')}
             onWindowChangeOrigin={changeWindow}
             offsetSeconds={offsetSeconds} activeOccurrenceIds={activeIds}
+            clock={clockRef.current} intervals={intervals}
             selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={rollReveal}
             playhead={playhead} onSelect={select} onSeek={seek}/>
@@ -481,6 +487,7 @@ export function PianoWorkspaceHarness() {
           <ContinuousScore document={document} boxes={boxes} selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={scoreReveal} onSelect={select}
             playheadTick={playheadTick} activeOccurrenceIds={activeIds}
+            clock={clockRef.current} alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals}
             scrollTarget={scoreTarget} onSeekTick={seekToTick} onUserScroll={onScoreScroll}
             onAmbiguous={(logicalNoteId, occurrenceIds) => setNotice(
               `This written note maps ${occurrenceIds.length} occurrences; choose one in the roll (logical ${logicalNoteId}).`)}/>
@@ -620,6 +627,31 @@ function noteFacts(document: NotationDocument, selection: CorrectionSelection) {
 }
 
 export default PianoWorkspaceHarness;
+
+/**
+ * The keyboard lights keys from the frame-rate clock, so sounding pitches stay exact
+ * without re-rendering the inspector around it.
+ */
+function LiveKeyboard({document, clock, intervals, selectedPitch, onKey, onSelectKey, width, semitones, toolbarHint, hint}: {
+  document: NotationDocument;
+  clock: ClockStore | null;
+  intervals: { id: string; start: number; end: number; pitch: number }[];
+  selectedPitch: number | null;
+  onKey: (pitch: number, auditionOnly: boolean) => void;
+  onSelectKey: (pitch: number) => void;
+  width: number;
+  semitones: number;
+  toolbarHint: string;
+  hint: string;
+}) {
+  const live = useClockTime(clock, 0);
+  const activePitches = intervals
+    .filter(interval => live >= interval.start && live < interval.end)
+    .map(interval => interval.pitch);
+  return <KeyboardEditor document={document} selectedPitch={selectedPitch} activePitches={activePitches}
+    onKey={onKey} onSelectKey={onSelectKey} width={width} semitones={semitones}
+    toolbarHint={toolbarHint} hint={hint}/>;
+}
 
 /** Re-exported so the controller and tests share one selection constructor. */
 export {selectionForOccurrence};

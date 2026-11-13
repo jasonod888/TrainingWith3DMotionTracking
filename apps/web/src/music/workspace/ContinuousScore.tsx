@@ -14,6 +14,8 @@ import {
   measureAtTick, scrollForMeasure, tickAtX, visibleMeasureIndexes, xForTick, type MeasureBox,
 } from './viewport';
 import {useElementWidth} from './useElementWidth';
+import {useClockTime, type ClockStore} from './clock';
+import {effectiveSecondsToTick, type Alignment} from '../../../../../packages/music-notation/index.ts';
 
 const RULER_HEIGHT = 22;
 const LINE = 10;
@@ -59,6 +61,11 @@ type Props = {
   reveal: ScoreReveal | null;
   /** Score cursor position from the shared source clock (Phase 4). */
   playheadTick?: number | null;
+  /** Frame-rate visual clock and the map used to place the cursor. */
+  clock?: ClockStore | null;
+  alignment?: Alignment | null;
+  offsetSeconds?: number;
+  intervals?: { id: string; start: number; end: number }[];
   /** Occurrences sounding at the current source time. */
   activeOccurrenceIds?: string[];
   /** Linked-navigation target from the roll or playback, performed once per token. */
@@ -75,7 +82,13 @@ type Props = {
 export function ContinuousScore({
   document, boxes, selectedOccurrenceId, reveal, playheadTick = null, activeOccurrenceIds = [],
   scrollTarget = null, onSelect, onAmbiguous, onSeekTick, onUserScroll,
+  clock = null, alignment = null, offsetSeconds = 0, intervals,
 }: Props) {
+  const liveSeconds = useClockTime(clock, Number.NaN);
+  const liveTick = clock && alignment ? effectiveSecondsToTick(alignment, liveSeconds, offsetSeconds) : playheadTick;
+  const liveActive = intervals
+    ? intervals.filter(interval => liveSeconds >= interval.start && liveSeconds < interval.end).map(interval => interval.id)
+    : activeOccurrenceIds;
   const [hostRef, width] = useElementWidth<HTMLDivElement>();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const programmatic = useRef(false);
@@ -174,9 +187,9 @@ export function ContinuousScore({
             const x = element.scrollLeft + (event.clientX - rect.left);
             onSeekTick(tickAtX(boxes, document, x));
           }}/>
-        {playheadTick !== null ? <line className="ws-score-playhead" data-playhead-tick={playheadTick}
-          x1={xForTick(boxes, document, playheadTick)} y1={RULER_HEIGHT}
-          x2={xForTick(boxes, document, playheadTick)} y2={HEIGHT - 10}/> : null}
+        {liveTick !== null ? <line className="ws-score-playhead" data-playhead-tick={liveTick}
+          x1={xForTick(boxes, document, liveTick)} y1={RULER_HEIGHT}
+          x2={xForTick(boxes, document, liveTick)} y2={HEIGHT - 10}/> : null}
         {[0, 1, 2, 3, 4].map(line => <g key={`staff-${line}`}>
           <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={TREBLE_TOP + line * LINE} x2={CONTEXT_WIDTH + totalWidth} y2={TREBLE_TOP + line * LINE}/>
           <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={BASS_TOP + line * LINE} x2={CONTEXT_WIDTH + totalWidth} y2={BASS_TOP + line * LINE}/>
@@ -214,7 +227,7 @@ export function ContinuousScore({
             {segment.notes.map(note => {
               const cy = yForNote(segment.staff, note.spelling);
               const selected = selectedOccurrenceId !== null && note.performance_ids.includes(selectedOccurrenceId);
-              const active = activeOccurrenceIds.some(id => note.performance_ids.includes(id));
+              const active = liveActive.some(id => note.performance_ids.includes(id));
               const occurrence = occurrenceFor(note);
               const ambiguous = occurrence === null;
               return <g key={note.id}>
