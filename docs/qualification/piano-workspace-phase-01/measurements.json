@@ -1,0 +1,38 @@
+{
+  "login_status": 200,
+  "seconds_to_note_forms": 1.08,
+  "desktop": {
+    "note_fieldsets": 50,
+    "videos": 1,
+    "svg_rolls": 1,
+    "canvases": 0,
+    "page_scroll_width": 1440,
+    "page_client_width": 1440,
+    "page_scroll_height": 15075,
+    "body_text_head": "f\nform\n.\nHome\nExplore\nGroups\nCreate\nO\nBack to lessons\nCompare AI models\nReview your music reference\n\nFollow the piano guide alongside your video, then refine the notes and teaching sections below.\n\nProposed notes preview\n\nThe keyboard and r",
+    "shows_edit_heading": true,
+    "note_count_claim": "1338",
+    "pagination": [
+      "1",
+      "27"
+    ]
+  },
+  "mobile": {
+    "note_fieldsets": 50,
+    "videos": 1,
+    "svg_rolls": 1,
+    "canvases": 0,
+    "page_scroll_width": 390,
+    "page_client_width": 390,
+    "page_scroll_height": 23363,
+    "body_text_head": "f\nform\n.\nO\nBack to lessons\nCompare AI models\nReview your music reference\n\nFollow the piano guide alongside your video, then refine the notes and teaching sections below.\n\nProposed notes preview\n0.0s\n104.8s\n209.6s\nFollowing source: 0.0 of 20",
+    "shows_edit_heading": true,
+    "note_count_claim": "1338",
+    "pagination": [
+      "1",
+      "27"
+    ]
+  },
+  "console_errors": [],
+  "library": []
+}
