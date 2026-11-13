@@ -56,6 +56,16 @@ test('reveal only moves the window when the target is outside the margin', () =>
   assert.ok(moved.start <= 80 && moved.start + moved.span >= 80);
 });
 
+test('a clip shorter than the minimum span is shown at its own length', () => {
+  const short = clampTimeWindow({start: 0, span: 10}, 1.2);
+  assert.deepEqual(short, {start: 0, span: 1.2});
+  const zoomed = zoomAround({start: 0, span: 1.2}, 1.2, 0.5, 0.6);
+  assert.equal(zoomed.span, 1.2, 'a short clip cannot zoom out beyond its own length');
+  const tiny = clampTimeWindow({start: 5, span: 10}, 0.4);
+  assert.equal(tiny.start, 0);
+  assert.equal(tiny.span, 0.4);
+});
+
 test('the visible range includes a buffer on both sides', () => {
   const range = visibleTimeRange({start: 100, span: 10});
   assert.equal(range.from, 97);

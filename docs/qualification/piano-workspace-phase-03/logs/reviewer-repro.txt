@@ -1,0 +1,9 @@
+﻿# Phase 3 correction — reviewer reproducer
+# Command: node --import ./apps/web/node_modules/tsx/dist/loader.mjs docs/qualification/piano-workspace-phase-03-review-repro.ts
+# Date: 2026-11-13 (Asia/Singapore)
+
+PASS: manual pan is not reversed just because a note remains selected
+PASS: width observer attaches after a loading placeholder is replaced by its host
+PASS: full 88-key pitch range is not drawn outside an inaccessible fixed-height SVG
+PASS: whole-note notation has no stem
+0 Phase 3 reviewer check(s) failed.

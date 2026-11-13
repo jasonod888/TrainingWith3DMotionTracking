@@ -102,10 +102,26 @@ export function PianoWorkspaceHarness() {
   const audioRef = useRef<NotationAudio | null>(null);
   const [keyboardRef, keyboardWidth] = useElementWidth<HTMLDivElement>();
   const compactKeyboard = keyboardWidth > 0 && keyboardWidth < 720;
+  const [rollReveal, setRollReveal] = useState<{occurrenceId: string; token: number} | null>(null);
+  const [scoreReveal, setScoreReveal] = useState<{tick: number; token: number} | null>(null);
+  const revealToken = useRef(0);
 
   const dispatch = useCallback((action: WorkspaceAction) => {
     setState(previous => (previous ? workspaceReducer(previous, action) : previous));
   }, []);
+
+  const document = state?.document ?? null;
+
+  /** A navigation request: bumped only by a selection change or an explicit Reveal. */
+  const requestReveal = useCallback((occurrenceId: string) => {
+    if (!document) return;
+    revealToken.current += 1;
+    const token = revealToken.current;
+    setRollReveal({occurrenceId, token});
+    const tick = document.events
+      .find(event => event.notes.some(note => note.performance_ids.includes(occurrenceId)))?.start;
+    if (tick !== undefined) setScoreReveal({tick, token});
+  }, [document]);
 
   useEffect(() => {
     let stopped = false;
@@ -171,9 +187,9 @@ export function PianoWorkspaceHarness() {
     if (occurrenceId) videoRef.current?.pause();
     setNotice('');
     dispatch({type: 'select', occurrenceId});
-  }, [dispatch]);
+    if (occurrenceId) requestReveal(occurrenceId);
+  }, [dispatch, requestReveal]);
 
-  const document = state?.document ?? null;
   const selection = state?.selection ?? null;
   const selected = selection && document ? noteFacts(document, selection) : null;
   const secondsPerTick = document ? 60 / (document.tempo.bpm * document.ppq) : 0.0625;
@@ -196,6 +212,14 @@ export function PianoWorkspaceHarness() {
   }, [document, playhead, select]);
 
   const boxes = useMemo(() => (document ? layoutMeasures(document).boxes : []), [document]);
+
+  // A selection that changes for any reason (click, undo, insert) requests one reveal.
+  const selectionOccurrence = state?.selection?.occurrenceId ?? null;
+  useEffect(() => {
+    if (!selectionOccurrence) return;
+    if (rollReveal?.occurrenceId === selectionOccurrence) return;
+    requestReveal(selectionOccurrence);
+  }, [selectionOccurrence, rollReveal?.occurrenceId, requestReveal]);
 
   // The roll opens at a readable window rather than fitting the whole recording.
   useEffect(() => {
@@ -225,7 +249,6 @@ export function PianoWorkspaceHarness() {
   const snapSeconds = snapTicks ? snapTicks * secondsPerTick : null;
   const report = state.lastReport;
   const summary = historySummary(state);
-  const revealTick = selection ? document.events.find(event => event.id === selection.eventId)?.start ?? null : null;
 
   return <main className="ws-shell">
     <header className="ws-head">
@@ -282,14 +305,16 @@ export function PianoWorkspaceHarness() {
         <section className="ws-panel ws-surface" aria-label="Piano roll">
           <TimeRoll document={document} window={window} onWindowChange={changeWindow}
             selectedOccurrenceId={selection?.occurrenceId ?? null}
-            revealOccurrenceId={selection?.occurrenceId ?? null}
+            reveal={rollReveal}
             playhead={playhead} onSelect={select} onSeek={seek}/>
           <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Dragging notes is Phase 6.</p>
         </section>
 
         <section className="ws-panel ws-surface" aria-label="Score">
           <ContinuousScore document={document} boxes={boxes} selectedOccurrenceId={selection?.occurrenceId ?? null}
-            revealTick={revealTick} onSelect={select}/>
+            reveal={scoreReveal} onSelect={select}
+            onAmbiguous={(logicalNoteId, occurrenceIds) => setNotice(
+              `This written note maps ${occurrenceIds.length} occurrences; choose one in the roll (logical ${logicalNoteId}).`)}/>
           <p className="ws-hint">One continuous grand staff; only the visible measures are rendered. Click a notehead to select it.</p>
         </section>
 
@@ -368,6 +393,7 @@ export function PianoWorkspaceHarness() {
               </label>
 
               <div className="ws-row" role="group" aria-label="Remove">
+                <button type="button" onClick={() => requestReveal(selection.occurrenceId)}>Reveal in views</button>
                 <button type="button" onClick={() => { audition([selected.pitch], Math.min(1.2, selected.duration ?? 0.4)); }}>Audition</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'delete-occurrence', occurrenceId: selection.occurrenceId}})}>Delete note</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'delete-logical-note', logicalNoteId: selection.logicalNoteId}})}>Delete logical note</button>

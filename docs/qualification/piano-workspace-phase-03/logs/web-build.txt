@@ -1,10 +1,9 @@
-﻿# npm run build (apps/web) — Phase 3 submission
-# Command: cd apps/web; npm run build (tsc --noEmit && vite build, includes the harness entry)
+﻿# npm run build (apps/web) — Phase 3 correction
+# Command: cd apps/web; npm run build
 # Date: 2026-11-13 (Asia/Singapore)
 
-(!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: 
 https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 5.70s
+✓ built in 5.60s

@@ -213,21 +213,36 @@ body {
 
 .ws-roll {
   display: grid;
-  align-items: start;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: stretch;
   border: 1px solid #ece9e1;
   border-radius: 6px;
   overflow: hidden;
 }
 
-.ws-roll-labels {
-  position: relative;
-  height: 174px;
-  overflow: hidden;
-  border-right: 1px solid #ece9e1;
+.ws-roll-gutter {
+  display: grid;
+  grid-template-rows: auto 1fr;
   background: #fbfbf8;
+  border-right: 1px solid #ece9e1;
+  overflow: hidden;
 }
 
-.ws-roll-labels span {
+.ws-roll-corner {
+  border-bottom: 1px solid #e2e0d8;
+}
+
+.ws-roll-label-viewport {
+  position: relative;
+  overflow: hidden;
+}
+
+.ws-roll-label-canvas {
+  position: relative;
+  will-change: transform;
+}
+
+.ws-roll-label-canvas span {
   position: absolute;
   left: 4px;
   font-size: 10px;
@@ -236,35 +251,39 @@ body {
 }
 
 .ws-roll-viewport {
-  overflow-x: auto;
-  overflow-y: hidden;
+  position: relative;
+  overflow: auto;
   min-width: 0;
   max-width: 100%;
   scrollbar-width: thin;
+  overscroll-behavior: contain;
 }
 
 .ws-roll-content {
   position: relative;
 }
 
-.ws-roll-svg {
-  display: block;
-  background: #fff;
-}
-
+/* Stays visible while the pitch canvas scrolls vertically, and scrolls with time. */
 .ws-roll-ruler {
-  fill: #f7f6f1;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f7f6f1;
+  border-bottom: 1px solid #e2e0d8;
   cursor: crosshair;
 }
 
-.ws-roll-tick {
-  stroke: #c9cfc8;
-  stroke-width: 1;
+.ws-roll-tick-label {
+  position: absolute;
+  top: 6px;
+  color: #6b7a72;
+  font-size: 9px;
+  white-space: nowrap;
 }
 
-.ws-roll-tick-label {
-  fill: #6b7a72;
-  font-size: 9px;
+.ws-roll-svg {
+  display: block;
+  background: #fff;
 }
 
 .ws-roll-grid {
@@ -344,10 +363,21 @@ body {
   cursor: pointer;
 }
 
+/* Whole and half notes are hollow: an unfilled head with a visible outline. */
+.ws-score-notehead.is-hollow {
+  fill: #fff;
+  stroke: #1f2d26;
+  stroke-width: 1.4;
+}
+
 .ws-score-notehead.is-selected {
   fill: #2a7be0;
   stroke: #144a8c;
   stroke-width: 1.5;
+}
+
+.ws-score-notehead.is-hollow.is-selected {
+  fill: #dceafb;
 }
 
 .ws-score-stem,
@@ -357,13 +387,22 @@ body {
   stroke-width: 1.2;
 }
 
+.ws-score-flag {
+  stroke-width: 1.4;
+}
+
+.ws-score-dot {
+  fill: #1f2d26;
+}
+
 .ws-score-accidental {
   fill: #1f2d26;
   font-size: 11px;
 }
 
-.ws-score-rest rect {
-  fill: #8a9a91;
+.ws-score-rest-glyph {
+  fill: #33413a;
+  font-size: 15px;
 }
 
 .ws-score-tie {
@@ -468,11 +507,7 @@ body {
   }
 
   .ws-roll {
-    grid-template-columns: 34px minmax(0, 1fr) !important;
-  }
-
-  .ws-roll-labels {
-    height: 184px;
+    grid-template-columns: 34px minmax(0, 1fr);
   }
 
   .ws-status {

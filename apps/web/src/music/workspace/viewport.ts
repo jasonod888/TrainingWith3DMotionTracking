@@ -19,13 +19,23 @@ export function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+/**
+ * Allowed window span for a clip. A short clip cannot be shown wider than itself, so
+ * the minimum collapses to the clip duration instead of claiming a 2 s minimum.
+ */
+export function spanBounds(duration: number): {min: number; max: number} {
+  const max = Math.max(0.25, Math.min(duration, MAX_SPAN_SECONDS));
+  return {min: Math.min(MIN_SPAN_SECONDS, max), max};
+}
+
 export function maxSpanFor(duration: number): number {
-  return clamp(duration, MIN_SPAN_SECONDS, MAX_SPAN_SECONDS);
+  return spanBounds(duration).max;
 }
 
 /** Keep the window inside the clip and inside the permitted zoom range. */
 export function clampTimeWindow(window: TimeWindow, duration: number): TimeWindow {
-  const span = clamp(Number.isFinite(window.span) ? window.span : DEFAULT_SPAN_SECONDS, MIN_SPAN_SECONDS, maxSpanFor(duration));
+  const bounds = spanBounds(duration);
+  const span = clamp(Number.isFinite(window.span) ? window.span : DEFAULT_SPAN_SECONDS, bounds.min, bounds.max);
   const start = clamp(Number.isFinite(window.start) ? window.start : 0, 0, Math.max(0, duration - span));
   return { start, span };
 }
@@ -39,7 +49,8 @@ export function windowCentre(window: TimeWindow): number {
  * viewport. The caller decides the anchor (playhead when visible, else the centre).
  */
 export function zoomAround(window: TimeWindow, duration: number, factor: number, anchor: number | null): TimeWindow {
-  const nextSpan = clamp(window.span * factor, MIN_SPAN_SECONDS, maxSpanFor(duration));
+  const bounds = spanBounds(duration);
+  const nextSpan = clamp(window.span * factor, bounds.min, bounds.max);
   const safeAnchor = anchor === null || !Number.isFinite(anchor) ? windowCentre(window) : clamp(anchor, 0, duration);
   const fraction = window.span > 0 ? clamp((safeAnchor - window.start) / window.span, 0, 1) : 0.5;
   return clampTimeWindow({ start: safeAnchor - fraction * nextSpan, span: nextSpan }, duration);
@@ -155,6 +166,19 @@ export function scrollForMeasure(
 /** Tick position of a source second under the estimated tempo map (Phase 3 only). */
 export function secondsToTick(document: NotationDocument, seconds: number): number {
   return Math.round(seconds / secondsPerTick(document));
+}
+
+/**
+ * Scroll offset that brings a pitch row into view. Returns the current offset when the
+ * row is already inside the visible band, so revealing never jitters.
+ */
+export function pitchScrollTop(
+  pitchY: number, scrollTop: number, rulerHeight: number, plotHeight: number,
+): number {
+  const visibleFrom = scrollTop + rulerHeight;
+  const visibleTo = scrollTop + rulerHeight + plotHeight;
+  if (pitchY >= visibleFrom && pitchY <= visibleTo) return scrollTop;
+  return Math.max(0, pitchY - rulerHeight - plotHeight / 2);
 }
 
 export function tickToSeconds(document: NotationDocument, tick: number): number {
