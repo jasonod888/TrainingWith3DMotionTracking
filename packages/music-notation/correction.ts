@@ -11,14 +11,16 @@
  * - `events`/`segments` stay in ticks and are interpretation only.
  * - A command returns the SAME document identity when it is a no-op or is
  *   rejected; callers can therefore treat identity as "nothing happened".
+ * - `selection` is `undefined` when the caller's current selection should be
+ *   kept (the reducer revalidates it); a value or `null` overrides it.
  */
 import {
-  GRID, MAX_EVENTS,
+  GRID, MAX_EVENTS, MAX_MEASURES,
   type NotationDocument, type NotationEvent, type NotationNote, type NotationStaff,
   type NotationVoice, type PerformanceNote,
 } from './types';
 import { refreshNotation } from './build';
-import { snapTick } from './rhythm';
+import { snapTick, measureTicks } from './rhythm';
 import { accidentalName, parseSpelling, spellPitch } from './spelling';
 
 export type CorrectionSelection = {
@@ -33,14 +35,23 @@ export type CorrectionSelection = {
 export type RejectionCode =
   | 'unknown-occurrence' | 'unknown-note' | 'unknown-event'
   | 'invalid-pitch' | 'invalid-velocity' | 'invalid-onset' | 'invalid-duration'
-  | 'invalid-ticks' | 'out-of-bounds' | 'written-overlap' | 'needs-third-voice'
-  | 'duplicate-chord-pitch' | 'duplicate-occurrence' | 'ambiguous-insert'
-  | 'unsupported-spelling' | 'too-many-occurrences';
+  | 'invalid-ticks' | 'invalid-scope' | 'out-of-bounds' | 'written-overlap'
+  | 'needs-third-voice' | 'duplicate-chord-pitch' | 'duplicate-occurrence'
+  | 'ambiguous-insert' | 'unsupported-spelling' | 'too-many-occurrences'
+  | 'document-invalid';
 
 export type CommandOutcome =
-  | { status: 'applied'; document: NotationDocument; label: string; selection: CorrectionSelection | null }
+  | {
+      status: 'applied';
+      document: NotationDocument;
+      label: string;
+      /** `undefined` keeps the caller's selection; `null` clears it explicitly. */
+      selection: CorrectionSelection | null | undefined;
+    }
   | { status: 'unchanged'; label: string }
   | { status: 'rejected'; code: RejectionCode; message: string };
+
+type Applied = Extract<CommandOutcome, {status: 'applied'}>;
 
 export type WrittenTarget = { eventId: string } | { logicalNoteId: string };
 
@@ -51,8 +62,8 @@ export type CorrectionCommand =
   | { type: 'set-occurrence-velocity'; occurrenceId: string; velocity: number | null }
   | { type: 'set-written-duration'; target: WrittenTarget; ticks: number; scope: 'event' | 'note' }
   | { type: 'move-written-start'; eventId: string; ticks: number }
-  | { type: 'apply-accidental'; logicalNoteId: string; accidental: 'sharp' | 'flat' | 'natural' }
-  | { type: 'respell'; logicalNoteId: string; spelling: string }
+  | { type: 'apply-accidental'; occurrenceId: string; accidental: 'sharp' | 'flat' | 'natural' }
+  | { type: 'respell'; occurrenceId: string; spelling: string }
   | {
       type: 'insert-note';
       pitch: number;
@@ -134,9 +145,79 @@ function rejection(code: RejectionCode, message: string): CommandOutcome {
   return { status: 'rejected', code, message };
 }
 
-function applied(document: NotationDocument, label: string, selection: CorrectionSelection | null): CommandOutcome {
+function applied(document: NotationDocument, label: string, selection?: CorrectionSelection | null): Applied {
   return { status: 'applied', document, label, selection };
 }
+
+/* ------------------------------------------------------------- validation */
+
+/**
+ * Structural check run after every command. A command whose result cannot be
+ * represented is rejected rather than allowed to escape as an exception or a
+ * malformed document.
+ */
+export function documentProblem(document: NotationDocument): string | null {
+  const occurrences = new Set<string>();
+  for (const item of document.performance) {
+    if (!item.id || item.id.length > 80) return 'An occurrence has no valid id.';
+    if (occurrences.has(item.id)) return 'The document repeats an occurrence id.';
+    occurrences.add(item.id);
+    if (!Number.isFinite(item.onset) || item.onset < 0) return 'An occurrence has an invalid start.';
+    if (item.duration !== null && (!Number.isFinite(item.duration) || item.duration <= 0)) return 'An occurrence has an invalid recorded length.';
+  }
+
+  const owned = new Map<string, string>();
+  const spans = new Map<string, { start: number; end: number; id: string }[]>();
+  for (const event of document.events) {
+    if (!Number.isInteger(event.start) || event.start < 0 || event.start % GRID !== 0) return 'An event is off the sixteenth grid.';
+    if (!Number.isInteger(event.duration) || event.duration < GRID || event.duration % GRID !== 0) return 'An event duration is off the sixteenth grid.';
+    if (event.rest && event.notes.length) return 'A rest carries notes.';
+    if (!event.rest && !event.notes.length) return 'A sounding event carries no notes.';
+    const pitches = new Set<number>();
+    for (const note of event.notes) {
+      if (!Number.isInteger(note.pitch) || note.pitch < 0 || note.pitch > 127) return 'A note has an invalid pitch.';
+      if (pitches.has(note.pitch)) return 'A chord repeats a pitch.';
+      pitches.add(note.pitch);
+      if (!note.performance_ids.length) return 'A sounding note has no occurrence.';
+      for (const id of note.performance_ids) {
+        if (!occurrences.has(id)) return 'A note links to a missing occurrence.';
+        const owner = owned.get(id);
+        if (owner && owner !== note.id) return 'An occurrence is owned by two logical notes.';
+        owned.set(id, note.id);
+      }
+    }
+    const key = `${event.staff}:${event.voice}`;
+    const list = spans.get(key) ?? [];
+    list.push({ start: event.start, end: event.start + event.duration, id: event.id });
+    spans.set(key, list);
+  }
+  for (const list of spans.values()) {
+    list.sort((left, right) => left.start - right.start || left.id.localeCompare(right.id));
+    for (let index = 1; index < list.length; index += 1) {
+      if (list[index].start < list[index - 1].end) return 'Two events overlap in one voice.';
+    }
+  }
+  for (const id of occurrences) {
+    if (!owned.has(id)) return 'An occurrence is missing from every logical note.';
+    if (document.performance_map[id] !== owned.get(id)) return 'The performance map disagrees with the notes.';
+  }
+  return null;
+}
+
+/** Refresh derived geometry, then refuse to hand back an invalid document. */
+function finalise(next: NotationDocument, label: string, selection?: CorrectionSelection | null): CommandOutcome {
+  let refreshed: NotationDocument;
+  try {
+    refreshed = refreshNotation(next);
+  } catch (error) {
+    return rejection('document-invalid', error instanceof Error ? error.message : 'The edit could not be represented.');
+  }
+  const problem = documentProblem(refreshed);
+  if (problem) return rejection('document-invalid', `${problem} Nothing was changed.`);
+  return applied(refreshed, label, selection);
+}
+
+/* ---------------------------------------------------------------- helpers */
 
 function overlapInVoice(
   document: NotationDocument, staff: NotationStaff, voice: NotationVoice,
@@ -156,31 +237,73 @@ function freeVoice(document: NotationDocument, staff: NotationStaff, start: numb
   return null;
 }
 
-/* -------------------------------------------------------------- commands */
+/**
+ * Give one occurrence its own logical note so a divergent edit cannot change the
+ * note it shares with other occurrences. Reuses the event when the pitch is free
+ * there; otherwise moves the note to an available voice; otherwise rejects.
+ */
+function detachOccurrence(
+  document: NotationDocument, event: NotationEvent, note: NotationNote, occurrenceId: string,
+  pitch: number, spelling: string, accidental: NotationNote['accidental'],
+): { ok: true; event: NotationEvent; note: NotationNote } | { ok: false; outcome: CommandOutcome } {
+  note.performance_ids = note.performance_ids.filter(id => id !== occurrenceId);
+  const empty = note.performance_ids.length === 0;
+  if (empty) {
+    event.notes = event.notes.filter(item => item.id !== note.id);
+    if (!event.notes.length) document.events = document.events.filter(item => item.id !== event.id);
+  }
+
+  const detached: NotationNote = { id: newId('n'), pitch, spelling, accidental, performance_ids: [occurrenceId] };
+  if (!event.notes.some(item => item.pitch === pitch)) {
+    event.notes.push(detached);
+    event.notes.sort((left, right) => left.pitch - right.pitch);
+    return { ok: true, event, note: detached };
+  }
+  if (empty) {
+    // The whole event disappeared; rebuild the note in its place.
+    const voice = freeVoice(document, event.staff, event.start, event.duration);
+    if (voice === null) return { ok: false, outcome: rejection('needs-third-voice', 'That note needs another voice, which this score does not have. Nothing was changed.') };
+    const rebuilt: NotationEvent = { id: event.id, staff: event.staff, voice, start: event.start, duration: event.duration, notes: [detached], rest: false, source: event.source };
+    document.events.push(rebuilt);
+    return { ok: true, event: rebuilt, note: detached };
+  }
+  const voice = freeVoice(document, event.staff, event.start, event.duration);
+  if (voice === null) {
+    return { ok: false, outcome: rejection('needs-third-voice', 'That change needs another voice, which this score does not have. Nothing was changed.') };
+  }
+  const split: NotationEvent = {
+    id: newId('ev'), staff: event.staff, voice, start: event.start, duration: event.duration,
+    notes: [detached], rest: false, source: 'inserted',
+  };
+  document.events.push(split);
+  return { ok: true, event: split, note: detached };
+}
+
+/* --------------------------------------------------------------- commands */
 
 function setPitch(document: NotationDocument, occurrenceId: string, pitch: number, spelling?: string): CommandOutcome {
   const found = noteForOccurrence(document, occurrenceId);
   if (!found) return rejection('unknown-occurrence', 'That note is no longer in the document.');
-  const occurrence = occurrenceById(document, occurrenceId);
-  if (!occurrence) return rejection('unknown-occurrence', 'That note is no longer in the document.');
   if (!Number.isInteger(pitch) || pitch < 0 || pitch > 127) {
     return rejection('invalid-pitch', 'A pitch must be a whole MIDI note between 0 and 127.');
   }
 
-  let targetSpelling: string | null = spelling ?? null;
-  if (targetSpelling !== null) {
+  let requestedSpelling: string | null = spelling ?? null;
+  if (requestedSpelling !== null) {
     let parsed: {pitch: number};
     try {
-      parsed = parseSpelling(targetSpelling);
+      parsed = parseSpelling(requestedSpelling);
     } catch {
-      return rejection('unsupported-spelling', `“${targetSpelling}” is not a valid pitch spelling.`);
+      return rejection('unsupported-spelling', `“${requestedSpelling}” is not a valid pitch spelling.`);
     }
     if (parsed.pitch !== pitch) {
       return rejection('unsupported-spelling', 'That spelling does not match the sounding pitch.');
     }
   }
+  const finalSpelling = requestedSpelling ?? spellPitch(pitch, document.key_signature).spelling;
 
-  if (found.note.pitch === pitch && targetSpelling === null && found.note.performance_ids.length === 1) {
+  // Complete semantic equality first: same sounding pitch and same written spelling.
+  if (found.note.pitch === pitch && found.note.spelling === finalSpelling) {
     return { status: 'unchanged', label: 'Pitch unchanged' };
   }
 
@@ -188,19 +311,11 @@ function setPitch(document: NotationDocument, occurrenceId: string, pitch: numbe
   const target = noteForOccurrence(next, occurrenceId);
   if (!target) return rejection('unknown-occurrence', 'That note is no longer in the document.');
   const { event, note } = target;
-
-  const derived = targetSpelling === null ? spellPitch(pitch, next.key_signature) : null;
-  const finalSpelling = targetSpelling ?? derived!.spelling;
   const finalAccidental = accidentalName(parseSpelling(finalSpelling).alter);
 
   if (note.performance_ids.length > 1) {
-    if (event.notes.some(item => item.id !== note.id && item.pitch === pitch)) {
-      return rejection('duplicate-chord-pitch', 'That chord already has a note at this pitch.');
-    }
-    note.performance_ids = note.performance_ids.filter(id => id !== occurrenceId);
-    event.notes = event.notes.filter(item => item.id !== note.id || item.performance_ids.length > 0);
-    event.notes.push({ id: newId('n'), pitch, spelling: finalSpelling, accidental: finalAccidental, performance_ids: [occurrenceId] });
-    event.notes.sort((left, right) => left.pitch - right.pitch);
+    const detached = detachOccurrence(next, event, note, occurrenceId, pitch, finalSpelling, finalAccidental);
+    if (!detached.ok) return detached.outcome;
   } else {
     if (event.notes.some(item => item.id !== note.id && item.pitch === pitch)) {
       return rejection('duplicate-chord-pitch', 'That chord already has a note at this pitch.');
@@ -214,8 +329,7 @@ function setPitch(document: NotationDocument, occurrenceId: string, pitch: numbe
   if (!linked) return rejection('unknown-occurrence', 'That note is no longer in the document.');
   linked.pitch = pitch;
 
-  const refreshed = refreshNotation(next);
-  return applied(refreshed, `Pitch → ${finalSpelling}`, selectionForOccurrence(refreshed, occurrenceId));
+  return finalise(next, `Pitch → ${finalSpelling}`);
 }
 
 function setOnset(document: NotationDocument, occurrenceId: string, seconds: number, snapSeconds?: number | null): CommandOutcome {
@@ -225,9 +339,12 @@ function setOnset(document: NotationDocument, occurrenceId: string, seconds: num
     return rejection('invalid-onset', 'A start time must be a finite number of seconds at or after zero.');
   }
   let onset = seconds;
-  if (snapSeconds && snapSeconds > 0) {
-    const tick = Math.round(seconds / snapSeconds) * snapSeconds;
-    onset = Number(tick.toFixed(9));
+  if (snapSeconds !== null && snapSeconds !== undefined) {
+    if (!Number.isFinite(snapSeconds) || snapSeconds <= 0) {
+      return rejection('invalid-onset', 'A snap interval must be a positive, finite number of seconds. Nothing was changed.');
+    }
+    onset = Number((Math.round(seconds / snapSeconds) * snapSeconds).toFixed(9));
+    if (!Number.isFinite(onset)) return rejection('invalid-onset', 'That snap interval produced an invalid start time.');
   }
   const length = occurrence.duration ?? 0;
   if (onset + length > document.duration + EPSILON) {
@@ -235,10 +352,8 @@ function setOnset(document: NotationDocument, occurrenceId: string, seconds: num
   }
   if (Math.abs(occurrence.onset - onset) < 1e-9) return { status: 'unchanged', label: 'Start unchanged' };
   const next = clone(document);
-  const linked = next.performance.find(item => item.id === occurrenceId)!;
-  linked.onset = onset;
-  const refreshed = refreshNotation(next);
-  return applied(refreshed, `Start → ${onset.toFixed(3)} s`, selectionForOccurrence(refreshed, occurrenceId));
+  next.performance.find(item => item.id === occurrenceId)!.onset = onset;
+  return finalise(next, `Start → ${onset.toFixed(3)} s`);
 }
 
 function setRecordedDuration(document: NotationDocument, occurrenceId: string, seconds: number): CommandOutcome {
@@ -255,8 +370,7 @@ function setRecordedDuration(document: NotationDocument, occurrenceId: string, s
   }
   const next = clone(document);
   next.performance.find(item => item.id === occurrenceId)!.duration = seconds;
-  const refreshed = refreshNotation(next);
-  return applied(refreshed, `Recorded length → ${seconds.toFixed(3)} s`, selectionForOccurrence(refreshed, occurrenceId));
+  return finalise(next, `Recorded length → ${seconds.toFixed(3)} s`);
 }
 
 function setVelocity(document: NotationDocument, occurrenceId: string, velocity: number | null): CommandOutcome {
@@ -268,9 +382,7 @@ function setVelocity(document: NotationDocument, occurrenceId: string, velocity:
   if (occurrence.velocity === velocity) return { status: 'unchanged', label: 'Velocity unchanged' };
   const next = clone(document);
   next.performance.find(item => item.id === occurrenceId)!.velocity = velocity;
-  const refreshed = refreshNotation(next);
-  return applied(refreshed, velocity === null ? 'Velocity cleared' : `Velocity → ${Math.round(velocity * 100)}%`,
-    selectionForOccurrence(refreshed, occurrenceId));
+  return finalise(next, velocity === null ? 'Velocity cleared' : `Velocity → ${Math.round(velocity * 100)}%`);
 }
 
 function resolveEvent(document: NotationDocument, target: WrittenTarget): NotationEvent | null {
@@ -284,60 +396,42 @@ function setWrittenDuration(
   if (!Number.isInteger(ticks) || ticks < GRID || ticks % GRID !== 0) {
     return rejection('invalid-ticks', 'A written duration must be a positive whole number of sixteenth notes.');
   }
+  if (scope !== 'event' && scope !== 'note') return rejection('invalid-scope', 'Unknown written-duration scope.');
   const event = resolveEvent(document, target);
   if (!event) return rejection('unknown-event', 'That rhythm is no longer in the score.');
-
   const focus = 'logicalNoteId' in target ? event.notes.find(note => note.id === target.logicalNoteId) ?? null : null;
   if ('logicalNoteId' in target && !focus) return rejection('unknown-note', 'That note is no longer in the score.');
+
+  // No-op detection happens before any split: asking for the value already shown
+  // must never be turned into a voice failure.
+  if (event.duration === ticks) return { status: 'unchanged', label: 'Written duration unchanged' };
 
   const mustSplit = focus !== null && scope === 'note' && event.notes.length > 1;
   const next = clone(document);
   const working = next.events.find(item => item.id === event.id)!;
-  let selection: CorrectionSelection | null = null;
-  let workingStart = working.start;
-  let workingId = working.id;
 
-  if (mustSplit) {
-    const note = working.notes.find(item => item.id === focus.id)!;
-    const voice = freeVoice(next, working.staff, working.start, ticks);
-    if (voice === null) {
-      return rejection('needs-third-voice', 'This change needs another voice, which this score does not have. Nothing was changed.');
-    }
-    working.notes = working.notes.filter(item => item.id !== note.id);
-    const split: NotationEvent = {
-      id: newId('ev'), staff: working.staff, voice, start: working.start, duration: ticks,
-      notes: [note], rest: false, source: 'inserted',
-    };
-    next.events.push(split);
-    if (!working.notes.length) next.events = next.events.filter(item => item.id !== working.id);
-    workingId = split.id;
-    selection = note.performance_ids.length
-      ? selectionForOccurrence(next, note.performance_ids[0])
-      : null;
-  } else {
-    const clash = overlapInVoice(next, working.staff, working.voice, workingStart, ticks, working.id);
+  if (!mustSplit) {
+    const clash = overlapInVoice(next, working.staff, working.voice, working.start, ticks, working.id);
     if (clash.length) {
       return rejection('written-overlap', 'That written value would overlap another event in the same voice. Nothing was changed.');
     }
+    working.duration = ticks;
+    return finalise(next, `Written value → ${ticks / GRID} sixteenths`);
   }
 
-  const edited = next.events.find(item => item.id === workingId)!;
-  if (mustSplit) {
-    const clash = overlapInVoice(next, edited.staff, edited.voice, edited.start, ticks, edited.id);
-    if (clash.length) {
-      return rejection('written-overlap', 'That written value would overlap another event in the same voice. Nothing was changed.');
-    }
+  const note = working.notes.find(item => item.id === focus!.id)!;
+  const voice = freeVoice(next, working.staff, working.start, ticks);
+  if (voice === null) {
+    return rejection('needs-third-voice', 'This change needs another voice, which this score does not have. Nothing was changed.');
   }
-  if (edited.duration === ticks) return { status: 'unchanged', label: 'Written duration unchanged' };
-  edited.duration = ticks;
-  const refreshed = refreshNotation(next);
-  const anchorOccurrence = selection?.occurrenceId
-    ?? refreshed.events.find(item => item.id === workingId)?.notes[0]?.performance_ids[0];
-  return applied(
-    refreshed,
-    `Written value → ${ticks / GRID} sixteenths`,
-    anchorOccurrence ? selectionForOccurrence(refreshed, anchorOccurrence) : null,
-  );
+  working.notes = working.notes.filter(item => item.id !== note.id);
+  if (!working.notes.length) next.events = next.events.filter(item => item.id !== working.id);
+  const split: NotationEvent = {
+    id: newId('ev'), staff: working.staff, voice, start: working.start, duration: ticks,
+    notes: [note], rest: false, source: 'inserted',
+  };
+  next.events.push(split);
+  return finalise(next, `Written value → ${ticks / GRID} sixteenths`);
 }
 
 function moveWrittenStart(document: NotationDocument, eventId: string, ticks: number): CommandOutcome {
@@ -354,28 +448,24 @@ function moveWrittenStart(document: NotationDocument, eventId: string, ticks: nu
     return rejection('written-overlap', 'That position would overlap another event in the same voice. Nothing was changed.');
   }
   working.start = ticks;
-  const refreshed = refreshNotation(next);
-  const first = working.notes[0]?.performance_ids[0];
-  return applied(refreshed, `Written position → ${ticks / GRID} sixteenths`, first ? selectionForOccurrence(refreshed, first) : null);
+  return finalise(next, `Written position → ${ticks / GRID} sixteenths`);
 }
 
-function applyAccidental(document: NotationDocument, logicalNoteId: string, accidental: 'sharp' | 'flat' | 'natural'): CommandOutcome {
-  const found = eventForNote(document, logicalNoteId);
-  if (!found) return rejection('unknown-note', 'That note is no longer in the score.');
+function applyAccidental(document: NotationDocument, occurrenceId: string, accidental: 'sharp' | 'flat' | 'natural'): CommandOutcome {
+  const found = noteForOccurrence(document, occurrenceId);
+  if (!found) return rejection('unknown-occurrence', 'That note is no longer in the document.');
   const parsed = parseSpelling(found.note.spelling);
   const natural = parseSpelling(`${parsed.letter}${parsed.octave}`).pitch;
   const pitch = accidental === 'sharp' ? natural + 1 : accidental === 'flat' ? natural - 1 : natural;
   if (pitch < 0 || pitch > 127) return rejection('invalid-pitch', 'That accidental would leave the MIDI range.');
   const spelling = `${parsed.letter}${accidental === 'sharp' ? '#' : accidental === 'flat' ? 'b' : ''}${parsed.octave}`;
-  const occurrence = found.note.performance_ids[0];
-  if (!occurrence) return rejection('unknown-occurrence', 'That note has no performance occurrence.');
-  return setPitch(document, occurrence, pitch, spelling);
+  return setPitch(document, occurrenceId, pitch, spelling);
 }
 
-function respellNote(document: NotationDocument, logicalNoteId: string, spelling: string): CommandOutcome {
-  const found = eventForNote(document, logicalNoteId);
-  if (!found) return rejection('unknown-note', 'That note is no longer in the score.');
-  let parsed: {pitch: number};
+function respellNote(document: NotationDocument, occurrenceId: string, spelling: string): CommandOutcome {
+  const found = noteForOccurrence(document, occurrenceId);
+  if (!found) return rejection('unknown-occurrence', 'That note is no longer in the document.');
+  let parsed: ReturnType<typeof parseSpelling>;
   try {
     parsed = parseSpelling(spelling);
   } catch {
@@ -385,13 +475,20 @@ function respellNote(document: NotationDocument, logicalNoteId: string, spelling
     return rejection('unsupported-spelling', 'Respell keeps the sounding pitch; use the accidental buttons to change it.');
   }
   if (found.note.spelling === spelling) return { status: 'unchanged', label: 'Spelling unchanged' };
+
   const next = clone(document);
-  const target = eventForNote(next, logicalNoteId)!.note;
-  target.spelling = spelling;
-  target.accidental = accidentalName(parseSpelling(spelling).alter);
-  const refreshed = refreshNotation(next);
-  const occurrence = target.performance_ids[0];
-  return applied(refreshed, `Respelled ${spelling}`, occurrence ? selectionForOccurrence(refreshed, occurrence) : null);
+  const target = noteForOccurrence(next, occurrenceId)!;
+  const finalAccidental = accidentalName(parsed.alter);
+  if (target.note.performance_ids.length > 1) {
+    const detached = detachOccurrence(next, target.event, target.note, occurrenceId, target.note.pitch, spelling, finalAccidental);
+    if (!detached.ok) return detached.outcome;
+  } else if (target.event.notes.some(item => item.id !== target.note.id && item.pitch === target.note.pitch)) {
+    return rejection('duplicate-chord-pitch', 'That chord already has a note at this pitch.');
+  } else {
+    target.note.spelling = spelling;
+    target.note.accidental = finalAccidental;
+  }
+  return finalise(next, `Respelled ${spelling}`);
 }
 
 function insertNote(document: NotationDocument, command: Extract<CorrectionCommand, {type: 'insert-note'}>): CommandOutcome {
@@ -411,11 +508,32 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
   if (document.performance.length >= MAX_EVENTS) {
     return rejection('too-many-occurrences', 'This lesson already has the maximum number of notes.');
   }
+  if (command.staff !== undefined && command.staff !== 'treble' && command.staff !== 'bass') {
+    return rejection('invalid-scope', 'Unknown staff.');
+  }
+  if (command.voice !== undefined && command.voice !== 1 && command.voice !== 2) {
+    return rejection('invalid-scope', 'Unknown voice.');
+  }
+
   const spb = secondsPerTick(document);
-  const start = command.startTicks ?? snapTick(onsetSeconds / spb);
-  const duration = command.durationTicks ?? Math.max(GRID, snapTick(durationSeconds / spb));
+  const startTicks = command.startTicks;
+  const durationTicks = command.durationTicks;
+  if (startTicks !== undefined && (!Number.isInteger(startTicks) || startTicks < 0 || startTicks % GRID !== 0)) {
+    return rejection('invalid-ticks', 'A written position must be a whole, non-negative number of sixteenth notes.');
+  }
+  if (durationTicks !== undefined && (!Number.isInteger(durationTicks) || durationTicks < GRID || durationTicks % GRID !== 0)) {
+    return rejection('invalid-ticks', 'A written duration must be a positive whole number of sixteenth notes.');
+  }
+  const start = startTicks ?? snapTick(onsetSeconds / spb);
+  const duration = durationTicks ?? Math.max(GRID, snapTick(durationSeconds / spb));
   const staff = command.staff ?? (pitch >= document.staff_split_pitch ? 'treble' : 'bass');
   const voice = command.voice ?? 1;
+  const lastMeasure = document.measures[document.measures.length - 1];
+  const lastEnd = lastMeasure ? lastMeasure.start + lastMeasure.duration : 0;
+  const wouldGrow = start + duration > lastEnd;
+  if (wouldGrow && document.measures.length >= MAX_MEASURES) {
+    return rejection('out-of-bounds', 'The score already has the maximum number of measures. Nothing was changed.');
+  }
 
   const duplicate = document.performance.find(item => item.pitch === pitch
     && Math.abs(item.onset - onsetSeconds) < 1e-6);
@@ -451,8 +569,9 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
     id: occurrenceId, onset: onsetSeconds, duration: durationSeconds, notation_duration: null,
     pitch, velocity: 0.7, confidence: null, optional: false, string: null, fret: null,
   });
-  const refreshed = refreshNotation(next);
-  return applied(refreshed, `Inserted ${spelling.spelling}`, selectionForOccurrence(refreshed, occurrenceId));
+  const outcome = finalise(next, `Inserted ${spelling.spelling}`);
+  if (outcome.status !== 'applied') return outcome;
+  return applied(outcome.document, outcome.label, selectionForOccurrence(outcome.document, occurrenceId));
 }
 
 function removeOccurrence(document: NotationDocument, occurrenceId: string): CommandOutcome {
@@ -468,8 +587,7 @@ function removeOccurrence(document: NotationDocument, occurrenceId: string): Com
       if (!target.event.notes.length) next.events = next.events.filter(event => event.id !== target.event.id);
     }
   }
-  const refreshed = refreshNotation(next);
-  return applied(refreshed, 'Note removed', null);
+  return finalise(next, 'Note removed');
 }
 
 function removeLogicalNote(document: NotationDocument, logicalNoteId: string): CommandOutcome {
@@ -483,8 +601,7 @@ function removeLogicalNote(document: NotationDocument, logicalNoteId: string): C
     target.event.notes = target.event.notes.filter(note => note.id !== logicalNoteId);
     if (!target.event.notes.length) next.events = next.events.filter(event => event.id !== target.event.id);
   }
-  const refreshed = refreshNotation(next);
-  return applied(refreshed, 'Note and all its occurrences removed', null);
+  return finalise(next, 'Note and all its occurrences removed');
 }
 
 /* ---------------------------------------------------------------- dispatch */
@@ -504,9 +621,9 @@ export function applyCommand(document: NotationDocument, command: CorrectionComm
     case 'move-written-start':
       return moveWrittenStart(document, command.eventId, command.ticks);
     case 'apply-accidental':
-      return applyAccidental(document, command.logicalNoteId, command.accidental);
+      return applyAccidental(document, command.occurrenceId, command.accidental);
     case 'respell':
-      return respellNote(document, command.logicalNoteId, command.spelling);
+      return respellNote(document, command.occurrenceId, command.spelling);
     case 'insert-note':
       return insertNote(document, command);
     case 'delete-occurrence':
@@ -514,6 +631,10 @@ export function applyCommand(document: NotationDocument, command: CorrectionComm
     case 'delete-logical-note':
       return removeLogicalNote(document, command.logicalNoteId);
     default:
-      return rejection('unknown-note', 'That edit is not available yet.');
+      return rejection('invalid-scope', 'That edit is not available yet.');
   }
 }
+
+/** Never called by commands; exported so callers can measure the notated grid. */
+export const sixteenthTicks = GRID;
+export const measureSpan = measureTicks;

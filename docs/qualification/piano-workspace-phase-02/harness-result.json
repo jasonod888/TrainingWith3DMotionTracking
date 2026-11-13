@@ -1,11 +1,15 @@
 {
-  "login": 200,
-  "status": "Unsaved changes (not saved \u2014 this harness has no save) | 1 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 total | Selected bp-1",
-  "facts": "A#4 \u00b7 bp-1 \u00b7 A#4 (MIDI 70) | 0.927 s \u00b7 recorded 0.882 s | treble voice 1 \u00b7 measure 1 \u00b7 written 480 ticks",
-  "start_after_10ms": 0.9272,
-  "start_expected": 0.9272,
-  "videos": 1,
+  "facts_initial": "A4 \u00b7 bp-1 \u00b7 A4 (MIDI 69) | 0.917 s \u00b7 recorded 0.882 s | treble voice 1 \u00b7 measure 1 \u00b7 written 600 ticks",
+  "scope_note_pressed": "true",
+  "scope_event_text": "Whole event",
+  "written_scope_applied": "Unsaved changes (not saved \u2014 this harness has no save) | 0 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 total | Selected bp-1",
+  "written_after": "A4 \u00b7 bp-1 \u00b7 A4 (MIDI 69) | 0.917 s \u00b7 recorded 0.882 s | treble voice 1 \u00b7 measure 1 \u00b7 written 480 ticks",
+  "recorded_unchanged": true,
+  "facts_after_sharp": "A#4 \u00b7 bp-1 \u00b7 A#4 (MIDI 70) | 0.917 s \u00b7 recorded 0.882 s | treble voice 1 \u00b7 measure 1 \u00b7 written 480 ticks",
+  "facts_after_respell": "Bb4 \u00b7 bp-1 \u00b7 A#4 (MIDI 70) | 0.917 s \u00b7 recorded 0.882 s | treble voice 1 \u00b7 measure 1 \u00b7 written 480 ticks",
+  "status_after_respell": "Unsaved changes (not saved \u2014 this harness has no save) | 1 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 total | Selected bp-1",
+  "status_after_full_undo": "No changes | 0 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 total | Selected bp-1",
+  "history_panel": "HISTORY |  | 0 step(s) undoable \u00b7 3 redoable \u00b7 0 KB of patches retained |  | History stores only the notes and events each edit changed; the score is rebuilt on undo.",
   "review_forms": 50,
-  "review_pages": "Page 1 of 27",
   "console_errors": []
 }

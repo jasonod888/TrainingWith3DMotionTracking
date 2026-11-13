@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {buildNotation, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
 import {
-  createWorkspaceState, workspaceReducer, workspaceStatus, type WorkspaceState,
+  createWorkspaceState, workspaceReducer, workspaceStatus, HISTORY_BYTE_BUDGET,
+  type WorkspaceState,
 } from '../src/music/workspace/workspace-state';
 
 const note = (id: string, onset: number, duration: number | null, pitch: number): PerformanceNote => ({
@@ -34,7 +35,7 @@ test('selecting something that is not in the document clears the selection hones
   assert.equal(state.lastReport?.status, 'rejected');
 });
 
-test('an applied command commits one history entry and reports it', () => {
+test('an applied command commits one patch entry and reports it', () => {
   const selected = workspaceReducer(start(), {type: 'select', occurrenceId: 'n-b'});
   const edited = workspaceReducer(selected, {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-b', pitch: 62}});
   assert.equal(edited.past.length, 1);
@@ -44,13 +45,15 @@ test('an applied command commits one history entry and reports it', () => {
   assert.equal(edited.lastReport?.status, 'applied');
   assert.equal(edited.document.performance.find(item => item.id === 'n-b')!.pitch, 62);
   assert.equal(edited.selection?.occurrenceId, 'n-b');
+  assert.ok(edited.historyBytes > 0);
+  assert.ok(edited.historyBytes < JSON.stringify(edited.document).length, 'a patch must be smaller than the document');
 });
 
 test('a rejected command changes nothing and creates no history', () => {
   const selected = workspaceReducer(start(), {type: 'select', occurrenceId: 'n-a'});
   const before = selected.document;
   const rejected = workspaceReducer(selected, {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 999}});
-  assert.equal(rejected.document, before, 'document identity must not change');
+  assert.equal(rejected.document, before);
   assert.equal(rejected.past.length, 0);
   assert.equal(rejected.dirty, false);
   assert.equal(rejected.lastReport?.status, 'rejected');
@@ -79,19 +82,44 @@ test('undo restores the document and a valid selection; redo re-applies', () => 
   assert.equal(redone.selection?.occurrenceId, 'n-c');
 });
 
-test('undo after a deletion never restores a dangling selection', () => {
-  const selected = workspaceReducer(start(), {type: 'select', occurrenceId: 'n-a'});
-  const deleted = workspaceReducer(selected, {type: 'command', command: {type: 'delete-occurrence', occurrenceId: 'n-a'}});
-  assert.equal(deleted.selection, null, 'deleting the selected note clears the selection');
-  const undone = workspaceReducer(deleted, {type: 'undo'});
-  assert.equal(undone.document.performance.length, 3);
-  assert.equal(undone.selection?.occurrenceId, 'n-a');
+test('R6: deleting a different occurrence preserves the current valid selection', () => {
+  let state = workspaceReducer(createWorkspaceState(score), {type: 'select', occurrenceId: 'n-a'});
+  state = workspaceReducer(state, {type: 'command', command: {type: 'delete-occurrence', occurrenceId: 'n-c'}});
+  assert.equal(state.selection?.occurrenceId, 'n-a');
+  assert.equal(state.document.performance.length, 2);
+});
+
+test('R6: deleting the selected occurrence clears the selection', () => {
+  let state = workspaceReducer(createWorkspaceState(score), {type: 'select', occurrenceId: 'n-a'});
+  state = workspaceReducer(state, {type: 'command', command: {type: 'delete-occurrence', occurrenceId: 'n-a'}});
+  assert.equal(state.selection, null);
+  assert.equal(state.document.performance.length, 2);
+});
+
+test('R6: undo back to the loaded document clears the unsaved-change indicator', () => {
+  let state = workspaceReducer(createWorkspaceState(score), {
+    type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 61},
+  });
+  assert.equal(state.dirty, true);
+  state = workspaceReducer(state, {type: 'undo'});
+  assert.equal(state.document, score, 'undo must restore the loaded document object');
+  assert.equal(state.dirty, false);
+  assert.match(workspaceStatus(state), /No changes/);
+  state = workspaceReducer(state, {type: 'redo'});
+  assert.equal(state.dirty, true);
+});
+
+test('R6: partial undo still reports unsaved changes', () => {
+  let state = createWorkspaceState(score);
+  state = workspaceReducer(state, {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 61}});
+  state = workspaceReducer(state, {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-b', pitch: 62}});
+  state = workspaceReducer(state, {type: 'undo'});
+  assert.equal(state.dirty, true);
 });
 
 test('status text never claims a save', () => {
   assert.match(workspaceStatus(start()), /No changes/);
-  const selected = workspaceReducer(start(), {type: 'select', occurrenceId: 'n-a'});
-  const edited = workspaceReducer(selected, {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 61}});
+  const edited = workspaceReducer(start(), {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 61}});
   assert.match(workspaceStatus(edited), /not saved/i);
   assert.doesNotMatch(workspaceStatus(edited), /^Saved/);
 });
@@ -102,4 +130,39 @@ test('reset replaces the document and clears history', () => {
   assert.equal(fresh.past.length, 0);
   assert.equal(fresh.dirty, false);
   assert.equal(fresh.document.performance.find(item => item.id === 'n-a')!.pitch, 60);
+});
+
+test('R5: history keeps patches, not documents, on a real-size score', () => {
+  // 1,338 notes over 209.6 s, deterministic: the same shape as the real example.
+  const large: PerformanceNote[] = [];
+  for (let index = 0; index < 1338; index += 1) {
+    const onset = 0.9 + (index % 970) * 0.2 + Math.floor(index / 970) * 0.01;
+    large.push(note(`big-${index}`, Number(onset.toFixed(4)), 0.4, 48 + (index * 7) % 36));
+  }
+  const document = buildNotation(large, {bpm: 145, duration: 209.594});
+  const documentBytes = JSON.stringify(document).length;
+  assert.ok(document.performance.length === 1338);
+
+  let state = createWorkspaceState(document);
+  const started = Date.now();
+  for (let index = 0; index < 20; index += 1) {
+    const current = document.performance[index].pitch;
+    state = workspaceReducer(state, {
+      type: 'command',
+      command: {type: 'set-occurrence-pitch', occurrenceId: `big-${index}`, pitch: Math.min(127, current + 1)},
+    });
+  }
+  const elapsed = Date.now() - started;
+  assert.equal(state.past.length, 20);
+  const retained = state.historyBytes;
+  assert.ok(retained < HISTORY_BYTE_BUDGET, 'history must stay inside its byte budget');
+  assert.ok(retained < documentBytes, 'twenty patches must cost less than one document');
+  assert.ok(retained / 20 < 2048, `each patch should be small, got ${Math.round(retained / 20)} bytes`);
+
+  // Full undo returns the exact loaded document and clears the dirty flag.
+  for (let index = 0; index < 20; index += 1) state = workspaceReducer(state, {type: 'undo'});
+  assert.equal(state.past.length, 0);
+  assert.equal(state.document, document);
+  assert.equal(state.dirty, false);
+  console.log(`# history benchmark: 20 edits in ${elapsed} ms, ${retained} bytes of patches retained (document ${documentBytes} bytes)`);
 });

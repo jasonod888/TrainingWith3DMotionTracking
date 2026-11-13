@@ -87,6 +87,8 @@ export function PianoWorkspaceHarness() {
   const [loading, setLoading] = useState(true);
   const [playhead, setPlayhead] = useState(0);
   const [snapTicks, setSnapTicks] = useState(0);
+  const [writtenScope, setWrittenScope] = useState<'note' | 'event'>('note');
+  const [respellDraft, setRespellDraft] = useState('');
   const [notice, setNotice] = useState('');
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -269,17 +271,44 @@ export function PianoWorkspaceHarness() {
               <div className="ws-row" role="group" aria-label="Pitch">
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch - 1}})}>− semitone</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch + 1}})}>+ semitone</button>
-                <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', logicalNoteId: selection.logicalNoteId, accidental: 'sharp'}})}>♯</button>
-                <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', logicalNoteId: selection.logicalNoteId, accidental: 'flat'}})}>♭</button>
-                <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', logicalNoteId: selection.logicalNoteId, accidental: 'natural'}})}>♮</button>
+                <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'sharp'}})}>♯</button>
+                <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'flat'}})}>♭</button>
+                <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'natural'}})}>♮</button>
               </div>
 
+              <div className="ws-row" role="group" aria-label="Respell">
+                <label className="ws-field ws-inline">
+                  <span>Respell</span>
+                  <input value={respellDraft} placeholder={selected.spelling} size={6}
+                    onChange={event => setRespellDraft(event.target.value)}/>
+                </label>
+                <button type="button" disabled={!respellDraft.trim()}
+                  onClick={() => { dispatch({type: 'command', command: {type: 'respell', occurrenceId: selection.occurrenceId, spelling: respellDraft.trim()}}); setRespellDraft(''); }}>
+                  Apply spelling
+                </button>
+              </div>
+
+              <div className="ws-row" role="group" aria-label="Written value scope">
+                <span className="ws-hint">Written value for</span>
+                <button type="button" aria-pressed={writtenScope === 'note'} className={writtenScope === 'note' ? 'is-active' : ''}
+                  onClick={() => setWrittenScope('note')}>This note</button>
+                <button type="button" aria-pressed={writtenScope === 'event'} className={writtenScope === 'event' ? 'is-active' : ''}
+                  onClick={() => setWrittenScope('event')}>Whole event{selected.notesInEvent > 1 ? ` (${selected.notesInEvent} notes)` : ''}</button>
+              </div>
               <div className="ws-row" role="group" aria-label="Written duration">
                 {DURATION_CHOICES.map(choice => <button key={choice.label} type="button"
-                  onClick={() => dispatch({type: 'command', command: {type: 'set-written-duration', target: {eventId: selection.eventId}, ticks: choice.ticks, scope: 'event'}})}>
+                  onClick={() => dispatch({type: 'command', command: {
+                    type: 'set-written-duration',
+                    target: writtenScope === 'note' ? {logicalNoteId: selection.logicalNoteId} : {eventId: selection.eventId},
+                    ticks: choice.ticks,
+                    scope: writtenScope,
+                  }})}>
                   {choice.label}
                 </button>)}
               </div>
+              <p className="ws-hint">
+                “This note” splits a chord member into its own voice if needed; “Whole event” rewrites every member's written value.
+              </p>
 
               <NumberField label="Start (s)" value={selected.onset} min={0} max={document.duration} step={0.001}
                 onCommit={value => { if (value !== null) dispatch({type: 'command', command: {type: 'set-occurrence-onset', occurrenceId: selection.occurrenceId, seconds: value, snapSeconds}}); }}/>
@@ -318,7 +347,12 @@ export function PianoWorkspaceHarness() {
 
         <section className="ws-panel" aria-label="History">
           <h2>History</h2>
-          <p className="ws-hint">{state.past.length} step(s) undoable · {state.future.length} redoable</p>
+          <p className="ws-hint">
+            {state.past.length} step(s) undoable · {state.future.length} redoable ·{' '}
+            {(state.historyBytes / 1024).toFixed(0)} KB of patches retained
+            {state.evicted ? ' (oldest entries dropped)' : ''}
+          </p>
+          <p className="ws-hint">History stores only the notes and events each edit changed; the score is rebuilt on undo.</p>
         </section>
       </aside>
     </div>
@@ -338,6 +372,7 @@ function noteFacts(document: NotationDocument, selection: CorrectionSelection) {
     velocity: occurrence.velocity,
     spelling,
     writtenTicks: event?.duration ?? 0,
+    notesInEvent: event?.notes.length ?? 1,
     linkedOccurrences: note?.performance_ids.length ?? 1,
   };
 }
