@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-11-13T17:28:55.452Z",
+  "source": "notation",
+  "saved": {
+    "notation_version": 1,
+    "events": 20,
+    "alignment_mode": "anchored",
+    "anchors": [
+      {
+        "seconds": 1,
+        "tick": 960
+      }
+    ],
+    "offset_seconds": 0.25,
+    "authored_spelling": "B#3",
+    "authored_written_ticks": 240
+  },
+  "reopened": {
+    "spelling": "B#3",
+    "written_ticks": 240,
+    "alignment_mode": "anchored",
+    "anchors": [
+      {
+        "seconds": 1,
+        "tick": 960
+      }
+    ],
+    "offset_seconds": 0.25,
+    "title": "Piano round trip"
+  }
+}

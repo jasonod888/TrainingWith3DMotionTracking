@@ -156,3 +156,16 @@ test('recovery rejects another account, draft or source, and unsupported version
   clearRecovery();
   assert.equal(readRecovery(identity).status, 'none');
 });
+
+test('duplicate recorded attacks on one written note keep every occurrence mapped', () => {
+  const doubled = buildNotation([
+    {id: 'd1', onset: 0.5, duration: 0.2, pitch: 60, velocity: 0.4, confidence: null, optional: false, string: null, fret: null},
+    {id: 'd2', onset: 0.5, duration: 0.2, pitch: 60, velocity: 0.6, confidence: null, optional: false, string: null, fret: null},
+    {id: 'd3', onset: 1.0, duration: 0.2, pitch: 64, velocity: 0.5, confidence: null, optional: false, string: null, fret: null},
+  ], {bpm: 120, duration: 2});
+  const mapped = new Set<string>();
+  for (const event of doubled.events) for (const note of event.notes) for (const id of note.performance_ids) mapped.add(id);
+  assert.deepEqual([...mapped].sort(), ['d1', 'd2', 'd3'], 'both attacks must map to the written note');
+  const edited = applyCommand(doubled, {type: 'set-occurrence-pitch', occurrenceId: 'd2', pitch: 62});
+  assert.equal(edited.status, 'applied', 'an edit against a doubled attack must apply');
+});

@@ -7,7 +7,7 @@
  * loads the same draft through the same API and writes nothing.
  */
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {assetUrl, getSession, request} from '../../api';
+import {ApiError, assetUrl, getSession, request} from '../../api';
 import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
   buildNotation, parseNotationDocument, selectionForOccurrence,
@@ -145,6 +145,7 @@ export function PianoWorkspaceHarness() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [saveConflict, setSaveConflict] = useState(false);
   const [reopenMessage, setReopenMessage] = useState('');
   const [recoveryOffer, setRecoveryOffer] = useState<RecoveryCheckpoint | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState('');
@@ -486,30 +487,50 @@ export function PianoWorkspaceHarness() {
 
   /* ------------------------------------------------------ save and reopen */
 
-  const save = useCallback(async () => {
+  const save = useCallback(async (baseOverride?: string) => {
     if (!document || !lessonId || !confirmReviewed || saving) return;
-    setSaving(true); setSaveError(''); setSaveMessage('');
+    setSaving(true); setSaveError(''); setSaveMessage(''); setSaveConflict(false);
+    const base = baseOverride ?? savedRevisionId;
     const body = buildSaveBody({
-      title, document, spans, alignment, anchors, offsetSeconds, baseRevisionId: savedRevisionId,
+      title, document, spans, alignment, anchors, offsetSeconds, baseRevisionId: base,
     });
     try {
       const manifest = await request<{ revision_id: string }>(
-        `/lessons/${encodeURIComponent(lessonId)}/${savedRevisionId ? 'music-revision' : 'music-draft/review'}`,
+        `/lessons/${encodeURIComponent(lessonId)}/${base ? 'music-revision' : 'music-draft/review'}`,
         'POST', body);
       setSavedRevisionId(manifest.revision_id);
       setSavedSignature(documentSignature);
+      setSaveConflict(false);
       clearRecovery();
       setRecoveryOffer(null);
       setRecoveryNotice('');
       setSaveMessage(`Saved privately · revision ${manifest.revision_id.slice(0, 8)}`);
     } catch (cause) {
-      // Edits stay in place; the local checkpoint keeps the work recoverable.
-      setSaveError(cause instanceof Error ? cause.message : 'The save failed; your edits are kept.');
+      // Edits stay in place; the local checkpoint keeps the work recoverable. A stale
+      // base is a conflict with an explicit resolution, never silent data loss.
+      if (cause instanceof ApiError && cause.status === 409) {
+        setSaveConflict(true);
+        setSaveError('This lesson has a newer saved revision. Your edits are kept locally.');
+      } else {
+        setSaveError(cause instanceof Error ? cause.message : 'The save failed; your edits are kept.');
+      }
     } finally {
       setSaving(false);
     }
   }, [document, lessonId, confirmReviewed, saving, title, spans, alignment, anchors, offsetSeconds,
       savedRevisionId, documentSignature]);
+
+  const saveOnLatestRevision = useCallback(async () => {
+    if (!lessonId) return;
+    try {
+      const lesson = await request<{ revision_id: string }>(`/lessons/${encodeURIComponent(lessonId)}`);
+      setSavedRevisionId(lesson.revision_id);
+      setSaveConflict(false);
+      await save(lesson.revision_id);
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : 'The latest revision could not be read.');
+    }
+  }, [lessonId, save]);
 
   const reopen = useCallback(async () => {
     if (!lessonId) return;
@@ -647,7 +668,7 @@ export function PianoWorkspaceHarness() {
         <span><input type="checkbox" aria-label="Confirm reviewed" checked={confirmReviewed}
           onChange={event => setConfirmReviewed(event.target.checked)}/> Reviewed</span>
       </label>
-      <button type="button" onClick={save} disabled={!confirmReviewed || saving || !dirty}
+      <button type="button" onClick={() => save()} disabled={!confirmReviewed || saving || !dirty}
         data-save-button="true">{saving ? 'Saving…' : 'Save privately'}</button>
       <button type="button" onClick={reopen}>Reopen saved</button>
 
@@ -687,6 +708,10 @@ export function PianoWorkspaceHarness() {
       </span>
       {saveMessage && <span className="ws-report" data-save-state="saved">{saveMessage}</span>}
       {saveError && <span className="ws-report is-bad" data-save-state="error">{saveError}</span>}
+      {saveConflict && <span className="ws-report" data-save-state="conflict">
+        <button type="button" onClick={saveOnLatestRevision}>Save on latest revision</button>
+        <button type="button" onClick={reopen}>Reload saved revision</button>
+      </span>}
       {reopenMessage && <span className="ws-report" data-reopen-state="message">{reopenMessage}</span>}
       {report && <span className={report.status === 'rejected' ? 'ws-report is-bad' : 'ws-report'}>
         {report.status === 'rejected' ? report.message : report.label}

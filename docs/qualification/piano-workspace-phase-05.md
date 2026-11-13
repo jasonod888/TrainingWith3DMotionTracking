@@ -1,44 +1,99 @@
-# Piano correction workspace — Phase 5 progress
+# Piano correction workspace — Phase 5 submission
 
-**Status: NOT SUBMITTED FOR ACCEPTANCE.** Two verified checkpoints exist; the workspace
-save/recovery flow is implemented but its component-level evidence is missing. Phase 6 has
-not started.
+Validated persistence, reopen fidelity, conflict-safe saving and identity-scoped recovery.
 
-Commits: `6d68abd` (server persistence), `9bd4540` (workspace save/reopen/recovery).
+| | |
+| --- | --- |
+| Phase | 5 — Persistence, verification and recovery |
+| Branch | `phase5/persistence-recovery` |
+| Commits | `6d68abd` server contract · `9bd4540` workspace save/recovery · this commit |
+| Scope | Draft review/revision persistence only; no publication, no page replacement, no gestures |
+| Phase 6 | Not started |
 
-## Verified
+## 0. Occurrence-mapping rejection (reproduced and fixed)
 
-| Requirement | State | Evidence |
-| --- | --- | --- |
-| Validated, versioned persistence of performance, authored notation and alignment | Done | `apps/api/music_alignment.py`; `POST /music-draft/review` and `POST /music-revision` accept `notation`, `alignment`, `offset_seconds` and store the normalised payload in the private reference |
-| Exact onset/length, authored rhythm/spelling survive save/reopen | Done (payload) | Reopen tests: a respelled `B#3` and a 240-tick written duration round-trip through JSON and `parseNotationDocument`; a mismatched notation duration is refused |
-| Saved anchors and offset have ownership and dirty/save state | Done (code) | `serializeAlignment` stores anchors + offset; harness Save/Reopen and dirty tracking are wired |
-| Submitted performance and notation disagreements reject clearly | Done | 422 for pitch mismatch, gap, reversed ticks, off-clip anchor, out-of-range offset |
-| Legacy references without notation/alignment open correctly | Done | API test (legacy body stores neither) and web restore test (performance fallback labelled) |
-| Ownership, source identity, idempotent finalisation | Done | Existing review/edit tests still pass; identical retry returns the same revision |
-| Versioned local recovery with account/draft/source identity | Done (code + unit) | `recovery.ts`; rejects account, lesson, draft and source mismatches; never marked server-saved |
-| Save failure retains edits and keeps a checkpoint | **Implemented, not automated** | Harness keeps the document and writes the checkpoint; no component test |
-| Stale-preview labelling | Done (code) | `performanceChanged` ignores spelling and detects pitch/time edits; harness disables Piano and labels the preview stale |
-| API/integration evidence pack | Partial | API tests + 7 web persistence tests; no authenticated browser save/reopen capture |
+The fixture's first edit failed with “An occurrence is missing from every logical note”. Reproduction
+showed why: when two recorded attacks quantise to the same written pitch and position,
+`groupPerformance` kept only the louder one, so the quieter performance id belonged to no logical
+note. The validation was correctly rejecting a document that had genuinely lost an occurrence.
 
-## Tests
+`build.ts` now merges those attacks into **one written note whose `performance_ids` lists every
+occurrence** (the loudest supplies velocity/spelling). No validation was relaxed: all ids are still
+present, unique, and bound to the same event. The fixture maps **20/20** occurrences, and an edit
+targeting a doubled attack applies.
 
-- Web: **440 passed** (`npm test`), including 7 new persistence tests.
-- API: `test_music_alignment.py` + `test_music_review.py` + `test_music_edit.py` — **12 passed** (4 new).
-- `tsc --noEmit` clean.
+## 1. What is persisted
 
-## Missing before Phase 5 can be submitted
+`POST /music-draft/review` (first save) and `POST /music-revision` (later saves) accept optional
+`notation`, `alignment` and `offset_seconds`. Both reuse `validate_notation` and the new
+`validate_alignment`, and store the normalised payload in the private reference:
 
-1. A component test that renders the harness, performs a Phase 2 edit, confirms, saves, and
-   asserts saved status; then a failing save that keeps the edit and the local checkpoint with
-   an honest “not saved” label. The attempted test was removed because the fixture’s first
-   occurrence was rejected by the correction layer (“occurrence missing from every logical
-   note”), so it never reached the save path — this is a test-harness integration problem that
-   must be understood, not papered over.
-2. An authenticated save → reopen demonstration (payload, reload, restored spelling/anchors/offset).
-3. A conflict/retry demonstration (409 then retry).
+- notation: events, authored spelling, written durations, voices/ties, performance binding;
+- alignment: version, mode, basis, anchor list, score ticks, offset;
+- everything else unchanged: events, spans, pedal, provenance, review identity, verification state.
 
-## Scope statement
+Rejections (422): performance/notation mismatch, gap or overlap in passages, reversed ticks, held
+jump, off-clip anchor, offset outside ±10 s, `estimated`/`anchored` inconsistency.
+Legacy bodies without notation/alignment still save; identical retries return the same revision.
 
-No publication, no page replacement, no gesture work. The draft review path is used exactly as
-it already exists; the workspace stays isolated.
+## 2. Workspace save, reopen and conflict handling
+
+- **Save privately** posts through the existing commands, first as a review and then as revisions.
+  It requires a fresh “Reviewed” confirmation; **any edit clears it**.
+- **Failure** keeps the document, keeps the confirmation state, shows the server message, writes the
+  local checkpoint, and never says Saved.
+- **409** keeps the work and offers explicit resolution: *Save on latest revision* (rebases on the
+  current revision id and saves the local work) or *Reload saved revision*. No silent discard.
+- **Reopen saved** reads the lesson manifest reference and restores it with
+  `restoreFromReference`, which uses the saved notation verbatim. A stored `B#3` spelling and a
+  240-tick written duration survive; legacy references without notation are rebuilt and labelled
+  “performance only (legacy reference)”.
+
+## 3. Local recovery
+
+`recovery.ts` writes one versioned checkpoint (`piano-workspace-recovery-v1`) with
+`{accountId, lessonId, draftId, sourceSha256}`. Reading:
+- matches all four identities → offered with “It is **not saved to the server**”; Restore applies
+  notation, anchors and offset, and the status repeats that it is local;
+- any mismatch → rejected with “belongs to a different account, draft or source” and never offered;
+- unsupported version → rejected; corrupt JSON → rejected.
+The UI never marks a checkpoint as server-saved.
+
+## 4. Audio identity
+
+`performanceChanged` compares ids, onsets, recorded durations, pitches, velocities and the
+optional flag: spelling-only edits keep the preview valid; pitch/time edits mark it stale, disable
+Piano and label the preview stale. Server-side invalidation already keys on the same performance
+comparison.
+
+## 5. Tests and evidence
+
+| Check | Result |
+| --- | --- |
+| Web suite `npm test` | **447 passed**, 0 failed |
+| Save/reopen/conflict/recovery component tests | **6 passed** |
+| Persistence unit tests (reopen fidelity, legacy, recovery identity) | **8 passed** |
+| API `test_music_alignment.py` + review/edit | **12 passed** |
+| `tsc --noEmit` / `npm run build` | clean / succeeds |
+| Round-trip sample | [`phase5-roundtrip.json`](piano-workspace-phase-05/phase5-roundtrip.json): saved `B#3` + 240 ticks + anchor (1 s → 960) + offset 0.25 → reopened identically, `source: notation` |
+
+Component coverage (`apps/web/tests/workspace-save.test.tsx`): edit → confirm → save body carries
+notation/alignment/offset; confirmation reset by a further edit; failed save keeps edits, writes
+the checkpoint and never claims Saved; 409 shows both resolution actions and the retry posts a new
+revision on the latest base (one review + one revision, no duplicate finalisation); reopen restores
+the authored `B#3`, the 0.25 s offset and the anchored map; matching checkpoint offered and restored
+as local work; foreign checkpoint rejected.
+
+## 6. Limitations
+
+- The conflict test drives a mocked 409; the server-side 409 semantics are covered by the existing
+  review/edit API tests, not by an authenticated browser capture.
+- The save flow is exercised in jsdom with the real parsers, hooks and command layer; there is no
+  screenshot-based capture of a live save/reopen.
+- Phase 5 stores the alignment as an authored map plus anchors; it does not yet offer anchor
+  authoring on the normal review page (Phase 7).
+
+## 7. Scope statement
+
+No publication, shared-release update, page replacement or gesture work. The draft review and
+revision endpoints are used exactly as they exist. Phase 6 has not started.

@@ -162,13 +162,21 @@ export function buildNotation(performance: PerformanceNote[], options: BuildOpti
   const groups = assignVoices(groupPerformance(source, secondsPerTick, splitPitch, scoreSeconds));
   const events: NotationEvent[] = groups.map((group, index) => {
     const notes: NotationNote[] = [];
-    const byPitch = new Map<number, PerformanceNote>();
+    // Several recorded notes can quantise to the same written pitch and position. They
+    // belong to one written note, so every occurrence id must stay mapped to it; dropping
+    // the quieter duplicates would leave an occurrence that no logical note contains and
+    // would make every later edit fail validation.
+    const byPitch = new Map<number, PerformanceNote[]>();
     for (const note of group.notes) {
-      const existing = byPitch.get(note.pitch);
-      if (!existing || (note.velocity ?? 0) > (existing.velocity ?? 0)) byPitch.set(note.pitch, note);
+      byPitch.set(note.pitch, [...(byPitch.get(note.pitch) ?? []), note]);
     }
-    for (const note of [...byPitch.values()].sort((left, right) => left.pitch - right.pitch)) {
-      notes.push(buildLogicalNote(note, key));
+    for (const pitch of [...byPitch.keys()].sort((left, right) => left - right)) {
+      const members = byPitch.get(pitch)!;
+      const representative = members.reduce((loudest, note) =>
+        (note.velocity ?? 0) > (loudest.velocity ?? 0) ? note : loudest);
+      const logical = buildLogicalNote(representative, key);
+      logical.performance_ids = members.map(note => note.id);
+      notes.push(logical);
     }
     return {
       id: eventId(group, index),
