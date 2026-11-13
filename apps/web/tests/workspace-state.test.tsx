@@ -1,8 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {buildNotation, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
+import {buildNotation, refreshNotation, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
 import {
-  createWorkspaceState, workspaceReducer, workspaceStatus, HISTORY_BYTE_BUDGET,
+  createWorkspaceState, historySummary, workspaceReducer, workspaceStatus, HISTORY_BYTE_BUDGET,
   type WorkspaceState,
 } from '../src/music/workspace/workspace-state';
 
@@ -17,6 +17,99 @@ const score: NotationDocument = buildNotation([
 function start(): WorkspaceState {
   return createWorkspaceState(score);
 }
+
+/** E4 at 1 s and a second occurrence at 3 s sharing one logical note. */
+function multiScore(): NotationDocument {
+  const base = buildNotation([note('e', 1, 0.5, 64), note('g', 1, 0.5, 67)], {bpm: 120, duration: 8});
+  const copy: NotationDocument = structuredClone(base);
+  copy.performance.push(note('e-repeat', 3, 0.5, 64));
+  const event = copy.events.find(item => item.notes.some(n => n.performance_ids.includes('e')))!;
+  event.notes.find(n => n.performance_ids.includes('e'))!.performance_ids.push('e-repeat');
+  return refreshNotation(copy);
+}
+
+test('F3: undo after deleting the selected note restores the note and its selection', () => {
+  let state = workspaceReducer(createWorkspaceState(score), {type: 'select', occurrenceId: 'n-a'});
+  state = workspaceReducer(state, {type: 'command', command: {type: 'delete-occurrence', occurrenceId: 'n-a'}});
+  assert.equal(state.selection, null);
+
+  state = workspaceReducer(state, {type: 'undo'});
+  assert.ok(state.document.performance.some(item => item.id === 'n-a'));
+  assert.equal(state.selection?.occurrenceId, 'n-a');
+  assert.equal(state.dirty, false);
+
+  state = workspaceReducer(state, {type: 'redo'});
+  assert.equal(state.selection, null);
+});
+
+test('F3: undo after an insertion restores the pre-insertion selection', () => {
+  let state = workspaceReducer(createWorkspaceState(score), {type: 'select', occurrenceId: 'n-b'});
+  state = workspaceReducer(state, {
+    type: 'command',
+    command: {type: 'insert-note', pitch: 70, onsetSeconds: 4, durationSeconds: 0.4},
+  });
+  assert.notEqual(state.selection?.occurrenceId, 'n-b', 'insertion selects the new note');
+
+  state = workspaceReducer(state, {type: 'undo'});
+  assert.equal(state.selection?.occurrenceId, 'n-b');
+  assert.equal(state.document.performance.length, 3);
+});
+
+test('F3: undo after a split restores the original logical note', () => {
+  const multi = multiScore();
+  let state = workspaceReducer(createWorkspaceState(multi), {type: 'select', occurrenceId: 'e-repeat'});
+  const beforeLogical = state.selection!.logicalNoteId;
+
+  state = workspaceReducer(state, {
+    type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'e-repeat', pitch: 62},
+  });
+  assert.notEqual(state.selection?.logicalNoteId, beforeLogical, 'the edit splits the shared logical note');
+
+  state = workspaceReducer(state, {type: 'undo'});
+  assert.equal(state.selection?.occurrenceId, 'e-repeat');
+  assert.equal(state.selection?.logicalNoteId, beforeLogical);
+});
+
+test('F3: undo restores the command selection even if another note was selected afterwards', () => {
+  let state = workspaceReducer(createWorkspaceState(score), {type: 'select', occurrenceId: 'n-a'});
+  state = workspaceReducer(state, {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 61}});
+  state = workspaceReducer(state, {type: 'select', occurrenceId: 'n-c'});
+  assert.equal(state.selection?.occurrenceId, 'n-c');
+
+  state = workspaceReducer(state, {type: 'undo'});
+  assert.equal(state.selection?.occurrenceId, 'n-a', 'undo restores the selection the edit started from');
+});
+
+test('F2: a same-pitch no-op creates no history and no dirty state', () => {
+  let state = workspaceReducer(createWorkspaceState(score), {type: 'select', occurrenceId: 'n-a'});
+  state = workspaceReducer(state, {type: 'command', command: {type: 'respell', occurrenceId: 'n-a', spelling: 'B#3'}});
+  assert.equal(state.lastReport?.status, 'applied');
+  const beforeHistory = state.past.length;
+  state = workspaceReducer(state, {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 60}});
+  assert.equal(state.lastReport?.status, 'unchanged');
+  assert.equal(state.past.length, beforeHistory, 'pressing the same key must not add history');
+});
+
+test('history bytes count undo and redo retention in UTF-8', () => {
+  let state = workspaceReducer(createWorkspaceState(score), {type: 'select', occurrenceId: 'n-a'});
+  state = workspaceReducer(state, {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 61}});
+  const edited = state.historyBytes;
+  assert.ok(edited > 0);
+
+  state = workspaceReducer(state, {type: 'undo'});
+  const summary = historySummary(state);
+  assert.equal(summary.undoSteps, 0);
+  assert.equal(summary.redoSteps, 1);
+  assert.equal(summary.redoBytes, edited, 'a redo entry still retains its patch');
+  assert.equal(summary.totalBytes, edited);
+  assert.equal(state.historyBytes, edited, 'the retained figure covers undo + redo');
+
+  state = workspaceReducer(state, {type: 'redo'});
+  assert.equal(state.historyBytes, edited);
+
+  state = workspaceReducer(state, {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-b', pitch: 62}});
+  assert.equal(historySummary(state).redoSteps, 0, 'a new command clears the redo queue');
+});
 
 test('selection is session state: no history entry and no dirty flag', () => {
   const selected = workspaceReducer(start(), {type: 'select', occurrenceId: 'n-b'});

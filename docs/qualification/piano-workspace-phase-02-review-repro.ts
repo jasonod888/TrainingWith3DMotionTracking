@@ -43,12 +43,14 @@ check('same pitch on a multi-mapped note does not split or throw', () => {
   assert.equal(applyCommand(multi, {type: 'set-occurrence-pitch', occurrenceId: 'e-repeat', pitch: 64}).status, 'unchanged');
 });
 
-check('applying an accidental cannot silently edit the first occurrence instead of the selected second', () => {
+check('applying an accidental edits the selected second occurrence and not the first', () => {
   let state = workspaceReducer(createWorkspaceState(multi), {type: 'select', occurrenceId: 'e-repeat'});
-  state = workspaceReducer(state, {type: 'command', command: {type: 'apply-accidental', logicalNoteId: target.id, accidental: 'sharp'}});
-  // Until this command accepts an occurrence target, it must reject ambiguity.
+  state = workspaceReducer(state, {type: 'command', command: {type: 'apply-accidental', occurrenceId: 'e-repeat', accidental: 'sharp'}});
   const first = state.document.performance.find(n => n.id === 'e')!;
-  assert.equal(first.pitch, 64);
+  const second = state.document.performance.find(n => n.id === 'e-repeat')!;
+  assert.equal(first.pitch, 64, 'the first occurrence must not move');
+  assert.equal(second.pitch, 65, 'the selected second occurrence must change');
+  assert.equal(state.selection?.occurrenceId, 'e-repeat');
 });
 
 check('invalid insertion grid is rejected through the command outcome', () => {

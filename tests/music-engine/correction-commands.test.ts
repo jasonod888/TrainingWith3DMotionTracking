@@ -106,6 +106,51 @@ test('written value and recorded length stay independent', () => {
   assert.equal(long.events.find(item => item.id === event.id)!.duration, 960);
 });
 
+/* ------------------------------------------------------------------- F1 */
+
+test('F1: note scope with an event target is rejected and changes nothing', () => {
+  const before = document();
+  const chord = eventOf(before, 'chord-e');
+  const result = applyCommand(before, {
+    // Runtime callers can still build this shape; the command must refuse it.
+    type: 'set-written-duration', target: {eventId: chord.id}, ticks: chord.duration + 480, scope: 'note',
+  } as never);
+  assert.equal(result.status, 'rejected');
+  if (result.status === 'rejected') assert.equal(result.code, 'invalid-scope');
+  assert.equal(eventOf(before, 'chord-e').duration, chord.duration);
+  assert.equal(eventOf(before, 'chord-g').duration, chord.duration);
+});
+
+test('F1: event scope with a note target is rejected and changes nothing', () => {
+  const before = document();
+  const chord = eventOf(before, 'chord-e');
+  const noteId = chord.notes.find(n => n.performance_ids.includes('chord-e'))!.id;
+  const result = applyCommand(before, {
+    type: 'set-written-duration', target: {logicalNoteId: noteId}, ticks: chord.duration + 480, scope: 'event',
+  } as never);
+  assert.equal(result.status, 'rejected');
+  if (result.status === 'rejected') assert.equal(result.code, 'invalid-scope');
+  assert.equal(eventOf(before, 'chord-e').duration, chord.duration);
+});
+
+/* ------------------------------------------------------------------- F2 */
+
+test('F2: the same piano pitch keeps authored enharmonic spelling', () => {
+  const base = buildNotation([note('flat', 1, 0.4, 61)], {bpm: 120, duration: 4});
+  const respelled = applied(applyCommand(base, {type: 'respell', occurrenceId: 'flat', spelling: 'Db4'}));
+  const result = applyCommand(respelled, {type: 'set-occurrence-pitch', occurrenceId: 'flat', pitch: 61});
+  assert.equal(result.status, 'unchanged');
+  assert.equal(eventOf(respelled, 'flat').notes[0].spelling, 'Db4');
+});
+
+test('F2: the same piano pitch on a multi-mapped note is a no-op and keeps spelling', () => {
+  const before = multiDocument();
+  const respelled = applied(applyCommand(before, {type: 'respell', occurrenceId: 'e-repeat', spelling: 'Fb4'}));
+  const result = applyCommand(respelled, {type: 'set-occurrence-pitch', occurrenceId: 'e-repeat', pitch: 64});
+  assert.equal(result.status, 'unchanged');
+  assert.equal(eventOf(respelled, 'e-repeat').notes[0].spelling, 'Fb4');
+});
+
 /* ------------------------------------------------------------------- R1 */
 
 test('R1: a single chord member gets its own written duration', () => {

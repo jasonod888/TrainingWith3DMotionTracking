@@ -1,13 +1,13 @@
-﻿# npm test (apps/web) — Phase 2 correction submission
-# Command: cd apps/web; npm test (tsx --test over tests/engine, tests/music-engine, apps/web/tests)
+﻿# npm test (apps/web) — Phase 2 correction submission 2
+# Command: cd apps/web; npm test
 # Date: 2026-11-13 (Asia/Singapore)
 
-# \# history benchmark: 20 edits in 801 ms, 19484 bytes of patches retained (document 1416868 bytes)
-# tests 378
+# \# history benchmark: 20 edits in 919 ms, 19484 bytes of patches retained (document 1416868 bytes)
+# tests 388
 # suites 0
-# pass 378
+# pass 388
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 6063.8453
+# duration_ms 6164.0866

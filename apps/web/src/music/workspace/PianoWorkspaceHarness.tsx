@@ -18,7 +18,7 @@ import {PianoRoll} from '../notation/PianoRoll';
 import {SheetMusic} from '../notation/SheetMusic';
 import {NotationAudio} from '../notation/notation-audio';
 import {
-  createWorkspaceState, workspaceReducer, workspaceStatus,
+  createWorkspaceState, historySummary, workspaceReducer, workspaceStatus,
   type WorkspaceAction, type WorkspaceState,
 } from './workspace-state';
 
@@ -192,6 +192,7 @@ export function PianoWorkspaceHarness() {
 
   const snapSeconds = snapTicks ? snapTicks * secondsPerTick : null;
   const report = state.lastReport;
+  const summary = historySummary(state);
 
   return <main className="ws-shell">
     <header className="ws-head">
@@ -297,12 +298,9 @@ export function PianoWorkspaceHarness() {
               </div>
               <div className="ws-row" role="group" aria-label="Written duration">
                 {DURATION_CHOICES.map(choice => <button key={choice.label} type="button"
-                  onClick={() => dispatch({type: 'command', command: {
-                    type: 'set-written-duration',
-                    target: writtenScope === 'note' ? {logicalNoteId: selection.logicalNoteId} : {eventId: selection.eventId},
-                    ticks: choice.ticks,
-                    scope: writtenScope,
-                  }})}>
+                  onClick={() => dispatch({type: 'command', command: writtenScope === 'note'
+                    ? {type: 'set-written-duration', target: {logicalNoteId: selection.logicalNoteId}, ticks: choice.ticks, scope: 'note'}
+                    : {type: 'set-written-duration', target: {eventId: selection.eventId}, ticks: choice.ticks, scope: 'event'}})}>
                   {choice.label}
                 </button>)}
               </div>
@@ -348,9 +346,9 @@ export function PianoWorkspaceHarness() {
         <section className="ws-panel" aria-label="History">
           <h2>History</h2>
           <p className="ws-hint">
-            {state.past.length} step(s) undoable · {state.future.length} redoable ·{' '}
-            {(state.historyBytes / 1024).toFixed(0)} KB of patches retained
-            {state.evicted ? ' (oldest entries dropped)' : ''}
+            {summary.undoSteps} undo step(s) · {summary.redoSteps} redoable ·{' '}
+            {(summary.totalBytes / 1024).toFixed(1)} KB retained ({summary.undoBytes} B undo + {summary.redoBytes} B redo){' '}
+            {summary.evicted ? '· oldest entries dropped' : ''}
           </p>
           <p className="ws-hint">History stores only the notes and events each edit changed; the score is rebuilt on undo.</p>
         </section>

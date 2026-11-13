@@ -93,7 +93,9 @@ const result = {
   retained_patch_bytes: retained,
   retained_bytes_each: +(retained / EDITS).toFixed(0),
   retained_vs_document: +(retained / documentBytes).toFixed(3),
+  retained_after_undo_bytes: state.historyBytes,
   undo: {...afterUndo, redo_steps: redone, redo_ms: redoMs, redo_ms_each: +(redoMs / Math.max(1, redone)).toFixed(1)},
-  note: 'Byte figures are serialised-size estimates, not measured heap.',
+  budget_bytes: 4 * 1024 * 1024,
+  note: 'Byte figures are UTF-8 patch sizes (serialised-size estimates), not measured heap; they cover undo + redo retention.',
 };
 console.log(JSON.stringify(result, null, 2));

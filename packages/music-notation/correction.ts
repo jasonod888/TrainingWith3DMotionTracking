@@ -60,7 +60,10 @@ export type CorrectionCommand =
   | { type: 'set-occurrence-onset'; occurrenceId: string; seconds: number; snapSeconds?: number | null }
   | { type: 'set-occurrence-duration'; occurrenceId: string; seconds: number }
   | { type: 'set-occurrence-velocity'; occurrenceId: string; velocity: number | null }
-  | { type: 'set-written-duration'; target: WrittenTarget; ticks: number; scope: 'event' | 'note' }
+  // Scope and target must agree: a whole-event change names an event, a note change
+  // names a logical note. The pairing is enforced by the type and re-checked at runtime.
+  | { type: 'set-written-duration'; target: { eventId: string }; ticks: number; scope: 'event' }
+  | { type: 'set-written-duration'; target: { logicalNoteId: string }; ticks: number; scope: 'note' }
   | { type: 'move-written-start'; eventId: string; ticks: number }
   | { type: 'apply-accidental'; occurrenceId: string; accidental: 'sharp' | 'flat' | 'natural' }
   | { type: 'respell'; occurrenceId: string; spelling: string }
@@ -300,9 +303,14 @@ function setPitch(document: NotationDocument, occurrenceId: string, pitch: numbe
       return rejection('unsupported-spelling', 'That spelling does not match the sounding pitch.');
     }
   }
+  // An unchanged sounding pitch with no explicit spelling keeps the authored spelling:
+  // pressing the key the note already has must never respell corrected notation.
+  if (found.note.pitch === pitch && requestedSpelling === null) {
+    return { status: 'unchanged', label: 'Pitch unchanged' };
+  }
   const finalSpelling = requestedSpelling ?? spellPitch(pitch, document.key_signature).spelling;
 
-  // Complete semantic equality first: same sounding pitch and same written spelling.
+  // Complete semantic equality: same sounding pitch and same written spelling.
   if (found.note.pitch === pitch && found.note.spelling === finalSpelling) {
     return { status: 'unchanged', label: 'Pitch unchanged' };
   }
@@ -391,12 +399,22 @@ function resolveEvent(document: NotationDocument, target: WrittenTarget): Notati
 }
 
 function setWrittenDuration(
-  document: NotationDocument, target: WrittenTarget, ticks: number, scope: 'event' | 'note',
+  document: NotationDocument,
+  target: WrittenTarget,
+  ticks: number,
+  scope: 'event' | 'note',
 ): CommandOutcome {
   if (!Number.isInteger(ticks) || ticks < GRID || ticks % GRID !== 0) {
     return rejection('invalid-ticks', 'A written duration must be a positive whole number of sixteenth notes.');
   }
   if (scope !== 'event' && scope !== 'note') return rejection('invalid-scope', 'Unknown written-duration scope.');
+  const namesNote = 'logicalNoteId' in target;
+  if (scope === 'note' && !namesNote) {
+    return rejection('invalid-scope', 'A note-scoped written change must name a logical note, not an event. Nothing was changed.');
+  }
+  if (scope === 'event' && namesNote) {
+    return rejection('invalid-scope', 'A whole-event written change must name an event, not a single note. Nothing was changed.');
+  }
   const event = resolveEvent(document, target);
   if (!event) return rejection('unknown-event', 'That rhythm is no longer in the score.');
   const focus = 'logicalNoteId' in target ? event.notes.find(note => note.id === target.logicalNoteId) ?? null : null;

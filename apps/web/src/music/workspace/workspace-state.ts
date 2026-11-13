@@ -2,8 +2,9 @@
  * One working document, one occurrence selection, one bounded history.
  *
  * History stores per-command patches (only the occurrences and events that
- * changed) rather than whole documents, and undoing back to the loaded document
- * restores that exact object and clears the unsaved-change indicator.
+ * changed) plus the selection on each side of the command, so undo and redo
+ * restore both the document and the selection that belonged to it. Byte figures
+ * are UTF-8 byte counts of the patches, not heap measurements.
  *
  * The reducer is pure and DOM-free so it can be unit tested without React.
  */
@@ -18,7 +19,15 @@ import {
 
 export type Snapshot = { document: NotationDocument; selection: CorrectionSelection | null };
 
-export type HistoryEntry = { patch: DocumentPatch; label: string; bytes: number };
+export type HistoryEntry = {
+  patch: DocumentPatch;
+  label: string;
+  bytes: number;
+  /** Selection immediately before the command; restored by undo. */
+  selectionBefore: CorrectionSelection | null;
+  /** Selection immediately after the command; restored by redo. */
+  selectionAfter: CorrectionSelection | null;
+};
 
 export type CommandReport = {
   status: 'applied' | 'unchanged' | 'rejected';
@@ -39,6 +48,7 @@ export type WorkspaceState = {
   evicted: boolean;
   revision: number;
   lastReport: CommandReport | null;
+  /** Retained undo + redo patches, in UTF-8 bytes. */
   historyBytes: number;
 };
 
@@ -49,7 +59,7 @@ export type WorkspaceAction =
   | { type: 'redo' }
   | { type: 'reset'; document: NotationDocument };
 
-/** Defensible budget for retained patches (serialised-size estimate, not a heap). */
+/** Defensible budget for retained patches, counted across undo and redo. */
 export const HISTORY_BYTE_BUDGET = 4 * 1024 * 1024;
 export const HISTORY_LIMIT = 500;
 
@@ -66,8 +76,8 @@ function reportOf(outcome: CommandOutcome, label: string): CommandReport {
   return { status: 'rejected', label: 'Not applied', code: outcome.code, message: outcome.message };
 }
 
-function keepOrRevalidate(document: NotationDocument, selection: CorrectionSelection | null): CorrectionSelection | null {
-  return isValidSelection(document, selection);
+function entryBytes(entries: HistoryEntry[]): number {
+  return entries.reduce((total, entry) => total + entry.bytes, 0);
 }
 
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
@@ -95,20 +105,25 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       const patch = diffDocuments(state.document, outcome.document);
       if (isEmptyPatch(patch)) return { ...state, lastReport: reportOf(outcome, action.command.type) };
 
-      const bytes = patchBytes(patch);
-      const past = [...state.past, { patch, label: outcome.label, bytes }];
-      let total = state.historyBytes + bytes;
+      const requested = outcome.selection === undefined ? state.selection : outcome.selection;
+      const selectionAfter = isValidSelection(outcome.document, requested);
+      const entry: HistoryEntry = {
+        patch, label: outcome.label, bytes: patchBytes(patch),
+        selectionBefore: state.selection, selectionAfter,
+      };
+
+      const past = [...state.past, entry];
+      let total = entryBytes(past);
       let evicted = state.evicted;
       while ((past.length > HISTORY_LIMIT || total > HISTORY_BYTE_BUDGET) && past.length > 1) {
         const dropped = past.shift()!;
         total -= dropped.bytes;
         evicted = true;
       }
-      const requested = outcome.selection === undefined ? state.selection : outcome.selection;
       return {
         ...state,
         document: outcome.document,
-        selection: keepOrRevalidate(outcome.document, requested),
+        selection: selectionAfter,
         past,
         future: [],
         dirty: true,
@@ -135,12 +150,12 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       return {
         ...state,
         document,
-        selection: keepOrRevalidate(document, state.selection),
+        selection: isValidSelection(document, entry.selectionBefore),
         past,
         future,
         dirty: !reachedOrigin,
         revision: state.revision + 1,
-        historyBytes: state.historyBytes - entry.bytes,
+        historyBytes: entryBytes(past) + entryBytes(future),
         lastReport: { status: 'applied', label: 'Undone' },
       };
     }
@@ -158,12 +173,12 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       return {
         ...state,
         document,
-        selection: keepOrRevalidate(document, state.selection),
+        selection: isValidSelection(document, entry.selectionAfter),
         past,
         future,
         dirty: true,
         revision: state.revision + 1,
-        historyBytes: state.historyBytes + entry.bytes,
+        historyBytes: entryBytes(past) + entryBytes(future),
         lastReport: { status: 'applied', label: 'Redone' },
       };
     }
@@ -183,7 +198,18 @@ export function workspaceStatus(state: WorkspaceState): string {
   return 'No changes';
 }
 
-/** Serialised-size estimate of retained history, for the harness and benchmarks. */
-export function historySummary(state: WorkspaceState): {steps: number; bytes: number; evicted: boolean} {
-  return { steps: state.past.length, bytes: state.historyBytes, evicted: state.evicted };
+/** Separates undo and redo retention, both counted in UTF-8 bytes. */
+export function historySummary(state: WorkspaceState): {
+  undoSteps: number; redoSteps: number; undoBytes: number; redoBytes: number; totalBytes: number; evicted: boolean;
+} {
+  const undoBytes = entryBytes(state.past);
+  const redoBytes = entryBytes(state.future);
+  return {
+    undoSteps: state.past.length,
+    redoSteps: state.future.length,
+    undoBytes,
+    redoBytes,
+    totalBytes: undoBytes + redoBytes,
+    evicted: state.evicted,
+  };
 }

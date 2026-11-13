@@ -60,8 +60,10 @@ export function diffDocuments(before: NotationDocument, after: NotationDocument)
   return patch;
 }
 
+/** UTF-8 byte length of the patch, not the UTF-16 code-unit count of `String.length`. */
 export function patchBytes(patch: DocumentPatch): number {
-  return JSON.stringify(patch).length;
+  const text = JSON.stringify(patch);
+  return typeof TextEncoder === 'undefined' ? text.length : new TextEncoder().encode(text).length;
 }
 
 export function isEmptyPatch(patch: DocumentPatch): boolean {
