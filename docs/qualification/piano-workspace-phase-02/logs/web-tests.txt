@@ -1,0 +1,12 @@
+﻿# npm test (apps/web) — Phase 2 submission
+# Command: cd apps/web; npm test (tsx --test over tests/engine, tests/music-engine, apps/web/tests)
+# Date: 2026-11-13 (Asia/Singapore)
+
+# tests 364
+# suites 0
+# pass 364
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5786.0543

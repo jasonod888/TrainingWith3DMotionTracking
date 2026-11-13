@@ -20,6 +20,9 @@ export default defineConfig({
       input: {
         main: resolve(root, 'index.html'),
         lab: resolve(root, 'avatar-lab.html'),
+        // Phase 2 correction-workspace harness: an isolated route that is never linked
+        // from the app shell and never part of the review workflow.
+        harness: resolve(root, 'workspace-harness.html'),
       },
     },
   },

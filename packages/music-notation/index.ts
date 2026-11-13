@@ -3,6 +3,7 @@ export * from './spelling';
 export * from './rhythm';
 export * from './build';
 export * from './edit';
+export * from './correction';
 export * from './parse';
 export * from './musicxml';
 

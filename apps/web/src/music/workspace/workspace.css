@@ -1,0 +1,185 @@
+/* Phase 2 developer harness. Deliberately small: layout polish belongs to Phase 3. */
+
+body {
+  margin: 0;
+  background: #f5f4ef;
+  color: #1f2a24;
+  font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.ws-shell {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 16px 18px 40px;
+}
+
+.ws-eyebrow {
+  margin: 0 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7a72;
+}
+
+.ws-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.ws-head h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.ws-sub,
+.ws-hint {
+  margin: 0;
+  color: #5d6b63;
+  font-size: 12px;
+}
+
+.ws-status {
+  display: grid;
+  gap: 2px;
+  text-align: right;
+  font-size: 12px;
+  color: #4c5a52;
+}
+
+.ws-status strong {
+  color: #1f5d3a;
+}
+
+.ws-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #e2e0d8;
+  border-radius: 8px;
+}
+
+.ws-toolbar button,
+.ws-row button {
+  border: 1px solid #cfd6ce;
+  background: #fbfbf8;
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ws-toolbar button:disabled,
+.ws-row button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ws-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.ws-field {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: #4c5a52;
+}
+
+.ws-field input,
+.ws-field select {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid #cfd6ce;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.ws-inline {
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.ws-time {
+  font-variant-numeric: tabular-nums;
+  color: #4c5a52;
+}
+
+.ws-report {
+  color: #1f5d3a;
+}
+
+.ws-report.is-bad {
+  color: #9a2d1f;
+}
+
+.ws-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .ws-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ws-edit,
+.ws-side {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ws-panel {
+  background: #fff;
+  border: 1px solid #e2e0d8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.ws-panel h2 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #6b7a72;
+}
+
+.ws-video {
+  width: 100%;
+  border-radius: 6px;
+  background: #000;
+}
+
+.ws-facts {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ws-error {
+  color: #9a2d1f;
+}
+
+/* The reused surfaces ship their own styles; keep them inside the panels. */
+.ws-panel .piano-roll-wrap,
+.ws-panel .notation-sheet-scroll,
+.ws-panel .draft-roll-scroll {
+  overflow-x: auto;
+}

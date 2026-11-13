@@ -24,11 +24,15 @@ type DragState = {
   deltaDuration: number;
 };
 
-export function PianoRoll({document: score, selection, playhead, onSelect, onPitchChange, onMove, onResize, onSeek}: {
+export function PianoRoll({document: score, selection, selectedOccurrenceId = null, playhead, onSelect, onSelectOccurrence, onPitchChange, onMove, onResize, onSeek}: {
   document: NotationDocument;
   selection: EditorSelection | null;
+  /** Occurrence-level selection used by the correction workspace. */
+  selectedOccurrenceId?: string | null;
   playhead: number;
   onSelect: (noteId: string) => void;
+  /** When present, clicking a note selects its performance occurrence instead of its logical note. */
+  onSelectOccurrence?: (occurrenceId: string) => void;
   onPitchChange: (noteId: string, pitch: number) => void;
   onMove: (eventId: string, startTicks: number) => void;
   onResize: (eventId: string, durationTicks: number) => void;
@@ -60,12 +64,13 @@ export function PianoRoll({document: score, selection, playhead, onSelect, onPit
     };
   };
 
-  const down = (event: React.PointerEvent<SVGRectElement>, noteId: string, eventId: string, pitch: number, onset: number, duration: number | null, mode: 'move' | 'resize') => {
+  const down = (event: React.PointerEvent<SVGRectElement>, noteId: string, eventId: string, occurrenceId: string, pitch: number, onset: number, duration: number | null, mode: 'move' | 'resize') => {
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     const point = localPoint(event);
     setDrag({noteId, eventId, pitch, onset, duration: duration ?? 0.25, startX: point.seconds, startY: pitch, mode, deltaSeconds: 0, deltaPitch: 0, deltaDuration: 0});
-    onSelect(noteId);
+    if (onSelectOccurrence) onSelectOccurrence(occurrenceId);
+    else onSelect(noteId);
   };
   const move = (event: React.PointerEvent<SVGRectElement>) => {
     if (!drag) return;
@@ -112,7 +117,8 @@ export function PianoRoll({document: score, selection, playhead, onSelect, onPit
           <text x={LEFT - 5} y={y(pitch) + 3} className="roll-label">{pitchName(pitch)}</text></g>)}
       {score.performance.map(note => {
         const logical = score.performance_map[note.id] ?? null;
-        const selected = logical !== null && logical === selectedLogical;
+        const selected = (selectedOccurrenceId !== null && selectedOccurrenceId === note.id)
+          || (selectedOccurrenceId === null && logical !== null && logical === selectedLogical);
         const dragging = drag?.noteId === logical;
         const left = x(note.onset);
         const width = Math.max(3, x(note.onset + noteLength(note)) - left);
@@ -124,12 +130,12 @@ export function PianoRoll({document: score, selection, playhead, onSelect, onPit
           <rect x={displayLeft} y={displayTop} width={displayWidth} height={Math.max(4, rowHeight - 1)} rx={2}
             className={`roll-note${selected ? ' is-selected' : ''}${note.pitch !== (dragging ? drag!.pitch : note.pitch) ? ' is-dragging' : ''}`}
             style={{opacity: 0.55 + (note.velocity ?? 0.5) * 0.45}}
-            onPointerDown={event => down(event, logical ?? note.id, logical ? score.events.find(eventItem => eventItem.notes.some(item => item.id === logical))?.id ?? '' : '', note.pitch, note.onset, note.duration, 'move')}
+            onPointerDown={event => down(event, logical ?? note.id, logical ? score.events.find(eventItem => eventItem.notes.some(item => item.id === logical))?.id ?? '' : '', note.id, note.pitch, note.onset, note.duration, 'move')}
             onPointerMove={move} onPointerUp={up} onPointerCancel={() => setDrag(null)}>
             <title>{`${pitchName(note.pitch)} at ${note.onset.toFixed(2)}s, ${noteLength(note).toFixed(2)}s`}</title>
           </rect>
           <rect x={left + width - 4} y={top} width={7} height={Math.max(4, rowHeight - 1)} rx={2} className="roll-resize"
-            onPointerDown={event => down(event, logical ?? note.id, logical ? score.events.find(eventItem => eventItem.notes.some(item => item.id === logical))?.id ?? '' : '', note.pitch, note.onset, note.duration, 'resize')}
+            onPointerDown={event => down(event, logical ?? note.id, logical ? score.events.find(eventItem => eventItem.notes.some(item => item.id === logical))?.id ?? '' : '', note.id, note.pitch, note.onset, note.duration, 'resize')}
             onPointerMove={move} onPointerUp={up} onPointerCancel={() => setDrag(null)}/>
         </g>;
       })}

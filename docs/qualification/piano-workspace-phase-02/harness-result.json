@@ -1,0 +1,11 @@
+{
+  "login": 200,
+  "status": "Unsaved changes (not saved \u2014 this harness has no save) | 1 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 total | Selected bp-1",
+  "facts": "A#4 \u00b7 bp-1 \u00b7 A#4 (MIDI 70) | 0.927 s \u00b7 recorded 0.882 s | treble voice 1 \u00b7 measure 1 \u00b7 written 480 ticks",
+  "start_after_10ms": 0.9272,
+  "start_expected": 0.9272,
+  "videos": 1,
+  "review_forms": 50,
+  "review_pages": "Page 1 of 27",
+  "console_errors": []
+}

@@ -63,13 +63,17 @@ function chordOffsets(notes: NotationSegmentNote[]): Map<string, number> {
   return offsets;
 }
 
-export function SheetMusic({document: score, selection, compact, focusMeasure, zoom = 1, onSelect, onSelectRest, onPitchChange}: {
+export function SheetMusic({document: score, selection, selectedOccurrenceId = null, compact, focusMeasure, zoom = 1, onSelect, onSelectOccurrence, onSelectRest, onPitchChange}: {
   document: NotationDocument;
   selection: EditorSelection | null;
+  /** Occurrence-level selection used by the correction workspace. */
+  selectedOccurrenceId?: string | null;
   compact: boolean;
   focusMeasure: number;
   zoom?: number;
   onSelect: (playable: {eventId: string; noteId: string; staff: 'treble' | 'bass'; measureIndex: number}) => void;
+  /** When present, an unambiguous notehead selects its performance occurrence. */
+  onSelectOccurrence?: (occurrenceId: string) => void;
   onSelectRest: (rest: NotationSegment) => void;
   onPitchChange: (noteId: string, pitch: number) => void;
 }) {
@@ -99,7 +103,8 @@ export function SheetMusic({document: score, selection, compact, focusMeasure, z
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     setDrag({noteId: note.logical_note_id, startY: event.clientY, semitones: 0, pitch});
-    onSelect({eventId: segment.event_id, noteId: note.logical_note_id, staff: segment.staff, measureIndex: segment.measure_index});
+    if (onSelectOccurrence && note.performance_ids.length === 1) onSelectOccurrence(note.performance_ids[0]);
+    else onSelect({eventId: segment.event_id, noteId: note.logical_note_id, staff: segment.staff, measureIndex: segment.measure_index});
   };
   const pointerMove = (event: React.PointerEvent<SVGRectElement>) => {
     if (!drag) return;
@@ -165,7 +170,8 @@ export function SheetMusic({document: score, selection, compact, focusMeasure, z
           {segment.notes.map(note => {
             const cx = x + (offsets.get(note.id) ?? 0);
             const cy = yForNote(segment.staff, note.spelling);
-            const selected = selectedLogical === note.logical_note_id;
+            const selected = (selectedOccurrenceId !== null && note.performance_ids.includes(selectedOccurrenceId))
+              || (selectedOccurrenceId === null && selectedLogical === note.logical_note_id);
             const dragged = drag?.noteId === note.logical_note_id;
             // Chord hit areas are split at the midpoint between noteheads so a
             // third or second never steals its neighbour's tap.
@@ -189,7 +195,7 @@ export function SheetMusic({document: score, selection, compact, focusMeasure, z
                 role="button" aria-label={`${pitchName(note.pitch)}, measure ${segment.measure_index + 1}, ${segment.staff} voice ${segment.voice}${selected ? ', selected' : ''}`}
                 onPointerDown={event => pointerDown(event, note, segment, note.pitch)}
                 onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => setDrag(null)}
-                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect({eventId: segment.event_id, noteId: note.logical_note_id, staff: segment.staff, measureIndex: segment.measure_index}); } }}/>
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (onSelectOccurrence && note.performance_ids.length === 1) onSelectOccurrence(note.performance_ids[0]); else onSelect({eventId: segment.event_id, noteId: note.logical_note_id, staff: segment.staff, measureIndex: segment.measure_index}); } }}/>
               {dragged && drag && drag.semitones !== 0
                 ? <text x={cx + 12} y={cy - 18} className="notation-drag-label">{pitchName(Math.max(0, Math.min(127, drag.pitch + drag.semitones)))}</text>
                 : null}
