@@ -97,3 +97,24 @@ as local work; foreign checkpoint rejected.
 
 No publication, shared-release update, page replacement or gesture work. The draft review and
 revision endpoints are used exactly as they exist. Phase 6 has not started.
+
+---
+
+## 8. Review corrections (this commit)
+
+| Review item | Resolution |
+| --- | --- |
+| R1 client/server contract | `buildSaveBody` names the draft for a first review and the base for a revision, plus the verification token; the complete passage map is serialized and parsed strictly. A cross-language test posts the generated payload to the real endpoints, retries idempotently, saves a revision, and checks legacy retention and refusal. |
+| R2 dirty/confirmation | Signature covers document, alignment, anchors, offset, spans and title; offset-only edits are saveable; an unchanged draft is finalisable; restored checkpoints are dirty and saveable. |
+| R3 integrity | Server rejects reversing anchor ticks, anchors disagreeing with the map, written-pitch disagreement and unowned occurrences; restore rejects reference/notation disagreements. |
+| R4 legacy retention | Omitted notation/alignment is retained when valid and refused clearly when incompatible. |
+| R5 reopen/load | Initial load opens a saved lesson from its stored reference (manifest → asset → restore) and keeps sections/assessment/preview metadata; the preview baseline is the performance the audio was rendered from; stored passages are used as the map; anchor history resets. |
+| R6 conflict/retry | Conflict causes are classified (verification vs stale base vs other); verification conflicts never offer a blind rebase; recovery stores the base revision and verification token; acknowledgements are snapshot-bound. |
+
+**Tests:** 451 web tests, 14 API tests (client contract, alignment, review, edit), `tsc` clean, reviewer probe **7/7** after supplying the draft identity it now requires.
+
+**Remaining gaps (not claimed):**
+
+- The delayed-save/intervening-edit component test hung under jsdom (an unresolved deferred response kept the runner alive) and is not included; the snapshot-bound code path is implemented but unverified at component level.
+- Audio-bound preview staleness is implemented but has no component test.
+- No authenticated browser save/reopen capture; the round trip is proven by the cross-language API test and the JSON evidence.
