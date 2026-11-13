@@ -1,0 +1,94 @@
+{
+  "anchor_tick": "11600",
+  "anchor_applied": {
+    "mode": "anchored",
+    "playhead_tick": "11600",
+    "cursor_x": 1666.1666666666667,
+    "active_x": [
+      1516.5,
+      1654,
+      1654,
+      1654,
+      1654,
+      1727,
+      1727,
+      1727
+    ],
+    "anchor_points": 7,
+    "status": "No changes0 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 totalNothin",
+    "notice": "Anchored at 1 point(s)."
+  },
+  "anchor_undone": {
+    "mode": "estimated",
+    "playhead_tick": "11600",
+    "cursor_x": 1666.1666666666667,
+    "active_x": [
+      1516.5,
+      1654,
+      1654,
+      1654,
+      1654,
+      1727,
+      1727,
+      1727
+    ],
+    "anchor_points": 6,
+    "status": "No changes0 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 totalNothin",
+    "notice": "Anchor removed (undo)."
+  },
+  "anchor_redone": {
+    "mode": "anchored",
+    "playhead_tick": "11600",
+    "cursor_x": 1666.1666666666667,
+    "active_x": [
+      1516.5,
+      1654,
+      1654,
+      1654,
+      1654,
+      1727,
+      1727,
+      1727
+    ],
+    "anchor_points": 7,
+    "status": "No changes0 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 totalNothin",
+    "notice": "Anchor restored (redo)."
+  },
+  "anchor_seek": {
+    "mode": "anchored",
+    "playhead_tick": "29000",
+    "cursor_x": 4330.416666666667,
+    "active_x": [
+      4107.75,
+      4107.75,
+      4107.75,
+      4180.75,
+      4253.75,
+      4253.75,
+      4253.75,
+      4253.75,
+      4300,
+      4300,
+      4300,
+      4300
+    ],
+    "anchor_points": 7,
+    "status": "No changes0 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 totalNothin",
+    "notice": "Anchor restored (redo)."
+  },
+  "explanation_note": {
+    "mode": "estimated",
+    "playhead_tick": "4800",
+    "cursor_x": 574,
+    "active_x": [
+      574,
+      611
+    ],
+    "anchor_points": 6,
+    "status": "No changes0 changed \u00b7 0 added \u00b7 0 removed \u00b7 6 totalNothing s",
+    "notice": ""
+  },
+  "notehead_vs_cursor_px": 0,
+  "console_errors": [],
+  "failures": []
+}

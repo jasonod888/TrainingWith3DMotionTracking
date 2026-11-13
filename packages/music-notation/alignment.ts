@@ -259,6 +259,25 @@ export function tickToEffectiveSeconds(alignment: Alignment, tick: number, offse
 
 /* ------------------------------------------------------------- anchors */
 
+export type AnchorPoint = { seconds: number; tick: number };
+
+/**
+ * Apply an authored anchor list to a base map. Anchors are applied in order; the first
+ * one that cannot be placed leaves the last valid map in place and reports why, so a
+ * mistaken point never silently distorts the rest.
+ */
+export function applyAnchors(
+  base: Alignment, document: NotationDocument, anchors: AnchorPoint[],
+): { alignment: Alignment; problem: string | null } {
+  let current = base;
+  for (const anchor of anchors) {
+    const result = addAnchor(current, document, anchor.seconds, anchor.tick);
+    if (!result.ok) return {alignment: current, problem: result.message};
+    current = result.alignment;
+  }
+  return {alignment: current, problem: null};
+}
+
 export type AnchorResult = { ok: true; alignment: Alignment; replacedTick: number } | { ok: false; message: string };
 
 /**

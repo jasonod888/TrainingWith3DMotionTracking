@@ -1,11 +1,5 @@
-﻿# npm test (apps/web) — Phase 4
+﻿# npm test (apps/web) — Phase 4 correction
 # Command: cd apps/web; npm test
-
-# tests 421
-# suites 0
-# pass 421
+# tests 431
+# pass 431
 # fail 0
-# cancelled 0
-# skipped 0
-# todo 0
-# duration_ms 6510.2178

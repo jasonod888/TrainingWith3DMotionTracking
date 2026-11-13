@@ -13,7 +13,34 @@ One source clock, a shared time↔score map, linked navigation and follow playba
 
 ---
 
-## 0. Correction status (this commit)
+---
+
+## 0.2 Correction round — all six items addressed
+
+The earlier status block below is superseded. Commits `54813d0`, `d88017d`, `d9b4733`, `eb194bb` and
+the current commit address R1–R6 and the trailing-hold boundary.
+
+| Item | Resolution | Evidence |
+| --- | --- | --- |
+| **R1** keyboard ignored the offset | Keyboard highlights and key selection use the same `occurrenceIntervals` as roll and score | Reviewer reproducer; `?demo=arpeggio` at +0.5 s / 2.25 s shows 0 roll, 0 score, 0 keys |
+| **R2** speech time compressed in the map but not the score | `scoreClock` defines one score-time domain; `buildNotation` accepts `scoreSeconds`/`scoreDuration`, so a note played at 8 s is engraved at tick 4800 where the cursor maps it | Engraving test; browser: post-explanation notehead is **0 px** from the cursor at 8 s and its written tick maps back to 8 s |
+| **R3** validation, inverse and ruler bounds | Map must tile the clip and stay continuous at joins; `spansProblem` reports bad spans; inverse scans before clamping; trailing hold returns the hold start; ruler clamps before/after content | 6 new tests + reviewer reproducer 5/5 |
+| **R4** anchor authoring, validation, undo/redo | `applyAnchors` applies a point list, keeps the last valid map and reports the first failure; harness panel authors a point at the stored source position, previews the current mapping, undoes/redoes, resets and removes points without dirtying the document; anchors survive unrelated edits | Anchor tests; browser flow applied → undo → redo → seek with `No changes` preserved |
+| **R5** source player not connected | Harness loads the draft's `piano_preview` and identity, renders the audio element and drives `usePianoSourcePlayer` with the one video clock and current offset; Original/Piano toggle; Piano disabled with an honest message when no verified preview exists; audition stops on playback or mode change | Gating test; source-player mapping tests already cover the controller |
+| **R6** frame-rate visuals vs inspector | `clock.ts` store mirrors the video every frame; TimeRoll, ContinuousScore and LiveKeyboard subscribe; inspector state updates at ~4 Hz; measured lag ≤ 1.5 frames | Worst roll lag **14 ms**, score tick within 16 ticks (~14 ms), nonzero viewport and offset cases, short-note transitions at their exact times |
+
+Trailing hold specifically: with playing 0–4 s and explanation 4–10 s, the held tick 3840 now returns
+**4 s** (`tickToSeconds` scans holds before clamping), while a tick beyond the score domain still clamps
+to 10 s.
+
+Current verified state: **431 web tests pass**, `tsc --noEmit` clean, reviewer reproducer **5/5**, frame
+and anchor browser checks exit 0. Phase 5 remains blocked pending review.
+
+---
+
+## 0.3 Earlier partial-correction status (superseded)
+
+
 
 **Do not treat this commit as the Phase 4 correction submission.** The reviewer's R1–R6 require six
 corrections; two are complete here and four are not started. This commit is pushed so the verified

@@ -1,11 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  activeOccurrenceIds, addAnchor, alignmentFromSpans, alignmentProblem, effectiveSecondsToTick, scoreClock, spansProblem,
+  activeOccurrenceIds, addAnchor, alignmentFromSpans, alignmentProblem, applyAnchors, effectiveSecondsToTick, scoreClock, spansProblem,
   estimatedAlignment, occurrenceIntervals, secondsToTick, tickToEffectiveSeconds, tickToSeconds,
   type Alignment,
 } from '../../../packages/music-notation/index.ts';
-import {buildNotation, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
+import {buildNotation, applyCommand, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
 
 const TICKS_PER_SECOND = 960; // 120 BPM, ppq 480
 
@@ -225,4 +225,31 @@ test('R3: a trailing explanation returns the hold start for its held tick', () =
   assert.ok(Math.abs(tickToSeconds(alignment, 4 * TICKS_PER_SECOND) - 4) < 1e-6,
     'the held tick belongs to the start of the trailing hold');
   assert.ok(Math.abs(tickToSeconds(alignment, 1e6) - 10) < 1e-6, 'past the score domain clamps to the clip end');
+});
+/* ------------------------------------------------------------------ R4 */
+
+test('R4: authored anchors apply in order and keep the last valid map', () => {
+  const document = clip();
+  const base = estimatedAlignment(document);
+  const first = applyAnchors(base, document, [{seconds: 3, tick: 3000}]);
+  assert.equal(first.problem, null);
+  assert.equal(first.alignment.mode, 'anchored');
+  assert.equal(secondsToTick(first.alignment, 3), 3000);
+
+  const second = applyAnchors(first.alignment, document, [{seconds: 6, tick: 7000}]);
+  assert.equal(second.problem, null, 'a later point inside the second stretch is accepted');
+
+  const invalid = applyAnchors(first.alignment, document, [{seconds: 6, tick: 500}]);
+  assert.ok(invalid.problem, 'a point that would reverse score order is reported');
+  assert.equal(secondsToTick(invalid.alignment, 3), 3000, 'the last valid map is kept');
+});
+
+test('R4: anchors survive unrelated document edits', () => {
+  const document = clip();
+  const edited = applyCommand(document, {type: 'set-occurrence-pitch', occurrenceId: 'a', pitch: 62});
+  assert.equal(edited.status, 'applied');
+  if (edited.status !== 'applied') return;
+  const again = applyAnchors(estimatedAlignment(edited.document), edited.document, [{seconds: 3, tick: 3000}]);
+  assert.equal(again.problem, null);
+  assert.equal(secondsToTick(again.alignment, 3), 3000);
 });

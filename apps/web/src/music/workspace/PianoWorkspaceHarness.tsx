@@ -12,7 +12,7 @@ import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
   buildNotation, selectionForOccurrence,
   activeOccurrenceIds, alignmentFromSpans, effectiveSecondsToTick, occurrenceIntervals,
-  scoreClock, tickToEffectiveSeconds,
+  applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, type AnchorPoint,
   type Alignment, type CorrectionSelection, type NotationDocument,
 } from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
@@ -106,6 +106,11 @@ export function PianoWorkspaceHarness() {
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
   const [scoreTarget, setScoreTarget] = useState<{ tick: number; token: number } | null>(null);
+  const [anchors, setAnchors] = useState<AnchorPoint[]>([]);
+  const [anchorPast, setAnchorPast] = useState<AnchorPoint[][]>([]);
+  const [anchorFuture, setAnchorFuture] = useState<AnchorPoint[][]>([]);
+  const [anchorTick, setAnchorTick] = useState('');
+  const [anchorPreview, setAnchorPreview] = useState('');
   const linkToken = useRef(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -281,8 +286,12 @@ export function PianoWorkspaceHarness() {
 
   const boxes = useMemo(() => (document ? layoutMeasures(document).boxes : []), [document]);
 
-  const alignment = useMemo<Alignment | null>(
+  const baseAlignment = useMemo<Alignment | null>(
     () => (document ? alignmentFromSpans(document, spans) : null), [document, spans]);
+  const anchored = useMemo(
+    () => (document && baseAlignment ? applyAnchors(baseAlignment, document, anchors) : null),
+    [document, baseAlignment, anchors]);
+  const alignment = anchored?.alignment ?? baseAlignment;
   const intervals = useMemo(() => (document ? occurrenceIntervals(document, offsetSeconds) : []), [document, offsetSeconds]);
   const activeIds = useMemo(() => activeOccurrenceIds(intervals, playhead), [intervals, playhead]);
   const playheadTick = alignment ? effectiveSecondsToTick(alignment, playhead, offsetSeconds) : null;
@@ -396,6 +405,57 @@ export function PianoWorkspaceHarness() {
       return zoomAround(current, document.duration, factor, anchor);
     });
   }, [document, playhead]);
+
+  /* --------------------------------------------------- alignment authoring */
+
+  const storedPlayhead = Math.max(0, playhead - offsetSeconds);
+
+  const commitAnchors = useCallback((next: AnchorPoint[]) => {
+    if (!document || !baseAlignment) return;
+    const check = applyAnchors(baseAlignment, document, next);
+    if (check.problem) { setAnchorPreview(`Not applied: ${check.problem}`); return; }
+    setAnchorPast(history => [...history.slice(-19), anchors]);
+    setAnchorFuture([]);
+    setAnchors(next);
+    setAnchorPreview(next.length ? `Anchored at ${next.length} point(s).` : 'Reset to the estimated map.');
+  }, [document, baseAlignment, anchors]);
+
+  const useCurrentTick = useCallback(() => {
+    if (!alignment) return;
+    setAnchorTick(String(Math.max(0, secondsToTick(alignment, storedPlayhead))));
+    setAnchorPreview('');
+  }, [alignment, storedPlayhead]);
+
+  const previewAnchor = useCallback(() => {
+    if (!alignment) return;
+    const tick = Number(anchorTick);
+    if (!Number.isInteger(tick) || tick < 0) { setAnchorPreview('Enter a whole tick number.'); return; }
+    setAnchorPreview(`Tick ${tick} currently maps to ${tickToSeconds(alignment, tick).toFixed(3)} s.`);
+  }, [alignment, anchorTick]);
+
+  const applyAnchorPoint = useCallback(() => {
+    const tick = Number(anchorTick);
+    if (!Number.isInteger(tick) || tick < 0) { setAnchorPreview('Enter a whole tick number.'); return; }
+    commitAnchors([...anchors, {seconds: storedPlayhead, tick}]);
+  }, [anchorTick, anchors, commitAnchors, storedPlayhead]);
+
+  const undoAnchors = useCallback(() => {
+    if (!anchorPast.length) return;
+    const previous = anchorPast[anchorPast.length - 1];
+    setAnchorPast(anchorPast.slice(0, -1));
+    setAnchorFuture([anchors, ...anchorFuture].slice(0, 20));
+    setAnchors(previous);
+    setAnchorPreview('Anchor removed (undo).');
+  }, [anchorPast, anchorFuture, anchors]);
+
+  const redoAnchors = useCallback(() => {
+    if (!anchorFuture.length) return;
+    const [next, ...rest] = anchorFuture;
+    setAnchorPast([...anchorPast.slice(-19), anchors]);
+    setAnchorFuture(rest);
+    setAnchors(next);
+    setAnchorPreview('Anchor restored (redo).');
+  }, [anchorPast, anchorFuture, anchors]);
 
   if (loading) return <main className="ws-shell"><p role="status">Opening the draft…</p></main>;
   if (error) return <main className="ws-shell"><p role="alert" className="ws-error">{error}</p></main>;
@@ -623,6 +683,36 @@ export function PianoWorkspaceHarness() {
             }})}>Add to chord</button>
           </div>
           <p className="ws-hint">Insertion is rejected when it would overwrite or collide. “Add to chord” only joins an identical written position.</p>
+        </section>
+
+        <section className="ws-panel" aria-label="Alignment">
+          <h2>Alignment</h2>
+          <p className="ws-hint" data-aligned={anchors.length > 0 ? 'true' : 'false'}>
+            {anchors.length
+              ? `Anchored from ${anchors.length} authored point(s); later pitch or velocity edits keep them.`
+              : 'Estimated from the tempo and passages. Author an anchor to correct it.'}
+          </p>
+          <div className="ws-row">
+            <button type="button" onClick={useCurrentTick}>Use current</button>
+            <label className="ws-field ws-inline">
+              <span>Tick</span>
+              <input value={anchorTick} size={8} aria-label="Anchor tick"
+                onChange={event => setAnchorTick(event.target.value)}/>
+            </label>
+            <button type="button" onClick={previewAnchor}>Preview</button>
+            <button type="button" onClick={applyAnchorPoint}>Apply anchor</button>
+          </div>
+          <div className="ws-row">
+            <button type="button" onClick={undoAnchors} disabled={!anchorPast.length}>Undo point</button>
+            <button type="button" onClick={redoAnchors} disabled={!anchorFuture.length}>Redo point</button>
+            <button type="button" onClick={() => commitAnchors([])} disabled={!anchors.length}>Reset</button>
+          </div>
+          {anchors.map((anchor, index) => <p className="ws-hint" key={`${anchor.seconds}-${anchor.tick}-${index}`}>
+            {anchor.seconds.toFixed(3)} s → tick {anchor.tick}{' '}
+            <button type="button" onClick={() => commitAnchors(anchors.filter((_, position) => position !== index))}>Remove</button>
+          </p>)}
+          {anchorPreview && <p className="ws-report">{anchorPreview}</p>}
+          <p className="ws-hint">Anchors are local and unsaved until Phase 5. One or more applied points make the map “anchored”.</p>
         </section>
 
         <section className="ws-panel" aria-label="History">

@@ -1,7 +1,5 @@
-﻿# npm run build (apps/web) — Phase 4
-# Command: cd apps/web; npm run build
+﻿# npm run build (apps/web) — Phase 4 correction
 
-- Use build.rollupOptions.output.manualChunks to improve chunking: 
 https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 5.05s
+✓ built in 5.09s
