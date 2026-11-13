@@ -18,6 +18,7 @@ from .auth import now
 from .contracts import (Asset, Contract, GuitarChord, MusicDraftDocument, MusicEvent, MusicLessonManifest,
                         MusicSpan, Section, SectionSet)
 from .database import LessonAsset, LessonRevision, MusicRevisionEdit
+from .music_alignment import validate_alignment
 from .music_notation import validate_notation
 from .music_review import ReviewAssessment, canonical
 from .permissions import accept_revision, accepted, latest_revision, owned_lesson
@@ -32,6 +33,9 @@ class EditMusic(Contract):
     # Optional so existing clients and guitar references stay valid. The server
     # validates the notation against the reviewed events and clip duration.
     notation: dict[str, Any] | None = None
+    # Versioned source-to-score map and the sync offset it was authored with.
+    alignment: dict[str, Any] | None = None
+    offset_seconds: float | None = Field(default=None, ge=-10.0, le=10.0, allow_inf_nan=False)
     spans: list[MusicSpan] = Field(max_length=500)
     guitar_chords: list[GuitarChord] = Field(default_factory=list, max_length=100)
     sections: list[Section] = Field(min_length=1, max_length=500)
@@ -96,6 +100,23 @@ def install_music_edit(app, settings, identity, db):
                 notation = validate_notation(body.notation, proposal.events, proposal.duration)
             except ValueError as exc:
                 raise HTTPException(422, str(exc)) from exc
+        alignment = None
+        if body.alignment is not None:
+            candidate = dict(body.alignment)
+            if body.offset_seconds is not None:
+                candidate['offset_seconds'] = body.offset_seconds
+            try:
+                alignment = validate_alignment(candidate, proposal.duration)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
+        elif body.offset_seconds is not None and previous_reference.get('alignment'):
+            # An offset change alone is a valid re-save of the stored map.
+            candidate = dict(previous_reference['alignment'])
+            candidate['offset_seconds'] = body.offset_seconds
+            try:
+                alignment = validate_alignment(candidate, proposal.duration)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
 
         reviewed_at = now()
         if performance_changed(previous_reference, proposal.events):
@@ -109,6 +130,7 @@ def install_music_edit(app, settings, identity, db):
             'pedal': [span.model_dump() for span in proposal.pedal],
             'provenance': proposal.provenance.model_dump(),
             **({'notation': notation} if notation is not None else {}),
+            **({'alignment': alignment} if alignment is not None else {}),
             'review': {'reviewer_id': account.id, 'reviewed_at': reviewed_at.isoformat(),
                        'draft_id': current.id, 'source_reference_sha256': current.manifest['reference']['sha256'],
                        'edited_from_revision': current.id},

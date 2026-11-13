@@ -18,6 +18,8 @@ from .database import LessonAsset, LessonRevision, MusicDraft, MusicReview, Musi
 from .music_verification import current_state_token, decisions_applied, proposal_sha256
 from .permissions import accept_revision, latest_revision, owned_lesson
 from .storage import storage_client
+from .music_alignment import validate_alignment
+from .music_notation import validate_notation
 from .music_preview import performance_changed, invalidate_preview
 
 
@@ -48,6 +50,10 @@ class ReviewMusic(Contract):
     events: list[MusicEvent] = Field(max_length=20000)
     spans: list[MusicSpan] = Field(max_length=500)
     guitar_chords: list[GuitarChord] = Field(default_factory=list, max_length=100)
+    # Optional: legacy clients save without them, and piano clients send both.
+    notation: dict | None = None
+    alignment: dict | None = None
+    offset_seconds: float | None = Field(default=None, ge=-10.0, le=10.0, allow_inf_nan=False)
     sections: list[Section] = Field(min_length=1,max_length=500)
     confirm_reviewed: Literal[True]
     assessment: ReviewAssessment = Field(default_factory=ReviewAssessment)
@@ -111,6 +117,21 @@ def install_music_review(app,settings,identity,db):
             if not decisions_applied([event.model_dump() for event in proposal.events],
                                      decision_rows,proposal.duration):
                 raise HTTPException(409,'The reviewed notes do not include every accepted suggestion. Reopen verification or undo it first.')
+        notation=None
+        if body.notation is not None:
+            try:
+                notation=validate_notation(body.notation, proposal.events, proposal.duration)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
+        alignment=None
+        if body.alignment is not None:
+            candidate=dict(body.alignment)
+            if body.offset_seconds is not None:
+                candidate['offset_seconds']=body.offset_seconds
+            try:
+                alignment=validate_alignment(candidate, proposal.duration)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
         verification=None
         if decision_rows or automatic_history:
             verification={
@@ -131,6 +152,8 @@ def install_music_review(app,settings,identity,db):
             'guitar_chords':[chord.model_dump() for chord in proposal.guitar_chords],
             'pedal':[span.model_dump() for span in proposal.pedal],
             'provenance':proposal.provenance.model_dump(),
+            **({'notation':notation} if notation is not None else {}),
+            **({'alignment':alignment} if alignment is not None else {}),
             'review':{'reviewer_id':account.id,'reviewed_at':reviewed_at.isoformat(),
                       'draft_id':row.id,'source_reference_sha256':body.reference_sha256,
                       **({'verification':verification} if verification else {})}}
