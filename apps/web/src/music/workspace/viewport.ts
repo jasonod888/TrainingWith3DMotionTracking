@@ -213,7 +213,14 @@ export function tickAtX(
 ): number {
   if (!boxes.length) return 0;
   const local = x - contextWidth;
-  const box = boxes.find(item => local >= item.x && local < item.x + item.width) ?? boxes[boxes.length - 1];
+  const firstBox = boxes[0];
+  if (local < firstBox.x) return document.measures[firstBox.index].start;
+  const lastBox = boxes[boxes.length - 1];
+  if (local >= lastBox.x + lastBox.width) {
+    const measure = document.measures[lastBox.index];
+    return measure.start + measure.duration;
+  }
+  const box = boxes.find(item => local >= item.x && local < item.x + item.width) ?? lastBox;
   const measure = document.measures[box.index];
   const within = clamp((local - box.x - SCORE_MEASURE_PAD) / Math.max(1, box.width - SCORE_MEASURE_PAD * 2), 0, 1);
   return Math.round(measure.start + within * measure.duration);

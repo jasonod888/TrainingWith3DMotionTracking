@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {buildNotation, type PerformanceNote} from '../../../packages/music-notation/index.ts';
 import {
   DEFAULT_SPAN_SECONDS, MAX_SPAN_SECONDS, MIN_SPAN_SECONDS, clampTimeWindow, layoutMeasures,
-  measureAtTick, pixelsPerSecond, revealWindow, rulerStep, rulerTicks, scrollForMeasure, secondsToTick,
+  measureAtTick, pixelsPerSecond, revealWindow, rulerStep, rulerTicks, scrollForMeasure, secondsToTick, tickAtX,
   secondsToX, tickToSeconds, visibleMeasureIndexes, visibleTimeRange, xToSeconds, zoomAround,
 } from '../src/music/workspace/viewport';
 
@@ -130,4 +130,15 @@ test('tick helpers agree with the estimated tempo and the measure at that tick',
   const index = measureAtTick(boxes, document, tick);
   assert.equal(boxes[index].index, index);
   assert.ok(document.measures[index].start <= tick);
+});
+
+test('R3: the score ruler inverse clamps before the first measure and after the last', () => {
+  const document = longDocument();
+  const {boxes} = layoutMeasures(document);
+  assert.equal(tickAtX(boxes, document, 0), 0, 'a position before the content start maps to tick 0');
+  const last = boxes[boxes.length - 1];
+  const end = tickAtX(boxes, document, 62 + last.x + last.width + 500);
+  assert.ok(end > document.measures[document.measures.length - 1].start, 'past the end maps to the clip end, not measure 1');
+  const middle = tickAtX(boxes, document, 62 + boxes[2].x + boxes[2].width / 2);
+  assert.ok(middle >= document.measures[boxes[2].index].start);
 });

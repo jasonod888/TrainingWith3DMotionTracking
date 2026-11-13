@@ -13,7 +13,29 @@ One source clock, a shared time↔score map, linked navigation and follow playba
 
 ---
 
-## 0. What was built
+## 0. Correction status (this commit)
+
+**Do not treat this commit as the Phase 4 correction submission.** The reviewer's R1–R6 require six
+corrections; two are complete here and four are not started. This commit is pushed so the verified
+work is reviewable and the branch is not silently half-edited.
+
+| Item | Status |
+| --- | --- |
+| **R1** Keyboard ignored the sync offset | **Fixed.** Keyboard highlights and key-selection candidates now come from the same `occurrenceIntervals` used by the roll and score. Verified by the reviewer reproducer (`offset activation agrees across keyboard, roll and score`) and by the harness at +0.5 s / 2.25 s. |
+| **R3** Alignment validation accepted holes and jumps; the inverse could seek forwards | **Fixed.** `alignmentProblem` now requires the map to tile the clip exactly (head, tail, no holes or overlaps), validates kind/mode/basis and whole ticks, and requires score continuity at every join; a silent jump is reported. `tickToSeconds` clamps to the score domain (negative → start, past the end → clip end) while keeping hold-start priority. `spansProblem` reports reversed/overlapping authored spans, and `alignmentFromSpans` falls back to a valid estimated map instead of returning an invalid list. `tickAtX` clamps before the first measure and after the last. Covered by four new tests and all five reviewer reproducer checks. |
+| **R2** Explanation time compressed in the map but not in the engraved score | **Not done.** The score is still built from absolute recording seconds, so a post-explanation note is engraved at its source position while the cursor maps to score time. This is the largest remaining defect. |
+| **R4** Anchor authoring flow | **Not done.** No UI, no authored-map history, no annotated rubato evidence. |
+| **R5** Existing source player not connected | **Not done.** The harness still uses only the video element; `usePianoSourcePlayer`, the verified preview asset and the Original/Piano modes are not wired. The earlier claim that the controller “owns audio mapping” in this harness was **incorrect** and is withdrawn here. |
+| **R6** Visual-clock timing | **Not done.** The ~20 fps paint throttle remains; no frame-level measurement against the current video timestamp exists. |
+| Fixture wording | Corrected: the audit found **89 real chord events with staggered recorded onsets (up to 92.8 ms)**, so “the real recording has no arpeggio” was wrong. The synthetic fixture is for controlled ground truth; real staggered chords remain in qualification, with arpeggiation versus decoder jitter unresolved. |
+
+Current verified state: **425 web tests pass**, `tsc --noEmit` clean, reviewer reproducer **5/5 PASS**.
+R2, R4, R5 and R6 are outstanding and were not attempted in this commit.
+
+---
+
+## 0.1 Original submission contents (unchanged below)
+
 
 | Deliverable | Where |
 | --- | --- |

@@ -51,6 +51,7 @@ export function estimatedAlignment(document: NotationDocument): Alignment {
  */
 export function alignmentFromSpans(document: NotationDocument, spans: PassageSpan[] | null | undefined): Alignment {
   if (!spans || !spans.length) return estimatedAlignment(document);
+  if (spansProblem(spans, document.duration)) return estimatedAlignment(document);
   const secondsPerBeatTick = secondsPerTick(document);
   const ordered = [...spans].sort((left, right) => left.start - right.start);
   const passages: AlignmentPassage[] = [];
@@ -64,7 +65,7 @@ export function alignmentFromSpans(document: NotationDocument, spans: PassageSpa
   };
 
   for (const span of ordered) {
-    const start = clamp(span.start, 0, document.duration);
+    const start = clamp(Math.max(span.start, cursor), 0, document.duration);
     const end = clamp(span.end, start, document.duration);
     if (start > cursor + EPSILON) {
       // Uncovered time holds the score at the last reached tick.
@@ -87,31 +88,63 @@ export function alignmentFromSpans(document: NotationDocument, spans: PassageSpa
   return {alignment_version: 1, mode: 'estimated', basis: 'passages', passages};
 }
 
-/** Returns a description of the first structural problem, or null. */
+/** Reports malformed authored spans: reversed, out of clip, or overlapping. */
+export function spansProblem(spans: PassageSpan[] | null | undefined, duration: number): string | null {
+  if (!spans || !spans.length) return null;
+  let previousEnd = 0;
+  for (const span of [...spans].sort((left, right) => left.start - right.start)) {
+    if (!Number.isFinite(span.start) || !Number.isFinite(span.end)) return 'A passage has a non-finite boundary.';
+    if (span.start < -EPSILON || span.end > duration + EPSILON) return 'A passage leaves the clip.';
+    if (span.end <= span.start + EPSILON) return 'A passage has no duration.';
+    if (span.start < previousEnd - EPSILON) return 'Authored passages overlap.';
+    if (span.kind !== 'playing' && span.kind !== 'explanation') return 'A passage has an unsupported kind.';
+    previousEnd = span.end;
+  }
+  return null;
+}
+
+/**
+ * Returns a description of the first structural problem, or null.
+ *
+ * The map must tile the clip exactly (no missing head or tail, no holes, no overlaps)
+ * and the score side must be continuous across joins: a timed passage starts where the
+ * previous one ended, and a held passage neither advances nor reverses the tick. A jump
+ * would make the cursor skip silently, so it is reported rather than accepted.
+ */
 export function alignmentProblem(alignment: Alignment, duration: number): string | null {
   if (!alignment || alignment.alignment_version !== 1) return 'Unsupported alignment version.';
+  if (alignment.mode !== 'estimated' && alignment.mode !== 'anchored') return 'Unsupported alignment mode.';
+  if (alignment.basis !== 'tempo' && alignment.basis !== 'passages') return 'Unsupported alignment basis.';
   if (!Array.isArray(alignment.passages) || !alignment.passages.length) return 'The alignment has no passages.';
-  let previousTick = -1;
-  let previousSeconds = -1;
+  let expectedStart = 0;
+  let previousTick = 0;
+  let first = true;
   for (const passage of alignment.passages) {
+    if (passage.kind !== 'timed' && passage.kind !== 'held') return 'An alignment passage has an unsupported kind.';
     const [start, end] = passage.source_seconds;
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start < -EPSILON || end > duration + EPSILON) {
-      return 'An alignment passage leaves the clip.';
-    }
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return 'An alignment passage has a non-finite boundary.';
+    if (start < -EPSILON || end > duration + EPSILON) return 'An alignment passage leaves the clip.';
     if (end <= start + EPSILON) return 'An alignment passage has no duration.';
-    if (start < previousSeconds - EPSILON) return 'Alignment passages are out of order.';
+    if (Math.abs(start - expectedStart) > EPSILON) {
+      return start > expectedStart ? 'The alignment leaves a gap in the recording.' : 'Alignment passages overlap.';
+    }
+    if (first) {
+      if (Math.abs(start) > EPSILON) return 'The alignment does not start at the beginning of the clip.';
+      first = false;
+    }
     if (passage.kind === 'timed') {
-      const [first, last] = passage.ticks;
-      if (!Number.isInteger(first) || !Number.isInteger(last) || last <= first) return 'A timed passage needs increasing ticks.';
-      if (first < previousTick) return 'A timed passage reverses score order.';
-      previousTick = last;
+      const [tickStart, tickEnd] = passage.ticks;
+      if (!Number.isInteger(tickStart) || !Number.isInteger(tickEnd)) return 'A timed passage needs whole ticks.';
+      if (tickEnd <= tickStart) return 'A timed passage needs increasing ticks.';
+      if (tickStart !== previousTick) return 'The alignment jumps in score time at a join.';
+      previousTick = tickEnd;
     } else {
       if (!Number.isInteger(passage.tick)) return 'A held passage needs a whole tick.';
-      if (passage.tick < previousTick) return 'A held passage reverses score order.';
-      previousTick = passage.tick;
+      if (passage.tick !== previousTick) return 'A held passage jumps in score time.';
     }
-    previousSeconds = end;
+    expectedStart = end;
   }
+  if (Math.abs(expectedStart - duration) > EPSILON) return 'The alignment does not reach the end of the clip.';
   return null;
 }
 
@@ -142,6 +175,12 @@ export function secondsToTick(alignment: Alignment, seconds: number): number {
  * seeking a held tick lands on the start of the hold (the documented policy).
  */
 export function tickToSeconds(alignment: Alignment, tick: number): number {
+  const first = alignment.passages[0];
+  const last = alignment.passages[alignment.passages.length - 1];
+  const firstTick = first.kind === 'timed' ? first.ticks[0] : first.tick;
+  const lastTick = last.kind === 'timed' ? last.ticks[1] : last.tick;
+  if (!Number.isFinite(tick) || tick <= firstTick) return first.source_seconds[0];
+  if (tick >= lastTick) return last.source_seconds[1];
   for (const passage of alignment.passages) {
     if (passage.kind === 'timed') {
       const [tickStart, tickEnd] = passage.ticks;
@@ -154,11 +193,7 @@ export function tickToSeconds(alignment: Alignment, tick: number): number {
       return passage.source_seconds[0];
     }
   }
-  const last = alignment.passages[alignment.passages.length - 1];
-  if (last.kind === 'timed') {
-    return tick > last.ticks[1] ? last.source_seconds[1] : last.source_seconds[0];
-  }
-  return tick > last.tick ? last.source_seconds[1] : last.source_seconds[0];
+  return last.source_seconds[1];
 }
 
 /* ------------------------------------------------------------ the offset */

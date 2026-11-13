@@ -248,22 +248,6 @@ export function PianoWorkspaceHarness() {
   const secondsPerTick = document ? 60 / (document.tempo.bpm * document.ppq) : 0.0625;
   const diff = useMemo(() => (baseline && document ? diffAgainst(baseline, document) : null), [baseline, document]);
 
-  const activePitches = useMemo(() => {
-    if (!document) return [];
-    return document.performance
-      .filter(note => playhead >= note.onset && playhead < note.onset + (note.duration ?? 0.25))
-      .map(note => note.pitch);
-  }, [document, playhead]);
-
-  const selectKey = useCallback((pitch: number) => {
-    if (!document) return;
-    const sounding = document.performance.filter(note => note.pitch === pitch
-      && playhead >= note.onset && playhead < note.onset + (note.duration ?? 0.25));
-    if (sounding.length === 1) { select(sounding[0].id); return; }
-    if (sounding.length > 1) { setNotice(`${sounding.length} ${pitchName(pitch)} notes overlap here; use the roll to choose one.`); return; }
-    setNotice(`No ${pitchName(pitch)} is sounding here. Audition only — select a note in the roll or score.`);
-  }, [document, playhead, select]);
-
   const boxes = useMemo(() => (document ? layoutMeasures(document).boxes : []), [document]);
 
   const alignment = useMemo<Alignment | null>(
@@ -271,6 +255,21 @@ export function PianoWorkspaceHarness() {
   const intervals = useMemo(() => (document ? occurrenceIntervals(document, offsetSeconds) : []), [document, offsetSeconds]);
   const activeIds = useMemo(() => activeOccurrenceIds(intervals, playhead), [intervals, playhead]);
   const playheadTick = alignment ? effectiveSecondsToTick(alignment, playhead, offsetSeconds) : null;
+
+  // Active highlighting and key selection use the same offset-aware intervals as
+  // the roll and score, so the keyboard cannot light or select an unsounding note.
+  const activePitches = useMemo(
+    () => intervals.filter(interval => playhead >= interval.start && playhead < interval.end).map(interval => interval.pitch),
+    [intervals, playhead]);
+
+  const selectKey = useCallback((pitch: number) => {
+    if (!document) return;
+    const sounding = intervals.filter(interval => interval.pitch === pitch
+      && playhead >= interval.start && playhead < interval.end);
+    if (sounding.length === 1) { select(sounding[0].id); return; }
+    if (sounding.length > 1) { setNotice(`${sounding.length} ${pitchName(pitch)} notes overlap here; use the roll to choose one.`); return; }
+    setNotice(`No ${pitchName(pitch)} is sounding here. Audition only — select a note in the roll or score.`);
+  }, [document, intervals, playhead, select]);
 
   // A selection that changes for any reason (click, undo, insert) requests one reveal.
   const selectionOccurrence = state?.selection?.occurrenceId ?? null;

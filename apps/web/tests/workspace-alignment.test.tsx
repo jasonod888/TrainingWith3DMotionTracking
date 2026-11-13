@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  activeOccurrenceIds, addAnchor, alignmentFromSpans, alignmentProblem, effectiveSecondsToTick,
+  activeOccurrenceIds, addAnchor, alignmentFromSpans, alignmentProblem, effectiveSecondsToTick, spansProblem,
   estimatedAlignment, occurrenceIntervals, secondsToTick, tickToEffectiveSeconds, tickToSeconds,
   type Alignment,
 } from '../../../packages/music-notation/index.ts';
@@ -132,4 +132,40 @@ test('a malformed alignment is reported rather than used', () => {
     ],
   };
   assert.ok(alignmentProblem(broken, 10));
+});
+
+test('R3: the map must tile the clip and stay continuous in score time', () => {
+  const clipLength = 12;
+  const cases: [string, Alignment][] = [
+    ['a missing head and tail', {alignment_version: 1, mode: 'estimated', basis: 'passages',
+      passages: [{kind: 'timed', source_seconds: [2, 10], ticks: [0, 9600]}]}],
+    ['a hole in the recording', {alignment_version: 1, mode: 'estimated', basis: 'passages',
+      passages: [{kind: 'timed', source_seconds: [0, 3], ticks: [0, 2880]}, {kind: 'timed', source_seconds: [5, 12], ticks: [2880, 9600]}]}],
+    ['a silent score jump', {alignment_version: 1, mode: 'estimated', basis: 'passages',
+      passages: [{kind: 'timed', source_seconds: [0, 4], ticks: [0, 3840]}, {kind: 'timed', source_seconds: [4, 12], ticks: [5000, 12000]}]}],
+    ['a held passage that jumps', {alignment_version: 1, mode: 'estimated', basis: 'passages',
+      passages: [{kind: 'timed', source_seconds: [0, 4], ticks: [0, 3840]}, {kind: 'held', source_seconds: [4, 12], tick: 5000}]}],
+  ];
+  for (const [name, map] of cases) assert.ok(alignmentProblem(map, clipLength), `accepted ${name}`);
+  const valid: Alignment = {alignment_version: 1, mode: 'anchored', basis: 'passages',
+    passages: [{kind: 'timed', source_seconds: [0, 4], ticks: [0, 3840]}, {kind: 'held', source_seconds: [4, 7], tick: 3840}, {kind: 'timed', source_seconds: [7, 12], ticks: [3840, 8640]}]};
+  assert.equal(alignmentProblem(valid, 12), null);
+});
+
+test('R3: the inverse clamps at both ends of the score domain', () => {
+  const document = clip();
+  const alignment = alignmentFromSpans(document, [
+    {start: 0, end: 4, kind: 'playing'}, {start: 4, end: 7, kind: 'explanation'}, {start: 7, end: 10, kind: 'playing'},
+  ]);
+  assert.equal(tickToSeconds(alignment, -1), 0, 'a negative tick returns the start boundary');
+  assert.equal(tickToSeconds(alignment, 1e9), 10, 'a tick past the end returns the clip end');
+  assert.ok(Math.abs(tickToSeconds(alignment, 3840) - 4) < 1e-6, 'the held tick still starts at the hold');
+});
+
+test('R3: overlapping or reversed authored spans are reported and not used', () => {
+  assert.ok(spansProblem([{start: 0, end: 5, kind: 'playing'}, {start: 4, end: 9, kind: 'playing'}], 10));
+  assert.ok(spansProblem([{start: 2, end: 1, kind: 'playing'}], 10));
+  assert.equal(spansProblem([{start: 0, end: 5, kind: 'playing'}, {start: 5, end: 10, kind: 'explanation'}], 10), null);
+  const overlapping = alignmentFromSpans(clip(), [{start: 0, end: 6, kind: 'playing'}, {start: 4, end: 10, kind: 'playing'}]);
+  assert.equal(alignmentProblem(overlapping, 10), null, 'malformed spans fall back to a valid estimated map');
 });
