@@ -4,10 +4,11 @@ import {pitchName} from '../music-reference';
 
 const WHITE = new Set([0, 2, 4, 5, 7, 9, 11]);
 const BLACK = new Set([1, 3, 6, 8, 10]);
-const WIDTH = 640;
+const DEFAULT_WIDTH = 640;
+const DEFAULT_SEMITONES = 36;
 const HEIGHT = 148;
 
-export function KeyboardEditor({document: score, selectedPitch, activePitches, onKey, onSelectKey, hint, toolbarHint}: {
+export function KeyboardEditor({document: score, selectedPitch, activePitches, onKey, onSelectKey, hint, toolbarHint, width = DEFAULT_WIDTH, semitones = DEFAULT_SEMITONES}: {
   document: NotationDocument;
   selectedPitch: number | null;
   activePitches: number[];
@@ -18,6 +19,10 @@ export function KeyboardEditor({document: score, selectedPitch, activePitches, o
   hint?: ReactNode;
   /** Replaces the default toolbar hint. */
   toolbarHint?: ReactNode;
+  /** Virtual keybed width in viewBox units; wider hosts show more keys. */
+  width?: number;
+  /** Keyboard range in semitones (default three octaves). */
+  semitones?: number;
 }) {
   const [octaveShift, setOctaveShift] = useState(0);
   const pitchRange = score.performance.map(note => note.pitch);
@@ -26,20 +31,21 @@ export function KeyboardEditor({document: score, selectedPitch, activePitches, o
   const first = Math.max(0, startOctave * 12);
   const whites = useMemo(() => {
     const result: number[] = [];
-    for (let pitch = first; pitch <= Math.min(127, first + 36); pitch += 1) if (WHITE.has(pitch % 12)) result.push(pitch);
+    for (let pitch = first; pitch <= Math.min(127, first + semitones); pitch += 1) if (WHITE.has(pitch % 12)) result.push(pitch);
     return result;
-  }, [first]);
-  const whiteWidth = (WIDTH - 12) / Math.max(1, whites.length);
+  }, [first, semitones]);
+  const whiteWidth = (width - 12) / Math.max(1, whites.length);
+  const blackWidth = Math.max(7, Math.min(18, whiteWidth * 0.62));
   const blackKeys = useMemo(() => {
     const result: {pitch: number; x: number}[] = [];
-    for (let pitch = first; pitch < Math.min(127, first + 36); pitch += 1) {
+    for (let pitch = first; pitch < Math.min(127, first + semitones); pitch += 1) {
       if (!BLACK.has(pitch % 12)) continue;
       const lowerWhite = whites.filter(value => value < pitch).length - 1;
       if (lowerWhite < 0) continue;
-      result.push({pitch, x: 6 + (lowerWhite + 1) * whiteWidth - whiteWidth * 0.3});
+      result.push({pitch, x: 6 + (lowerWhite + 1) * whiteWidth - blackWidth * 0.55});
     }
     return result;
-  }, [first, whites, whiteWidth]);
+  }, [first, whites, whiteWidth, blackWidth, semitones]);
 
   return <div className="keyboard-editor">
     <div className="keyboard-toolbar">
@@ -49,8 +55,8 @@ export function KeyboardEditor({document: score, selectedPitch, activePitches, o
       <button type="button" onClick={() => setOctaveShift(value => Math.min(2, value + 1))} aria-label="Keyboard octave up">+ oct</button>
       <span className="small muted">{toolbarHint ?? 'Tap to audition; with a note selected, tap to set its pitch.'}</span>
     </div>
-    <svg className="keyboard-svg" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={`Piano keyboard from ${pitchName(first)}`}>
-      <rect x="0" y="0" width={WIDTH} height={HEIGHT} className="keyboard-bg"/>
+    <svg className="keyboard-svg" viewBox={`0 0 ${width} ${HEIGHT}`} role="img" aria-label={`Piano keyboard from ${pitchName(first)}`}>
+      <rect x="0" y="0" width={width} height={HEIGHT} className="keyboard-bg"/>
       {whites.map((pitch, index) => {
         const x = 6 + index * whiteWidth;
         const selected = selectedPitch === pitch;
@@ -67,7 +73,7 @@ export function KeyboardEditor({document: score, selectedPitch, activePitches, o
       {blackKeys.map(({pitch, x}) => {
         const selected = selectedPitch === pitch;
         const active = activePitches.includes(pitch);
-        return <rect key={pitch} x={x} y="8" width="13" height="78" rx="3"
+        return <rect key={pitch} x={x} y="8" width={blackWidth} height="78" rx="3"
           className={`keyboard-black${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
           onClick={() => { onKey(pitch, false); onSelectKey?.(pitch); }} role="button" tabIndex={0}
           onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onKey(pitch, false); onSelectKey?.(pitch); } }}

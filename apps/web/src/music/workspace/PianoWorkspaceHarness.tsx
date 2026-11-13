@@ -1,9 +1,10 @@
 /**
- * Phase 2 developer harness: an isolated route for exercising the shared document,
- * occurrence selection, commands and history.
+ * Developer harness for the correction workspace.
  *
- * Deliberately not part of the review workflow: it loads the same draft through the
- * same API, but writes nothing. The ordinary review route is untouched.
+ * Phase 3: the readable layout — keyboard above a ten-second time roll, a continuous
+ * horizontally scrollable grand staff below, a whole-clip overview, and the smaller
+ * reference video and inspector alongside. Isolated from the review workflow; it
+ * loads the same draft through the same API and writes nothing.
  */
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {assetUrl, request} from '../../api';
@@ -14,13 +15,18 @@ import {
 } from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
 import {KeyboardEditor} from '../notation/KeyboardEditor';
-import {PianoRoll} from '../notation/PianoRoll';
-import {SheetMusic} from '../notation/SheetMusic';
 import {NotationAudio} from '../notation/notation-audio';
+import {ClipOverview} from './ClipOverview';
+import {ContinuousScore} from './ContinuousScore';
+import {TimeRoll} from './TimeRoll';
+import {
+  clampTimeWindow, DEFAULT_SPAN_SECONDS, layoutMeasures, zoomAround, type TimeWindow,
+} from './viewport';
 import {
   createWorkspaceState, historySummary, workspaceReducer, workspaceStatus,
   type WorkspaceAction, type WorkspaceState,
 } from './workspace-state';
+import {useElementWidth} from './useElementWidth';
 
 const DURATION_CHOICES = [
   {label: 'Whole', ticks: 1920},
@@ -90,9 +96,12 @@ export function PianoWorkspaceHarness() {
   const [writtenScope, setWrittenScope] = useState<'note' | 'event'>('note');
   const [respellDraft, setRespellDraft] = useState('');
   const [notice, setNotice] = useState('');
+  const [window, setWindow] = useState<TimeWindow>({start: 0, span: DEFAULT_SPAN_SECONDS});
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<NotationAudio | null>(null);
+  const [keyboardRef, keyboardWidth] = useElementWidth<HTMLDivElement>();
+  const compactKeyboard = keyboardWidth > 0 && keyboardWidth < 720;
 
   const dispatch = useCallback((action: WorkspaceAction) => {
     setState(previous => (previous ? workspaceReducer(previous, action) : previous));
@@ -186,6 +195,29 @@ export function PianoWorkspaceHarness() {
     setNotice(`No ${pitchName(pitch)} is sounding here. Audition only — select a note in the roll or score.`);
   }, [document, playhead, select]);
 
+  const boxes = useMemo(() => (document ? layoutMeasures(document).boxes : []), [document]);
+
+  // The roll opens at a readable window rather than fitting the whole recording.
+  useEffect(() => {
+    if (!document) return;
+    setWindow(clampTimeWindow({start: 0, span: DEFAULT_SPAN_SECONDS}, document.duration));
+  }, [document?.duration]);
+
+  const changeWindow = useCallback((next: TimeWindow) => {
+    if (!document) return;
+    setWindow(clampTimeWindow(next, document.duration));
+  }, [document]);
+
+  const zoom = useCallback((factor: number) => {
+    if (!document) return;
+    setWindow(current => {
+      const anchor = playhead >= current.start && playhead <= current.start + current.span
+        ? playhead
+        : current.start + current.span / 2;
+      return zoomAround(current, document.duration, factor, anchor);
+    });
+  }, [document, playhead]);
+
   if (loading) return <main className="ws-shell"><p role="status">Opening the draft…</p></main>;
   if (error) return <main className="ws-shell"><p role="alert" className="ws-error">{error}</p></main>;
   if (!document || !state) return <main className="ws-shell"><p role="status">No document.</p></main>;
@@ -193,11 +225,12 @@ export function PianoWorkspaceHarness() {
   const snapSeconds = snapTicks ? snapTicks * secondsPerTick : null;
   const report = state.lastReport;
   const summary = historySummary(state);
+  const revealTick = selection ? document.events.find(event => event.id === selection.eventId)?.start ?? null : null;
 
   return <main className="ws-shell">
     <header className="ws-head">
       <div>
-        <p className="ws-eyebrow">Developer harness · Phase 2 · writes nothing</p>
+        <p className="ws-eyebrow">Developer harness · Phase 3 · writes nothing</p>
         <h1>{title || 'Piano correction workspace'}</h1>
         <p className="ws-sub">
           {document.performance.length} notes · {document.events.length} events · {document.measures.length} measures ·{' '}
@@ -220,6 +253,13 @@ export function PianoWorkspaceHarness() {
           {SNAP_CHOICES.map(choice => <option key={choice.label} value={choice.ticks}>{choice.label}</option>)}
         </select>
       </label>
+      <div className="ws-zoom" role="group" aria-label="Zoom">
+        <button type="button" onClick={() => zoom(1.25)} aria-label="Zoom out">−</button>
+        <span className="ws-window-label" data-window-span={window.span.toFixed(2)}>
+          {window.span.toFixed(window.span < 10 ? 1 : 0)} s visible · from {window.start.toFixed(1)} s
+        </span>
+        <button type="button" onClick={() => zoom(0.8)} aria-label="Zoom in">+</button>
+      </div>
       <span className="ws-time">{playhead.toFixed(2)} s / {document.duration.toFixed(2)} s</span>
       {report && <span className={report.status === 'rejected' ? 'ws-report is-bad' : 'ws-report'}>
         {report.status === 'rejected' ? report.message : report.label}
@@ -229,24 +269,32 @@ export function PianoWorkspaceHarness() {
 
     <div className="ws-grid">
       <div className="ws-edit">
-        <section className="ws-panel" aria-label="Keyboard">
-          <KeyboardEditor document={document} selectedPitch={selected?.pitch ?? null} activePitches={activePitches}
-            onKey={pitch => audition([pitch], 0.4)} onSelectKey={selectKey}
-            toolbarHint="Tap to audition. With a note selected, tap a key to select that pitch at the playhead; it never edits a note."
-            hint="Selection and audition only; use “Add note at playhead” in the inspector to insert."/>
+        <section className="ws-panel ws-surface" aria-label="Keyboard">
+          <div ref={keyboardRef}>
+            <KeyboardEditor document={document} selectedPitch={selected?.pitch ?? null} activePitches={activePitches}
+              onKey={pitch => audition([pitch], 0.4)} onSelectKey={selectKey}
+              width={compactKeyboard ? 640 : 1040} semitones={compactKeyboard ? 36 : 60}
+              toolbarHint="Tap to audition. With a note selected, tap a key to select that pitch at the playhead; it never edits a note."
+              hint="Selection and audition only; use “Add note at playhead” in the inspector to insert."/>
+          </div>
         </section>
 
-        <section className="ws-panel" aria-label="Piano roll">
-          <PianoRoll document={document} selection={null} selectedOccurrenceId={selection?.occurrenceId ?? null}
-            playhead={playhead} onSelect={() => {}} onSelectOccurrence={select}
-            onPitchChange={() => {}} onMove={() => {}} onResize={() => {}} onSeek={seek}/>
-          <p className="ws-hint">Click a note to select that occurrence. Dragging is not part of Phase 2.</p>
+        <section className="ws-panel ws-surface" aria-label="Piano roll">
+          <TimeRoll document={document} window={window} onWindowChange={changeWindow}
+            selectedOccurrenceId={selection?.occurrenceId ?? null}
+            revealOccurrenceId={selection?.occurrenceId ?? null}
+            playhead={playhead} onSelect={select} onSeek={seek}/>
+          <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Dragging notes is Phase 6.</p>
         </section>
 
-        <section className="ws-panel" aria-label="Score">
-          <SheetMusic document={document} selection={null} selectedOccurrenceId={selection?.occurrenceId ?? null}
-            compact={false} focusMeasure={selection?.measureIndex ?? 0} zoom={1}
-            onSelect={() => {}} onSelectOccurrence={select} onSelectRest={() => {}} onPitchChange={() => {}}/>
+        <section className="ws-panel ws-surface" aria-label="Score">
+          <ContinuousScore document={document} boxes={boxes} selectedOccurrenceId={selection?.occurrenceId ?? null}
+            revealTick={revealTick} onSelect={select}/>
+          <p className="ws-hint">One continuous grand staff; only the visible measures are rendered. Click a notehead to select it.</p>
+        </section>
+
+        <section className="ws-panel ws-surface" aria-label="Overview">
+          <ClipOverview document={document} window={window} playhead={playhead} onWindowChange={changeWindow}/>
         </section>
       </div>
 

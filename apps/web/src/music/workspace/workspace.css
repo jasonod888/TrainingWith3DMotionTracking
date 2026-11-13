@@ -1,4 +1,6 @@
-/* Phase 2 developer harness. Deliberately small: layout polish belongs to Phase 3. */
+/* Phase 3 correction-workspace layout.
+   Keyboard above a ten-second time roll, continuous grand staff below, overview,
+   and the reference video + inspector alongside. */
 
 body {
   margin: 0;
@@ -8,9 +10,9 @@ body {
 }
 
 .ws-shell {
-  max-width: 1500px;
+  max-width: 1520px;
   margin: 0 auto;
-  padding: 16px 18px 40px;
+  padding: 14px 18px 32px;
 }
 
 .ws-eyebrow {
@@ -31,7 +33,7 @@ body {
 
 .ws-head h1 {
   margin: 0 0 4px;
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .ws-sub,
@@ -58,8 +60,8 @@ body {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 12px 0;
-  padding: 8px 10px;
+  margin: 10px 0;
+  padding: 7px 10px;
   background: #fff;
   border: 1px solid #e2e0d8;
   border-radius: 8px;
@@ -86,6 +88,7 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   margin: 8px 0;
+  align-items: center;
 }
 
 .ws-field {
@@ -106,19 +109,28 @@ body {
 }
 
 .ws-inline {
-  grid-auto-flow: column;
+  display: flex;
   align-items: center;
   gap: 6px;
   margin: 0;
 }
 
-.ws-time {
+.ws-time,
+.ws-window-label {
   font-variant-numeric: tabular-nums;
   color: #4c5a52;
+  font-size: 12px;
+}
+
+.ws-zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .ws-report {
   color: #1f5d3a;
+  font-size: 12px;
 }
 
 .ws-report.is-bad {
@@ -127,21 +139,15 @@ body {
 
 .ws-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 12px;
   align-items: start;
-}
-
-@media (max-width: 1000px) {
-  .ws-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .ws-edit,
 .ws-side {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -149,20 +155,46 @@ body {
   background: #fff;
   border: 1px solid #e2e0d8;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   min-width: 0;
 }
 
 .ws-panel h2 {
   margin: 0 0 6px;
-  font-size: 13px;
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: #6b7a72;
 }
 
+.ws-surface {
+  padding: 4px 8px 2px;
+}
+
+.ws-surface .ws-hint {
+  padding: 2px 2px 0;
+}
+
+/* The shared keyboard renders at its viewBox aspect; keep the panel compact. */
+.ws-panel .keyboard-svg {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.ws-panel .keyboard-toolbar {
+  padding: 2px 0 4px;
+}
+
+/* The keybed sits on a dark background; keep its octave labels readable. */
+.ws-panel .keyboard-label {
+  fill: #f2efe6;
+  font-size: 10px;
+}
+
 .ws-video {
   width: 100%;
+  max-width: 100%;
   border-radius: 6px;
   background: #000;
 }
@@ -177,9 +209,280 @@ body {
   color: #9a2d1f;
 }
 
-/* The reused surfaces ship their own styles; keep them inside the panels. */
-.ws-panel .piano-roll-wrap,
-.ws-panel .notation-sheet-scroll,
-.ws-panel .draft-roll-scroll {
-  overflow-x: auto;
+/* ---------------------------------------------------------------- time roll */
+
+.ws-roll {
+  display: grid;
+  align-items: start;
+  border: 1px solid #ece9e1;
+  border-radius: 6px;
+  overflow: hidden;
 }
+
+.ws-roll-labels {
+  position: relative;
+  height: 174px;
+  overflow: hidden;
+  border-right: 1px solid #ece9e1;
+  background: #fbfbf8;
+}
+
+.ws-roll-labels span {
+  position: absolute;
+  left: 4px;
+  font-size: 10px;
+  color: #6b7a72;
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-roll-viewport {
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+  max-width: 100%;
+  scrollbar-width: thin;
+}
+
+.ws-roll-content {
+  position: relative;
+}
+
+.ws-roll-svg {
+  display: block;
+  background: #fff;
+}
+
+.ws-roll-ruler {
+  fill: #f7f6f1;
+  cursor: crosshair;
+}
+
+.ws-roll-tick {
+  stroke: #c9cfc8;
+  stroke-width: 1;
+}
+
+.ws-roll-tick-label {
+  fill: #6b7a72;
+  font-size: 9px;
+}
+
+.ws-roll-grid {
+  stroke: #f0eee7;
+  stroke-width: 1;
+}
+
+.ws-roll-octave {
+  stroke: #e6e3da;
+  stroke-width: 1;
+}
+
+.ws-roll-note {
+  fill: #7fae8f;
+  cursor: pointer;
+}
+
+.ws-roll-note:hover {
+  fill: #5f9a75;
+}
+
+.ws-roll-note.is-selected {
+  fill: #2a7be0;
+  stroke: #144a8c;
+  stroke-width: 1.5;
+}
+
+.ws-roll-playhead {
+  stroke: #d9822b;
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ grand staff */
+
+.ws-score {
+  position: relative;
+  border: 1px solid #ece9e1;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.ws-score-viewport {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  scrollbar-width: thin;
+}
+
+.ws-score-svg {
+  display: block;
+}
+
+.ws-score-paper {
+  fill: #fff;
+}
+
+.ws-score-staff {
+  stroke: #b9c4bd;
+  stroke-width: 1;
+}
+
+.ws-score-barline {
+  stroke: #98a69f;
+  stroke-width: 1;
+}
+
+.ws-score-measure-number,
+.ws-overview-label {
+  fill: #6b7a72;
+  font-size: 10px;
+}
+
+.ws-score-notehead {
+  fill: #1f2d26;
+  cursor: pointer;
+}
+
+.ws-score-notehead.is-selected {
+  fill: #2a7be0;
+  stroke: #144a8c;
+  stroke-width: 1.5;
+}
+
+.ws-score-stem,
+.ws-score-flag,
+.ws-score-ledger {
+  stroke: #1f2d26;
+  stroke-width: 1.2;
+}
+
+.ws-score-accidental {
+  fill: #1f2d26;
+  font-size: 11px;
+}
+
+.ws-score-rest rect {
+  fill: #8a9a91;
+}
+
+.ws-score-tie {
+  fill: none;
+  stroke: #1f2d26;
+  stroke-width: 1.2;
+}
+
+.ws-score-clef {
+  fill: #1f2d26;
+  font-size: 26px;
+}
+
+.ws-score-key,
+.ws-score-time {
+  fill: #33413a;
+  font-size: 11px;
+}
+
+.ws-score-brace {
+  fill: none;
+  stroke: #1f2d26;
+  stroke-width: 1.2;
+}
+
+/* Pinned clef/key/time context: never scrolls with the strip. */
+.ws-score-context {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 62px;
+  background: #fff;
+  border-right: 1px solid #ece9e1;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- overview */
+
+.ws-overview {
+  width: 100%;
+  max-width: 100%;
+}
+
+.ws-overview svg {
+  display: block;
+  width: 100%;
+}
+
+.ws-overview-track {
+  fill: #f4f2ec;
+  stroke: #e2e0d8;
+}
+
+.ws-overview-density {
+  fill: #b7cbbf;
+}
+
+.ws-overview-window {
+  fill: rgba(42, 123, 224, 0.14);
+  stroke: #2a7be0;
+  stroke-width: 1.5;
+  cursor: grab;
+}
+
+.ws-overview-window:active {
+  cursor: grabbing;
+}
+
+.ws-overview-playhead {
+  stroke: #d9822b;
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+/* At short desktop heights, drop the optional description lines so the keyboard,
+   roll, both staves and the overview stay visible together. */
+@media (max-height: 980px) {
+  .ws-surface .ws-hint {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------- responsive */
+
+@media (max-width: 1100px) {
+  .ws-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ws-side {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .ws-shell {
+    padding: 10px 10px 24px;
+  }
+
+  .ws-head h1 {
+    font-size: 18px;
+  }
+
+  .ws-roll {
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+  }
+
+  .ws-roll-labels {
+    height: 184px;
+  }
+
+  .ws-status {
+    text-align: left;
+  }
+
+  /* notation.css gives the shared keyboard a 180px minimum height on narrow
+     screens; the workspace sizes the keybed by its own range instead. */
+  .ws-panel .keyboard-svg {
+    min-height: 0;
+  }
+}
+
