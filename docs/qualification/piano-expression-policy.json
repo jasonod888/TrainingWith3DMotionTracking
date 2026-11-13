@@ -1,0 +1,70 @@
+{
+  "benchmark": {
+    "evidence_kind": "rendered",
+    "heldout_cases": 4,
+    "report_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "source": "phase-4 expression benchmark not yet available"
+  },
+  "categories": {
+    "audible_duration": {
+      "attempts": 0,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 0,
+      "implemented": true,
+      "precision": 0.0,
+      "reason": "No human held-out target for audible duration is available.",
+      "suggestions": 0
+    },
+    "key_release": {
+      "attempts": 0,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 0,
+      "implemented": false,
+      "precision": 0.0,
+      "reason": "Physical key release cannot be inferred reliably from audible decay alone.",
+      "suggestions": 0
+    },
+    "pedal": {
+      "attempts": 0,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 0,
+      "implemented": false,
+      "precision": 0.0,
+      "reason": "Pedal state has no qualified estimator in this phase.",
+      "suggestions": 0
+    },
+    "relative_dynamics": {
+      "attempts": 0,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 0,
+      "implemented": true,
+      "precision": 0.0,
+      "reason": "No human held-out target for relative dynamics is available.",
+      "suggestions": 0
+    },
+    "written_rhythm": {
+      "attempts": 0,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 0,
+      "implemented": false,
+      "precision": 0.0,
+      "reason": "Written rhythm requires a separate notation model and evaluation.",
+      "suggestions": 0
+    }
+  },
+  "generated_at": "2026-11-11T00:00:00+00:00",
+  "policy_version": "piano-expression-1",
+  "scope": "Phase 4 expression improvements; categories not listed are never applied.",
+  "status": "insufficient-evidence",
+  "thresholds": {
+    "max_damage_rate": 0.0,
+    "min_correction_precision": 0.95,
+    "min_heldout_cases": 40,
+    "min_suggestions": 20
+  }
+}

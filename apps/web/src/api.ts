@@ -97,3 +97,16 @@ export function uploadChunk(jobId:string,part:number,body:Blob,signal:AbortSigna
  xhr.upload.onprogress=e=>progress(e.loaded);xhr.onload=()=>{clean();if(xhr.status>=200&&xhr.status<300)resolve();else{let message='Upload stopped. You can resume it from your library.';try{message=JSON.parse(xhr.responseText).detail??message;}catch{}reject(new ApiError(message,xhr.status));}};xhr.onerror=xhr.ontimeout=()=>{clean();reject(new Error('Connection interrupted. Resume the upload from your library.'));};xhr.onabort=()=>{clean();reject(new DOMException('Upload paused.','AbortError'));};if(signal.aborted){clean();reject(new DOMException('Upload paused.','AbortError'));return;}xhr.send(body);
  });
 }
+
+export type PianoComparisonSource={id:string;label:string;lesson_id:string|null;seconds:number;has_reference:boolean};
+export type PianoComparisonRun={variant:string;status:string;attempt:number;error:string|null;blocked_reasons:string[]};
+export type PianoComparison={id:string;status:string;source_id:string;lesson_id:string|null;interval:[number,number];variants:string[];cancel_requested:boolean;created_at:string|null;updated_at:string|null;result_available:boolean;runs:PianoComparisonRun[]};
+export const loadComparisonSources=()=>request<{sources:PianoComparisonSource[]}>('/piano-comparisons/sources');
+export const createPianoComparison=(source_id:string,variants:string[])=>request<PianoComparison>('/piano-comparisons','POST',{source_id,variants});
+export const loadPianoComparison=(id:string)=>request<PianoComparison>(`/piano-comparisons/${encodeURIComponent(id)}`);
+export const loadPianoComparisonResults=(id:string)=>request<Record<string,unknown>>(`/piano-comparisons/${encodeURIComponent(id)}/results`);
+export const cancelPianoComparison=(id:string)=>request<PianoComparison>(`/piano-comparisons/${encodeURIComponent(id)}/cancel`,'POST',{});
+export const retryPianoRun=(id:string,variant:string)=>request<PianoComparison>(`/piano-comparisons/${encodeURIComponent(id)}/runs/${encodeURIComponent(variant)}/retry`,'POST',{});
+export const pianoComparisonSourceUrl=(id:string)=>`/api/piano-comparisons/${encodeURIComponent(id)}/source`;
+export const pianoComparisonAssetUrl=(id:string,variant:string,asset:string)=>`/api/piano-comparisons/${encodeURIComponent(id)}/runs/${encodeURIComponent(variant)}/assets/${encodeURIComponent(asset)}`;
+export const registerLessonComparisonSource=(lesson_id:string)=>request<PianoComparisonSource>('/piano-comparisons/sources','POST',{lesson_id});

@@ -1,0 +1,104 @@
+{
+  "date": "2026-11-12",
+  "scope": "Review and local diagnostic validation; no automatic categories enabled or running worker changed.",
+  "implementation": {
+    "estimator_code_sha256": "7ddf65992feebc0cdbc8488e8282e357dc409f8d6068fe510ebe023e363774c5",
+    "verifier_code_sha256": "bf0cc4c02bc0bbd7a740757e9fbdcc30dfb7374f386fa0eb333118c926806821",
+    "settings_sha256": "c59a890224fc38446b1765f7aa4453e2058172cffad53285462d481a56d13df5",
+    "weights_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+    "model": "basic-pitch",
+    "model_version": "0.4.0",
+    "decoder": "basic-pitch-0.4.0/piano-peaks-v1",
+    "decoder_sha256": "7cec0b8413c6319debc70aeaf230f95d2a761230108baaaa7a25b780b3304fa1",
+    "application_code_sha256": "9e68f14a333b3a7ef25913ef5fd2cb762dc9ee88a74397ba605c5b02f0601973"
+  },
+  "benchmark": {
+    "rendered_clips": 24,
+    "proposal_runs": 96,
+    "summary": {
+      "clean_reference": {
+        "scorable_trials": 126,
+        "suggestions": 0,
+        "within_reference_tolerance": 0,
+        "damaged_correct": 0,
+        "mae_before_seconds": 0.0,
+        "mae_after_seconds": 0.0
+      },
+      "natural_decoder": {
+        "scorable_trials": 125,
+        "suggestions": 0,
+        "within_reference_tolerance": 0,
+        "damaged_correct": 0,
+        "mae_before_seconds": 0.08775172940177683,
+        "mae_after_seconds": 0.08775172940177683
+      },
+      "corruption": {
+        "scorable_trials": 252,
+        "suggestions": 9,
+        "within_reference_tolerance": 9,
+        "damaged_correct": 0,
+        "mae_before_seconds": 1.0238724625880984,
+        "mae_after_seconds": 1.0099455108550242
+      }
+    }
+  },
+  "original": {
+    "duration": 14.677369614512472,
+    "note_count": 34,
+    "events_unchanged": true,
+    "profile_sha256": "7273926b177ab7b4501791f15bd4cedc47df1fcd9d1af177a3a881a2cc6efa6c",
+    "expression_summary": {
+      "abstention_count": 68,
+      "by_attribute": {
+        "audible_duration": {
+          "analyzed": 34,
+          "candidates": 0,
+          "no_change": 34
+        },
+        "relative_dynamics": {
+          "analyzed": 34,
+          "candidates": 0,
+          "no_change": 34
+        }
+      },
+      "candidate_count": 0,
+      "events_considered": 34,
+      "measurement_count": 7,
+      "proposal_count": 0,
+      "truncated": false
+    },
+    "phase3_summary": {
+      "by_kind": {
+        "missing_pitch": 1,
+        "octave_ambiguity": 2,
+        "wrong_pitch": 10
+      },
+      "edit_count": 0,
+      "finding_count": 13,
+      "flagged_count": 0,
+      "qualified_count": 0,
+      "runtime_seconds": 3.22,
+      "suggested_count": 0,
+      "unresolved_count": 13,
+      "withheld_count": 0
+    },
+    "phase3_coverage": {
+      "atoms_truncated": false,
+      "findings_truncated": false,
+      "regions_analysed": 13,
+      "regions_skipped": 0,
+      "regions_total": 13,
+      "skipped": [],
+      "truncated_regions": false
+    },
+    "audio_sha256": "b858b6b3edf8841f2bf370745c86f0fb4b03c21a32791a47ac6622e422be42b0",
+    "has_checked_expression_reference": false,
+    "measured_expression_improvement": false
+  },
+  "validation": {
+    "full_api_passed": 392,
+    "full_api_skipped": 1,
+    "focused_final_passed": 100,
+    "web_build": "passed"
+  }
+}

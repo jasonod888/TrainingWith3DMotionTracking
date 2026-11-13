@@ -36,12 +36,16 @@ class Settings(BaseSettings):
     # Each music instrument has its own route and kill switch, so piano can be enabled
     # while guitar stays off (and vice versa). Both are registered but disabled here.
     music_piano_conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'disabled'
+    # New piano uploads use the raw Kong route by default. A deployment without the
+    # pinned Kong worker profile queues honestly and never falls back to Basic Pitch.
+    music_piano_default_model: Literal['kong', 'basic-pitch'] = 'kong'
     music_guitar_conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'disabled'
     music_remote_conversion_enabled: bool = False
     music_midi_setup_enabled: bool = False
     music_history_enabled: bool = False
     music_require_run_profile: bool = False
     music_allowed_run_profiles: str = ''  # Comma-separated operator-approved profile digests.
+    music_kong_allowed_run_profiles: str = ''  # Route-specific approvals; never infer from a worker label.
     music_analysis_retention_days: int = 30
     music_piano_library_ui_enabled: bool = False
     music_guitar_library_ui_enabled: bool = False
@@ -52,6 +56,7 @@ class Settings(BaseSettings):
     conversion_target: str = ''
     remote_conversion_concurrency: int = 1
     upload_temp_dir: Path = ROOT / '.local/upload-tmp'
+    piano_comparison_dir: Path = ROOT / '.local/repo-research/comparisons'
     silhouettes_enabled: bool = False
     # Rollout gate for the Phase 2 discovery interface. Off means the subject filter is
     # not rendered at all, so an existing movement library keeps its current controls.

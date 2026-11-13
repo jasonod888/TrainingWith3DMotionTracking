@@ -44,6 +44,15 @@ Migration **0019** adds `music_reviews`. The record ties draft, lesson, reviewed
 reviewer and review time to original/reviewed reference hashes and the request fingerprint.
 The original proposal document remains intact; its status becomes `reviewed`.
 
+When qualified corrections were applied automatically at draft handoff, the reviewed
+reference also records `review.verification.automatic_corrections` (including phase-4
+expression edits), the baseline and working hashes, and whether the working document was
+still applied. Manual decisions
+remain in `review.verification.decisions`. This keeps rollback history and the distinction
+between automatic and owner-accepted edits after the draft leaves the review screen.
+Saving decisions requires the current working-state token; a stale tab, a rollback, or a
+hand-edit that removed an accepted correction is refused.
+
 Music publishing stays blocked by the existing guards. Finalisation is never a shortcut
 through public-media or sharing qualification.
 

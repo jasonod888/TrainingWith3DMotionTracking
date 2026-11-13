@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piano reconstruction listening pilot</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main id="app">
+  <section id="setup" class="card">
+    <h1>Listening pilot</h1>
+    <p class="muted">
+      Internal development instrument. Not the confirmatory study, and not evidence of
+      indistinguishability.
+    </p>
+    <label for="listener">Anonymous participant code</label>
+    <input id="listener" autocomplete="off" placeholder="e.g. L01">
+    <label for="equipment">Headphones or monitors used</label>
+    <input id="equipment" autocomplete="off" placeholder="e.g. DT 770, laptop output">
+    <button id="start" disabled>Begin</button>
+    <p id="setup-error" class="error" role="alert"></p>
+    <details>
+      <summary>Instructions</summary>
+      <div id="instructions"></div>
+    </details>
+  </section>
+
+  <section id="session" class="card hidden">
+    <header class="bar">
+      <span id="progress"></span>
+      <button id="save" type="button" class="secondary">Save progress</button>
+    </header>
+    <div id="item"></div>
+    <footer class="bar">
+      <button id="previous" type="button" class="secondary">Previous</button>
+      <button id="next" type="button">Next</button>
+      <span id="item-error" class="error" role="alert"></span>
+    </footer>
+  </section>
+
+  <section id="break" class="card hidden">
+    <h2>Break</h2>
+    <p>Take a short break. Continue when you are ready.</p>
+    <button id="resume" type="button">Continue</button>
+  </section>
+
+  <section id="done" class="card hidden">
+    <h2>Finished</h2>
+    <p>Download the session file and hand it to the facilitator.</p>
+    <button id="download" type="button">Download session JSON</button>
+    <p id="download-note" class="muted"></p>
+  </section>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

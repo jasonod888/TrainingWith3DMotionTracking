@@ -64,10 +64,17 @@ export type AssessmentPolicy = {
 };
 
 export type MusicDraftGuitarChord={id:string;name:string;start:number;frets:number[];position:number};
-export type MusicDraftEvent={id:string;onset:number;duration:number|null;pitch:number;velocity:number|null;confidence:number|null;optional:boolean;string:number|null;fret:number|null};
+export type MusicDraftEvent={id:string;onset:number;duration:number|null;notation_duration?:number|null;pitch:number;velocity:number|null;confidence:number|null;optional:boolean;string:number|null;fret:number|null};
+export type MusicDraftCorrection={finding_id:string;kind:string;applied_at:string;reverted_at?:string|null;
+ policy_sha256?:string|null;report_sha256?:string|null;edits:unknown[];event_id?:string;attribute?:string;
+ before?:unknown;value?:unknown};
+export type MusicPlaybackSettings={sync_offset_seconds:number;revision:number};
+export type MusicPedalSpan={onset:number;offset:number;type:'sustain'};
 export type MusicDraftView={draft_version:1;draft_id:string;lesson_id:string;title:string;status:'draft'|'reviewed';
  subject:'piano'|'guitar';instrument:InstrumentConfig;duration:number;reference:Asset;source_video:Asset|null;
+ piano_preview?:Asset|null;playback?:MusicPlaybackSettings;pedal?:MusicPedalSpan[];preview_identity?:string|null;raw_model?:boolean;correction_operations?:number;
  events:MusicDraftEvent[];spans:{start:number;end:number;kind:'playing'|'explanation'}[];guitar_chords:MusicDraftGuitarChord[];analysis:{key:string;mime:string;bytes:number;sha256:string}|null;warnings:string[];
+ baseline_events?:MusicDraftEvent[];working_corrected?:boolean;automatic_corrections?:MusicDraftCorrection[];
  provenance:{adapter:string;engine:string;model:string|null;model_version:string|null;code_version:string;audio_sha256:string;profile_sha256?:string|null}};
 
 export type MusicLessonManifest = {
@@ -85,6 +92,10 @@ export type MusicLessonManifest = {
   assessment: AssessmentPolicy;
   source_video?: Asset | null;
   preview_video?: Asset | null;
+  piano_preview?: Asset | null;
+  playback?: MusicPlaybackSettings;
+  pedal?: MusicPedalSpan[];
+  preview_identity?: string | null;
   waveform?: Asset | null;
   midi_export?: Asset | null;
   public_poster?: Asset | null;

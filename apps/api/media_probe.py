@@ -24,7 +24,10 @@ class MediaProbeError(RuntimeError):
 
 
 def _run(arguments: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(arguments, capture_output=True, text=True, timeout=PROBE_TIMEOUT_SECONDS)
+    # FFmpeg tools emit UTF-8, including embedded titles/comments. Windows' default
+    # code page can fail in the pipe reader and leave valid ffprobe JSON unreadable.
+    return subprocess.run(arguments, capture_output=True, text=True,
+                          encoding='utf-8', errors='replace', timeout=PROBE_TIMEOUT_SECONDS)
 
 
 def probe_audio_media(path: Path) -> dict:

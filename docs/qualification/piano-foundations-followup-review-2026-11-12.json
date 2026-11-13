@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-12",
+  "scope": "Focused foundation review and continuation plan; no application fixes made",
+  "tests": {
+    "passed": 107,
+    "seconds": 5.18,
+    "log": ".local/repo-research/foundation-review-tests.log",
+    "full_developer_suite_repeated": false
+  },
+  "reproduced": {
+    "legacy_duration_identity_collision": {
+      "same_identity": true,
+      "audio_differs": true
+    },
+    "source_extent_identity_collision": {
+      "same_identity": true,
+      "frames": [
+        8000,
+        16000
+      ]
+    },
+    "short_candidate": {
+      "reference_seconds": 2,
+      "candidate_seconds": 1,
+      "objective": 0.0,
+      "scored_seconds": 1.0,
+      "warnings": [
+        "reference truncated to 8000 samples"
+      ]
+    }
+  },
+  "kong_model": {
+    "source": "https://zenodo.org/api/records/4034264",
+    "release_license": "CC-BY-4.0",
+    "md5": "22b961b77c1878239fec963362097045",
+    "sha256": "c3fa9730725bf4a762f1c14bc80cd5986eacda01b026f5a4a2525cd607876141",
+    "published_md5_matches": true
+  },
+  "source_files": {
+    "scripts/piano_rights.py": "df2b3668a5262074ae71eb55974823d035cdd7d7b5aac804eb90a983156e9252",
+    "scripts/piano_performance.py": "9f458fcf0c676a865dea9d5d580a5f825fc4e5a5b4917e9a049db1c2e0cc9ee6",
+    "scripts/piano_render.py": "07dc4569471aca91ec866d9704bcb7f685bf380d03bbc50f7557d09f726cb89d",
+    "scripts/piano_reconstruction_metrics.py": "da5b2656f2d6053ddb1e4ce17f65ed632e45960629c423df5dde97d0f43a2b83",
+    "scripts/piano_reconstruction_harness.py": "451e94194fad12fa51f996e3c894b2081198305e50ba6e98982a47745780e6c5"
+  }
+}

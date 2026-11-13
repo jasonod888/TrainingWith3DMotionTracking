@@ -25,6 +25,7 @@ export type PerformanceNote = {
   id: string;
   onset: number;
   duration: number | null;
+  notation_duration?: number | null;
   pitch: number;
   velocity: number | null;
   confidence: number | null;

@@ -104,3 +104,20 @@
 .creating-move.create-keyboard-open [data-panel=details] .clip-editor{display:none}
 .creating-move.create-keyboard-open .has-clip .create-heading{display:none}
 .creating-move.create-keyboard-open [data-panel=details] .create-options{max-height:100%;overflow:auto}
+
+.review-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.compare-models{border:1px solid #cfc7b8;background:#fbf8f1;border-radius:9px;padding:8px 12px;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer}
+.compare-models:hover{background:#f2ece0}
+.compare-models:disabled{opacity:.5;cursor:not-allowed}
+
+.review-audio{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-top:10px}
+.review-audio-modes{display:flex;gap:6px}
+.review-sync{display:flex;align-items:center;gap:6px;font-size:.88rem}
+.review-sync input{width:88px;padding:4px 6px;border:1px solid #cfc7b8;border-radius:6px;font:inherit}
+.review-audio p{width:100%;margin:0}
+
+.music-audio-modes{display:flex;gap:4px}
+.music-audio-modes .active{outline:2px solid #35556b}
+.music-sync{display:flex;align-items:center;gap:6px;font-size:.85rem}
+.music-sync input{width:84px;padding:4px 6px;border:1px solid #cfc7b8;border-radius:6px;font:inherit}
+.piano-note-roll{width:100%;height:150px;border:1px solid #e0d9cc;border-radius:10px;background:#f4f1ea;margin-top:8px}

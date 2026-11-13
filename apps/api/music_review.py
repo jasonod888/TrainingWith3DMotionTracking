@@ -12,10 +12,13 @@ from sqlalchemy.orm import Session
 
 from .auth import now
 from .contracts import (Contract, Asset, AssessmentPolicy, GuitarChord, MusicDraftDocument, MusicEvent,
-                        MusicLessonManifest, MusicSpan, Section, SectionSet)
-from .database import LessonAsset, LessonRevision, MusicDraft, MusicReview
+                        MusicLessonManifest, MusicPlaybackSettings, MusicSpan, Section,
+                        SectionSet)
+from .database import LessonAsset, LessonRevision, MusicDraft, MusicReview, MusicVerificationDecision
+from .music_verification import current_state_token, decisions_applied, proposal_sha256
 from .permissions import accept_revision, latest_revision, owned_lesson
 from .storage import storage_client
+from .music_preview import performance_changed, invalidate_preview
 
 
 class ReviewAssessment(Contract):
@@ -48,6 +51,9 @@ class ReviewMusic(Contract):
     sections: list[Section] = Field(min_length=1,max_length=500)
     confirm_reviewed: Literal[True]
     assessment: ReviewAssessment = Field(default_factory=ReviewAssessment)
+    # Required whenever verification decisions exist; binds the save to the exact
+    # working state the owner reviewed.
+    verification_state_token: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
 
 
 def canonical(value):
@@ -89,14 +95,45 @@ def install_music_review(app,settings,identity,db):
         except ValidationError as exc:
             raise HTTPException(422,'Keep notes, spans and contiguous sections inside the clip.') from exc
         reviewed_at=now()
+        if performance_changed(row.document, proposal.events):
+            invalidate_preview(proposal)
+        decision_rows=list(session.scalars(select(MusicVerificationDecision).where(
+            MusicVerificationDecision.draft_id==row.id)).all())
+        automatic_history=list(row.correction_history or [])
+        if decision_rows or row.working_document or automatic_history:
+            expected_token=current_state_token(row,decision_rows)
+            if body.verification_state_token!=expected_token:
+                raise HTTPException(409,'The working notes changed. Reopen the review before saving.')
+        if decision_rows:
+            baseline=proposal_sha256(row.document.get('events') or [])
+            if any(item.proposal_sha256!=baseline for item in decision_rows):
+                raise HTTPException(409,'Verification decisions were recorded against an earlier proposal. Reopen verification.')
+            if not decisions_applied([event.model_dump() for event in proposal.events],
+                                     decision_rows,proposal.duration):
+                raise HTTPException(409,'The reviewed notes do not include every accepted suggestion. Reopen verification or undo it first.')
+        verification=None
+        if decision_rows or automatic_history:
+            verification={
+                'proposal_sha256': (decision_rows[0].proposal_sha256 if decision_rows
+                                    else proposal_sha256(row.document.get('events') or [])),
+                'baseline_sha256': proposal_sha256(row.document.get('events') or []),
+                'working_sha256': proposal_sha256([event.model_dump() for event in proposal.events]),
+                'working_corrected': bool(row.working_document),
+                'automatic_corrections': automatic_history}
+            if decision_rows:
+                verification['decisions']=[{'finding_id':item.finding_id,'decision':item.decision,
+                    'decided_at':item.decided_at.isoformat() if item.decided_at else None,
+                    'document':item.document} for item in sorted(decision_rows,key=lambda value:value.finding_id)]
         reference_document={'reference_version':1,'subject':proposal.subject,
             'instrument':proposal.instrument.model_dump(),'duration':proposal.duration,
             'events':[event.model_dump() for event in proposal.events],
             'spans':[span.model_dump() for span in proposal.spans],
             'guitar_chords':[chord.model_dump() for chord in proposal.guitar_chords],
+            'pedal':[span.model_dump() for span in proposal.pedal],
             'provenance':proposal.provenance.model_dump(),
             'review':{'reviewer_id':account.id,'reviewed_at':reviewed_at.isoformat(),
-                      'draft_id':row.id,'source_reference_sha256':body.reference_sha256}}
+                      'draft_id':row.id,'source_reference_sha256':body.reference_sha256,
+                      **({'verification':verification} if verification else {})}}
         data=canonical(reference_document)
         digest=hashlib.sha256(data).hexdigest()
         key=f'lessons/{lesson_id}/{row.id}-reviewed-reference.json'
@@ -107,6 +144,10 @@ def install_music_review(app,settings,identity,db):
         manifest=MusicLessonManifest(lesson_id=lesson_id,revision_id=uuid4().hex,title=body.title.strip() or lesson.title,
             subject=proposal.subject,duration=proposal.duration,instrument=proposal.instrument,
             section_set=sections,reference=asset,reference_reviewed=True,source_video=proposal.source_video,
+            piano_preview=proposal.piano_preview,
+            playback=proposal.playback or MusicPlaybackSettings(),
+            pedal=proposal.pedal,
+            preview_identity=proposal.preview_identity,
             assessment=AssessmentPolicy(rubric_version=body.assessment.rubric_version,assessment=body.assessment.assessment,
                 input_modes=body.assessment.input_modes or ['none'],dimensions=body.assessment.dimensions),
             warnings=proposal.warnings)

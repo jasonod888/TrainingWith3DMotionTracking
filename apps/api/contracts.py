@@ -147,6 +147,19 @@ class AssessmentPolicy(Contract):
         return self
 
 
+class MusicPedalEvent(Contract):
+    """Sustain span predicted by the model; not written notation or audible-ending truth."""
+    onset: float = Field(ge=0)
+    offset: float = Field(gt=0)
+    type: Literal['sustain'] = 'sustain'
+
+
+class MusicPlaybackSettings(Contract):
+    """Versioned lesson playback settings; a missing object means zero offset."""
+    sync_offset_seconds: float = Field(default=0.0, ge=-10.0, le=10.0, allow_inf_nan=False)
+    revision: int = Field(default=1, ge=1)
+
+
 class MusicLessonManifest(Contract):
     """Manifest v2 for a reviewed music reference.
 
@@ -169,9 +182,13 @@ class MusicLessonManifest(Contract):
     assessment: AssessmentPolicy
     source_video: Asset | None = None
     preview_video: Asset | None = None
+    piano_preview: Asset | None = None
     waveform: Asset | None = None
     midi_export: Asset | None = None
     public_poster: Asset | None = None
+    playback: MusicPlaybackSettings | None = None
+    pedal: list[MusicPedalEvent] = Field(default_factory=list, max_length=2000)
+    preview_identity: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
     warnings: list[str] = Field(default_factory=list)
 
     @model_validator(mode='after')
@@ -186,6 +203,11 @@ class MusicLessonManifest(Contract):
             asset = getattr(self, name)
             if asset and asset.mime not in ('video/mp4', 'video/webm'):
                 raise ValueError('Music video must be MP4 or WebM.')
+        if self.piano_preview and self.piano_preview.mime != 'audio/wav':
+            raise ValueError('A piano preview must be a WAV asset.')
+        for span in self.pedal:
+            if span.offset <= span.onset or span.offset > self.duration + 1e-6:
+                raise ValueError('A pedal span must stay inside the clip.')
         if self.waveform and self.waveform.mime != 'application/json':
             raise ValueError('Waveform data must be JSON.')
         if self.midi_export and self.midi_export.mime not in ('audio/midi', 'audio/mid', 'application/x-midi'):
@@ -228,6 +250,8 @@ class MusicEvent(Contract):
     id: str = Field(min_length=1, max_length=80)
     onset: float = Field(ge=0)
     duration: float | None = Field(default=None, gt=0)
+    # Written value is independent of audible decay and pedal-extended sound.
+    notation_duration: float | None = Field(default=None, gt=0)
     pitch: int = Field(ge=0, le=127)
     velocity: float | None = Field(default=None, ge=0, le=1)
     confidence: float | None = Field(default=None, ge=0, le=1)
@@ -294,6 +318,10 @@ class MusicDraftDocument(Contract):
     duration: float = Field(gt=0)
     reference: Asset
     source_video: Asset | None = None
+    piano_preview: Asset | None = None
+    playback: MusicPlaybackSettings | None = None
+    pedal: list[MusicPedalEvent] = Field(default_factory=list, max_length=2000)
+    preview_identity: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
     events: list[MusicEvent] = Field(default_factory=list, max_length=20000)
     spans: list[MusicSpan] = Field(default_factory=list, max_length=500)
     guitar_chords: list[GuitarChord] = Field(default_factory=list, max_length=100)
@@ -309,6 +337,11 @@ class MusicDraftDocument(Contract):
             raise ValueError('A draft reference must be JSON.')
         if self.source_video and self.source_video.mime not in ('video/mp4','video/webm'):
             raise ValueError('A draft source must be a supported video.')
+        if self.piano_preview and self.piano_preview.mime != 'audio/wav':
+            raise ValueError('A piano preview must be a WAV asset.')
+        for span in self.pedal:
+            if span.offset <= span.onset or span.offset > self.duration + 1e-6:
+                raise ValueError('A pedal span must stay inside the clip.')
         if len({event.id for event in self.events}) != len(self.events):
             raise ValueError('Draft event ids must be unique.')
         ordered = sorted(self.spans, key=lambda span: span.start)

@@ -22,6 +22,7 @@ from .music_notation import validate_notation
 from .music_review import ReviewAssessment, canonical
 from .permissions import accept_revision, accepted, latest_revision, owned_lesson
 from .storage import storage_client
+from .music_preview import performance_changed, invalidate_preview
 
 
 class EditMusic(Contract):
@@ -79,6 +80,10 @@ def install_music_edit(app, settings, identity, db):
                 'spans': [span.model_dump() for span in body.spans],
                 'guitar_chords': [chord.model_dump() for chord in body.guitar_chords],
                 'provenance': previous_reference['provenance'],
+                'pedal': previous_reference.get('pedal', current.manifest.get('pedal', [])),
+                'playback': current.manifest.get('playback'),
+                'piano_preview': current.manifest.get('piano_preview'),
+                'preview_identity': current.manifest.get('preview_identity'),
                 'warnings': [],
             })
             version = current.version + 1
@@ -93,12 +98,15 @@ def install_music_edit(app, settings, identity, db):
                 raise HTTPException(422, str(exc)) from exc
 
         reviewed_at = now()
+        if performance_changed(previous_reference, proposal.events):
+            invalidate_preview(proposal)
         reference_document = {
             'reference_version': 1, 'subject': proposal.subject,
             'instrument': proposal.instrument.model_dump(), 'duration': proposal.duration,
             'events': [event.model_dump() for event in proposal.events],
             'spans': [span.model_dump() for span in proposal.spans],
             'guitar_chords': [chord.model_dump() for chord in proposal.guitar_chords],
+            'pedal': [span.model_dump() for span in proposal.pedal],
             'provenance': proposal.provenance.model_dump(),
             **({'notation': notation} if notation is not None else {}),
             'review': {'reviewer_id': account.id, 'reviewed_at': reviewed_at.isoformat(),
@@ -116,6 +124,10 @@ def install_music_edit(app, settings, identity, db):
         manifest = MusicLessonManifest.model_validate({
             **current.manifest, 'revision_id': revision_id, 'title': body.title.strip() or current.manifest['title'],
             'section_set': sections.model_dump(), 'reference': asset.model_dump(),
+            'piano_preview': proposal.piano_preview.model_dump() if proposal.piano_preview else None,
+            'preview_identity': proposal.preview_identity,
+            'pedal': [span.model_dump() for span in proposal.pedal],
+            'warnings': [*current.manifest.get('warnings', []), *proposal.warnings],
             'assessment': body.assessment.model_dump(), 'reference_reviewed': True,
         })
         revision = LessonRevision(id=revision_id, lesson_id=lesson_id, version=version,

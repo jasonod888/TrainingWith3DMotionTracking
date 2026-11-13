@@ -12,6 +12,6 @@ export function VelocityInput({label,value,onChange,disabled=false}:{
     aria-label={`${label} slider`} onChange={event=>onChange(Number(event.target.value)/100)}/>
   <input type="number" min={0} max={100} step={1} value={percent??''} placeholder="auto" disabled={disabled}
     aria-label={`${label} value`} onChange={event=>onChange(event.target.value===''?null:Math.max(0,Math.min(100,Number(event.target.value)))/100)}/>
-  <p className="small muted">Basic Pitch estimate, not measured key pressure or calibrated MIDI velocity.</p>
+  <p className="small muted">Approximate playback intensity. This does not measure physical key pressure.</p>
  </div>;
 }

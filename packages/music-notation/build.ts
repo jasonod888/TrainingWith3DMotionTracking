@@ -37,6 +37,7 @@ function copyPerformance(note: PerformanceNote): PerformanceNote {
     id: note.id,
     onset: note.onset,
     duration: note.duration,
+    ...(note.notation_duration != null ? {notation_duration: note.notation_duration} : {}),
     pitch: note.pitch,
     velocity: note.velocity,
     confidence: note.confidence,
@@ -70,7 +71,9 @@ function groupPerformance(performance: PerformanceNote[], secondsPerTick: number
   const groups = new Map<string, Group>();
   for (const source of performance) {
     const start = snapTick(source.onset / secondsPerTick);
-    const sourceLength = source.duration && source.duration > 0 ? source.duration : 0.25;
+    const sourceLength = source.notation_duration && source.notation_duration > 0
+      ? source.notation_duration
+      : source.duration && source.duration > 0 ? source.duration : 0.25;
     const end = snapTick((source.onset + sourceLength) / secondsPerTick);
     const duration = Math.max(GRID, end - start);
     const staff = source.pitch >= splitPitch ? 'treble' : 'bass';

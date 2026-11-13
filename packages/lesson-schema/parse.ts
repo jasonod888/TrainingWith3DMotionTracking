@@ -13,7 +13,7 @@
 import {validateSections} from './index';
 import type {
   AssessmentPolicy, Asset, InstrumentConfig, LessonDocument, LessonManifest, LessonSummary,
-  MusicLessonManifest, MusicDraftView, MusicDraftEvent, Section, SectionSet, SummaryCapabilities,
+  MusicLessonManifest, MusicDraftView, MusicDraftEvent, MusicDraftCorrection, Section, SectionSet, SummaryCapabilities,
 } from './index';
 
 export type ParseErrorCode = 'malformed' | 'unsupported_format';
@@ -51,7 +51,7 @@ const BODY_KEYS = new Set([
 const MUSIC_KEYS = new Set([
   'schema_version', 'experience_family', 'lesson_id', 'revision_id', 'title', 'subject', 'duration',
   'instrument', 'section_set', 'reference', 'reference_reviewed', 'assessment',
-  'source_video', 'preview_video', 'waveform', 'midi_export', 'public_poster', 'warnings',
+  'source_video', 'preview_video', 'piano_preview', 'playback', 'pedal', 'preview_identity', 'waveform', 'midi_export', 'public_poster', 'warnings',
 ]);
 
 const SUMMARY_KEYS = new Set([
@@ -86,6 +86,27 @@ function readAsset(value: unknown): Asset | null | undefined {
   if (!isText(key) || !safeKey(key) || !isText(mime) || !isNumber(bytes) || bytes < 0) return undefined;
   if (typeof sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(sha256)) return undefined;
   return {key, mime, bytes, sha256};
+}
+
+function readPedal(value: unknown): {onset:number;offset:number;type:'sustain'}[] | null | undefined {
+ if(value===undefined)return undefined;
+ if(!Array.isArray(value)||value.length>2000)return null;
+ const spans:{onset:number;offset:number;type:'sustain'}[]=[];
+ for(const span of value){
+  if(!isRecord(span)||Object.keys(span).some(key=>!['onset','offset','type'].includes(key)))return null;
+  if(!isNumber(span.onset)||!isNumber(span.offset)||span.onset<0||span.offset<=span.onset)return null;
+  if(span.type!=='sustain')return null;
+  spans.push({onset:span.onset,offset:span.offset,type:'sustain'});
+ }
+ return spans;
+}
+
+function readPlayback(value: unknown): {sync_offset_seconds: number; revision: number} | null | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value) || Object.keys(value).some(key => !['sync_offset_seconds','revision'].includes(key))) return null;
+  if (!isNumber(value.sync_offset_seconds) || Math.abs(value.sync_offset_seconds) > 10) return null;
+  if (!isCount(value.revision) || value.revision < 1) return null;
+  return {sync_offset_seconds: value.sync_offset_seconds, revision: value.revision};
 }
 
 function readSections(value: unknown, duration: number): Section[] | undefined {
@@ -266,15 +287,22 @@ export function parseMusicLessonManifest(value: unknown): ParseResult<MusicLesso
   if (!assessment) return malformed('This music lesson has an invalid assessment policy.');
   const sourceVideo: OptionalAsset = readAsset(value.source_video);
   const preview: OptionalAsset = readAsset(value.preview_video);
+  const pianoPreview: OptionalAsset = readAsset(value.piano_preview);
+  const playback = readPlayback(value.playback);
+  const pedal = readPedal(value.pedal);
+  const previewIdentity = value.preview_identity ?? null;
+  if (previewIdentity !== null && (typeof previewIdentity !== 'string' || !/^[a-f0-9]{64}$/.test(previewIdentity))) return malformed('This music lesson has an invalid preview identity.');
   const waveform: OptionalAsset = readAsset(value.waveform);
   const midi: OptionalAsset = readAsset(value.midi_export);
   const poster: OptionalAsset = readAsset(value.public_poster);
-  if (sourceVideo === undefined || preview === undefined || waveform === undefined
+  if (sourceVideo === undefined || preview === undefined || pianoPreview === undefined
+      || playback === null || pedal === null || waveform === undefined
       || midi === undefined || poster === undefined) {
     return malformed('This music lesson has an invalid media asset.');
   }
   if (sourceVideo && !isVideo(sourceVideo)) return malformed('This music lesson source is not a video.');
   if (preview && !isVideo(preview)) return malformed('This music lesson preview is not a video.');
+  if (pianoPreview && pianoPreview.mime !== 'audio/wav') return malformed('This music lesson piano preview is not WAV.');
   if (waveform && waveform.mime !== 'application/json') return malformed('This music lesson waveform is not JSON.');
   if (midi && !MIDI_MIMES.includes(midi.mime)) return malformed('This music lesson has an invalid MIDI export.');
   if (poster && !isImage(poster)) return malformed('This music lesson has an invalid public poster.');
@@ -289,6 +317,10 @@ export function parseMusicLessonManifest(value: unknown): ParseResult<MusicLesso
       assessment,
       source_video: sourceVideo ?? null,
       preview_video: preview ?? null,
+      piano_preview: pianoPreview ?? null,
+      ...(playback ? {playback} : {}),
+      ...(pedal ? {pedal} : {}),
+      ...(previewIdentity ? {preview_identity: previewIdentity} : {}),
       waveform: waveform ?? null,
       midi_export: midi ?? null,
       public_poster: poster ?? null,
@@ -374,23 +406,58 @@ export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
  if(!isRecord(value)||value.draft_version!==1||!isId(value.draft_id)||!isId(value.lesson_id)||!isTitle(value.title)||
    !['draft','reviewed'].includes(String(value.status))||!isNumber(value.duration)||value.duration<=0||
    (value.subject!=='piano'&&value.subject!=='guitar'))return bad();
- const keys=['draft_version','draft_id','lesson_id','revision_id','title','status','subject','instrument','duration','reference','source_video','events','spans','guitar_chords','analysis','provenance','warnings'];
+ const keys=['draft_version','draft_id','lesson_id','revision_id','title','status','subject','instrument','duration','reference','source_video','piano_preview','playback','pedal','preview_identity','raw_model','correction_operations','events','spans','guitar_chords','analysis','provenance','warnings','baseline_events','working_corrected','automatic_corrections'];
  if(Object.keys(value).some(key=>!keys.includes(key)))return bad();
- const instrument=readInstrument(value.instrument),reference=readAsset(value.reference),source=readAsset(value.source_video??null);
- if(!instrument||instrument.instrument!==value.subject||!reference||reference.mime!=='application/json'||source===undefined||source&&!isVideo(source))return bad();
+ const instrument=readInstrument(value.instrument),reference=readAsset(value.reference),source=readAsset(value.source_video??null),pianoPreview=readAsset(value.piano_preview??null);
+ const playback=readPlayback(value.playback),pedal=readPedal(value.pedal);
+ const previewIdentity=value.preview_identity??null;
+ if(previewIdentity!==null&&(typeof previewIdentity!=='string'||!/^[a-f0-9]{64}$/.test(previewIdentity)))return bad();
+ if(!instrument||instrument.instrument!==value.subject||!reference||reference.mime!=='application/json'||source===undefined||source&&!isVideo(source)||pianoPreview===undefined||pianoPreview&&pianoPreview.mime!=='audio/wav'||playback===null||pedal===null)return bad();
+ if(value.raw_model!==undefined&&typeof value.raw_model!=='boolean')return bad();
+ if(value.correction_operations!==undefined&&(!isCount(value.correction_operations)||value.correction_operations<0))return bad();
  if(!Array.isArray(value.events)||value.events.length>20000||!Array.isArray(value.spans)||value.spans.length>500)return bad();
- const events:MusicDraftEvent[]=[],seen=new Set<string>();
- for(const event of value.events){
-  if(!isRecord(event)||!isId(event.id)||seen.has(event.id)||!isNumber(event.onset)||event.onset<0||event.onset>value.duration||
-   !isCount(event.pitch)||event.pitch>127||Object.keys(event).some(key=>!['id','onset','duration','pitch','velocity','confidence','optional','string','fret'].includes(key)))return bad();
-  const duration=event.duration??null,velocity=event.velocity??null,confidence=event.confidence??null,optional=event.optional??false;
-  if(duration!==null&&(!isNumber(duration)||duration<=0||event.onset+duration>value.duration+1e-6)||
-    velocity!==null&&(!isNumber(velocity)||velocity<0||velocity>1)||confidence!==null&&(!isNumber(confidence)||confidence<0||confidence>1)||typeof optional!=='boolean')return bad();
-  const string=event.string??null,fret=event.fret??null;
-  if((string===null)!==(fret===null)||string!==null&&(!isCount(string)||string<1||string>6)||fret!==null&&(!isCount(fret)||fret>24)||
-    string!==null&&({1:64,2:59,3:55,4:50,5:45,6:40} as Record<number,number>)[string]+(fret as number)!==event.pitch)return bad();
-  seen.add(event.id);events.push({id:event.id,onset:event.onset,pitch:event.pitch,duration,velocity,confidence,optional,string,fret});
+ const draftDuration=value.duration as number;
+ const readDraftEvents=(values:unknown):MusicDraftEvent[]|null=>{
+  if(!Array.isArray(values)||values.length>20000)return null;
+  const parsed:MusicDraftEvent[]=[],ids=new Set<string>();
+  for(const event of values){
+   if(!isRecord(event)||!isId(event.id)||ids.has(event.id)||!isNumber(event.onset)||event.onset<0||event.onset>draftDuration||
+    !isCount(event.pitch)||event.pitch>127||Object.keys(event).some(key=>!['id','onset','duration','notation_duration','pitch','velocity','confidence','optional','string','fret'].includes(key)))return null;
+   const duration=event.duration??null,notationDuration=event.notation_duration??null,velocity=event.velocity??null,confidence=event.confidence??null,optional=event.optional??false;
+   if(duration!==null&&(!isNumber(duration)||duration<=0||event.onset+duration>draftDuration+1e-6)||
+     notationDuration!==null&&(!isNumber(notationDuration)||notationDuration<=0||notationDuration>draftDuration)||
+     velocity!==null&&(!isNumber(velocity)||velocity<0||velocity>1)||confidence!==null&&(!isNumber(confidence)||confidence<0||confidence>1)||typeof optional!=='boolean')return null;
+   const string=event.string??null,fret=event.fret??null;
+   if((string===null)!==(fret===null)||string!==null&&(!isCount(string)||string<1||string>6)||fret!==null&&(!isCount(fret)||fret>24)||
+     string!==null&&({1:64,2:59,3:55,4:50,5:45,6:40} as Record<number,number>)[string]+(fret as number)!==event.pitch)return null;
+   ids.add(event.id);parsed.push({id:event.id,onset:event.onset,pitch:event.pitch,duration,velocity,confidence,optional,string,fret,notation_duration:notationDuration});
+  }
+  return parsed;
+ };
+ const events=readDraftEvents(value.events);if(!events)return bad();
+ const baselineEvents=value.baseline_events===undefined?undefined:readDraftEvents(value.baseline_events);
+ if(baselineEvents===null)return bad();
+ let automaticCorrections:MusicDraftCorrection[]|undefined;
+ if(value.automatic_corrections!==undefined){
+  if(!Array.isArray(value.automatic_corrections)||value.automatic_corrections.length>2000)return bad();
+  automaticCorrections=[];
+  for(const correction of value.automatic_corrections){
+   if(!isRecord(correction)||!isId(correction.finding_id)||!isText(correction.kind)||!isText(correction.applied_at)||
+    Object.keys(correction).some(key=>!['finding_id','kind','applied_at','reverted_at','policy_sha256','report_sha256','edits','source','pitch','time_range','event_id','attribute','before','value','expression_version'].includes(key))||
+    !(correction.reverted_at==null||isText(correction.reverted_at))||
+    !(correction.policy_sha256==null||(typeof correction.policy_sha256==='string'&&/^[a-f0-9]{64}$/.test(correction.policy_sha256)))||
+    !(correction.report_sha256==null||(typeof correction.report_sha256==='string'&&/^[a-f0-9]{64}$/.test(correction.report_sha256)))||
+    !Array.isArray(correction.edits))return bad();
+   automaticCorrections.push({finding_id:correction.finding_id,kind:correction.kind,applied_at:correction.applied_at,
+    reverted_at:(correction.reverted_at as string|null|undefined)??null,policy_sha256:(correction.policy_sha256 as string|null|undefined)??null,
+    report_sha256:(correction.report_sha256 as string|null|undefined)??null,edits:[...correction.edits],
+    ...(typeof correction.event_id==='string'?{event_id:correction.event_id}:{}),
+    ...(typeof correction.attribute==='string'?{attribute:correction.attribute}:{}),
+    ...('before' in correction?{before:correction.before}:{}),
+    ...('value' in correction?{value:correction.value}:{})});
+  }
  }
+ if(value.working_corrected!==undefined&&typeof value.working_corrected!=='boolean')return bad();
  const spans:{start:number;end:number;kind:'playing'|'explanation'}[]=[];
  for(const span of value.spans){
   if(!isRecord(span)||Object.keys(span).some(key=>!['start','end','kind'].includes(key))||!isNumber(span.start)||!isNumber(span.end)||span.start<0||span.end<=span.start||span.end>value.duration+1e-6||
@@ -418,6 +485,12 @@ export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
  for(const [key,max] of [['model',120],['model_version',80]] as const)if(provenance[key]!=null&&(!isText(provenance[key])||provenance[key].length>max))return bad();
  if(typeof provenance.audio_sha256!=='string'||! /^[a-f0-9]{64}$/.test(provenance.audio_sha256)||!isStringArray(value.warnings)||value.warnings.length>100)return bad();
  return {ok:true,value:{draft_version:1,draft_id:value.draft_id,lesson_id:value.lesson_id,title:value.title,status:value.status as 'draft'|'reviewed',
-  subject:value.subject,instrument,duration:value.duration,reference,source_video:source,events,spans,guitar_chords:chords,analysis:analysis??null,warnings:[...value.warnings],
+  subject:value.subject,instrument,duration:value.duration,reference,source_video:source,piano_preview:pianoPreview??null,
+ ...(playback?{playback}:{}),...(pedal?{pedal}:{}),...(previewIdentity?{preview_identity:previewIdentity}:{}),...(value.raw_model!==undefined?{raw_model:value.raw_model}:{}),
+ ...(value.correction_operations!==undefined?{correction_operations:value.correction_operations}:{}),
+ events,spans,guitar_chords:chords,analysis:analysis??null,warnings:[...value.warnings],
+  ...(baselineEvents?{baseline_events:baselineEvents}:{}),
+  ...(automaticCorrections?{automatic_corrections:automaticCorrections}:{}),
+  ...(value.working_corrected!==undefined?{working_corrected:value.working_corrected}:{}),
   provenance:{adapter:String(provenance.adapter),engine:String(provenance.engine),code_version:String(provenance.code_version),model:provenance.model as string|null??null,model_version:provenance.model_version as string|null??null,audio_sha256:provenance.audio_sha256,profile_sha256:provenance.profile_sha256 as string|null??null}}};
 }

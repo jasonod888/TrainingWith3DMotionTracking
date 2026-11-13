@@ -1,0 +1,299 @@
+{
+  "date": "2026-11-11",
+  "scope": "Diagnostic evaluation; no automatic category qualified or enabled.",
+  "matching": "One-to-one exact MIDI pitch, onset within 50 ms; offsets and dynamics are not scored.",
+  "implementation": {
+    "verifier_code_sha256": "f3ada0b59ea644faeebab07337408aa1accfcf4d1864dabc43869b2d578b6a09",
+    "settings_sha256": "c59a890224fc38446b1765f7aa4453e2058172cffad53285462d481a56d13df5",
+    "weights_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+    "model": "basic-pitch",
+    "model_version": "0.4.0",
+    "decoder": "basic-pitch-0.4.0/piano-peaks-v1",
+    "decoder_sha256": "e83b23d4e972cbf4622aa7e925aa45f65528e19f7bfb1a435427605081f2cebb",
+    "application_code_sha256": "4b04b96748c13c3b6338bf29ad99d6340b8eb6d81237d72ffe79c110fb6399bb"
+  },
+  "rendered": {
+    "report_sha256": "3729b31c71273ed2fb04073e22d84049689926d3f915052eb299d5b7d6b2e920",
+    "summary": {
+      "correction_trial_count": 9,
+      "correction_trial_categories": {
+        "duplicate_event": 5,
+        "extra_pitch": 2,
+        "onset_shift": 2
+      },
+      "deleted_note": {
+        "attempts": 8,
+        "detection_rate": 0.625,
+        "suggestion_rate": 0.0,
+        "improved_rate": 0.0,
+        "proposal_damage_rate": 0.0,
+        "applied_edits": 0,
+        "conflicts": 0,
+        "damage_per_case": 0.0,
+        "mean_seconds": 1.761625000028289
+      },
+      "inserted_note": {
+        "attempts": 8,
+        "detection_rate": 0.375,
+        "suggestion_rate": 0.25,
+        "improved_rate": 0.25,
+        "proposal_damage_rate": 0.0,
+        "applied_edits": 2,
+        "conflicts": 0,
+        "damage_per_case": 0.0,
+        "mean_seconds": 1.8886249999923166
+      },
+      "octave_substitution": {
+        "attempts": 8,
+        "detection_rate": 0.125,
+        "suggestion_rate": 0.0,
+        "improved_rate": 0.0,
+        "proposal_damage_rate": 0.0,
+        "applied_edits": 0,
+        "conflicts": 0,
+        "damage_per_case": 0.0,
+        "mean_seconds": 1.8242500000051223
+      },
+      "shifted_onset": {
+        "attempts": 8,
+        "detection_rate": 0.25,
+        "suggestion_rate": 0.25,
+        "improved_rate": 0.25,
+        "proposal_damage_rate": 0.0,
+        "applied_edits": 2,
+        "conflicts": 0,
+        "damage_per_case": 0.0,
+        "mean_seconds": 1.8397499999700813
+      },
+      "duplicate_event": {
+        "attempts": 8,
+        "detection_rate": 0.625,
+        "suggestion_rate": 0.625,
+        "improved_rate": 0.625,
+        "proposal_damage_rate": 0.0,
+        "applied_edits": 5,
+        "conflicts": 0,
+        "damage_per_case": 0.0,
+        "mean_seconds": 1.9298750000161817
+      },
+      "merged_repetition": {
+        "attempts": 8,
+        "detection_rate": 0.125,
+        "suggestion_rate": 0.0,
+        "improved_rate": 0.0,
+        "proposal_damage_rate": 0.0,
+        "applied_edits": 0,
+        "conflicts": 0,
+        "damage_per_case": 0.0,
+        "mean_seconds": 1.7929999999760184
+      },
+      "clean_reference": {
+        "suggestions": 0,
+        "cases": 8
+      },
+      "natural": {
+        "reference": {
+          "cases": 8,
+          "applied_edits": 0,
+          "conflicts": 0,
+          "errors_fixed": 0,
+          "correct_notes_damaged": 0,
+          "remaining_missing": 0,
+          "remaining_extra": 0,
+          "errors_before": 0,
+          "errors_after": 0,
+          "judged_edits": 0,
+          "correct_edits": 0,
+          "incorrect_edits": 0
+        },
+        "decoder": {
+          "cases": 8,
+          "applied_edits": 0,
+          "conflicts": 0,
+          "errors_fixed": 0,
+          "correct_notes_damaged": 0,
+          "remaining_missing": 26,
+          "remaining_extra": 51,
+          "errors_before": 77,
+          "errors_after": 77,
+          "judged_edits": 0,
+          "correct_edits": 0,
+          "incorrect_edits": 0
+        }
+      }
+    }
+  },
+  "human": {
+    "dataset": "SMD v2 corrected MIDI with original recorded WAV, 20-second starts, three performances",
+    "source": "https://www.audiolabs-erlangen.de/resources/MIR/SMD/midi",
+    "archive": "https://zenodo.org/records/13753319",
+    "report_sha256": "cc17a5205f07be9d04bfd430deb025427c9433e3ef6380d32ad98f7e2d0e554b",
+    "recordings": [
+      {
+        "recording": "Bach_BWV888-02_008_20110315-SMD.wav",
+        "audio_sha256": "ec4e8bb399aa370559d802ce453c259612557a75735c7cb84a1864acddfce6c1",
+        "reference_sha256": "75875b713ae88d4f25f167e078a5fcf2326b24de9d28c1763775e23f82cf4885",
+        "seconds": 20.0,
+        "reference_notes": 175,
+        "applied": 0,
+        "conflicts": 0,
+        "correct_notes_damaged": 0,
+        "findings": {
+          "finding_count": 2,
+          "suggested_count": 0,
+          "flagged_count": 0,
+          "unresolved_count": 2,
+          "qualified_count": 0,
+          "withheld_count": 0,
+          "edit_count": 0,
+          "by_kind": {
+            "wrong_pitch": 2
+          },
+          "runtime_seconds": 2.5
+        },
+        "baseline": {
+          "matched": 106,
+          "missing": 69,
+          "extra": 12,
+          "onset_mae_ms": 5.7908018867926
+        },
+        "piano_decoder": {
+          "matched": 165,
+          "missing": 10,
+          "extra": 5,
+          "onset_mae_ms": 5.803282828282956
+        },
+        "after_suggested_corrections": {
+          "matched": 165,
+          "missing": 10,
+          "extra": 5,
+          "onset_mae_ms": 5.803282828282956
+        }
+      },
+      {
+        "recording": "Chopin_Op028-01_003_20100611-SMD.wav",
+        "audio_sha256": "a995d038a31f443d798ae54b4e862055c9fa2b3a9f25ca123e03e04bc752f063",
+        "reference_sha256": "060b665facc88c6fd5887d0d68e51935cda1a211770cf7233ca8a47e8497e6c9",
+        "seconds": 20.0,
+        "reference_notes": 240,
+        "applied": 2,
+        "conflicts": 0,
+        "correct_notes_damaged": 0,
+        "findings": {
+          "finding_count": 6,
+          "suggested_count": 2,
+          "flagged_count": 0,
+          "unresolved_count": 4,
+          "qualified_count": 0,
+          "withheld_count": 0,
+          "edit_count": 2,
+          "by_kind": {
+            "duplicate_event": 2,
+            "wrong_pitch": 4
+          },
+          "runtime_seconds": 6.0
+        },
+        "baseline": {
+          "matched": 172,
+          "missing": 68,
+          "extra": 75,
+          "onset_mae_ms": 8.029360465116277
+        },
+        "piano_decoder": {
+          "matched": 203,
+          "missing": 37,
+          "extra": 51,
+          "onset_mae_ms": 6.852504105090334
+        },
+        "after_suggested_corrections": {
+          "matched": 203,
+          "missing": 37,
+          "extra": 49,
+          "onset_mae_ms": 6.852504105090334
+        }
+      },
+      {
+        "recording": "Chopin_Op028-11_003_20100611-SMD.wav",
+        "audio_sha256": "a5709c2b954d5bfbf9a0fce5478e846f8bb6fbc75355d3c0c6d09f566441aea0",
+        "reference_sha256": "a7f5a344bbb22d3efd672a9271b27b106218aec28a4d3b53086af0ce38dac51f",
+        "seconds": 20.0,
+        "reference_notes": 211,
+        "applied": 1,
+        "conflicts": 0,
+        "correct_notes_damaged": 0,
+        "findings": {
+          "finding_count": 1,
+          "suggested_count": 1,
+          "flagged_count": 0,
+          "unresolved_count": 0,
+          "qualified_count": 0,
+          "withheld_count": 0,
+          "edit_count": 1,
+          "by_kind": {
+            "duplicate_event": 1
+          },
+          "runtime_seconds": 5.52
+        },
+        "baseline": {
+          "matched": 187,
+          "missing": 24,
+          "extra": 70,
+          "onset_mae_ms": 7.003163992869848
+        },
+        "piano_decoder": {
+          "matched": 195,
+          "missing": 16,
+          "extra": 44,
+          "onset_mae_ms": 7.172564102564107
+        },
+        "after_suggested_corrections": {
+          "matched": 195,
+          "missing": 16,
+          "extra": 43,
+          "onset_mae_ms": 7.172564102564107
+        }
+      }
+    ]
+  },
+  "original_clip": {
+    "analysis_sha256": "685d04cf3e04ec2dc309e4dce93b0985b07870897f96f21cba05c198441c9c62",
+    "profile_sha256": "955b8e1382b6b1655c56db26374598c713d74085b1ff94dbab6320a65f36829b",
+    "note_count": 34,
+    "baseline_note_count": 46,
+    "verification": {
+      "code_sha256": "f3ada0b59ea644faeebab07337408aa1accfcf4d1864dabc43869b2d578b6a09",
+      "correction_policy_sha256": "fda921f597bb48b88c31a217d8f07d019b69f8747237f0935dccd2e76b9adfc4",
+      "expression_count": 0,
+      "expression_policy_sha256": "d408c664373ab52a964a82338501832e8f08cd7c0053d8c909c53fba78bf53c3",
+      "expression_report": "expression.json",
+      "expression_status": "disabled",
+      "finding_count": 13,
+      "mode": "qualified",
+      "qualified_count": 0,
+      "report": "verification.json",
+      "runtime_seconds": 1.88,
+      "settings_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "status": "complete",
+      "suggested_count": 0,
+      "unresolved_count": 13,
+      "version": "piano-verifier-1",
+      "withheld_count": 0
+    },
+    "coverage": {
+      "atoms_truncated": false,
+      "findings_truncated": false,
+      "regions_analysed": 13,
+      "regions_skipped": 0,
+      "regions_total": 13,
+      "skipped": [],
+      "truncated_regions": false
+    },
+    "has_checked_reference": false,
+    "safe_automatic_edits": 0
+  },
+  "tests": {
+    "music_pipeline_passed": 139,
+    "web_passed": 314,
+    "web_build": "passed"
+  }
+}

@@ -302,6 +302,14 @@ class MusicDraft(Base):
     instrument: Mapped[str] = mapped_column(String(16))
     status: Mapped[str] = mapped_column(String(16), default='draft', server_default='draft')
     document: Mapped[dict] = mapped_column(JSON)
+    # Automatic qualified corrections live beside the immutable baseline document.
+    # The baseline is never rewritten; correction history is retained for rollback.
+    working_document: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    correction_history: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Versioned playback settings (sync offset) and the raw-model completion receipt.
+    playback: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    raw_model: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
+    correction_operations: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class MusicRevisionEdit(Base):
@@ -326,6 +334,27 @@ class MusicReview(Base):
     reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     document: Mapped[dict] = mapped_column(JSON)
 
+
+class MusicVerificationDecision(Base):
+    """Owner decision on one verification finding for an unreviewed draft.
+
+    Decisions are audit records: the draft document stays the immutable baseline and
+    the working proposal is reconstructed from the stored edit snapshots, so it survives
+    analysis-archive expiry.
+    """
+    __tablename__ = 'music_verification_decisions'
+    __table_args__ = (UniqueConstraint('draft_id', 'finding_id', name='uq_music_verification_decision'),)
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    draft_id: Mapped[str] = mapped_column(ForeignKey('music_drafts.id'), index=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), index=True)
+    finding_id: Mapped[str] = mapped_column(String(40))
+    decision: Mapped[str] = mapped_column(String(16))
+    proposal_sha256: Mapped[str] = mapped_column(String(64))
+    reviewer_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'))
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    document: Mapped[dict] = mapped_column(JSON)
+
+
 class MusicPracticeAttempt(Base):
     """Opt-in aggregate, unscored music history; never raw performance data."""
     __tablename__ = 'music_practice_attempts'
@@ -335,6 +364,60 @@ class MusicPracticeAttempt(Base):
     revision_id: Mapped[str] = mapped_column(ForeignKey('lesson_revisions.id'))
     summary: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class PianoComparisonSource(Base):
+    """A server-registered master audio file that a comparison may score.
+
+    Registration is a developer/owner action outside the browser; the API accepts only
+    this id, never a filesystem path.
+    """
+    __tablename__ = 'piano_comparison_sources'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(80), index=True)
+    lesson_id: Mapped[str | None] = mapped_column(String(80), index=True)
+    label: Mapped[str] = mapped_column(String(200))
+    path: Mapped[str] = mapped_column(String(1024))
+    sha256: Mapped[str] = mapped_column(String(64))
+    seconds: Mapped[float] = mapped_column(Float)
+    reference_path: Mapped[str | None] = mapped_column(String(1024))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class PianoComparison(Base):
+    __tablename__ = 'piano_comparisons'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(80), index=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey('piano_comparison_sources.id'), index=True)
+    lesson_id: Mapped[str | None] = mapped_column(String(80), index=True)
+    interval_start: Mapped[float] = mapped_column(Float)
+    interval_end: Mapped[float] = mapped_column(Float)
+    variants: Mapped[list] = mapped_column(JSON)
+    registry_sha256: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24), default='queued', server_default='queued')
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
+    result: Mapped[dict | None] = mapped_column(JSON)
+    error: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class PianoModelRun(Base):
+    __tablename__ = 'piano_model_runs'
+    __table_args__ = (UniqueConstraint('comparison_id', 'variant', name='uq_piano_run_variant'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    comparison_id: Mapped[str] = mapped_column(ForeignKey('piano_comparisons.id'), index=True)
+    variant: Mapped[str] = mapped_column(String(64))
+    family: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(24), default='queued', server_default='queued')
+    attempt: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    lease_token: Mapped[str | None] = mapped_column(String(36))
+    run_dir: Mapped[str | None] = mapped_column(String(1024))
+    receipt: Mapped[dict | None] = mapped_column(JSON)
+    blocked_reasons: Mapped[list] = mapped_column(JSON, default=list)
+    error: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 def make_engine(url):
@@ -368,7 +451,10 @@ def database_ready(engine):
         connection.execute(text('SELECT id, group_id, email FROM group_invitations LIMIT 0'))
         connection.execute(text('SELECT group_id, lesson_id FROM group_lessons LIMIT 0'))
         connection.execute(text('SELECT group_id, lesson_id FROM group_public_moves LIMIT 0'))
-        connection.execute(text('SELECT id, job_id, lesson_id, owner_id, subject, instrument, status, document FROM music_drafts LIMIT 0'))
+        connection.execute(text('SELECT id, job_id, lesson_id, owner_id, subject, instrument, status, document, working_document, correction_history FROM music_drafts LIMIT 0'))
         connection.execute(text('SELECT id, lesson_id, base_revision_id, revision_id, editor_id, document FROM music_revision_edits LIMIT 0'))
         connection.execute(text('SELECT id, draft_id, lesson_id, revision_id, reviewer_id, reviewed_at, document FROM music_reviews LIMIT 0'))
         connection.execute(text('SELECT id, account_id, lesson_id, revision_id, summary FROM music_practice_attempts LIMIT 0'))
+        connection.execute(text('SELECT id, owner_id, lesson_id, label, path, sha256, seconds FROM piano_comparison_sources LIMIT 0'))
+        connection.execute(text('SELECT id, owner_id, source_id, status, cancel_requested FROM piano_comparisons LIMIT 0'))
+        connection.execute(text('SELECT id, comparison_id, variant, status, attempt FROM piano_model_runs LIMIT 0'))

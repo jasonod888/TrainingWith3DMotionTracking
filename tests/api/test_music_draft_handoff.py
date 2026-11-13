@@ -1,12 +1,17 @@
 """Unreviewed draft handoff: stored separately, never a manifest, never publishable."""
+import io
 import json
 import sys
+import zipfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from apps.api.database import Lesson, LessonRevision, MusicDraft
+from apps.api.music_corrections import (VERIFIER_PATH, current_application_sha256,
+                                       file_sha256, policy_sha256)
+from apps.api.music_verification import proposal_sha256
 from scripts.music_worker import MusicWorker
 from support_multi import music_worker
 from test_music_media_validation import media, real_media_app, upload
@@ -43,6 +48,76 @@ def draft_payload(reference, sha, **changes):
     }
     value.update(changes)
     return value
+
+
+def test_qualified_corrections_are_applied_before_the_owner_opens_the_draft(tmp_path):
+    with real_media_app(tmp_path) as (client, app, settings, store, mail):
+        completed = upload(client, media(tmp_path, 'audio'))
+        assert completed.json()['state'] == 'queued'
+        claim, lease, base = claimed(client, app, 'http://localhost')
+        reference = client.put(base + '/files/reference.json', headers=lease,
+                               content=b'{"draft":1,"events":[]}').json()
+        events = [
+            {'id': 'e1', 'onset': 0.7, 'duration': 0.4, 'pitch': 60, 'velocity': 0.7},
+            {'id': 'e2', 'onset': 1.0, 'duration': 0.4, 'pitch': 64, 'optional': True},
+        ]
+        finding = {'id': 'vf-1', 'kind': 'onset_shift', 'status': 'suggested',
+                   'correction_status': 'qualified', 'time_range': [0.5, 0.9],
+                   'event_ids': ['e1'], 'pitch': 60, 'explanation': 'Timing.',
+                   'evidence': {}, 'alternatives': [], 'ambiguous': False,
+                   'ambiguity_reasons': [],
+                   'proposed_edits': [{'op': 'set_onset', 'event_ids': ['e1'],
+                                       'before': {'onset': 0.7}, 'after': {'onset': 0.5},
+                                       'reason': 'Attack evidence.'}]}
+        implementation = {'verifier_code_sha256': file_sha256(VERIFIER_PATH),
+                          'settings_sha256': 'a' * 64, 'weights_sha256': 'b' * 64,
+                          'model': 'basic-pitch', 'model_version': '0.4.0',
+                          'decoder': 'basic-pitch-0.4.0/piano-peaks-v1',
+                          'decoder_sha256': 'd' * 64,
+                          'application_code_sha256': current_application_sha256()}
+        report = {'schema_version': 1, 'verifier_version': 'piano-verifier-1',
+                  'mode': 'qualified', 'status': 'complete',
+                  'source': {'audio_sha256': claim['sha256'], 'duration': 2.0,
+                             'proposal_sha256': proposal_sha256(events),
+                             'verifier_code_sha256': implementation['verifier_code_sha256'],
+                             'model': implementation['model'],
+                             'model_version': implementation['model_version'],
+                             'decoder': implementation['decoder'],
+                             'decoder_sha256': implementation['decoder_sha256'],
+                             'weights_sha256': implementation['weights_sha256']},
+                  'settings_sha256': implementation['settings_sha256'],
+                  'findings': [finding], 'edits': finding['proposed_edits'],
+                  'correction_policy': {'mode': 'qualified', 'policy_version': 'piano-corrections-1',
+                                        'policy': {'policy_version': 'piano-corrections-1',
+                                                   'status': 'qualified',
+                                                   'implementation': implementation,
+                                                   'categories': {'onset_shift': {'enabled': True}}},
+                                        'policy_sha256': policy_sha256({
+                                            'policy_version': 'piano-corrections-1',
+                                            'status': 'qualified',
+                                            'implementation': implementation,
+                                            'categories': {'onset_shift': {'enabled': True}}}),
+                                        'enabled_categories': ['onset_shift'], 'withheld_count': 0},
+                  'summary': {'finding_count': 1, 'suggested_count': 1}}
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('verification.json', json.dumps(report))
+        analysis = client.put(base + '/files/analysis.zip', headers=lease,
+                              content=buffer.getvalue()).json()
+        response = client.post(base + '/draft', headers=lease,
+                               json=draft_payload(reference, claim['sha256'], events=events,
+                                                  analysis=analysis))
+        assert response.status_code == 200, response.text
+        with Session(app.state.engine) as session:
+            draft = session.query(MusicDraft).one()
+            assert draft.document['events'][0]['onset'] == 0.7
+            assert draft.working_document['events'][0]['onset'] == 0.5
+            assert draft.correction_history[0]['finding_id'] == 'vf-1'
+            assert any(item.get('source') == 'automatic' for item in draft.correction_history)
+        view = client.get(f"/api/lessons/{response.json()['lesson_id']}/music-draft").json()
+        assert view['working_corrected'] is True
+        assert view['events'][0]['onset'] == 0.5
+        assert view['baseline_events'][0]['onset'] == 0.7
 
 
 def test_draft_handoff_is_stored_apart_and_never_publishable(tmp_path):

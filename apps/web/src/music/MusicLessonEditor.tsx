@@ -10,14 +10,15 @@ import {NotationEditor, createNotation} from './notation/NotationEditor';
 import './music-review.css';
 import './notation/notation.css';
 
-type EditNote = {id: string; onset: number; duration: number | null; pitch: number; optional: boolean;
+type EditNote = {id: string; onset: number; duration: number | null; notation_duration?: number | null; pitch: number; optional: boolean;
   velocity: number | null; confidence: number | null; string: number | null; fret: number | null};
 const OPEN_STRING: Record<number, number> = {1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40};
 const PAGE = 50;
 
-function editNotesFrom(events: {id: string; onset: number; duration: number | null; pitch: number; optional: boolean;
+function editNotesFrom(events: {id: string; onset: number; duration: number | null; notation_duration?: number | null; pitch: number; optional: boolean;
   velocity: number | null; confidence: number | null; string: number | null; fret: number | null}[]): EditNote[] {
   return events.map(event => ({id: event.id, onset: event.onset, pitch: event.pitch, duration: event.duration,
+    notation_duration: event.notation_duration ?? null,
     optional: event.optional, velocity: event.velocity, confidence: event.confidence, string: event.string, fret: event.fret}));
 }
 

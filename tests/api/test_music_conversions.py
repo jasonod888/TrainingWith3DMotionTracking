@@ -30,6 +30,9 @@ def music_app(tmp_path, music_piano_conversion_provider='local', music_guitar_co
                         web_dist_dir=tmp_path / 'no-web',
                         music_piano_conversion_provider=music_piano_conversion_provider,
                         music_guitar_conversion_provider=music_guitar_conversion_provider,
+                        # These legacy-route tests exercise the Basic Pitch worker; the
+                        # Kong default and its route are covered separately.
+                        music_piano_default_model=overrides.pop('music_piano_default_model','basic-pitch'),
                         _env_file=None, **overrides)
     app = create_app(settings)
     Base.metadata.create_all(app.state.engine)

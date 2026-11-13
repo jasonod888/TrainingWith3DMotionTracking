@@ -1,10 +1,10 @@
 # Piano transcription verification: developer brief
 
-Status: proposed development, not implemented. Research and scope agreed in discussion on 11 November 2026. This document specifies an investigation and staged delivery; it does not claim that the proposed verifier has been validated on our recordings.
+Status: phases 1 and 2 are implemented as an opt-in diagnostic verifier and owner review; the phase 3 correction-qualification and automatic-application path is implemented but **no correction category is currently qualified**, so the checked-in configuration applies no automatic corrections. Phase 4 adds independent audible-duration and relative-dynamics proposals and application; pedal/key-release and written-rhythm inference remain unimplemented and disabled. Real human-performance evidence, browser integration and the larger held-out study remain outstanding. This document specifies the investigation and staged delivery; it does not claim that the verifier has been validated on our recordings.
 
 ## Objective and reason
 
-Improve piano transcription by checking the detected notes against the original audio, identifying disagreements, and proposing evidence-backed corrections. Basic Pitch remains the initial detector. The new stage must distinguish a suspicious passage from a sufficiently supported edit, and must be able to leave a passage unresolved.
+Improve piano transcription by checking the detected notes against the original audio, identifying disagreements, and automatically applying evidence-backed corrections once their categories have passed qualification. Basic Pitch remains the initial detector. The new stage must distinguish a suspicious passage from a sufficiently supported edit, and must be able to leave a passage unresolved. The intended user experience is seamless: users receive the improved notes in the normal editor without inspecting technical comparisons or accepting individual verifier findings. Diagnostic reports and before/after comparisons remain optional advanced tools.
 
 The current decoder improves attack selection, but it cannot ensure that every quiet chord note was found, every detected pitch is real, or every repetition and onset is correct. Lowering a threshold globally can recover notes while introducing many additional detections. Instead, investigate local alternatives where the audio and draft disagree.
 
@@ -16,11 +16,11 @@ Proposed processing sequence:
 
 1. Existing media validation and audio extraction.
 2. Existing Basic Pitch inference and selected decoder.
-3. **New piano-only audio verification stage**, using that exact audio, decoded proposal, and retained model activations.
-4. Owner review, with linked score, piano roll, keyboard, and source playback.
+3. **New piano-only audio verification stage**, using that exact audio, decoded proposal, and retained model activations; automatically apply qualified corrections to a derived working draft before displaying it.
+4. Owner review of the improved working draft in the normal editor, with linked score, piano roll, keyboard, and source playback. Technical findings and comparisons are optional.
 5. Existing reviewed revision and release workflow.
 
-Initially run step 3 in diagnostic mode. Preserve the current proposal unchanged and store a separate report and optional alternative proposal. Do not replace existing reviews or shared releases. Once qualified, supported edits may form a new proposed draft while retaining an accessible original and complete change history. Owner acceptance must continue through the existing review workflow.
+Initially run step 3 in diagnostic mode. Preserve the current proposal unchanged and store a separate report and optional alternative proposal. Do not replace existing reviews or shared releases. In phase 3, automatically apply supported edits only for qualified categories to a derived working draft, retaining the immutable original and complete change history. Uncertain or unqualified changes leave the affected notes unchanged and do not block the normal flow with mandatory technical review. Final owner review/save and publication remain separate from automatic correction; automatic correction does not publish or share a lesson. The existing qualification gate alone does not complete phase 3: automatic application and integration into the displayed working draft are also required.
 
 Use the same extracted audio and time origin as inference. Record the media/analysis identity so a report cannot be applied to a different trim or revision. Keep performed note times separate from written score values. The verifier must not quantize expressive timing to make the sheet look tidy.
 
@@ -97,8 +97,20 @@ Before automatic corrections, establish and document acceptable precision and da
 
 1. **Benchmark and diagnostic prototype:** deliver reproducible analysis, issue reports and comparisons; proposals remain unchanged.
 2. **Owner suggestions:** integrate issue selection, contextual playback, accept/reject, undo and provenance. Verify save/reopen and stale-revision rejection.
-3. **Qualified corrections:** enable only error types that meet the agreed held-out quality/damage limits. Keep ambiguous cases for review and retain rollback.
-4. **Separate later investigations:** pedal/key-release estimation, relative dynamics and written-rhythm inference. Each needs its own targets and evaluation.
+3. **Qualified automatic note corrections:** enable only error types that meet the agreed held-out quality/damage limits. Apply qualified corrections automatically to the working draft before opening the normal editor; individual suggestion acceptance is not required. Preserve uncertain notes unchanged, keep diagnostics optional, and retain rollback. Deliver automatic note correction in this phase rather than deferring it to phase 4.
+4. **Automatic expression and notation improvements:** extend the same background pipeline with audible-duration refinement, pedal/key-release estimation, relative dynamics and written-rhythm inference. Investigate and qualify each capability separately before enabling its automatic application. Follow the phase 4 requirements below.
+
+### Phase 4 requirements: expression and notation
+
+Phase 4 extends the automatic correction pipeline delivered in phase 3. It must not introduce a mandatory comparison screen or require users to approve technical findings one by one. Qualified improvements appear in the normal editor; optional advanced controls expose the original, correction history and diagnostic evidence.
+
+- **Separate qualification:** audible duration, pedal, physical key release, relative dynamics and written rhythm each require their own target definitions, benchmark, held-out evaluation and enablement policy. Success in one category does not qualify another. Do not infer key release solely from audible decay, or present relative loudness as directly measured key pressure.
+- **Preserve uncertainty:** leave existing values unchanged when evidence is insufficient or a category is disabled. If a new attribute cannot be inferred reliably, leave it unspecified rather than inventing a value. Optional diagnostics may explain uncertainty without blocking editing.
+- **Separate performance from notation:** maintain distinct performed onset/duration data and written score values. Improving score readability must preserve expressive timing and source-video alignment. Pedal-extended sound must not automatically become a longer written note.
+- **Protect owner work:** run improvements before the initial editor presentation where practical. Any later analysis must be bound to the exact draft revision and must preserve manual edits, detecting conflicts rather than overwriting them. Keep the immutable original and an internal versioned history supporting undo and rollback.
+- **Independent failure and rollout:** enable categories separately. Failure, timeout or unavailability of a phase 4 component must preserve the usable phase 3 result. Applying improvements must never publish, share, or silently rewrite an existing reviewed revision or release.
+
+Phase 4 acceptance must demonstrate background processing without mandatory technical decisions; correct round-trip persistence of both performance and notation; preservation of uncertain values and manual edits; source-timing alignment; undo/rollback; per-category qualification enforcement; and fallback to the phase 3 result when later processing fails. Qualification evidence must measure improvements and damage on real held-out performances for the specific attribute being changed.
 
 Completion requires a versioned report/schema, bounded verifier worker, feature flag and fallback, candidate comparison implementation, review integration, reproducible benchmark and documented measured results. Tests must protect real repetitions, octaves and expressive timing, and verify that existing reviews/releases are never silently rewritten.
 

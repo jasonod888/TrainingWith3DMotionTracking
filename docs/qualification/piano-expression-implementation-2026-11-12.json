@@ -1,0 +1,90 @@
+{
+  "date": "2026-11-12",
+  "status": "software-implemented-accuracy-acceptance-incomplete",
+  "automatic_expression_categories_enabled": [],
+  "estimator_code_sha256": "1a76339978eef6c48d5165f90c257bdbff62b1b943443cdbc4a2cacaf84f771e",
+  "original_clip": {
+    "events": 34,
+    "events_unchanged": true,
+    "expression_summary": {
+      "abstention_count": 68,
+      "by_attribute": {
+        "audible_duration": {
+          "analyzed": 34,
+          "candidates": 0,
+          "no_change": 34
+        },
+        "relative_dynamics": {
+          "analyzed": 34,
+          "candidates": 0,
+          "no_change": 34
+        }
+      },
+      "candidate_count": 0,
+      "events_considered": 34,
+      "measurement_count": 2,
+      "proposal_count": 0,
+      "truncated": false
+    }
+  },
+  "public_velocity": {
+    "holdout_performances": 40,
+    "matched_notes_sampled": 3271,
+    "suggestions": 0,
+    "improved": 0,
+    "worsened": 0,
+    "damaged_correct": 0,
+    "mae_before_midi_units": 22.469897829409966,
+    "mae_after_midi_units": 22.469897829409966
+  },
+  "companion_offline_only": {
+    "matched": 3241,
+    "mae_baseline": 22.505872446775687,
+    "mae_companion": 12.132675100277693
+  },
+  "rendered": {
+    "clean_reference": {
+      "scorable": 252,
+      "suggestions": 0,
+      "improved": 0,
+      "within_tolerance": 0
+    },
+    "natural_decoder": {
+      "scorable": 245,
+      "suggestions": 0,
+      "improved": 0,
+      "within_tolerance": 0
+    },
+    "corruption": {
+      "scorable": 504,
+      "suggestions": 142,
+      "improved": 142,
+      "within_tolerance": 142
+    }
+  },
+  "verification": {
+    "full_api": {
+      "passed": 401,
+      "skipped": 1
+    },
+    "focused_after_final_identity_changes": 107,
+    "expression_final": 33,
+    "web": 314,
+    "web_production_build": "passed",
+    "browser": "working values, rollback, mobile width verified in disposable fixture"
+  },
+  "artifacts": {
+    ".local\\expression-completion\\public-velocity\\report.json": {
+      "sha256": "44a647a3f61b3a92e03e15d533ccfb86797f7d2a55772b1c57210d7bc8b6e279"
+    },
+    ".local\\expression-completion\\holdout-duration-final\\report.json": {
+      "sha256": "ea683bc6e4aad938ea2183ce5fa994054c51d9af8810fb17c5ef041ed571b33c"
+    },
+    ".local\\expression-completion\\companion\\report.json": {
+      "sha256": "10ed4ace170865d314ad28726a329211edf631dca0262d8f3e3074efcb5ecd72"
+    },
+    ".local\\expression-completion\\final-original-result\\analysis.zip": {
+      "sha256": "700a57af0315b2683ffa68a77919291451173e395381e217743e9a04f667f7c9"
+    }
+  }
+}

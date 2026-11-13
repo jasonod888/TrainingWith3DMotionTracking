@@ -1,0 +1,52 @@
+.comparison-page{max-width:1080px;margin:0 auto;padding:16px 16px 64px;display:flex;flex-direction:column;gap:16px;color:#23211d}
+.comparison-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.comparison-header h1{margin:0 0 4px;font-size:1.6rem}
+.comparison-note{margin:0;color:#5b554c;font-size:.92rem;line-height:1.45}
+.comparison-state{padding:4px 10px;border-radius:999px;background:#e8e3d9;font-size:.8rem;text-transform:capitalize;white-space:nowrap}
+.comparison-complete{background:#dcebd8;color:#285a2b}
+.comparison-partial{background:#f4e6c8;color:#6b4c12}
+.comparison-failed,.comparison-blocked{background:#f3d9d4;color:#7b2418}
+.comparison-running,.comparison-queued{background:#dde7ee;color:#26495e}
+.comparison-error{color:#8c2f21;background:#f8e6e1;padding:8px 12px;border-radius:8px}
+.comparison-field{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.9rem}
+.comparison-field select{max-width:520px;padding:8px;border:1px solid #c9c1b3;border-radius:8px;background:#fff;font:inherit}
+.comparison-variants{border:1px solid #d8d0c2;border-radius:10px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px 20px}
+.comparison-variants legend{padding:0 6px;font-weight:600;font-size:.9rem}
+.comparison-variants label{display:flex;align-items:center;gap:6px;font-size:.92rem}
+.comparison-start{align-self:flex-start;padding:10px 18px;border-radius:10px;border:0;background:#35556b;color:#fff;font-weight:600;cursor:pointer}
+.comparison-start:disabled{opacity:.5;cursor:not-allowed}
+.comparison-transport{display:flex;flex-direction:column;gap:10px;background:#fff;border:1px solid #e0d9cc;border-radius:12px;padding:12px}
+.comparison-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.comparison-source{border:1px solid #cfc7b8;background:#fbf8f1;border-radius:999px;padding:7px 12px;font:inherit;font-size:.88rem;cursor:pointer}
+.comparison-source.active{background:#35556b;color:#fff;border-color:#35556b}
+.comparison-source:disabled{opacity:.45;cursor:not-allowed}
+.comparison-toggle{display:flex;align-items:center;gap:6px;font-size:.86rem;color:#5b554c}
+.comparison-seek{display:flex;align-items:center;gap:10px;font-size:.85rem;color:#5b554c}
+.comparison-seek input[type=range]{flex:1}
+.comparison-loop{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:.85rem;color:#5b554c}
+.comparison-loop input[type=number]{width:76px;padding:4px 6px;border:1px solid #cfc7b8;border-radius:6px;font:inherit}
+.comparison-roll{width:100%;height:180px;border:1px solid #e0d9cc;border-radius:10px;background:#f4f1ea}
+.comparison-runs ul{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:6px}
+.comparison-runs li{font-size:.9rem;background:#fff;border:1px solid #e0d9cc;border-radius:8px;padding:8px 10px}
+.comparison-runs li button{margin-left:8px}
+.comparison-actions{display:flex;gap:10px;flex-wrap:wrap}
+.comparison-actions button,.comparison-runs button{border:1px solid #cfc7b8;background:#fbf8f1;border-radius:8px;padding:6px 10px;font:inherit;font-size:.86rem;cursor:pointer}
+.comparison-results h2,.comparison-runs h2{margin:0 0 6px;font-size:1.1rem}
+.comparison-table-wrap{overflow-x:auto;border:1px solid #e0d9cc;border-radius:10px;background:#fff}
+.comparison-results table{width:100%;border-collapse:collapse;font-size:.86rem}
+.comparison-results th,.comparison-results td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid #ece6da}
+.comparison-results thead th{background:#f4f1ea;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+.comparison-results th small{display:block;font-weight:400;color:#7d7568;text-transform:none;letter-spacing:0}
+.comparison-results td{min-width:150px}
+.cell-not_estimated,.cell-reference_unavailable,.cell-unsupported_semantics,.cell-blocked_license,.cell-not_run{color:#7d7568;font-style:italic}
+.cell-diagnostic_only{color:#6b4c12}
+@media(max-width:640px){
+ .comparison-page{padding:12px}
+ .comparison-header{flex-direction:column;gap:6px}
+ .comparison-roll{height:150px}
+ .comparison-source{width:100%;text-align:center;border-radius:10px}
+}
+
+.comparison-secondary{align-self:flex-start;border:1px solid #cfc7b8;background:#fbf8f1;border-radius:9px;padding:8px 12px;font:inherit;font-size:.88rem;cursor:pointer}
+.comparison-secondary:disabled{opacity:.5;cursor:not-allowed}
+.comparison-warning{color:#7b2418;background:#f8e6e1;border-radius:8px;padding:8px 12px;margin:0;font-size:.88rem}

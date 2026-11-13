@@ -17,10 +17,15 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from .auth import digest, now
-from .contracts import Asset, LessonManifest, MusicDraftDocument, MusicLessonManifest
+from .contracts import (Asset, LessonManifest, MusicDraftDocument, MusicLessonManifest,
+                        MusicPlaybackSettings)
 from .database import Account, Conversion, Lesson, LessonAsset, LessonRevision, MusicDraft, WorkerCredential
+from .music_verification import (automatic_expression_document, automatic_working_document,
+                                 read_expression_report, read_verification_report,
+                                 report_identity_matches)
 from .storage import storage_client
 from botocore.exceptions import ClientError
+from types import SimpleNamespace
 from .processing import ENGINE_VERSION, PIPELINE_VERSION, Provider, processing_status
 from .media_probe import MediaProbeError, probe_audio_media
 from . import processing_routes, subjects
@@ -36,15 +41,16 @@ FILES={**{name:mime for name,mime in (
         ('reference.glb','model/gltf-binary'),('reference.json','application/json'),
         ('preview.mp4','video/mp4'),('thumbnail.jpg','image/jpeg'),('instructor.mp4','video/mp4'),
         ('instructor-alpha.webm','video/webm'),('source.mp4','video/mp4'),('waveform.json','application/json'),
-        ('midi.mid','audio/midi'),('poster.png','image/png'),('analysis.zip','application/zip'))},
+        ('midi.mid','audio/midi'),('poster.png','image/png'),('analysis.zip','application/zip'),
+        ('preview.wav','audio/wav'))},
     'avatar-male.glb':'model/gltf-binary','avatar-female.glb':'model/gltf-binary',
     'avatar-report.json':'application/json'}
 
 # Asset role to upload name, per completion contract. Declared once here and used by
 # completion, delivery and cleanup instead of scattered filename allowlists.
 MUSIC_ROLES=(('reference','reference.json'),('source_video','source.mp4'),('preview_video','preview.mp4'),
-             ('waveform','waveform.json'),('midi_export','midi.mid'),('public_poster','poster.png'),
-             ('analysis','analysis.zip'))
+             ('piano_preview','preview.wav'),('waveform','waveform.json'),('midi_export','midi.mid'),
+             ('public_poster','poster.png'),('analysis','analysis.zip'))
 
 
 class Preparation(BaseModel):
@@ -153,7 +159,8 @@ def install_conversions(app,engine,settings,identity,db):
     def create(body:NewConversion,account=Depends(identity),session:Session=Depends(db)):
         try:
             selected_subject,family,selected_instrument=subjects.validate_selection(body.subject,body.instrument)
-            route=processing_routes.route_for(selected_subject,selected_instrument)
+            route=processing_routes.route_for(selected_subject,selected_instrument,
+                piano_model=settings.music_piano_default_model)
         except subjects.SubjectError as exc:
             raise HTTPException(422,str(exc)) from exc
         if not processing_routes.available(route,settings):
@@ -485,6 +492,16 @@ def install_conversions(app,engine,settings,identity,db):
         job=leased(session,job_id,credential,token)
         route=processing_routes.route_for_pipeline(job.pipeline_version)
         if route is None or route.completion!='music-v2':raise HTTPException(422,'Unknown processing route.')
+        if route.raw_model:
+            if body.provenance.model!=route.model or body.provenance.adapter!='kong-adapter' or body.provenance.engine!='pytorch':
+                raise HTTPException(422,'This route requires a raw Kong result from its approved adapter.')
+            if body.piano_preview is None or body.preview_identity is None:
+                raise HTTPException(422,'A Kong result requires a bound piano preview.')
+            approved={value.strip() for value in settings.music_kong_allowed_run_profiles.split(',') if value.strip()}
+            if body.provenance.profile_sha256 not in approved:
+                raise HTTPException(422,'This Kong run profile is not approved for this route.')
+        elif body.provenance.model=='kong' or body.provenance.adapter=='kong-adapter':
+            raise HTTPException(422,'Kong results require the Kong processing route.')
         if job.state!='verifying':raise HTTPException(422,'Draft is not ready for verification.')
         if job.provider!='local' and job.submission_state!='submitted':raise HTTPException(409,'Missing provider submission receipt.')
         if settings.music_require_run_profile:
@@ -518,6 +535,8 @@ def install_conversions(app,engine,settings,identity,db):
                           CopySource={'Bucket':settings.storage_bucket,'Key':expected})
         body.reference.key=key
         session.add(LessonAsset(lesson_id=lesson_id,**body.reference.model_dump()))
+        analysis_report=None
+        analysis_expression=None
         if body.analysis:
             expected_analysis=f'attempts/{job.id}/{token}/analysis.zip'
             if body.analysis.key!=expected_analysis or body.analysis.mime!='application/zip':
@@ -528,11 +547,21 @@ def install_conversions(app,engine,settings,identity,db):
                 raise HTTPException(422,'Analysis artifact is missing.') from exc
             if analysis_head['ContentLength']!=body.analysis.bytes or analysis_head.get('Metadata',{}).get('sha256')!=body.analysis.sha256:
                 raise HTTPException(422,'Analysis artifact checksum/size mismatch.')
+            try:
+                analysis_body=store.get_object(Bucket=settings.storage_bucket,Key=expected_analysis)['Body']
+                try:
+                    analysis_bytes=analysis_body.read()
+                finally:
+                    analysis_body.close()
+            except ClientError as exc:
+                raise HTTPException(422,'Analysis artifact is missing.') from exc
             analysis_key=f'lessons/{lesson_id}/{draft_id}-analysis.zip'
             store.copy_object(Bucket=settings.storage_bucket,Key=analysis_key,
                               CopySource={'Bucket':settings.storage_bucket,'Key':expected_analysis})
             body.analysis.key=analysis_key
             session.add(LessonAsset(lesson_id=lesson_id,**body.analysis.model_dump()))
+            analysis_report,_report_reason=read_verification_report(analysis_bytes)
+            analysis_expression=read_expression_report(analysis_bytes)
         # Preserve private instructor media before upload/attempt retention removes it.
         webm='webm' in ((job.media_findings or {}).get('container') or '') or job.filename.lower().endswith('.webm')
         source_key=f'lessons/{lesson_id}/{draft_id}-source.'+('webm' if webm else 'mp4')
@@ -541,13 +570,50 @@ def install_conversions(app,engine,settings,identity,db):
         body.source_video=Asset(key=source_key,mime='video/webm' if webm else 'video/mp4',
                                 bytes=job.source_bytes,sha256=job.source_sha256)
         session.add(LessonAsset(lesson_id=lesson_id,**body.source_video.model_dump()))
+        if body.piano_preview is not None:
+            expected_preview=f'attempts/{job.id}/{token}/preview.wav'
+            if body.piano_preview.key!=expected_preview or body.piano_preview.mime!='audio/wav':
+                raise HTTPException(422,'Piano preview is outside this processing attempt.')
+            preview_head=store.head_object(Bucket=settings.storage_bucket,Key=expected_preview)
+            if preview_head['ContentLength']!=body.piano_preview.bytes or \
+                    preview_head.get('Metadata',{}).get('sha256')!=body.piano_preview.sha256:
+                raise HTTPException(422,'Piano preview checksum/size mismatch.')
+            preview_key=f'lessons/{lesson_id}/{draft_id}-preview.wav'
+            store.copy_object(Bucket=settings.storage_bucket,Key=preview_key,
+                              CopySource={'Bucket':settings.storage_bucket,'Key':expected_preview})
+            body.piano_preview.key=preview_key
+            session.add(LessonAsset(lesson_id=lesson_id,**body.piano_preview.model_dump()))
+        raw_model=route.raw_model
+        if body.playback is None:
+            body.playback=MusicPlaybackSettings()
+        document=body.model_dump();working=None;history=None
+        if not raw_model and analysis_report is not None and report_identity_matches(
+                SimpleNamespace(document=document), analysis_report):
+            working,history=automatic_working_document(document,analysis_report)
+            if analysis_expression is not None:
+                try:
+                    phase4_working,phase4_history=automatic_expression_document(
+                        working or document,analysis_expression)
+                except Exception:
+                    phase4_working,phase4_history=None,[]
+                if phase4_working is not None:
+                    working=phase4_working
+                    history=[*(history or []),*phase4_history]
         session.add(MusicDraft(id=draft_id,job_id=job.id,lesson_id=lesson_id,owner_id=job.owner_id,
                                subject=body.subject,instrument=body.instrument.instrument,status='draft',
-                               document=body.model_dump(),created_at=now()))
+                               document=document,working_document=working,
+                               correction_history=history or None,
+                               playback=body.playback.model_dump(),
+                               raw_model=raw_model,
+                               correction_operations=0 if raw_model else len(history or []),
+                               created_at=now()))
         job.lesson_id=lesson_id;job.state='ready_for_review';job.lease_until=None;session.commit()
         try:
             store.delete_object(Bucket=settings.storage_bucket,Key=job.source_key)
             store.delete_object(Bucket=settings.storage_bucket,Key=expected)
+            if body.piano_preview:
+                store.delete_object(Bucket=settings.storage_bucket,
+                                    Key=f'attempts/{job.id}/{token}/preview.wav')
             if body.analysis: store.delete_object(Bucket=settings.storage_bucket,Key=f'attempts/{job.id}/{token}/analysis.zip')
         except Exception:
             import logging

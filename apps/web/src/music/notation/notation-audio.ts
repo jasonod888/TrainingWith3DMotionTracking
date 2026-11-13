@@ -1,5 +1,6 @@
 /** Small, allocation-light piano audition for score editing. No samples or network. */
-import {MASTER_GAIN, velocityCutoff, velocityDecay, velocityGain, velocityPartials} from '../music-velocity';
+import {MASTER_GAIN} from '../music-velocity';
+import {schedulePianoVoice} from '../piano-audition';
 
 type Voice = {oscillator: OscillatorNode; gain: GainNode};
 
@@ -49,25 +50,8 @@ export class NotationAudio {
     const length = Math.max(0.12, Math.min(4, seconds));
     for (const pitch of pitches) {
       if (!Number.isInteger(pitch) || pitch < 0 || pitch > 127) continue;
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      const filter = context.createBiquadFilter();
-      const partials = velocityPartials(velocity);
-      oscillator.setPeriodicWave(context.createPeriodicWave(new Float32Array([0, ...partials]), new Float32Array(partials.length + 1)));
-      oscillator.frequency.value = 440 * 2 ** ((pitch - 69) / 12);
-      filter.type = 'lowpass';
-      filter.frequency.value = velocityCutoff(velocity);
-      filter.Q.value = 0.7;
-      const level = velocityGain(velocity);
-      const decay = Math.min(length, Math.max(0.08, velocityDecay(velocity)));
-      gain.gain.setValueAtTime(0.0001, base);
-      gain.gain.exponentialRampToValueAtTime(level, base + 0.008);
-      gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, level * 0.45), base + decay);
-      gain.gain.exponentialRampToValueAtTime(0.0001, base + length);
-      oscillator.connect(filter).connect(gain).connect(output);
-      oscillator.start(base);
-      oscillator.stop(base + length + 0.02);
-      this.voices.push({oscillator, gain});
+      const voice = schedulePianoVoice(context, output, {pitch, velocity, duration: length, startTime: base});
+      if (voice) this.voices.push(voice);
     }
     // Trim finished voices without a timer leak.
     this.voices = this.voices.slice(-64);

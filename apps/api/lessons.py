@@ -12,7 +12,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from .contracts import LessonManifest, LessonSummary, MusicLessonManifest, Section, SectionSet, SummaryCapabilities
+from .contracts import (LessonManifest, LessonSummary, MusicLessonManifest,
+                        MusicPlaybackSettings, Section, SectionSet, SummaryCapabilities)
 from .database import Account, Lesson, LessonAsset, LessonRevision, MusicDraft, PracticeProgress, LessonGrant
 from .storage import storage_client
 from .permissions import access_reasons, latest_acceptance, owned_lesson,latest_revision,public_lesson,public_manifest,readable_lesson
@@ -173,7 +174,7 @@ def import_music_fixture(engine, settings, owner_id, manifest_path, asset_dir):
     """
     manifest = MusicLessonManifest.model_validate_json(Path(manifest_path).read_text(encoding='utf-8'))
     lesson_id, revision_id = uuid4().hex, uuid4().hex
-    roles = ('reference', 'source_video', 'preview_video', 'waveform', 'midi_export', 'public_poster')
+    roles = ('reference', 'source_video', 'preview_video', 'piano_preview', 'waveform', 'midi_export', 'public_poster')
     assets = [getattr(manifest, role) for role in roles if getattr(manifest, role)]
     names = [Path(asset.key).name for asset in assets]
     if len(names) != len(set(names)):
@@ -357,7 +358,42 @@ def install_lessons(app, engine, settings, identity, db):
         owned_lesson(session, lesson_id, account.id)
         row=session.scalar(select(MusicDraft).where(MusicDraft.lesson_id==lesson_id).order_by(MusicDraft.created_at.desc()))
         if not row:raise HTTPException(404,'No draft reference is available.')
-        return {**row.document,'draft_id':row.id,'title':session.get(Lesson,lesson_id).title,'lesson_id':lesson_id,'revision_id':None,'status':row.status}
+        document = row.working_document or row.document
+        response = {**document,'draft_id':row.id,'title':session.get(Lesson,lesson_id).title,'lesson_id':lesson_id,'revision_id':None,'status':row.status}
+        if row.working_document:
+            response.update({'working_corrected':True,'baseline_events':row.document.get('events') or [],
+                             'automatic_corrections':row.correction_history or []})
+        response.update({'raw_model':bool(row.raw_model),
+                         'correction_operations':int(row.correction_operations or 0)})
+        return response
+
+    class MusicPlaybackInput(BaseModel):
+        draft_id: str = Field(min_length=1, max_length=80)
+        sync_offset_seconds: float = Field(ge=-10.0, le=10.0, allow_inf_nan=False)
+        revision: int = Field(ge=1)
+
+    @router.patch('/{lesson_id}/music-draft/playback')
+    def set_playback(lesson_id: str, body: MusicPlaybackInput,
+                     account=Depends(identity), session: Session = Depends(db)):
+        """Owner-only optimistic update of the global note/audio sync offset."""
+        owned_lesson(session, lesson_id, account.id, True)
+        row=session.scalar(select(MusicDraft).where(MusicDraft.lesson_id==lesson_id)
+                           .order_by(MusicDraft.created_at.desc()).with_for_update())
+        if not row:raise HTTPException(404,'No draft reference is available.')
+        if row.id!=body.draft_id or row.status!='draft':
+            raise HTTPException(409,'This draft was replaced or finalized. Reopen the lesson.')
+        current=row.playback or {'sync_offset_seconds':0.0,'revision':1}
+        if body.revision!=current.get('revision'):
+            raise HTTPException(409,'Playback settings changed. Reopen the review.')
+        saved=MusicPlaybackSettings(sync_offset_seconds=body.sync_offset_seconds,
+                                    revision=int(current.get('revision',1))+1)
+        row.playback=saved.model_dump()
+        row.document={**row.document,'playback':row.playback}
+        if row.working_document:
+            row.working_document={**row.working_document,'playback':row.playback}
+        session.commit()
+        return row.playback
+
     @router.get('/{lesson_id}/progress')
     def progress(lesson_id: str, revision_id: str | None = None, account=Depends(identity), session: Session = Depends(db)):
         lesson,revision = readable_lesson(session,lesson_id,account.id,revision_id)
@@ -531,7 +567,7 @@ def install_lessons(app, engine, settings, identity, db):
             # Private extracted audio follows private source-video rules. A public
             # viewer never receives audio, video, MIDI or the reference itself.
             fields = ('public_poster',) if reasons == ['public'] else (
-                'reference', 'source_video', 'preview_video', 'waveform', 'midi_export', 'public_poster')
+                'reference', 'source_video', 'preview_video', 'piano_preview', 'waveform', 'midi_export', 'public_poster')
         else:
             fields=('animation','landmarks') if reasons==['public'] else ('animation','landmarks','source_video','thumbnail','focused_video','focused_video_alpha')
         allowed={value['key'] for value in (manifest.get(field) for field in fields) if value}
@@ -539,7 +575,7 @@ def install_lessons(app, engine, settings, identity, db):
                        if reasons!=['public'] or kind in ('male','female'))
         if 'owner' in reasons:
             for proposal in session.scalars(select(MusicDraft).where(MusicDraft.lesson_id==lesson_id)).all():
-                allowed.update(value['key'] for value in (proposal.document.get(field) for field in ('reference','source_video')) if value)
+                allowed.update(value['key'] for value in (proposal.document.get(field) for field in ('reference','source_video','piano_preview')) if value)
         # Avatar clips are presentation derivatives: they are not in the immutable manifest, so
         # they are allowed by name and still require a stored record for this lesson below.
         if name in DERIVATIVE_NAMES:

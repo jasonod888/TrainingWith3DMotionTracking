@@ -1,0 +1,527 @@
+{
+  "schema": "piano-rights-manifest-1",
+  "schema_version": 1,
+  "reviewed_on": "2026-11-12",
+  "register": "docs/piano-reconstruction-rights-register.md",
+  "policy": "A use is permitted only when its decision is 'approved'. Missing, 'unresolved', 'prohibited' and 'not_applicable' decisions deny the use. A derived artifact inherits any 'prohibited' or 'unresolved' decision of every ancestor; 'not_applicable' describes a node's own role and is not inherited. A filename, a research label or a manual policy edit must not bypass a decision.",
+  "uses": {
+    "acquisition_storage": "Download and retain the source asset for development.",
+    "internal_evaluation": "Score candidates against this reference during internal development.",
+    "model_selection": "Benchmark or compare candidate models or checkpoints for selection.",
+    "training": "Fit or fine-tune model weights on the asset.",
+    "calibration": "Fit calibration or profile parameters that are shipped as derived artifacts.",
+    "hosted_inference": "Run the asset or artifact while serving product requests.",
+    "publication": "Publish derived numbers, excerpts or comparisons.",
+    "redistribution_original": "Distribute the source asset itself.",
+    "redistribution_derived": "Distribute derived assets such as converted samples, renders or profiles."
+  },
+  "sources": [
+    {
+      "id": "vienna-4x22-audio",
+      "kind": "audio_corpus",
+      "title": "Vienna 4x22 Piano Corpus - original audio recordings",
+      "licensor": "Werner Goebl, mdw - University of Music and Performing Arts Vienna",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "evidence": [
+        "https://datasets.mdw.ac.at/datasets/dataset/98ea25fa-2468-43ff-929b-3c926e163583?view=full"
+      ],
+      "attribution_required": true,
+      "attribution": "The Vienna 4x22 Piano Corpus - Werner Goebl, DOI 10.21939/4X22, CC BY 4.0.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "unresolved",
+        "calibration": "approved",
+        "hosted_inference": "not_applicable",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Retain the license and attribution notice with every copy and adaptation.",
+        "State that trimming, resampling or additional annotations are changes by this project."
+      ],
+      "notes": [
+        "Training is unresolved because no model training is planned and no decision was recorded; it is not a permission gap for the current route.",
+        "One piano, one recording setting and four works: usable for first-domain evaluation, not for a universal claim."
+      ]
+    },
+    {
+      "id": "vienna-4x22-corrected-midi",
+      "kind": "performance_reference",
+      "title": "CPJKU corrected Vienna performance MIDI",
+      "licensor": "CPJKU contributors (updates to the Vienna 4x22 collection)",
+      "license": "CC-BY-4.0",
+      "license_url": "https://github.com/CPJKU/vienna4x22",
+      "revision": "1033ade0899bfd03a89f370c9ad5d8443ddccd3e",
+      "evidence": [
+        "https://github.com/CPJKU/vienna4x22",
+        "https://github.com/CPJKU/vienna4x22/blob/master/CHANGES.md"
+      ],
+      "attribution_required": true,
+      "attribution": "Performance reference updates by CPJKU contributors, CC BY 4.0; credit the original Vienna 4x22 collection.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "unresolved",
+        "calibration": "approved",
+        "hosted_inference": "not_applicable",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Pin the corrected revision above; do not substitute the unshifted original MIDI.",
+        "Retain attribution and identify project changes."
+      ],
+      "notes": [
+        "The unshifted original MIDI lacks some pedal events and has start-time offsets; it is not an approved performance reference.",
+        "Controller and note-off conventions must be validated rather than assumed."
+      ]
+    },
+    {
+      "id": "vcsl-piano-samples",
+      "kind": "sample_library",
+      "title": "Versilian Community Sample Library - piano samples",
+      "licensor": "Versilian Studios / Samuel Gossner",
+      "license": "CC0-1.0",
+      "license_url": "https://github.com/sgossner/VCSL/blob/master/LICENSE",
+      "revision": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+      "evidence": [
+        "https://github.com/sgossner/VCSL"
+      ],
+      "attribution_required": false,
+      "attribution": "",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "approved",
+        "calibration": "approved",
+        "hosted_inference": "not_applicable",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Use the original source distribution and pin the asset hashes.",
+        "Retain provenance even though attribution is not required."
+      ],
+      "notes": [
+        "CC0 places the work in the public domain; the maintainer explicitly includes commercial software use."
+      ]
+    },
+    {
+      "id": "salamander-grand-piano-v3",
+      "kind": "sample_library",
+      "title": "Salamander Grand Piano V3 (48 kHz / 24 bit, SFZ)",
+      "licensor": "Alexander Holm; SFZ mapping by kinwie",
+      "license": "CC-BY-3.0",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/",
+      "revision": "sfzinstruments/SalamanderGrandPiano master (2022-01-09)",
+      "evidence": [
+        "https://github.com/sfzinstruments/SalamanderGrandPiano",
+        "https://archive.org/details/SalamanderGrandPianoV3"
+      ],
+      "attribution_required": true,
+      "attribution": "Salamander Grand Piano V3 - Alexander Holm, CC BY 3.0. SFZ mapping updates by kinwie.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "not_applicable",
+        "calibration": "approved",
+        "hosted_inference": "approved",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Retain attribution, license link and the upstream source location in product notices.",
+        "Identify project modifications to the SFZ mapping or converted assets.",
+        "Do not assume a non-ARIA sampler reproduces the mapped behavior."
+      ],
+      "notes": [
+        "Upstream states the instrument plays properly only in sforzando and similar ARIA-based samplers; opcode coverage is an engineering gate, not a rights question.",
+        "Attribution license does not establish audio quality; quality is a separate renderer gate."
+      ]
+    },
+    {
+      "id": "sfizz-engine",
+      "kind": "renderer_engine",
+      "title": "sfizz SFZ parser and synth library",
+      "licensor": "sfztools contributors",
+      "license": "BSD-2-Clause",
+      "license_url": "https://github.com/sfztools/sfizz/blob/develop/LICENSE",
+      "revision": "sfztools/sfizz develop",
+      "evidence": [
+        "https://github.com/sfztools/sfizz"
+      ],
+      "attribution_required": true,
+      "attribution": "sfizz - sfztools contributors, BSD 2-Clause.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "not_applicable",
+        "calibration": "approved",
+        "hosted_inference": "approved",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Retain the copyright notice and license text in source and binary distributions.",
+        "Record build and packaging mode for the actual artifact."
+      ],
+      "notes": [
+        "Repository is archived (last push 2025-03-17); a maintenance owner or vetted maintained fork is required before production.",
+        "Maintenance is an operational gate recorded in the renderer selection artifact, not a rights restriction."
+      ]
+    },
+    {
+      "id": "fluidsynth-engine",
+      "kind": "renderer_engine",
+      "title": "FluidSynth SoundFont synthesizer",
+      "licensor": "FluidSynth contributors",
+      "license": "LGPL-2.1",
+      "license_url": "https://github.com/FluidSynth/fluidsynth/blob/master/LICENSE",
+      "evidence": [
+        "https://github.com/FluidSynth/fluidsynth"
+      ],
+      "attribution_required": true,
+      "attribution": "FluidSynth - FluidSynth contributors, GNU LGPL 2.1.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "not_applicable",
+        "calibration": "approved",
+        "hosted_inference": "approved",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Dynamic linking and relinking rights for the LGPL library must be preserved in the shipped build.",
+        "Ship the LGPL license text and record the exact library version."
+      ],
+      "notes": [
+        "Used as a control/cost baseline, not as a fidelity claim."
+      ]
+    },
+    {
+      "id": "basic-pitch-0.4.0",
+      "kind": "model_checkpoint",
+      "title": "Basic Pitch 0.4.0 (current production event source)",
+      "licensor": "Spotify",
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/spotify/basic-pitch/blob/main/LICENSE",
+      "evidence": [
+        "https://github.com/spotify/basic-pitch"
+      ],
+      "attribution_required": false,
+      "attribution": "",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "unresolved",
+        "calibration": "approved",
+        "hosted_inference": "approved",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Confirm the packaged checkpoint, not only the repository license, at pin time.",
+        "Do not treat its amplitude as a calibrated physical strike velocity."
+      ],
+      "notes": [
+        "Already in production; retained as an alternative or fallback rather than the mandatory primary model."
+      ]
+    },
+    {
+      "id": "kong-piano-inference-package",
+      "kind": "model_code",
+      "title": "piano-transcription-inference 0.0.6 (author inference package)",
+      "licensor": "Qiuqiang Kong",
+      "license": "MIT",
+      "license_url": "https://pypi.org/project/piano-transcription-inference/0.0.6/",
+      "revision": "0.0.6",
+      "artifact": {
+        "wheel_sha256": "64348200b700a0ee792aa62386803fb2a638e378b3835b9a7ccff4701f0612f5",
+        "wheel_md5": "ffcacc2c645a7da4a7f7c768c637e9af",
+        "declared_classifier": "License :: OSI Approved :: MIT License"
+      },
+      "evidence": [
+        "https://pypi.org/pypi/piano-transcription-inference/0.0.6/json"
+      ],
+      "attribution_required": true,
+      "attribution": "piano-transcription-inference - Qiuqiang Kong, MIT.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "unresolved",
+        "calibration": "approved",
+        "hosted_inference": "approved",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Record the wheel digest above; a later release is a different artifact.",
+        "Report the declared dependencies (torchlibrosa, librosa, mido, matplotlib) as separate third-party notices."
+      ],
+      "notes": [
+        "This is the author's inference distribution, separate from the unlicensed training repository.",
+        "Do not describe the whole planning repository as MIT merely because this package is."
+      ]
+    },
+    {
+      "id": "kong-piano-checkpoint-4034264",
+      "kind": "model_checkpoint",
+      "title": "High-resolution piano transcription checkpoint (Zenodo 4034264)",
+      "licensor": "Qiuqiang Kong",
+      "license": "CC-BY-4.0",
+      "license_url": "https://zenodo.org/records/4034264",
+      "revision": "10.5281/zenodo.4034264",
+      "artifact": {
+        "filename": "CRNN_note_F1=0.9677_pedal_F1=0.9186.pth",
+        "md5": "22b961b77c1878239fec963362097045",
+        "sha256": "c3fa9730725bf4a762f1c14bc80cd5986eacda01b026f5a4a2525cd607876141",
+        "bytes": 171966578
+      },
+      "evidence": [
+        "https://zenodo.org/api/records/4034264",
+        "https://zenodo.org/records/4034264"
+      ],
+      "attribution_required": true,
+      "attribution": "High-resolution Piano Transcription with Pedals (Kong et al.), checkpoint Zenodo 4034264, CC BY 4.0.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "unresolved",
+        "calibration": "approved",
+        "hosted_inference": "approved",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Verify the artifact digest above before use; a mirror with a different label is not this artifact.",
+        "Record any conversion or quantization as a derived artifact with its own hash and transformation notes.",
+        "Retain the CC BY attribution wherever the model or its derived profile is distributed."
+      ],
+      "notes": [
+        "Training-data provenance is recorded separately. The published CC BY 4.0 grant on this checkpoint is the governing permission for its use; an unrelated corpus's noncommercial terms do not automatically replace it.",
+        "The locally inspected file .local/piano-diagnosis/reference-packages/piano.pth matches the digest above."
+      ]
+    },
+    {
+      "id": "transkun-checkpoint",
+      "kind": "model_checkpoint",
+      "title": "Transkun piano transcription (MIT code with bundled weights)",
+      "licensor": "Yujia Yan and contributors",
+      "license": "MIT",
+      "license_url": "https://github.com/Yujia-Yan/Transkun/blob/main/LICENSE",
+      "revision": "Yujia-Yan/Transkun main (pin exact commit before benchmarking)",
+      "evidence": [
+        "https://github.com/Yujia-Yan/Transkun",
+        "https://pypi.org/project/transkun/"
+      ],
+      "attribution_required": true,
+      "attribution": "Transkun - Yujia Yan and contributors, MIT.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "unresolved",
+        "model_selection": "unresolved",
+        "training": "unresolved",
+        "calibration": "unresolved",
+        "hosted_inference": "unresolved",
+        "publication": "approved",
+        "redistribution_original": "unresolved",
+        "redistribution_derived": "unresolved"
+      },
+      "conditions": [
+        "Record the exact bundled .pt checkpoint and its digest before any benchmark run.",
+        "Use the upstream Yujia-Yan/Transkun repository; a fork is not a grant."
+      ],
+      "notes": [
+        "MIT code, packaged .pt weights and an MIT classifier on PyPI are relevant evidence, not a blanket clearance of every checkpoint use.",
+        "Optional comparison only. Basic Pitch and the licensed Kong route are the critical path; do not block model selection on this entry."
+      ]
+    },
+    {
+      "id": "bytedance-piano-transcription",
+      "kind": "model_code",
+      "title": "ByteDance piano transcription training repository (no published license)",
+      "licensor": "ByteDance",
+      "license": null,
+      "license_url": "https://github.com/bytedance/piano_transcription",
+      "evidence": [
+        "https://github.com/bytedance/piano_transcription",
+        "https://arxiv.org/abs/2010.01815"
+      ],
+      "attribution_required": true,
+      "attribution": "ByteDance piano transcription (research release).",
+      "decisions": {
+        "acquisition_storage": "unresolved",
+        "internal_evaluation": "unresolved",
+        "model_selection": "unresolved",
+        "training": "unresolved",
+        "calibration": "unresolved",
+        "hosted_inference": "unresolved",
+        "publication": "unresolved",
+        "redistribution_original": "unresolved",
+        "redistribution_derived": "unresolved"
+      },
+      "conditions": [
+        "No license file is published for this repository; obtain written permission before using its code or training assets.",
+        "Do not use code copied from this training checkout in the inference route."
+      ],
+      "notes": [
+        "This entry covers the training repository only. The author's separately published inference package and checkpoint are recorded as separate approved entries.",
+        "Repository archived; root contents contain no LICENSE file, so default copyright applies."
+      ]
+    },
+    {
+      "id": "veloest-sfproxy",
+      "kind": "model_checkpoint",
+      "title": "VeloEst base piano velocity model (Diff-SFProxy release)",
+      "licensor": "Zhanhong He and contributors",
+      "license": "CC-BY-4.0",
+      "license_url": "https://github.com/zhanh-he/sfproxy-velocity-estimation",
+      "revision": "c4440429ca674b57ac885e3ce25ea7661d06cf9a",
+      "artifact": {
+        "base_weights_sha256": "8cede73af4481661c51d7b409939489f32b208d6e971d833aac4a6e7eed438aa",
+        "piano_adapted_weights_sha256": "d22e589b2c46b6efd4fbd307c5130b5f083abedda543fdeb50f117b1bb230343"
+      },
+      "evidence": [
+        "https://github.com/zhanh-he/sfproxy-velocity-estimation",
+        "https://github.com/zhanh-he/score-informed-amt"
+      ],
+      "attribution_required": true,
+      "attribution": "VeloEst / Diff-SFProxy - Zhanhong He and contributors, CC BY 4.0.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "unresolved",
+        "calibration": "approved",
+        "hosted_inference": "unresolved",
+        "publication": "approved",
+        "redistribution_original": "unresolved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Record the README declaration as the grant: the repository has no LICENSE file at its root.",
+        "Hosted inference stays unresolved until a written clarification or an explicit licence file exists.",
+        "Do not install the differentiable backend, SoundFont or guitar assets for the inference path."
+      ],
+      "notes": [
+        "README states: 'We release this work under CC BY 4.0 license.' That declaration is the evidence, not a LICENSE file.",
+        "Benchmark both bundled piano checkpoints; the adapted one did worse in the local probe, so adaptation is not automatically an improvement."
+      ]
+    },
+    {
+      "id": "veloest-score-hpt",
+      "kind": "model_code",
+      "title": "VeloEst score_hpt component (MIT notice)",
+      "licensor": "Zhanhong He and contributors",
+      "license": "MIT",
+      "license_url": "https://github.com/zhanh-he/sfproxy-velocity-estimation/blob/main/score_hpt/LICENSE",
+      "revision": "c4440429ca674b57ac885e3ce25ea7661d06cf9a",
+      "evidence": [
+        "https://github.com/zhanh-he/sfproxy-velocity-estimation/tree/main/score_hpt"
+      ],
+      "attribution_required": true,
+      "attribution": "score_hpt - Zhanhong He and contributors, MIT.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "unresolved",
+        "calibration": "approved",
+        "hosted_inference": "unresolved",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Retain the MIT notice with any copied source.",
+        "The root CC BY 4.0 declaration and this MIT notice cover different parts of the distribution; record both."
+      ],
+      "notes": [
+        "Copied from the pinned revision; the research training configuration is not part of the inference path."
+      ]
+    },
+    {
+      "id": "smd-midi",
+      "kind": "performance_reference",
+      "title": "Saarland Music Data (SMD) original audio with paired MIDI",
+      "licensor": "AudioLabs, Friedrich-Alexander University Erlangen-Nurnberg",
+      "license": "CC-BY-NC-SA-3.0",
+      "license_url": "https://www.audiolabs-erlangen.de/resources/MIR/SMD/midi",
+      "evidence": [
+        "https://www.audiolabs-erlangen.de/resources/MIR/SMD/midi"
+      ],
+      "attribution_required": true,
+      "attribution": "Saarland Music Data - AudioLabs, CC BY-NC-SA 3.0.",
+      "decisions": {
+        "acquisition_storage": "prohibited",
+        "internal_evaluation": "prohibited",
+        "model_selection": "prohibited",
+        "training": "prohibited",
+        "calibration": "prohibited",
+        "hosted_inference": "prohibited",
+        "publication": "unresolved",
+        "redistribution_original": "prohibited",
+        "redistribution_derived": "prohibited"
+      },
+      "conditions": [
+        "Excluded from the selected commercial route.",
+        "Previously fitted calibrations and dependent artifacts are not approved for qualification or shipping."
+      ],
+      "notes": [
+        "Noncommercial and share-alike terms are incompatible with this product plan.",
+        "Historical research observations may remain identified as such; they are not a release gate."
+      ]
+    },
+    {
+      "id": "maestro",
+      "kind": "performance_reference",
+      "title": "MAESTRO dataset",
+      "licensor": "Google Magenta",
+      "license": "CC-BY-NC-SA-4.0",
+      "license_url": "https://magenta.tensorflow.org/datasets/maestro",
+      "evidence": [
+        "https://magenta.tensorflow.org/datasets/maestro"
+      ],
+      "attribution_required": true,
+      "attribution": "MAESTRO - Google Magenta, CC BY-NC-SA 4.0.",
+      "decisions": {
+        "acquisition_storage": "prohibited",
+        "internal_evaluation": "prohibited",
+        "model_selection": "prohibited",
+        "training": "prohibited",
+        "calibration": "prohibited",
+        "hosted_inference": "prohibited",
+        "publication": "unresolved",
+        "redistribution_original": "prohibited",
+        "redistribution_derived": "prohibited"
+      },
+      "conditions": [
+        "Excluded from the selected commercial route."
+      ],
+      "notes": [
+        "Publication in academic research does not establish clearance for this project's commercial uses."
+      ]
+    }
+  ]
+}

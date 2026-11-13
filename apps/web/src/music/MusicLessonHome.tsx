@@ -8,6 +8,11 @@ import {
 } from './music-reference';
 import './music.css';
 import {InstrumentGuideStage} from './renderers/InstrumentGuideStage';
+import {PianoNoteRoll} from './PianoNoteRoll';
+import {shiftOnset,clampOffsetSeconds} from './piano-playback';
+import {usePianoSourcePlayer} from './usePianoSourcePlayer';
+import {usePianoPreferences} from './piano-preferences';
+import {usePianoPreviewAsset} from './usePianoPreviewAsset';
 import {MidiKeyboardCheck} from './MidiKeyboardCheck';
 const MusicHistoryPanel=lazy(()=>import('./MusicHistoryPanel').then(module=>({default:module.MusicHistoryPanel})));
 import {attackSourceTime} from '../../../../packages/music-engine/onsets';
@@ -39,6 +44,13 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   const [playing, setPlaying] = useState(false);
   const [videoFailed,setVideoFailed]=useState(false),[retry,setRetry]=useState(0);
   const video = useRef<HTMLVideoElement>(null);
+  const piano = useRef<HTMLAudioElement>(null);
+  const {audioMode,setAudioMode,volume,setVolume}=usePianoPreferences();
+  const [syncOffsetMs,setSyncOffsetMs]=useState(()=>Math.round((lesson.playback?.sync_offset_seconds??0)*1000));
+  const syncOffset=syncOffsetMs/1000;
+  const [loop,setLoop]=useState(false);
+  const [loopStart,setLoopStart]=useState(0);
+  const [loopEnd,setLoopEnd]=useState(0);
   const clock = useRef(0);
   const [practice,setPractice]=useState<PracticeState|null>(null);
   const [practiceOptions,setPracticeOptions]=useState<PracticeOptions|null>(null);
@@ -278,9 +290,19 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
     }
   };
 
-  const active = useMemo(() => reference ? activeEvents(reference, time) : [], [reference, time]);
+  const preview=usePianoPreviewAsset(lesson.piano_preview);
+  const player=usePianoSourcePlayer(video,piano,preview.url?audioMode:'original',syncOffset,`${identity}:${preview.url}`,()=>setAudioMode('original'));
+  useEffect(()=>{setSyncOffsetMs(Math.round((lesson.playback?.sync_offset_seconds??0)*1000));setLoop(false);setLoopStart(0);setLoopEnd(lesson.duration);if(!lesson.piano_preview)setAudioMode('original');},[identity]);
+  useEffect(()=>{if(video.current&&video.current.volume!==volume)video.current.volume=volume;});
+
+  const shiftedReference=useMemo(()=>reference?{...reference,
+    events:reference.events.map(event=>({...event,onset:shiftOnset(event.onset,syncOffset)})),
+    spans:reference.spans.map(span=>({...span,start:span.start+syncOffset,end:span.end+syncOffset}))}:null,
+    [reference,syncOffset]);
+  const active = useMemo(() => shiftedReference ? activeEvents(shiftedReference, time) : [], [shiftedReference, time]);
+  referenceRef.current=shiftedReference;
   const sectionIndex=sectionsAt(lesson.section_set.sections,time);
-  const span = reference ? currentSpan(reference, time) : null;
+  const span = shiftedReference ? currentSpan(shiftedReference, time) : null;
   const sections = lesson.section_set.sections;
 
   return <section className="music-home music-guide">
@@ -301,10 +323,15 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
         <div className="music-video">
           {source
             ? <video ref={video} src={source} controls={!practiceActive} playsInline preload="metadata"
-                onTimeUpdate={event => { clock.current = event.currentTarget.currentTime; setTime(event.currentTarget.currentTime); }}
+                onVolumeChange={event=>setVolume(event.currentTarget.volume)}
+                onLoadedMetadata={event=>{if(loopEnd===0)setLoopEnd(event.currentTarget.duration);}}
+                onTimeUpdate={event => { const current=event.currentTarget.currentTime;
+                  if(loop&&loopEnd>loopStart&&current>=loopEnd){event.currentTarget.currentTime=loopStart;clock.current=loopStart;setTime(loopStart);return;}
+                  clock.current=current;setTime(current); }}
                 onPlay={() => {if(practiceRef.current)stopPractice(false);setPlaying(true);}} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)}
                 onError={() => {setVideoFailed(true);setPlaying(false);}}/>
             : <div className="music-no-video">The original video is unavailable. The guide can still play on its own.</div>}
+          <audio ref={piano} src={preview.url||undefined} preload="auto" hidden/>
         </div>
         <div className="music-guide-panel">
           <div className="music-transport">
@@ -312,6 +339,21 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
               {playing ? <Pause size={16} aria-hidden="true"/> : <Play size={16} aria-hidden="true"/>}
               {playing ? 'Pause' : 'Play'}
             </button>
+            <div className="music-audio-modes" role="group" aria-label="Playback audio">
+              <button className={audioMode==='original'?'secondary active':'secondary'} aria-pressed={audioMode==='original'} onClick={()=>setAudioMode('original')}>Original</button>
+              <button className={audioMode==='piano'?'secondary active':'secondary'} aria-pressed={audioMode==='piano'} disabled={!preview.url||!player.ready} onClick={()=>setAudioMode('piano')}>Piano</button>
+            </div>
+            <label className="music-sync">Sync
+              <input aria-label="Sync offset in milliseconds" type="number" step={10} min={-10000} max={10000} value={syncOffsetMs} onChange={event=>setSyncOffsetMs(clampOffsetSeconds(Number(event.target.value)/1000)*1000)}/> ms (temporary)
+            </label>
+            <label className="music-sync"><input aria-label="Loop playback" type="checkbox" checked={loop} onChange={event=>setLoop(event.target.checked)}/> Loop</label>
+            <label className="music-sync">from <input aria-label="Loop start" type="number" min={0} max={reference.duration} step={0.1} value={loopStart} onChange={event=>setLoopStart(Number(event.target.value))}/></label>
+            <label className="music-sync">to <input aria-label="Loop end" type="number" min={0} max={reference.duration} step={0.1} value={loopEnd} onChange={event=>setLoopEnd(Number(event.target.value))}/></label>
+            {!lesson.piano_preview&&<p className="small muted">Piano audio is unavailable for this lesson.</p>}
+            {player.error&&<p role="alert">{player.error}</p>}
+            {preview.error&&<p role="alert">{preview.error} <button onClick={preview.retry}>Retry piano audio</button></p>}
+            {lesson.piano_preview&&!preview.url&&!preview.error&&<p role="status">Preparing piano audio. Original audio is available.</p>}
+            <label>Listening volume<input aria-label="Listening volume" type="range" min={0} max={1} step={.01} value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
             <input aria-label="Lesson position" type="range" min={0} max={reference.duration} step={0.01}
               value={Math.min(time, reference.duration)} onChange={event => seek(Number(event.target.value))}/>
             <span className="music-time">{timeLabel(time)} / {timeLabel(reference.duration)}</span>
@@ -321,6 +363,9 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
             {span && <span className="music-span"> · {span.start.toFixed(1)}–{span.end.toFixed(1)}s</span>}
           </p>
           <InstrumentGuideStage key={identity} reference={reference} active={active} time={time} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>
+          {(lesson.pedal?.length??0)>0&&<p className="small muted" data-pedal-active={lesson.pedal!.some(span=>time>=span.onset+syncOffset&&time<span.offset+syncOffset)}>Sustain pedal: {lesson.pedal!.some(span=>time>=span.onset+syncOffset&&time<span.offset+syncOffset)?'on':'off'} (estimated)</p>}
+          <PianoNoteRoll events={reference.events.map(event=>({pitch:event.pitch,onset:event.onset,duration:event.duration??null}))}
+            duration={reference.duration} time={time} offsetSeconds={syncOffset}/>
           <ol className="music-sections" aria-label="Teaching sections">
             {sections.map(section => <li key={section.id}>
               <button className="secondary" aria-current={sectionIndex===sections.indexOf(section) ? 'step' : undefined}

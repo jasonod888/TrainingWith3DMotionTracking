@@ -49,6 +49,10 @@ def create_app(settings: Settings | None = None):
     install_music_attempts(app,settings,identity,db)
     from .music_edit import install_music_edit
     install_music_edit(app,settings,identity,db)
+    from .music_verification import install_music_verification
+    install_music_verification(app,settings,identity,db)
+    from .piano_comparisons import install_piano_comparisons
+    install_piano_comparisons(app,engine,settings,identity,db)
 
     from fastapi.exceptions import RequestValidationError
 

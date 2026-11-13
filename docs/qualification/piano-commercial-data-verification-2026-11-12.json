@@ -1,0 +1,41 @@
+{
+  "verified_on": "2026-11-12",
+  "selection": "Vienna corrected performance data plus VCSL synthetic development; Salamander rendering candidate",
+  "dataset": {
+    "name": "Vienna 4x22",
+    "license": "CC-BY-4.0",
+    "source": "https://datasets.mdw.ac.at/datasets/dataset/98ea25fa-2468-43ff-929b-3c926e163583",
+    "corrected_source": "https://github.com/CPJKU/vienna4x22",
+    "corrected_commit": "1033ade0899bfd03a89f370c9ad5d8443ddccd3e",
+    "primary_performances": 88,
+    "primary_notes": 43656,
+    "primary_files_with_sustain": 88,
+    "primary_files_with_soft_pedal": 88,
+    "all_midi_files_downloaded": 112,
+    "audio_archive": "https://datasets.mdw.ac.at/media/content_files/8dec8d0a-c4da-4a96-b290-a3ba783c03ba.zip",
+    "original_audio_sample": {
+      "file": "audio/Chopin_Ballade/Chopin_op38_p01.wav",
+      "sha256": "808a6a3e66a468e89f010a6d6e43c86b50ac6b73fad7307c3e0ffa7da9816ff5",
+      "sample_rate": 44100,
+      "channels": 2,
+      "seconds": 128.19927437641724
+    },
+    "full_audio_archive_downloaded": false
+  },
+  "synthetic_samples": {
+    "name": "VCSL",
+    "license": "CC0-1.0",
+    "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+    "wav_samples_downloaded": 4,
+    "source": "https://github.com/sgossner/VCSL"
+  },
+  "renderer_candidate": {
+    "name": "Salamander Grand Piano V3",
+    "license": "CC-BY-3.0",
+    "source": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+    "downloaded_this_turn": false
+  },
+  "noncommercial_corpora_required": false,
+  "application_code_changed": false,
+  "accuracy_qualification_claimed": false
+}

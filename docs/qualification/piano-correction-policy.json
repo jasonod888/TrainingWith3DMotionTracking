@@ -1,0 +1,83 @@
+{
+  "benchmark": {
+    "evidence_kind": "rendered",
+    "heldout_cases": 4,
+    "report_sha256": "4052b2da3d7dfbb0724e7c9571d1bf8000680bfc8b527fe43b8392466ab607da",
+    "source": "scripts/benchmark_piano_verification.py"
+  },
+  "categories": {
+    "duplicate_event": {
+      "attempts": 4,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 4,
+      "precision": 1.0,
+      "reason": "Only rendered/synthetic evidence is available. Too few held-out cases for this category. Too few suggested corrections to estimate precision.",
+      "suggestions": 3
+    },
+    "extra_pitch": {
+      "attempts": 4,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 4,
+      "precision": 1.0,
+      "reason": "Only rendered/synthetic evidence is available. Too few held-out cases for this category. Too few suggested corrections to estimate precision.",
+      "suggestions": 1
+    },
+    "missed_repetition": {
+      "attempts": 4,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 4,
+      "precision": 0.0,
+      "reason": "Only rendered/synthetic evidence is available. Too few held-out cases for this category. Too few suggested corrections to estimate precision. Suggested-correction precision is below the threshold.",
+      "suggestions": 0
+    },
+    "missing_pitch": {
+      "attempts": 4,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 4,
+      "precision": 0.0,
+      "reason": "Only rendered/synthetic evidence is available. Too few held-out cases for this category. Too few suggested corrections to estimate precision. Suggested-correction precision is below the threshold.",
+      "suggestions": 0
+    },
+    "octave_ambiguity": {
+      "attempts": 4,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 4,
+      "precision": 0.0,
+      "reason": "Only rendered/synthetic evidence is available. Too few held-out cases for this category. Too few suggested corrections to estimate precision. Suggested-correction precision is below the threshold.",
+      "suggestions": 0
+    },
+    "onset_shift": {
+      "attempts": 4,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 4,
+      "precision": 0.0,
+      "reason": "Only rendered/synthetic evidence is available. Too few held-out cases for this category. Too few suggested corrections to estimate precision. Suggested-correction precision is below the threshold.",
+      "suggestions": 0
+    },
+    "unmatched_attack": {
+      "attempts": 0,
+      "damage_rate": 0.0,
+      "enabled": false,
+      "heldout_cases": 0,
+      "precision": 0.0,
+      "reason": "The benchmark has no controlled human-performance insertion scenario for this category.",
+      "suggestions": 0
+    }
+  },
+  "generated_at": "2026-11-11T11:02:42.634911+00:00",
+  "policy_version": "piano-corrections-1",
+  "scope": "Piano correction qualification; categories not listed are never enabled.",
+  "status": "insufficient-evidence",
+  "thresholds": {
+    "max_damage_rate": 0.0,
+    "min_correction_precision": 0.95,
+    "min_heldout_cases": 40,
+    "min_suggestions": 20
+  }
+}

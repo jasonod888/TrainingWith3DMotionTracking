@@ -19,7 +19,7 @@ CompletionContract = Literal['body-v1', 'music-v2']
 BODY_REQUIRED_ASSETS = ('reference.glb', 'reference.json', 'preview.mp4', 'thumbnail.jpg')
 BODY_OPTIONAL_ASSETS = ('instructor.mp4', 'instructor-alpha.webm')
 MUSIC_REQUIRED_ASSETS = ('reference.json',)
-MUSIC_OPTIONAL_ASSETS = ('source.mp4', 'preview.mp4', 'waveform.json', 'midi.mid', 'poster.png', 'analysis.zip')
+MUSIC_OPTIONAL_ASSETS = ('source.mp4', 'preview.mp4', 'preview.wav', 'waveform.json', 'midi.mid', 'poster.png', 'analysis.zip')
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,8 @@ class ProcessingRoute:
     provider_setting: str = 'conversion_provider'
     target_setting: str = 'conversion_target'
     remote_setting: str = 'remote_conversion_enabled'
+    model: str | None = None
+    raw_model: bool = False
 
     @property
     def work_assets(self) -> tuple[str, ...]:
@@ -66,6 +68,20 @@ ROUTES: dict[str, ProcessingRoute] = {
         target_setting='music_piano_conversion_target',
         remote_setting='music_remote_conversion_enabled',
     ),
+    'music-piano-kong': ProcessingRoute(
+        id='music-piano-kong',
+        family='music',
+        subjects=('piano',),
+        pipeline_version='music-piano-kong-v1',
+        capability='music_piano',
+        completion='music-v2',
+        required_assets=('reference.json', 'preview.wav'),
+        optional_assets=tuple(name for name in MUSIC_OPTIONAL_ASSETS if name!='preview.wav'),
+        model='kong', raw_model=True,
+        provider_setting='music_piano_conversion_provider',
+        target_setting='music_piano_conversion_target',
+        remote_setting='music_remote_conversion_enabled',
+    ),
     'music-guitar': ProcessingRoute(
         id='music-guitar',
         family='music',
@@ -84,9 +100,12 @@ ROUTES: dict[str, ProcessingRoute] = {
 DEFAULT_ROUTE = ROUTES['body-default']
 
 
-def route_for(subject: str | None, instrument: str | None = None) -> ProcessingRoute:
+def route_for(subject: str | None, instrument: str | None = None, *,
+              piano_model: str | None = None) -> ProcessingRoute:
     """Select the route for a validated subject. Body is the default on purpose."""
     resolved, _family, _instrument = subjects.validate_selection(subject, instrument)
+    if resolved == 'piano' and piano_model == 'kong':
+        return ROUTES['music-piano-kong']
     for route in ROUTES.values():
         if resolved in route.subjects:
             return route

@@ -1,0 +1,1349 @@
+{
+  "scope": "Diagnostic only. No qualification or policy changes.",
+  "controlled_targets": {
+    "duration": "Isolated stem end above -40 dB RMS, 10 ms window; seconds.",
+    "dynamics": "Known linear render gain, 0\u20131; not calibrated MIDI velocity."
+  },
+  "code_sha256": "884d8b7ba7d9e032bdc0ed063f90b7bd890f40aee63b2c47ca862b3824e21d76",
+  "weights_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+  "samples": [
+    {
+      "filename": "A0.mp3",
+      "sha256": "f62d50bd977679e1316063866ece754604b8c214d73b7e3033372c75d9064c03"
+    },
+    {
+      "filename": "A1.mp3",
+      "sha256": "17fa1e363f9fad67c3357be54a6defc4fca5a5c2aada21de84b30254f9cb2f5b"
+    },
+    {
+      "filename": "A2.mp3",
+      "sha256": "20601d890f44a3c22499c7b61f52e571795df1fe5a01fac553dded7b6379e1d4"
+    },
+    {
+      "filename": "A3.mp3",
+      "sha256": "8e108fe228e34e32f6b4e61efff732eec53058a9e6f05a8d8e719598b132c4f9"
+    },
+    {
+      "filename": "A4.mp3",
+      "sha256": "a62df24a2c84cea8d18c1fa8aca7c18c877ba2b76a00a591256fa74d3ce54ac3"
+    },
+    {
+      "filename": "A5.mp3",
+      "sha256": "9e5cee1fe9cf68b7193623d46a27c8956e572c1ff234ca0e11599b556050dec6"
+    },
+    {
+      "filename": "A6.mp3",
+      "sha256": "b6064a657592c63c03561d2ce1092607c14e1d8091445d50065d0ec819ff6fbc"
+    },
+    {
+      "filename": "A7.mp3",
+      "sha256": "751c0a0acd00bad6e52749063dac56a0def9870242b053c68ab45cbe8d083fc1"
+    },
+    {
+      "filename": "C1.mp3",
+      "sha256": "caba05f0be4d9f6030adcc033208b49ac54e47d58edc57b743085b095b4ea395"
+    },
+    {
+      "filename": "C2.mp3",
+      "sha256": "7029a9e84f748433bc33d067ee13d37d0b866768f09ae6c7dac8e2e98e1e53ca"
+    },
+    {
+      "filename": "C3.mp3",
+      "sha256": "bb70dd921d81b3dda561c19b5c029292ae5a6fba1947e364bf274218ce19a9d1"
+    },
+    {
+      "filename": "C4.mp3",
+      "sha256": "689eaa4c2fd7f29a2cc0e386eec462156d523a87d701269e5e2458e66056f4f6"
+    },
+    {
+      "filename": "C5.mp3",
+      "sha256": "2f5b0f7422063010fb379e684bfdf2daa3911dcd2251413d79fa2a53029fdc30"
+    },
+    {
+      "filename": "C6.mp3",
+      "sha256": "0d3232edd13ba69fd5caf4a295060ae0fd533b8a1433ae0a038644d70715c907"
+    },
+    {
+      "filename": "C7.mp3",
+      "sha256": "694b512fac99ba7f7290c045d9c18e94724a7ebcc319b937baabc62125814283"
+    },
+    {
+      "filename": "C8.mp3",
+      "sha256": "b4b5f321751b544ee7f0d6d3e3f1ef52873dd4a6aee91ba41e6c8e61e17a084c"
+    },
+    {
+      "filename": "Ds1.mp3",
+      "sha256": "1c02b816b85d2fa938815fdf04d7d327ff20068f1aadc3c97052144c735afa0c"
+    },
+    {
+      "filename": "Ds2.mp3",
+      "sha256": "a106cdec93aa4e767e36809fc9cdaa6b92453fb9f18d5fc28ac4eb0f9f239ecd"
+    },
+    {
+      "filename": "Ds3.mp3",
+      "sha256": "4fe73ea3f2c59a1dbfb35cff1d9d8a9e38cb12ef39a91a13083729544cdafed5"
+    },
+    {
+      "filename": "Ds4.mp3",
+      "sha256": "663e8bb3e2d0fa23a30526dcd7ab0e42609c193c07025647ef46badcf81ec211"
+    },
+    {
+      "filename": "Ds5.mp3",
+      "sha256": "bf71096e653ab7ceca3914b9fd44d8c27fe83c162564c5db34bd06b94eb14b8c"
+    },
+    {
+      "filename": "Ds6.mp3",
+      "sha256": "eb643014d9f926f1a5f9f51fc4a1ed8c07c6da36ce164d5b221d7b878a53f142"
+    },
+    {
+      "filename": "Ds7.mp3",
+      "sha256": "d51f4c51bed719f51e75ad22d5b9ac4b4d1a4749d02ef31ea03696de46fa5e77"
+    },
+    {
+      "filename": "Fs1.mp3",
+      "sha256": "5cbb51d2a0a55a9ef3656671ca72e336856813949055bb6c189cf990655335cf"
+    },
+    {
+      "filename": "Fs2.mp3",
+      "sha256": "dd34c708274eeba35da1fd99fc31ef904e390ff02f6864aefe8a13261f8a8327"
+    },
+    {
+      "filename": "Fs3.mp3",
+      "sha256": "960fefd90f56608b7edf958dadfeca893cff5744ab9034d61e419401fe45ce9c"
+    },
+    {
+      "filename": "Fs4.mp3",
+      "sha256": "613652f5c96e35736ce6a46bc4ddb6ba1076d1fb16a35a4c22c14e67efdde57c"
+    },
+    {
+      "filename": "Fs5.mp3",
+      "sha256": "ed2fdf543274ea72ddd4eb634a16356531a5f4040b2a60d34fb12a5c72cbf22f"
+    },
+    {
+      "filename": "Fs6.mp3",
+      "sha256": "c584d2b4e96a37b12c920ed3212d149abedf25342389bfdc557b2fac847ab11c"
+    },
+    {
+      "filename": "Fs7.mp3",
+      "sha256": "e9ce71e0f7dc39c1d0033d656cf57e3aa8b303127147f194cc92b04e2b648a9f"
+    }
+  ],
+  "summary": {
+    "correct_reference": {
+      "audible_duration": {
+        "matched_scorable_notes": 126,
+        "suggestions": 21,
+        "improved": 0,
+        "worsened": 21,
+        "damaged_correct": 21,
+        "mae_before": 0.0,
+        "mae_after": 0.13095418061404457,
+        "unscorable_suggestions": 0
+      },
+      "relative_dynamics": {
+        "matched_scorable_notes": 138,
+        "suggestions": 24,
+        "improved": 0,
+        "worsened": 24,
+        "damaged_correct": 24,
+        "mae_before": 0.0,
+        "mae_after": 0.03155072463768116,
+        "unscorable_suggestions": 0
+      }
+    },
+    "too_short_flat_velocity": {
+      "audible_duration": {
+        "matched_scorable_notes": 126,
+        "suggestions": 122,
+        "improved": 116,
+        "worsened": 6,
+        "damaged_correct": 0,
+        "mae_before": 0.644346542849944,
+        "mae_after": 0.20382644062916178,
+        "unscorable_suggestions": 0
+      },
+      "relative_dynamics": {
+        "matched_scorable_notes": 138,
+        "suggestions": 37,
+        "improved": 22,
+        "worsened": 13,
+        "damaged_correct": 8,
+        "mae_before": 0.17130434782608694,
+        "mae_after": 0.17731159420289855,
+        "unscorable_suggestions": 0
+      }
+    },
+    "too_long_correct_velocity": {
+      "audible_duration": {
+        "matched_scorable_notes": 126,
+        "suggestions": 124,
+        "improved": 112,
+        "worsened": 12,
+        "damaged_correct": 0,
+        "mae_before": 1.4033983823262521,
+        "mae_after": 0.18263146528452656,
+        "unscorable_suggestions": 0
+      },
+      "relative_dynamics": {
+        "matched_scorable_notes": 138,
+        "suggestions": 0,
+        "improved": 0,
+        "worsened": 0,
+        "damaged_correct": 0,
+        "mae_before": 0.0,
+        "mae_after": 0.0,
+        "unscorable_suggestions": 0
+      }
+    },
+    "ai_decoder": {
+      "audible_duration": {
+        "matched_scorable_notes": 125,
+        "suggestions": 28,
+        "improved": 9,
+        "worsened": 18,
+        "damaged_correct": 10,
+        "mae_before": 0.08775172940177679,
+        "mae_after": 0.1604421746396268,
+        "unscorable_suggestions": 0
+      },
+      "relative_dynamics": {
+        "matched_scorable_notes": 137,
+        "suggestions": 16,
+        "improved": 11,
+        "worsened": 5,
+        "damaged_correct": 2,
+        "mae_before": 0.2084525547445255,
+        "mae_after": 0.18581021897810218,
+        "unscorable_suggestions": 0
+      }
+    }
+  },
+  "by_scenario": {
+    "isolated_same_pitch": {
+      "correct_reference": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 6,
+          "improved": 0,
+          "worsened": 6,
+          "damaged_correct": 6,
+          "mae_before": 0.0,
+          "mae_after": 0.07033333333333334,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_short_flat_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 12,
+          "improved": 12,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.3999773242630385,
+          "mae_after": 0.056689342403628024,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 6,
+          "improved": 6,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.19000000000000003,
+          "mae_after": 0.12375000000000001,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_long_correct_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 12,
+          "improved": 12,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 1.6494244764741122,
+          "mae_after": 0.056689342403628024,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "ai_decoder": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0336918905345265,
+          "mae_after": 0.0336918905345265,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 4,
+          "improved": 4,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.27258333333333334,
+          "mae_after": 0.147475,
+          "unscorable_suggestions": 0
+        }
+      }
+    },
+    "equal_gain_different_pitches": {
+      "correct_reference": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 6,
+          "improved": 0,
+          "worsened": 6,
+          "damaged_correct": 6,
+          "mae_before": 0.0,
+          "mae_after": 0.1506666666666667,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_short_flat_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 12,
+          "improved": 12,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.39912698412698405,
+          "mae_after": 0.06249055177626602,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 6,
+          "improved": 0,
+          "worsened": 6,
+          "damaged_correct": 6,
+          "mae_before": 0.0,
+          "mae_after": 0.1506666666666667,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_long_correct_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 12,
+          "improved": 12,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 1.6505670204583707,
+          "mae_after": 0.06249055177626602,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "ai_decoder": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.02345369043199011,
+          "mae_after": 0.02345369043199011,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 3,
+          "improved": 0,
+          "worsened": 3,
+          "damaged_correct": 0,
+          "mae_before": 0.2604083333333333,
+          "mae_after": 0.32160833333333333,
+          "unscorable_suggestions": 0
+        }
+      }
+    },
+    "chords": {
+      "correct_reference": {
+        "audible_duration": {
+          "matched_scorable_notes": 36,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 36,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_short_flat_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 36,
+          "suggestions": 36,
+          "improved": 36,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.499710254472159,
+          "mae_after": 0.03393046107331836,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 36,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.16666666666666666,
+          "mae_after": 0.16666666666666666,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_long_correct_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 36,
+          "suggestions": 36,
+          "improved": 36,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 1.5501899561755927,
+          "mae_after": 0.03393046107331836,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 36,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "ai_decoder": {
+        "audible_duration": {
+          "matched_scorable_notes": 36,
+          "suggestions": 4,
+          "improved": 4,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.06292328214256784,
+          "mae_after": 0.027751059920345586,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 36,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.1494361111111111,
+          "mae_after": 0.1494361111111111,
+          "unscorable_suggestions": 0
+        }
+      }
+    },
+    "quiet_melody_over_bass": {
+      "correct_reference": {
+        "audible_duration": {
+          "matched_scorable_notes": 24,
+          "suggestions": 8,
+          "improved": 0,
+          "worsened": 8,
+          "damaged_correct": 8,
+          "mae_before": 0.0,
+          "mae_after": 0.15667422524565386,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 24,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_short_flat_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 24,
+          "suggestions": 24,
+          "improved": 18,
+          "worsened": 6,
+          "damaged_correct": 0,
+          "mae_before": 0.7249886621315191,
+          "mae_after": 0.2266780045351475,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 24,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.27499999999999997,
+          "mae_after": 0.27499999999999997,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_long_correct_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 24,
+          "suggestions": 24,
+          "improved": 24,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 1.3143513897509072,
+          "mae_after": 0.2266780045351475,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 24,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "ai_decoder": {
+        "audible_duration": {
+          "matched_scorable_notes": 23,
+          "suggestions": 13,
+          "improved": 5,
+          "worsened": 7,
+          "damaged_correct": 2,
+          "mae_before": 0.11876025366025762,
+          "mae_after": 0.20878462141452056,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 23,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.13484347826086954,
+          "mae_after": 0.13484347826086954,
+          "unscorable_suggestions": 0
+        }
+      }
+    },
+    "pedal_overlap": {
+      "correct_reference": {
+        "audible_duration": {
+          "matched_scorable_notes": 15,
+          "suggestions": 13,
+          "improved": 0,
+          "worsened": 13,
+          "damaged_correct": 13,
+          "mae_before": 0.0,
+          "mae_after": 0.8493363567649282,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 15,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_short_flat_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 15,
+          "suggestions": 11,
+          "improved": 11,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 1.6439773242630384,
+          "mae_after": 1.0646439909297056,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 15,
+          "suggestions": 6,
+          "improved": 2,
+          "worsened": 4,
+          "damaged_correct": 2,
+          "mae_before": 0.1,
+          "mae_after": 0.1822,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_long_correct_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 15,
+          "suggestions": 13,
+          "improved": 1,
+          "worsened": 12,
+          "damaged_correct": 0,
+          "mae_before": 0.4060226757369616,
+          "mae_after": 0.8866061980347697,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 15,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "ai_decoder": {
+        "audible_duration": {
+          "matched_scorable_notes": 15,
+          "suggestions": 11,
+          "improved": 0,
+          "worsened": 11,
+          "damaged_correct": 8,
+          "mae_before": 0.30840381818284673,
+          "mae_after": 0.860533497941727,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 15,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.1821333333333333,
+          "mae_after": 0.1821333333333333,
+          "unscorable_suggestions": 0
+        }
+      }
+    },
+    "repeated_same_pitch": {
+      "correct_reference": {
+        "audible_duration": {
+          "matched_scorable_notes": 3,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 15,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_short_flat_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 3,
+          "suggestions": 3,
+          "improved": 3,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.6500000000000001,
+          "mae_after": 0.08666666666666674,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 15,
+          "suggestions": 7,
+          "improved": 4,
+          "worsened": 3,
+          "damaged_correct": 0,
+          "mae_before": 0.18000000000000002,
+          "mae_after": 0.19093333333333337,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_long_correct_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 3,
+          "suggestions": 3,
+          "improved": 3,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 1.4000000000000001,
+          "mae_after": 0.08666666666666674,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 15,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "ai_decoder": {
+        "audible_duration": {
+          "matched_scorable_notes": 3,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.021205223384720195,
+          "mae_after": 0.021205223384720195,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 15,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.28800000000000003,
+          "mae_after": 0.28800000000000003,
+          "unscorable_suggestions": 0
+        }
+      }
+    },
+    "quiet_recording": {
+      "correct_reference": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 6,
+          "improved": 0,
+          "worsened": 6,
+          "damaged_correct": 6,
+          "mae_before": 0.0,
+          "mae_after": 0.07250000000000001,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_short_flat_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 12,
+          "improved": 12,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.39997732426303845,
+          "mae_after": 0.056689342403628086,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 6,
+          "improved": 5,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.19000000000000003,
+          "mae_after": 0.12700000000000003,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_long_correct_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 12,
+          "improved": 12,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 1.6494008760344503,
+          "mae_after": 0.056689342403628086,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "ai_decoder": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.030029814932211508,
+          "mae_after": 0.030029814932211508,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 3,
+          "improved": 3,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.27750833333333336,
+          "mae_after": 0.17248333333333332,
+          "unscorable_suggestions": 0
+        }
+      }
+    },
+    "noisy_recording": {
+      "correct_reference": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 6,
+          "improved": 0,
+          "worsened": 6,
+          "damaged_correct": 6,
+          "mae_before": 0.0,
+          "mae_after": 0.06933333333333334,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_short_flat_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 12,
+          "improved": 12,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.3999773242630385,
+          "mae_after": 0.056689342403628,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 6,
+          "improved": 5,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.19000000000000003,
+          "mae_after": 0.12125000000000002,
+          "unscorable_suggestions": 0
+        }
+      },
+      "too_long_correct_velocity": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 12,
+          "improved": 12,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 1.6494896487589266,
+          "mae_after": 0.056689342403628,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.0,
+          "mae_after": 0.0,
+          "unscorable_suggestions": 0
+        }
+      },
+      "ai_decoder": {
+        "audible_duration": {
+          "matched_scorable_notes": 12,
+          "suggestions": 0,
+          "improved": 0,
+          "worsened": 0,
+          "damaged_correct": 0,
+          "mae_before": 0.019705374185178027,
+          "mae_after": 0.019705374185178027,
+          "unscorable_suggestions": 0
+        },
+        "relative_dynamics": {
+          "matched_scorable_notes": 12,
+          "suggestions": 6,
+          "improved": 4,
+          "worsened": 2,
+          "damaged_correct": 2,
+          "mae_before": 0.27490833333333337,
+          "mae_after": 0.18534166666666665,
+          "unscorable_suggestions": 0
+        }
+      }
+    }
+  },
+  "date": "2026-11-11",
+  "controlled_clips": 24,
+  "controlled_note_events": 138,
+  "report_sha256": "b43895c2db78ccb0e45d2883800abf5aa59fe4329d62794a27cae8a0042e2d7e",
+  "human_comparison": {
+    "scope": "MIDI key release and normalized strike velocity diagnostics only; neither establishes audible end or calibrated audio-to-MIDI velocity accuracy.",
+    "summary": {
+      "key_release_diagnostic": {
+        "matched_scorable_notes": 563,
+        "suggestions": 127,
+        "improved": 1,
+        "worsened": 126,
+        "damaged_correct": 51,
+        "mae_before": 0.17202613972764966,
+        "mae_after": 0.2887753404381292,
+        "unscorable_suggestions": 0
+      },
+      "normalized_midi_velocity_diagnostic": {
+        "matched_scorable_notes": 563,
+        "suggestions": 0,
+        "improved": 0,
+        "worsened": 0,
+        "damaged_correct": 0,
+        "mae_before": 0.12052374652102768,
+        "mae_after": 0.12052374652102768,
+        "unscorable_suggestions": 0
+      }
+    }
+  },
+  "original_clip": {
+    "scope": "Offline potential edits only. No checked reference; no policy enabled or notes changed.",
+    "notes": 34,
+    "duration_proposals": [
+      {
+        "id": "bp-1",
+        "pitch": 73,
+        "onset": 0.2206,
+        "before": 0.6153,
+        "proposed": 0.86
+      },
+      {
+        "id": "bp-3",
+        "pitch": 61,
+        "onset": 0.9172,
+        "before": 0.3483,
+        "proposed": 1.18
+      },
+      {
+        "id": "bp-5",
+        "pitch": 81,
+        "onset": 1.2423,
+        "before": 0.3599,
+        "proposed": 0.5
+      },
+      {
+        "id": "bp-9",
+        "pitch": 76,
+        "onset": 2.4162,
+        "before": 0.5689,
+        "proposed": 1.78
+      },
+      {
+        "id": "bp-12",
+        "pitch": 64,
+        "onset": 2.9386,
+        "before": 3.6249,
+        "proposed": 2.22
+      },
+      {
+        "id": "bp-15",
+        "pitch": 66,
+        "onset": 3.5772,
+        "before": 0.2438,
+        "proposed": 1.58
+      },
+      {
+        "id": "bp-17",
+        "pitch": 73,
+        "onset": 7.7361,
+        "before": 0.5818,
+        "proposed": 0.78
+      },
+      {
+        "id": "bp-21",
+        "pitch": 61,
+        "onset": 8.3411,
+        "before": 0.7663,
+        "proposed": 1.22
+      },
+      {
+        "id": "bp-24",
+        "pitch": 68,
+        "onset": 8.6778,
+        "before": 0.7779,
+        "proposed": 0.98
+      },
+      {
+        "id": "bp-26",
+        "pitch": 54,
+        "onset": 9.0377,
+        "before": 0.418,
+        "proposed": 0.58
+      },
+      {
+        "id": "bp-27",
+        "pitch": 50,
+        "onset": 9.4557,
+        "before": 5.1122,
+        "proposed": 2.54
+      },
+      {
+        "id": "bp-28",
+        "pitch": 81,
+        "onset": 9.4557,
+        "before": 0.7908,
+        "proposed": 0.54
+      },
+      {
+        "id": "bp-29",
+        "pitch": 76,
+        "onset": 9.9446,
+        "before": 0.952,
+        "proposed": 2.38
+      },
+      {
+        "id": "bp-30",
+        "pitch": 57,
+        "onset": 9.9562,
+        "before": 4.6117,
+        "proposed": 1.94
+      },
+      {
+        "id": "bp-31",
+        "pitch": 81,
+        "onset": 10.5251,
+        "before": 0.8011,
+        "proposed": 0.34
+      },
+      {
+        "id": "bp-32",
+        "pitch": 64,
+        "onset": 10.5367,
+        "before": 4.0312,
+        "proposed": 2.22
+      },
+      {
+        "id": "bp-33",
+        "pitch": 74,
+        "onset": 11.2797,
+        "before": 0.3947,
+        "proposed": 0.74
+      },
+      {
+        "id": "bp-34",
+        "pitch": 66,
+        "onset": 11.2913,
+        "before": 0.2438,
+        "proposed": 1.38
+      }
+    ],
+    "dynamics_proposals": {}
+  },
+  "production_changed": false,
+  "automatic_categories_enabled": false,
+  "software_tests_passed": 9,
+  "duration_failure_examples": [
+    {
+      "seed": 2,
+      "scenario": "pedal_overlap",
+      "proposal": "ai_decoder",
+      "event_id": "bp-1",
+      "pitch": 54,
+      "attribute": "audible_duration",
+      "target": 2.1937153169352577,
+      "before": 2.1839,
+      "after": 3.5463,
+      "suggested": true,
+      "scorable": true,
+      "before_error": 0.009815316935257723,
+      "after_error": 1.3525846830647423,
+      "improved": false,
+      "worsened": true,
+      "damaged_correct": true
+    },
+    {
+      "seed": 2,
+      "scenario": "pedal_overlap",
+      "proposal": "ai_decoder",
+      "event_id": "bp-6",
+      "pitch": 73,
+      "attribute": "audible_duration",
+      "target": 4.004337135822096,
+      "before": 4.0196,
+      "after": 2.8272,
+      "suggested": true,
+      "scorable": true,
+      "before_error": 0.015262864177903346,
+      "after_error": 1.1771371358220963,
+      "improved": false,
+      "worsened": true,
+      "damaged_correct": true
+    },
+    {
+      "seed": 0,
+      "scenario": "pedal_overlap",
+      "proposal": "ai_decoder",
+      "event_id": "bp-5",
+      "pitch": 72,
+      "attribute": "audible_duration",
+      "target": 4.592211430701674,
+      "before": 4.6117,
+      "after": 3.4593000000000003,
+      "suggested": true,
+      "scorable": true,
+      "before_error": 0.019488569298325764,
+      "after_error": 1.1329114307016739,
+      "improved": false,
+      "worsened": true,
+      "damaged_correct": true
+    }
+  ],
+  "already_correct_dynamics_failures": [
+    {
+      "seed": 0,
+      "scenario": "isolated_same_pitch",
+      "proposal": "correct_reference",
+      "event_id": "ref-0",
+      "pitch": 60,
+      "attribute": "relative_dynamics",
+      "target": 0.22,
+      "before": 0.22,
+      "after": 0.083,
+      "suggested": true,
+      "scorable": true,
+      "before_error": 0.0,
+      "after_error": 0.137,
+      "improved": false,
+      "worsened": true,
+      "damaged_correct": true
+    },
+    {
+      "seed": 0,
+      "scenario": "isolated_same_pitch",
+      "proposal": "correct_reference",
+      "event_id": "ref-1",
+      "pitch": 60,
+      "attribute": "relative_dynamics",
+      "target": 0.4,
+      "before": 0.4,
+      "after": 0.257,
+      "suggested": true,
+      "scorable": true,
+      "before_error": 0.0,
+      "after_error": 0.14300000000000002,
+      "improved": false,
+      "worsened": true,
+      "damaged_correct": true
+    },
+    {
+      "seed": 0,
+      "scenario": "equal_gain_different_pitches",
+      "proposal": "correct_reference",
+      "event_id": "ref-0",
+      "pitch": 48,
+      "attribute": "relative_dynamics",
+      "target": 0.5,
+      "before": 0.5,
+      "after": 0.807,
+      "suggested": true,
+      "scorable": true,
+      "before_error": 0.0,
+      "after_error": 0.30700000000000005,
+      "improved": false,
+      "worsened": true,
+      "damaged_correct": true
+    },
+    {
+      "seed": 0,
+      "scenario": "equal_gain_different_pitches",
+      "proposal": "correct_reference",
+      "event_id": "ref-3",
+      "pitch": 84,
+      "attribute": "relative_dynamics",
+      "target": 0.5,
+      "before": 0.5,
+      "after": 0.259,
+      "suggested": true,
+      "scorable": true,
+      "before_error": 0.0,
+      "after_error": 0.241,
+      "improved": false,
+      "worsened": true,
+      "damaged_correct": true
+    }
+  ],
+  "verifier_code_sha256": "f3ada0b59ea644faeebab07337408aa1accfcf4d1864dabc43869b2d578b6a09",
+  "benchmark_code_sha256": "a63ff368f6e56a3c527e1bdb3be9dfe304188ad7bef65489bb5b2c40fe090128",
+  "settings": {
+    "analysis": {
+      "low_split_hz": 700.0,
+      "low_fft": 8192,
+      "full_fft": 2048,
+      "hop": 256,
+      "min_bin_hz": 25.0,
+      "max_bin_hz": 6000.0,
+      "noise_percentile": 15,
+      "attack_fft": 1024,
+      "attack_hop": 128,
+      "attack_min_hz": 900.0,
+      "attack_max_hz": 8000.0
+    },
+    "tuning": {
+      "max_cents": 40.0,
+      "min_partial_hz": 80.0,
+      "max_partial_hz": 2500.0
+    },
+    "templates": {
+      "max_partials": 24,
+      "inharmonicity": 0.0004,
+      "attack_tilt": 0.72,
+      "sustain_tilt": 1.05,
+      "attack_rolloff_hz": 6500.0,
+      "sustain_rolloff_hz": 3200.0,
+      "velocity_tilt": 0.35,
+      "sustain_decay_scale": 1.0
+    },
+    "decomposition": {
+      "attack_tau_s": 0.03,
+      "sustain_attack_s": 0.012,
+      "ridge": 1e-09,
+      "sweeps": 90,
+      "context_before_s": 2.0,
+      "envelope_smear_frames": 8,
+      "max_atoms": 160,
+      "max_frames": 720
+    },
+    "regions": {
+      "cluster_gap_s": 0.35,
+      "before_s": 0.45,
+      "after_s": 1.1,
+      "max_regions": 80,
+      "max_region_seconds": 8.0,
+      "max_region_notes": 80,
+      "max_window_notes": 240
+    },
+    "checks": {
+      "attack_tolerance_s": 0.06,
+      "unmatched_attack_min_novelty": 0.22,
+      "onset_step_s": 0.02,
+      "onset_min_shift_s": 0.06,
+      "onset_min_attack": 0.5,
+      "attack_lag_s": 0.045,
+      "repetition_min_gap_s": 0.12,
+      "repetition_end_margin_s": 0.05,
+      "repetition_min_novelty": 0.9,
+      "repetition_min_broadband": 0.55,
+      "duplicate_gap_s": 0.16,
+      "duplicate_second_attack": 0.35,
+      "duplicate_attack_ratio": 0.5,
+      "missing_unexplained": 0.35,
+      "missing_fundamental": 0.35,
+      "missing_min_snr_db": 3.0,
+      "candidate_limit": 4
+    },
+    "scoring": {
+      "add_gain": 0.55,
+      "shift_gain": 0.3,
+      "repetition_min_gain": 0.15,
+      "substitute_gain": 0.45,
+      "delete_max_gain": 0.18,
+      "merge_max_gain": 1.5,
+      "margin": 0.12
+    },
+    "insertion": {
+      "min_gain": 1.0,
+      "min_fundamental": 0.5,
+      "min_attack_sharp": 2.0,
+      "min_attack": 0.2,
+      "min_decoder_onset": 0.65,
+      "competing_ratio": 0.75
+    },
+    "limits": {
+      "max_findings": 400,
+      "budget_seconds": 100.0,
+      "max_events": 20000,
+      "max_audio_seconds": 600.0,
+      "max_region_matrix": 2000000
+    }
+  },
+  "thresholds": {
+    "onset_threshold": 0.6,
+    "frame_threshold": 0.3,
+    "minimum_note_length": 80.0,
+    "onset_prominence": 0.2,
+    "minimum_attack_spacing_ms": 70.0
+  },
+  "decoding": {
+    "decoding_version": "basic-pitch-0.4.0/piano-peaks-v1",
+    "include_pitch_bends": false,
+    "infer_onsets": false,
+    "maximum_frequency": null,
+    "melodia_trick": false,
+    "midi_tempo": 120,
+    "minimum_frequency": null,
+    "multiple_pitch_bends": false
+  }
+}

@@ -40,6 +40,18 @@ function Harness({onChange}: {onChange: (document: any) => void}) {
   return <NotationEditor title="Test lesson" document={document} onChange={next => { setDocument(next); onChange(next); }}/>;
 }
 
+test('audible duration does not silently lengthen the written note', () => {
+  const note = (duration: number, notation: number) => [{
+    id: 'e', onset: 0, duration, notation_duration: notation, pitch: 60, velocity: 0.5,
+    confidence: null, optional: false, string: null, fret: null,
+  }];
+  const short = buildNotation(note(0.2, 0.2), {bpm: 120, duration: 2});
+  const audibleLong = buildNotation(note(1.2, 0.2), {bpm: 120, duration: 2});
+  assert.equal(short.events[0].duration, audibleLong.events[0].duration);
+  assert.ok(audibleLong.events[0].duration < buildNotation(note(1.2, 1.2),
+    {bpm: 120, duration: 2}).events[0].duration);
+});
+
 test('the editor renders both staves and selects one note inside a chord', async () => {
   let latest: any = initial;
   render(<Harness onChange={value => { latest = value; }}/>);

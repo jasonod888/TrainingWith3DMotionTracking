@@ -14,6 +14,7 @@ from pathlib import Path
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -22,11 +23,12 @@ from urllib.parse import urlparse
 import httpx
 
 try:
-    from .music_run_profile import load_profile, VerifiedProfile
+    from .music_run_profile import load_kong_profile, load_profile, VerifiedProfile
 except ImportError:  # Direct script execution.
-    from music_run_profile import load_profile, VerifiedProfile
+    from music_run_profile import load_kong_profile, load_profile, VerifiedProfile
 
-PIPELINES = {'music-piano-v1': 'piano', 'music-guitar-v1': 'guitar'}
+PIPELINES = {'music-piano-kong-v1': 'piano', 'music-piano-v1': 'piano',
+             'music-guitar-v1': 'guitar'}
 
 
 class LeaseLost(RuntimeError):
@@ -48,6 +50,8 @@ class MusicWorker:
         if profile:
             if not isinstance(profile, VerifiedProfile):
                 raise ValueError('Load a verified profile before starting the worker.')
+            if (pipeline=='music-piano-kong-v1')!=(profile.get('model')=='kong'):
+                raise ValueError('The worker profile model does not match its processing route.')
             profile.reverify()
             # The code artifact must be the entry point actually passed to the process.
             entry = adapter_command[1] if len(adapter_command) > 1 and Path(adapter_command[0]).stem.lower().startswith('python') else adapter_command[0]
@@ -118,8 +122,11 @@ class MusicWorker:
             check()
             log = folder / 'command.log'
             with log.open('wb') as output:
-                environment={**os.environ,'CUDA_VISIBLE_DEVICES':'-1','OMP_NUM_THREADS':'1',
+                environment={**os.environ,'OMP_NUM_THREADS':'1',
                              'TF_NUM_INTRAOP_THREADS':'1','TF_NUM_INTEROP_THREADS':'1'}
+                if not (self.profile and self.profile.get('model') == 'kong'
+                        and self.profile.get('device') == 'cuda'):
+                    environment['CUDA_VISIBLE_DEVICES']='-1'
                 environment.pop('MUSIC_RUN_PROFILE', None)
                 environment.pop('MUSIC_MODEL_WEIGHTS', None)
                 if self.profile:
@@ -136,6 +143,10 @@ class MusicWorker:
                             raise RuntimeError('Music command exceeded its time limit.')
                         time.sleep(.05)
                     if process.returncode:
+                        output.flush()
+                        # Keep a bounded diagnostic in private operator logs before the
+                        # temporary source/audio directory is removed.
+                        print(log.read_bytes()[-4000:].decode('utf-8',errors='replace'),file=sys.stderr,flush=True)
                         raise RuntimeError('Music command failed.')
                 finally:
                     if process.poll() is None:
@@ -276,8 +287,11 @@ def main():
         if missing:
             parser.error('A profile requires ' + ', '.join('--' + name for name in missing) + '.')
         try:
-            profile = load_profile(args.profile, weights=args.weights, code=args.code,
-                                   config=args.config, approval=args.approval)
+            raw_profile = json.loads(args.profile.read_text(encoding='utf-8'))
+            loader = (load_kong_profile if raw_profile.get('model') == 'kong'
+                      else load_profile)
+            profile = loader(args.profile, weights=args.weights, code=args.code,
+                             config=args.config, approval=args.approval)
         except (OSError, ValueError) as error:
             parser.error(str(error))
     token = os.environ.get('WORKER_TOKEN', '').strip()

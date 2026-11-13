@@ -3,6 +3,7 @@ export type MusicReferenceEvent = {
   id: string;
   onset: number;
   duration: number | null;
+  notation_duration?: number | null;
   pitch: number;
   velocity: number | null;
   confidence: number | null;
@@ -88,6 +89,8 @@ export function parseMusicReference(value: unknown, options: {includeNotation?: 
     if (onset < 0 || onset > duration + 1e-6) throw new Error(`Note ${id} starts outside the clip.`);
     const length = item.duration == null ? null : finite(item.duration, `note ${id} length`);
     if (length !== null && (length <= 0 || onset + length > duration + 1e-6)) throw new Error(`Note ${id} ends outside the clip.`);
+    const notationDuration = item.notation_duration == null ? null : finite(item.notation_duration, `note ${id} written length`);
+    if (notationDuration !== null && (notationDuration <= 0 || notationDuration > duration)) throw new Error(`Note ${id} has an invalid written length.`);
     const velocity = item.velocity == null ? null : finite(item.velocity, `note ${id} velocity`);
     if (velocity !== null && (velocity < 0 || velocity > 1)) throw new Error(`Note ${id} has an invalid velocity.`);
     const confidence = item.confidence == null ? null : finite(item.confidence, `note ${id} confidence`);
@@ -102,7 +105,7 @@ export function parseMusicReference(value: unknown, options: {includeNotation?: 
     if (string !== null && ({1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40} as Record<number, number>)[string] + fret! !== pitch) {
       throw new Error(`Note ${id} position does not match its pitch in standard tuning.`);
     }
-    return {id, onset, duration: length, pitch, velocity, confidence, optional: item.optional === true, string, fret};
+    return {id, onset, duration: length, notation_duration: notationDuration, pitch, velocity, confidence, optional: item.optional === true, string, fret};
   }).sort((left, right) => left.onset - right.onset || left.pitch - right.pitch);
   const guitarChords: GuitarChord[] = Array.isArray(document.guitar_chords) ? document.guitar_chords.map((raw, index) => {
     if (!raw || typeof raw !== 'object') throw new Error('The reference has an invalid chord.');

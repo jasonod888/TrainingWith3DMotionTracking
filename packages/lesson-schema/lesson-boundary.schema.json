@@ -553,6 +553,17 @@
           ],
           "default": null
         },
+        "piano_preview": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Asset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "waveform": {
           "anyOf": [
             {
@@ -586,6 +597,38 @@
           ],
           "default": null
         },
+        "playback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MusicPlaybackSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pedal": {
+          "items": {
+            "$ref": "#/$defs/MusicPedalEvent"
+          },
+          "maxItems": 2000,
+          "title": "Pedal",
+          "type": "array"
+        },
+        "preview_identity": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preview Identity"
+        },
         "warnings": {
           "items": {
             "type": "string"
@@ -606,6 +649,55 @@
         "assessment"
       ],
       "title": "MusicLessonManifest",
+      "type": "object"
+    },
+    "MusicPedalEvent": {
+      "additionalProperties": false,
+      "description": "Sustain span predicted by the model; not written notation or audible-ending truth.",
+      "properties": {
+        "onset": {
+          "minimum": 0,
+          "title": "Onset",
+          "type": "number"
+        },
+        "offset": {
+          "exclusiveMinimum": 0,
+          "title": "Offset",
+          "type": "number"
+        },
+        "type": {
+          "const": "sustain",
+          "default": "sustain",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "onset",
+        "offset"
+      ],
+      "title": "MusicPedalEvent",
+      "type": "object"
+    },
+    "MusicPlaybackSettings": {
+      "additionalProperties": false,
+      "description": "Versioned lesson playback settings; a missing object means zero offset.",
+      "properties": {
+        "sync_offset_seconds": {
+          "default": 0.0,
+          "maximum": 10.0,
+          "minimum": -10.0,
+          "title": "Sync Offset Seconds",
+          "type": "number"
+        },
+        "revision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "title": "MusicPlaybackSettings",
       "type": "object"
     },
     "Section": {

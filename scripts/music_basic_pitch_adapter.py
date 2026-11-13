@@ -8,6 +8,9 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
+import sys
+import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -81,6 +84,204 @@ def note_events(notes, duration):
     return events
 
 
+def _run_expression(folder, audio, reference, events, duration, report,
+                    policy, mode, settings, summary, duration_enabled=True,
+                    dynamics_enabled=True, calibration=None, calibration_domain=None):
+    """Run Phase 4 over the exact Phase 3 working events, independently of Phase 3."""
+    try:
+        try:
+            import piano_corrections
+        except ImportError:
+            from apps.api.music_corrections import apply_qualified_corrections
+        else:
+            apply_qualified_corrections = piano_corrections.apply_qualified_corrections
+        working = events
+        if report.get('mode') == 'qualified' and any(
+                finding.get('status') == 'suggested' and finding.get('correction_status') == 'qualified'
+                for finding in report.get('findings') or []):
+            working, _history, _policy = apply_qualified_corrections(events, report, duration)
+        working_path = folder / 'working-events.json'
+        identity = {key: (report.get('source') or {}).get(key) for key in
+                    ('model', 'model_version', 'decoder', 'weights_sha256', 'decoder_sha256')}
+        identity['audio_sha256'] = hashlib.sha256(Path(audio).read_bytes()).hexdigest()
+        working_path.write_text(json.dumps({'events': working, 'provenance': identity}), encoding='utf-8')
+        policy_path = folder / 'expression-policy.json'
+        policy_path.write_text(json.dumps(policy), encoding='utf-8')
+        output = folder / 'expression.json'
+        command = [sys.executable, str(Path(__file__).with_name('piano_expression.py')),
+                   '--audio', str(audio), '--reference', str(working_path),
+                   '--duration', str(duration), '--policy', str(policy_path),
+                   '--mode', mode, '--output', str(output)]
+        if not duration_enabled:
+            command.append('--no-analyze-duration')
+        if not dynamics_enabled:
+            command.append('--no-analyze-dynamics')
+        if calibration is not None:
+            calibration_path = folder / 'velocity-calibration.json'
+            calibration_path.write_text(json.dumps(calibration), encoding='utf-8')
+            command += ['--velocity-calibration', str(calibration_path),
+                        '--calibration-domain', str(calibration_domain)]
+        if settings:
+            settings_path = folder / 'expression-settings.json'
+            settings_path.write_text(json.dumps(settings), encoding='utf-8')
+            command += ['--settings', str(settings_path)]
+        completed = subprocess.run(command, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                   timeout=90, env=os.environ.copy())
+        if completed.returncode != 0 or not output.is_file():
+            summary['expression_reason'] = 'expression-failed'
+            return None
+        return json.loads(output.read_text(encoding='utf-8'))
+    except subprocess.TimeoutExpired:
+        summary['expression_reason'] = 'expression-timeout'
+        return None
+    except Exception as error:
+        summary['expression_reason'] = type(error).__name__
+        return None
+
+
+def _verification_summary(profile, audio, events, model_output, duration, reference, audio_sha):
+    """Run the optional diagnostic verifier without ever changing the draft.
+
+    A failure or mismatch leaves the baseline proposal usable and records that
+    verification was unavailable.
+    """
+    block = profile.get('verification')
+    if not block:
+        return {'status': 'not-configured', 'mode': None, 'version': None}, None, None
+    summary = {'status': 'unavailable', 'mode': block.get('mode'),
+               'version': block.get('version'), 'code_sha256': block.get('code_sha256'),
+               'settings_sha256': block.get('settings_sha256')}
+    if block.get('enabled') is not True:
+        summary['status'] = 'disabled'
+        return summary, None, None
+    try:
+        import piano_verifier
+        verifier_path = Path(__file__).with_name('piano_verifier.py')
+        if hashlib.sha256(verifier_path.read_bytes()).hexdigest() != block.get('code_sha256'):
+            summary['reason'] = 'verifier-code-mismatch'
+            return summary, None, None
+        if piano_verifier.VERIFIER_VERSION != block.get('version'):
+            summary['reason'] = 'verifier-version-mismatch'
+            return summary, None, None
+        mode = block.get('mode') or 'diagnostic'
+        policy = block.get('correction_policy')
+        expression_enabled = block.get('expression_enabled') is True
+        expression_mode = block.get('expression_mode') or 'qualified'
+        expression_policy = block.get('expression_policy')
+        if mode == 'qualified':
+            if not isinstance(policy, dict):
+                summary['reason'] = 'correction-policy-missing'
+                return summary, None, None
+            digest = piano_verifier.correction_policy_digest(policy)
+            if digest != block.get('correction_policy_sha256'):
+                summary['reason'] = 'correction-policy-digest-mismatch'
+                return summary, None, None
+        if expression_enabled:
+            try:
+                from piano_expression_identity import estimator_sha256
+            except ImportError:
+                from scripts.piano_expression_identity import estimator_sha256
+            expression_sha = block.get('expression_code_sha256')
+            if expression_sha is not None and expression_sha != estimator_sha256(Path(__file__).parent):
+                expression_enabled = False
+                summary['expression_reason'] = 'expression-code-mismatch'
+            if expression_mode == 'qualified' and not isinstance(expression_policy, dict):
+                expression_enabled = False
+                summary['expression_reason'] = 'expression-policy-missing'
+            elif expression_policy is not None and piano_verifier.expression_policy_digest(
+                    expression_policy) != block.get('expression_policy_sha256'):
+                expression_enabled = False
+                summary['expression_reason'] = 'expression-policy-digest-mismatch'
+        # Run verification in its own process so a crash, timeout or memory failure
+        # cannot take down the adapter or lose the decoded baseline.
+        with tempfile.TemporaryDirectory(prefix='verify-', dir=reference.parent) as temporary:
+            folder = Path(temporary)
+            activations = folder / 'activations.npz'
+            np.savez_compressed(activations, **model_output)
+            report_path = folder / 'verification.json'
+            # Execution identity belongs beside the immutable reference, whose public
+            # provenance contract intentionally has no decoder/configuration fields.
+            try:
+                from piano_corrections import decoder_sha256
+            except ImportError:
+                from scripts.piano_corrections import decoder_sha256
+            execution_path = folder / 'execution.json'
+            execution_path.write_text(json.dumps({
+                'model': profile.get('model'), 'model_version': profile.get('model_version'),
+                'profile_sha256': profile.get('profile_sha256'),
+                'decoder': (profile.get('decoding') or {}).get('decoding_version'),
+                'weights_sha256': profile.get('weights_sha256'),
+                'decoder_sha256': decoder_sha256(profile, Path(__file__)),
+            }), encoding='utf-8')
+            command = [sys.executable, str(verifier_path), '--audio', str(audio),
+                       '--reference', str(reference), '--activations', str(activations),
+                       '--duration', str(duration), '--output', str(report_path),
+                       '--mode', mode, '--execution-metadata', str(execution_path)]
+            if block.get('settings'):
+                settings_path = folder / 'settings.json'
+                settings_path.write_text(json.dumps(block['settings']), encoding='utf-8')
+                command += ['--settings', str(settings_path)]
+            if policy is not None:
+                policy_path = folder / 'correction-policy.json'
+                policy_path.write_text(json.dumps(policy), encoding='utf-8')
+                command += ['--correction-policy', str(policy_path)]
+            completed = subprocess.run(command, stdin=subprocess.DEVNULL,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                       timeout=120, env=os.environ.copy())
+            if completed.returncode != 0 or not report_path.is_file():
+                summary['reason'] = 'verifier-failed'
+                return summary, None, None
+            report = json.loads(report_path.read_text(encoding='utf-8'))
+            expression_report = None
+            if expression_enabled:
+                expression_report = _run_expression(
+                    folder, audio, reference, events, duration, report, expression_policy,
+                    expression_mode, block.get('settings'), summary,
+                    block.get('expression_analyze_duration', True) is not False,
+                    block.get('expression_analyze_dynamics', True) is not False,
+                    block.get('expression_calibration'), block.get('expression_calibration_domain'))
+        summary.update({'status': report.get('status', 'complete'),
+                        'mode': report.get('mode', mode),
+                        'correction_policy_sha256': (report.get('correction_policy') or {}).get('policy_sha256'),
+                        'finding_count': report['summary']['finding_count'],
+                        'suggested_count': report['summary']['suggested_count'],
+                        'unresolved_count': report['summary']['unresolved_count'],
+                        'qualified_count': report['summary'].get('qualified_count', 0),
+                        'withheld_count': report['summary'].get('withheld_count', 0),
+                        'expression_status': (expression_report or {}).get('status', 'unavailable' if expression_enabled else 'disabled'),
+                        'expression_count': ((expression_report or {}).get('summary') or {}).get('proposal_count', 0),
+                        'expression_policy_sha256': ((expression_report or {}).get('policy') or {}).get('policy_sha256'),
+                        'runtime_seconds': report['summary']['runtime_seconds'],
+                        'report': 'verification.json'})
+        if expression_report is not None:
+            summary['expression_report'] = 'expression.json'
+            summary['_expression_report_value'] = expression_report
+        if summary.get('expression_reason'):
+            summary['expression_status'] = 'unavailable'
+        revised = None
+        if report['edits']:
+            try:
+                revised_events = piano_verifier.apply_edits(events, report['edits'])
+            except ValueError:
+                summary['revised_error'] = 'conflicting-edits'
+                revised_events = None
+            if revised_events is not None:
+                revised = {'schema_version': 1,
+                           'derived_from_proposal_sha256': report['source']['proposal_sha256'],
+                           'note': 'Alternative proposal from verification; not reviewed, applied or publishable.',
+                           'edits': report['edits'], 'events': revised_events}
+                summary.update({'revised_proposal': 'verification-proposal.json',
+                                'revised_note_count': len(revised_events)})
+        return summary, report, revised
+    except subprocess.TimeoutExpired:
+        summary['reason'] = 'verifier-timeout'
+        return summary, None, None
+    except Exception as error:  # Verification is optional; the draft must survive.
+        summary['reason'] = type(error).__name__
+        return summary, None, None
+
+
 def main():
     parser = argparse.ArgumentParser()
     for name in ('input', 'source', 'job', 'output'):
@@ -146,6 +347,10 @@ def main():
     midi_path = out / 'proposal.mid'
     midi.write(str(midi_path))
     metadata['duration'] = duration
+    verification, verification_report, verification_revised = _verification_summary(
+        profile, audio, events, model_output, duration, out / 'reference.json', audio_sha)
+    verification_expression = verification.pop('_expression_report_value', None)
+    metadata['verification'] = verification
     baseline = None
     if decoding['decoding_version'] == PIANO_DECODING:
         baseline_thresholds = {'onset_threshold': .5, 'frame_threshold': .3, 'minimum_note_length': 127.7}
@@ -164,6 +369,13 @@ def main():
         archive.write(out / 'reference.json', 'proposed-reference.json')
         if baseline is not None:
             archive.writestr('baseline-reference.json', json.dumps(baseline, separators=(',', ':')))
+        if verification_report is not None:
+            archive.writestr('verification.json', json.dumps(verification_report, indent=2, sort_keys=True))
+        if verification_expression is not None:
+            archive.writestr('expression.json', json.dumps(verification_expression, indent=2, sort_keys=True))
+        if verification_revised is not None:
+            archive.writestr('verification-proposal.json',
+                             json.dumps(verification_revised, indent=2, sort_keys=True))
         archive.writestr('metadata.json', json.dumps(metadata, indent=2, sort_keys=True))
     for path in (raw_path, midi_path):
         path.unlink()

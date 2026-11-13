@@ -1,0 +1,74 @@
+* { box-sizing: border-box; }
+:root {
+  color-scheme: light dark;
+  --bg: #0f1115;
+  --card: #171a21;
+  --text: #e9ecf1;
+  --muted: #9aa3b2;
+  --accent: #4f8cff;
+  --error: #ff7a7a;
+  --line: #262b35;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f4f6fa; --card: #ffffff; --text: #151922; --muted: #5b6472; --line: #dde3ec; }
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 56rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.hidden { display: none !important; }
+h1, h2 { margin: 0 0 .5rem; font-size: 1.35rem; }
+h3 { margin: 1.25rem 0 .35rem; font-size: 1rem; }
+.muted { color: var(--muted); }
+.error { color: var(--error); min-height: 1.2rem; }
+label { display: block; margin: .75rem 0 .25rem; font-weight: 600; }
+input[type="text"], textarea, select {
+  width: 100%;
+  padding: .55rem .65rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+textarea { min-height: 3.2rem; resize: vertical; }
+button {
+  font: inherit;
+  padding: .6rem 1rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+button:disabled { opacity: .5; cursor: not-allowed; }
+button.secondary { background: transparent; border-color: var(--line); color: var(--text); }
+.bar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; margin: .5rem 0 1rem; }
+.reference audio, .candidate audio { width: 100%; margin: .35rem 0; }
+.candidate {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: .85rem;
+  margin: 1rem 0;
+}
+.candidate header { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+.label { font-weight: 700; letter-spacing: .06em; }
+.slider-row { display: flex; align-items: center; gap: .75rem; }
+input[type="range"] { flex: 1; }
+.value { min-width: 3rem; text-align: right; font-variant-numeric: tabular-nums; }
+.anchors { display: grid; gap: .2rem; margin: .35rem 0 0; padding: 0; list-style: none; font-size: .85rem; color: var(--muted); }
+.question { font-weight: 600; margin: .75rem 0; }
+.attribution { font-size: .8rem; color: var(--muted); }
+@media (max-width: 30rem) {
+  main { padding: 1rem .5rem 3rem; }
+  .card { padding: 1rem; }
+}

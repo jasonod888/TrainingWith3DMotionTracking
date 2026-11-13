@@ -49,6 +49,9 @@ function parsePerformance(value: unknown): PerformanceNote[] {
     const pitch = integer(item.pitch, `performance pitch ${index + 1}`, 0, 127);
     const duration = item.duration == null ? null : number(item.duration, `performance duration ${index + 1}`);
     if (duration !== null && duration <= 0) throw new Error('A performance duration is not positive.');
+    const notationDuration = item.notation_duration == null ? null
+      : number(item.notation_duration, `performance written duration ${index + 1}`);
+    if (notationDuration !== null && notationDuration <= 0) throw new Error('A performance written duration is not positive.');
     const velocity = item.velocity == null ? null : number(item.velocity, `performance velocity ${index + 1}`);
     if (velocity !== null && (velocity < 0 || velocity > 1)) throw new Error('A performance velocity is out of range.');
     const confidence = item.confidence == null ? null : number(item.confidence, `performance confidence ${index + 1}`);
@@ -60,7 +63,7 @@ function parsePerformance(value: unknown): PerformanceNote[] {
     if (string !== null && (!Number.isInteger(string) || string < 1 || string > 6 || fret === null || !Number.isInteger(fret) || fret < 0 || fret > 12)) {
       throw new Error('A performance position is invalid.');
     }
-    return { id, onset, duration, pitch, velocity, confidence, optional: item.optional === true, string, fret };
+    return { id, onset, duration, ...(notationDuration != null ? {notation_duration: notationDuration} : {}), pitch, velocity, confidence, optional: item.optional === true, string, fret };
   });
 }
 
