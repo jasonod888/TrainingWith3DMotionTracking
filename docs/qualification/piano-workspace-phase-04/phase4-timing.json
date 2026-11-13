@@ -1,114 +1,154 @@
 {
   "rate1": [
     {
-      "video": 1.8342,
+      "video": 1.9123,
       "rate": 1,
-      "roll_seconds": 1.829,
-      "score_tick": 2122,
+      "roll_seconds": 1.8996,
+      "score_tick": 2204,
       "ticks_per_second": 1160,
       "window_start": 0,
       "roll_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-5",
+        "bp-6"
       ],
       "score_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-6",
+        "bp-5"
       ],
       "key_pitches": [
-        54
+        54,
+        61,
+        80
       ],
       "roll_pitches": [
-        54
+        54,
+        80,
+        61
       ]
     },
     {
-      "video": 1.8364,
+      "video": 1.9143,
       "rate": 1,
-      "roll_seconds": 1.829,
-      "score_tick": 2122,
+      "roll_seconds": 1.8996,
+      "score_tick": 2204,
       "ticks_per_second": 1160,
       "window_start": 0,
       "roll_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-5",
+        "bp-6"
       ],
       "score_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-6",
+        "bp-5"
       ],
       "key_pitches": [
-        54
+        54,
+        61,
+        80
       ],
       "roll_pitches": [
-        54
+        54,
+        80,
+        61
       ]
     },
     {
-      "video": 1.8383,
+      "video": 1.9207,
       "rate": 1,
-      "roll_seconds": 1.829,
-      "score_tick": 2122,
+      "roll_seconds": 1.916,
+      "score_tick": 2223,
       "ticks_per_second": 1160,
       "window_start": 0,
       "roll_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-5",
+        "bp-6"
       ],
       "score_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-6",
+        "bp-5"
       ],
       "key_pitches": [
-        54
+        54,
+        61,
+        80
       ],
       "roll_pitches": [
-        54
+        54,
+        80,
+        61
       ]
     },
     {
-      "video": 1.8399,
+      "video": 1.9231,
       "rate": 1,
-      "roll_seconds": 1.829,
-      "score_tick": 2122,
+      "roll_seconds": 1.916,
+      "score_tick": 2223,
       "ticks_per_second": 1160,
       "window_start": 0,
       "roll_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-5",
+        "bp-6"
       ],
       "score_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-6",
+        "bp-5"
       ],
       "key_pitches": [
-        54
+        54,
+        61,
+        80
       ],
       "roll_pitches": [
-        54
+        54,
+        80,
+        61
       ]
     },
     {
-      "video": 1.8413,
+      "video": 1.9248,
       "rate": 1,
-      "roll_seconds": 1.829,
-      "score_tick": 2122,
+      "roll_seconds": 1.916,
+      "score_tick": 2223,
       "ticks_per_second": 1160,
       "window_start": 0,
       "roll_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-5",
+        "bp-6"
       ],
       "score_ids": [
-        "bp-3"
+        "bp-3",
+        "bp-6",
+        "bp-5"
       ],
       "key_pitches": [
-        54
+        54,
+        61,
+        80
       ],
       "roll_pitches": [
-        54
+        54,
+        80,
+        61
       ]
     }
   ],
-  "rate1_worst_lag": 0.0123,
-  "rate1_worst_tick": 14,
+  "rate1_worst_lag": 0.0147,
+  "rate1_worst_tick": 17,
   "rate_half": {
     "first": {
-      "video": 1.9689,
+      "video": 2.0485,
       "rate": 0.5,
-      "roll_seconds": 1.9667,
-      "score_tick": 2281,
+      "roll_seconds": 2.0413,
+      "score_tick": 2368,
       "ticks_per_second": 1160,
       "window_start": 0,
       "roll_ids": [
@@ -133,34 +173,34 @@
       ]
     },
     "second": {
-      "video": 2.4766,
+      "video": 2.5557,
       "rate": 0.5,
-      "roll_seconds": 2.4744,
-      "score_tick": 2870,
+      "roll_seconds": 2.5493,
+      "score_tick": 2957,
       "ticks_per_second": 1160,
-      "window_start": 0,
+      "window_start": 1.7,
       "roll_ids": [
-        "bp-7"
+        "bp-8"
       ],
       "score_ids": [
-        "bp-7"
+        "bp-8"
       ],
       "key_pitches": [
-        81
+        80
       ],
       "roll_pitches": [
-        81
+        80
       ]
     }
   },
-  "rate_half_delta": 0.508,
+  "rate_half_delta": 0.507,
   "seek": {
     "video": 2.4888,
     "rate": 1,
     "roll_seconds": 2.4888,
     "score_tick": 2887,
     "ticks_per_second": 1160,
-    "window_start": 0,
+    "window_start": 1.7,
     "roll_ids": [
       "bp-7"
     ],
@@ -174,7 +214,12 @@
       81
     ]
   },
-  "frames": [
+  "seek_window": {
+    "window_start": 1.7,
+    "window_span": 10,
+    "roll_cursor": 250.37262739862376
+  },
+  "stepped_frames": [
     {
       "requested": 1.996,
       "roll_seconds": 1.996,
@@ -405,6 +450,437 @@
       ],
       "roll_pitches": [
         60,
+        64,
+        67
+      ]
+    }
+  ],
+  "stepped_viewport_start": 1.3,
+  "stepped_offset_positive": [
+    {
+      "requested": 2.492,
+      "roll_seconds": 2.492,
+      "score_tick": 1912,
+      "ticks_per_second": 960,
+      "roll_ids": [],
+      "score_ids": [],
+      "key_pitches": [],
+      "roll_pitches": []
+    },
+    {
+      "requested": 2.496,
+      "roll_seconds": 2.496,
+      "score_tick": 1916,
+      "ticks_per_second": 960,
+      "roll_ids": [],
+      "score_ids": [],
+      "key_pitches": [],
+      "roll_pitches": []
+    },
+    {
+      "requested": 2.5,
+      "roll_seconds": 2.5,
+      "score_tick": 1920,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1"
+      ],
+      "score_ids": [
+        "f-1"
+      ],
+      "key_pitches": [
+        60
+      ],
+      "roll_pitches": [
+        60
+      ]
+    },
+    {
+      "requested": 2.504,
+      "roll_seconds": 2.504,
+      "score_tick": 1924,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1"
+      ],
+      "score_ids": [
+        "f-1"
+      ],
+      "key_pitches": [
+        60
+      ],
+      "roll_pitches": [
+        60
+      ]
+    },
+    {
+      "requested": 2.508,
+      "roll_seconds": 2.508,
+      "score_tick": 1928,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1"
+      ],
+      "score_ids": [
+        "f-1"
+      ],
+      "key_pitches": [
+        60
+      ],
+      "roll_pitches": [
+        60
+      ]
+    },
+    {
+      "requested": 2.512,
+      "roll_seconds": 2.512,
+      "score_tick": 1932,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "key_pitches": [
+        60,
+        64
+      ],
+      "roll_pitches": [
+        60,
+        64
+      ]
+    },
+    {
+      "requested": 2.516,
+      "roll_seconds": 2.516,
+      "score_tick": 1935,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "key_pitches": [
+        60,
+        64
+      ],
+      "roll_pitches": [
+        60,
+        64
+      ]
+    },
+    {
+      "requested": 2.52,
+      "roll_seconds": 2.52,
+      "score_tick": 1939,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "key_pitches": [
+        60,
+        64
+      ],
+      "roll_pitches": [
+        60,
+        64
+      ]
+    },
+    {
+      "requested": 2.524,
+      "roll_seconds": 2.524,
+      "score_tick": 1943,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        60,
+        64,
+        67
+      ],
+      "roll_pitches": [
+        60,
+        64,
+        67
+      ]
+    }
+  ],
+  "stepped_offset_negative": [
+    {
+      "requested": 1.492,
+      "roll_seconds": 1.492,
+      "score_tick": 1912,
+      "ticks_per_second": 960,
+      "roll_ids": [],
+      "score_ids": [],
+      "key_pitches": [],
+      "roll_pitches": []
+    },
+    {
+      "requested": 1.496,
+      "roll_seconds": 1.496,
+      "score_tick": 1916,
+      "ticks_per_second": 960,
+      "roll_ids": [],
+      "score_ids": [],
+      "key_pitches": [],
+      "roll_pitches": []
+    },
+    {
+      "requested": 1.5,
+      "roll_seconds": 1.5,
+      "score_tick": 1920,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1"
+      ],
+      "score_ids": [
+        "f-1"
+      ],
+      "key_pitches": [
+        60
+      ],
+      "roll_pitches": [
+        60
+      ]
+    },
+    {
+      "requested": 1.504,
+      "roll_seconds": 1.504,
+      "score_tick": 1924,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1"
+      ],
+      "score_ids": [
+        "f-1"
+      ],
+      "key_pitches": [
+        60
+      ],
+      "roll_pitches": [
+        60
+      ]
+    },
+    {
+      "requested": 1.508,
+      "roll_seconds": 1.508,
+      "score_tick": 1928,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1"
+      ],
+      "score_ids": [
+        "f-1"
+      ],
+      "key_pitches": [
+        60
+      ],
+      "roll_pitches": [
+        60
+      ]
+    },
+    {
+      "requested": 1.512,
+      "roll_seconds": 1.512,
+      "score_tick": 1932,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "key_pitches": [
+        60,
+        64
+      ],
+      "roll_pitches": [
+        60,
+        64
+      ]
+    },
+    {
+      "requested": 1.516,
+      "roll_seconds": 1.516,
+      "score_tick": 1935,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "key_pitches": [
+        60,
+        64
+      ],
+      "roll_pitches": [
+        60,
+        64
+      ]
+    },
+    {
+      "requested": 1.52,
+      "roll_seconds": 1.52,
+      "score_tick": 1939,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "key_pitches": [
+        60,
+        64
+      ],
+      "roll_pitches": [
+        60,
+        64
+      ]
+    },
+    {
+      "requested": 1.524,
+      "roll_seconds": 1.524,
+      "score_tick": 1943,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        60,
+        64,
+        67
+      ],
+      "roll_pitches": [
+        60,
+        64,
+        67
+      ]
+    }
+  ],
+  "stepped_release": [
+    {
+      "requested": 2.496,
+      "roll_seconds": 2.496,
+      "score_tick": 2396,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        60,
+        64,
+        67
+      ],
+      "roll_pitches": [
+        60,
+        64,
+        67
+      ]
+    },
+    {
+      "requested": 2.5,
+      "roll_seconds": 2.5,
+      "score_tick": 2400,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        64,
+        67
+      ],
+      "roll_pitches": [
+        64,
+        67
+      ]
+    },
+    {
+      "requested": 2.504,
+      "roll_seconds": 2.504,
+      "score_tick": 2404,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        64,
+        67
+      ],
+      "roll_pitches": [
+        64,
+        67
+      ]
+    },
+    {
+      "requested": 2.508,
+      "roll_seconds": 2.508,
+      "score_tick": 2408,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        64,
+        67
+      ],
+      "roll_pitches": [
         64,
         67
       ]

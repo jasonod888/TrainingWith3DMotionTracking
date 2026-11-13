@@ -13,6 +13,16 @@ SESSION = Path('.local/phase3/session.json')
 FAILURES = []
 RESULT = {}
 
+WINDOW = """() => {
+  const label = document.querySelector('.ws-window-label');
+  const head = document.querySelector('.ws-roll-playhead');
+  return {
+    window_start: Number((label?.textContent?.match(/from ([0-9.]+)/) || [0, 0])[1]),
+    window_span: Number(label?.dataset.windowSpan ?? 0),
+    roll_cursor: head ? Number(head.getAttribute('x1')) : null,
+  };
+}"""
+
 SAMPLE = """() => {
   const video = document.querySelector('video');
   const roll = document.querySelector('.ws-roll-playhead');
@@ -51,7 +61,7 @@ STEP = """async (value) => {
   const viewport = document.querySelector('.ws-roll-viewport');
   const label = document.querySelector('.ws-window-label');
   const span = Number(label.dataset.windowSpan);
-  const rollSeconds = Number(roll.getAttribute('x1')) / (viewport.clientWidth / span);
+  const rollSeconds = roll ? Number(roll.getAttribute('x1')) / (viewport.clientWidth / span) : null;
   return {
     requested: Number(clock.value),
     roll_seconds: Number(rollSeconds.toFixed(4)),
@@ -132,17 +142,11 @@ def main() -> int:
             page.locator('.ws-toolbar select').first.select_option('1')
 
             # Seek: the cursor must agree after a seek, not just during playback.
-            page.evaluate("""() => {
-              const scroller = document.querySelector('.ws-roll-viewport');
-              scroller.scrollLeft = 10000;
-              scroller.dispatchEvent(new Event('scroll'));
-            }""")
-            page.wait_for_timeout(300)
             page.locator('.ws-score-ruler').click(position={'x': 400, 'y': 10})
             page.wait_for_timeout(500)
             seeked = page.evaluate(SAMPLE)
             RESULT['seek'] = seeked
-            expect(seeked['window_start'] >= 0, 'window state after seek')
+            RESULT['seek_window'] = page.evaluate(WINDOW)
             expect(abs(seeked['roll_seconds'] - seeked['video']) <= frame,
                    f"seek: cursor lag {abs(seeked['roll_seconds'] - seeked['video']):.4f}s")
             expect(abs(seeked['score_tick'] - round(seeked['video'] * seeked['ticks_per_second'])) <= 2,
@@ -158,7 +162,7 @@ def main() -> int:
                 state = page.evaluate(STEP, round(1.996 + index * 0.004, 3))
                 if state:
                     steps.append(state)
-            RESULT['frames'] = steps
+            RESULT['stepped_frames'] = steps
             by_request = {step['requested']: step for step in steps}
             expect(by_request.get(1.996, {}).get('roll_ids') == [], 'no note should sound at 1.996 s')
             expect(by_request.get(2.004, {}).get('roll_ids') == ['f-1'], 'only the first attack by 2.004 s')
@@ -167,6 +171,59 @@ def main() -> int:
                    'all three attacks by 2.028 s')
             for step in steps:
                 expect(identity_ok(step), f"identities disagree at {step['requested']} s: {step['roll_ids']} vs {step['score_ids']} vs {step['key_pitches']}")
+
+            def step_run(base, count, label):
+                offset_input = page.locator('.ws-toolbar input[type=number]').first
+                step_states = []
+                for index in range(count):
+                    state = page.evaluate(STEP, round(base + index * 0.004, 3))
+                    if state:
+                        step_states.append(state)
+                RESULT[label] = step_states
+                return {state['requested']: state for state in step_states}
+
+            # The controlled scenario must run at a nonzero viewport.
+            page.evaluate("""() => {
+              const scroller = document.querySelector('.ws-roll-viewport');
+              scroller.scrollLeft = 130;
+              scroller.dispatchEvent(new Event('scroll'));
+            }""")
+            page.wait_for_timeout(400)
+            RESULT['stepped_viewport_start'] = page.evaluate(WINDOW)['window_start']
+            expect(RESULT['stepped_viewport_start'] > 1,
+                   f"the stepped scenario must run at a nonzero viewport (start {RESULT['stepped_viewport_start']})")
+
+            # Positive offset: attacks move later by exactly 0.5 s.
+            page.locator('.ws-toolbar input[type=number]').first.fill('0.5')
+            page.locator('.ws-toolbar input[type=number]').first.press('Enter')
+            page.wait_for_timeout(300)
+            positive = step_run(2.492, 9, 'stepped_offset_positive')
+            expect(sorted(positive.get(2.504, {}).get('roll_ids', [])) == ['f-1'],
+                   'positive offset: the first attack should be at 2.504 s')
+            expect(sorted(positive.get(2.516, {}).get('roll_ids', [])) == ['f-1', 'f-2'],
+                   'positive offset: the second attack should be at 2.516 s')
+
+            # Negative offset: the same attacks arrive earlier.
+            page.locator('.ws-toolbar input[type=number]').first.fill('-0.5')
+            page.locator('.ws-toolbar input[type=number]').first.press('Enter')
+            page.wait_for_timeout(300)
+            negative = step_run(1.492, 9, 'stepped_offset_negative')
+            expect(sorted(negative.get(1.504, {}).get('roll_ids', [])) == ['f-1'],
+                   'negative offset: the first attack should be at 1.504 s')
+            expect(sorted(negative.get(1.516, {}).get('roll_ids', [])) == ['f-1', 'f-2'],
+                   'negative offset: the second attack should be at 1.516 s')
+
+            # Release boundary without offset: f-1 ends at 2.500 s exactly.
+            page.locator('.ws-toolbar input[type=number]').first.fill('0')
+            page.locator('.ws-toolbar input[type=number]').first.press('Enter')
+            page.wait_for_timeout(300)
+            release = step_run(2.496, 4, 'stepped_release')
+            expect('f-1' not in (release.get(2.500) or {}).get('roll_ids', []),
+                   'release: f-1 must stop sounding at its exact end (2.500 s)')
+            expect('f-1' in (release.get(2.496) or {}).get('roll_ids', []), 'release: f-1 still sounds before its end')
+            for label in ('stepped_offset_positive', 'stepped_offset_negative', 'stepped_release'):
+                for state in RESULT[label]:
+                    expect(identity_ok(state), f"identities disagree in {label} at {state['requested']} s")
             page.screenshot(path=str(OUT / 'frames-12ms.png'))
         except Exception as cause:
             FAILURES.append(f'exception: {cause}')

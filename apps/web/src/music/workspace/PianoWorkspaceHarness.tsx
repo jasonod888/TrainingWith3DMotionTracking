@@ -265,6 +265,8 @@ export function PianoWorkspaceHarness() {
   // Audition yields to real playback and to a source-mode change.
   useEffect(() => { if (playing) audioRef.current?.stop(); }, [playing]);
   useEffect(() => { if (!preview.url && audioMode === 'piano') setAudioMode('original'); }, [preview.url, audioMode]);
+  // A controller failure visibly returns the source audio, never a silent Piano.
+  useEffect(() => { if (player.error && audioMode === 'piano') setAudioMode('original'); }, [player.error, audioMode]);
   useEffect(() => { audioRef.current?.stop(); }, [audioMode]);
 
   const audition = useCallback((pitches: number[], seconds = 0.5) => {

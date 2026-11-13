@@ -15,7 +15,48 @@ One source clock, a shared time↔score map, linked navigation and follow playba
 
 ---
 
-## 0.4 Follow-up correction (this commit)
+## 0.6 Second follow-up — supported Piano flow and precise timing claims
+
+### Supported Piano flow (automated, in the shared suite)
+
+`apps/web/tests/workspace-piano-integration.test.tsx` runs in `npm test` and renders the actual harness with
+controlled media doubles (currentTime, duration, readyState, paused, muted, volume, playbackRate, play/pause
+events), a bounded frame scheduler and the **real** preview hook and source controller.
+
+1. **Pending verification**: the preview fetch is held open; Piano is disabled, `audio.src` is `null`, and the
+   UI says it is verifying. When the bytes resolve with a matching SHA-256, the blob URL is exposed and Piano
+   enables.
+2. **Controller integration**: with a 0.5 s offset and Piano selected, the video is muted, Piano maps 5 s → 4.5 s,
+   play/pause reach the Piano element, a seek to 10 s maps to 9.5 s, changing the video rate to 0.5 reaches the
+   Piano element, and a new 1.0 s offset remaps 10 s → 9 s. The video remains the only transport.
+3. **Original restores**: selecting Original stops Piano and unmutes the source. A rejected `play()` makes the
+   controller fail; the harness visibly falls back to Original (aria-pressed) with source audio restored.
+4. **Cleanup**: unmount revokes the verified blob URL through the preview hook, restores the source mute state,
+   and leaves no scheduled frame callbacks.
+
+Two tests, both in the suite; the file terminates normally and fails on unmet assertions. Total suite **433
+passing**.
+
+### Timing qualification — corrected claims
+
+| Claim | Evidence |
+| --- | --- |
+| Stepped fixture, settled activation | 12 ms attacks at 2.000/2.012/2.024, sampled after two rendered frames — labelled **stepped** evidence in `stepped_frames` |
+| Positive offset | +0.5 s: first attack at 2.504, second at 2.516 |
+| Negative offset | −0.5 s: first attack at 1.504, second at 1.516 |
+| Release boundary | at exactly 2.500 s the first note is gone while the later two still sound |
+| Nonzero viewport in the controlled scenario | window starts at **1.3 s**, not zero |
+| Live progressing clock | rate 1 worst lag **14.7 ms**, tick within **17 ticks**; rate 0.5 advances **0.507 s** per wall second; seek agrees with the cursor |
+| Occurrence identities | sets compared across roll, score and keyboard at every step (not raw counts) |
+
+The stepped fixture is settled-per-step evidence and is **not** presented as a progressing-frame-clock test;
+that role belongs to the live rate/seek samples above.
+
+---
+
+## 0.7 First follow-up correction (superseded)
+
+
 
 | Item | Resolution | Evidence |
 | --- | --- | --- |
@@ -28,13 +69,11 @@ with `npx tsx --test tests/workspace-audio.probe.tsx`): **2/2 pass**, exit 0. It
 with a tracked synthetic draft, mocked media events and audition methods, and performs no service calls or
 writes. It is kept out of the shared suite because jsdom keeps media handles open; it exits explicitly.
 
-**Remaining limitation (honest):** the *valid, verified* preview path (Piano enabled with a blob URL after a
-correct hash) is wired through the same hook but is **not** covered by an automated probe in this submission —
-the jsdom audio element never settles after a blob `src`. The mismatch and unavailable paths are covered, and
-the hook's verification code is the one already used by the source-player pages, but the enabled-Piano case
-remains developer-verified only.
+**Limitation recorded at that commit (now resolved):** the valid, verified preview path was not automated
+there; §0.6 adds the actual-workspace integration test for the successful path, controller behaviour, failure
+fallback and cleanup.
 
-431 web tests pass; `tsc` clean; timing script exits 0; audio probe exits 0.
+431 web tests passed at that commit; `tsc` clean; timing script exited 0; audio probe exited 0.
 
 ---
 
