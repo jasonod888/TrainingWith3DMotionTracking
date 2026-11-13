@@ -15,6 +15,7 @@ import {
   type TimeWindow,
 } from './viewport';
 import {useElementWidth} from './useElementWidth';
+import {useClockTime, type ClockStore} from './clock';
 
 const RULER_HEIGHT = 24;
 const PLOT_HEIGHT = 168;
@@ -38,14 +39,22 @@ type Props = {
   activeOccurrenceIds?: string[];
   onSelect: (occurrenceId: string) => void;
   onSeek: (seconds: number) => void;
+  /** Frame-rate visual clock; when present the cursor follows it per frame. */
+  clock?: ClockStore | null;
+  /** Offset-aware intervals used to light sounding notes inside this surface. */
+  intervals?: { id: string; start: number; end: number }[];
   /** Distinguishes a user scroll from a reveal or playback pan. */
   onWindowChangeOrigin?: (window: TimeWindow, origin: 'user' | 'reveal' | 'playback') => void;
 };
 
 export function TimeRoll({
   document, window, onWindowChange, selectedOccurrenceId, reveal, playhead, offsetSeconds = 0,
-  activeOccurrenceIds = [], onSelect, onSeek, onWindowChangeOrigin,
+  activeOccurrenceIds = [], onSelect, onSeek, onWindowChangeOrigin, clock = null, intervals,
 }: Props) {
+  const livePlayhead = useClockTime(clock, playhead);
+  const liveActive = intervals
+    ? intervals.filter(interval => livePlayhead >= interval.start && livePlayhead < interval.end).map(interval => interval.id)
+    : activeOccurrenceIds;
   const [viewportRef, measuredWidth, element] = useElementWidth<HTMLDivElement>();
   const [labelOffset, setLabelOffset] = useState(0);
   const syncing = useRef(false);
@@ -169,7 +178,7 @@ export function TimeRoll({
             const left = (note.onset + effectiveOffset) * pps;
             const noteWidth = Math.max(2, (note.duration ?? 0.25) * pps - 1);
             const selected = selectedOccurrenceId === note.id;
-            const active = activeOccurrenceIds.includes(note.id);
+            const active = liveActive.includes(note.id);
             return <rect key={note.id} className={`ws-roll-note${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
               x={left} y={y(note.pitch) - rowHeight / 2} width={noteWidth} height={Math.max(3, rowHeight - 1)} rx={2}
               data-occurrence={note.id} role="button" tabIndex={0}
@@ -179,8 +188,8 @@ export function TimeRoll({
               <title>{`${pitchName(note.pitch)} · ${note.onset.toFixed(2)} s · ${(note.duration ?? 0).toFixed(2)} s`}</title>
             </rect>;
           })}
-          {playhead >= window.start && playhead <= window.start + window.span
-            ? <line className="ws-roll-playhead" x1={playhead * pps} y1={0} x2={playhead * pps} y2={pitchHeight}/>
+          {livePlayhead >= window.start && livePlayhead <= window.start + window.span
+            ? <line className="ws-roll-playhead" x1={livePlayhead * pps} y1={0} x2={livePlayhead * pps} y2={pitchHeight}/>
             : null}
         </svg>
       </div>

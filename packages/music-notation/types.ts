@@ -161,6 +161,13 @@ export type BuildOptions = {
   grid?: number;
   /** Use the reviewed source duration even when the last event ends earlier. */
   duration?: number;
+  /**
+   * Map a recorded onset to notated score seconds (explanation time contributes none).
+   * The performance copy keeps the exact source seconds.
+   */
+  scoreSeconds?: (note: PerformanceNote) => number;
+  /** Length of the notated score when it differs from the source duration. */
+  scoreDuration?: number;
 };
 
 export type EditorSelection = {

@@ -67,14 +67,18 @@ type Group = {
 
 type AssignedGroup = Group & { voice: 1 | 2; skipped?: boolean };
 
-function groupPerformance(performance: PerformanceNote[], secondsPerTick: number, splitPitch: number): Group[] {
+function groupPerformance(
+  performance: PerformanceNote[], secondsPerTick: number, splitPitch: number,
+  scoreSeconds: (note: PerformanceNote) => number,
+): Group[] {
   const groups = new Map<string, Group>();
   for (const source of performance) {
-    const start = snapTick(source.onset / secondsPerTick);
+    const scoreOnset = scoreSeconds(source);
+    const start = snapTick(scoreOnset / secondsPerTick);
     const sourceLength = source.notation_duration && source.notation_duration > 0
       ? source.notation_duration
       : source.duration && source.duration > 0 ? source.duration : 0.25;
-    const end = snapTick((source.onset + sourceLength) / secondsPerTick);
+    const end = snapTick((scoreOnset + sourceLength) / secondsPerTick);
     const duration = Math.max(GRID, end - start);
     const staff = source.pitch >= splitPitch ? 'treble' : 'bass';
     const key = `${staff}:${start}:${duration}`;
@@ -153,8 +157,9 @@ export function buildNotation(performance: PerformanceNote[], options: BuildOpti
   const duration = options.duration ?? Math.max(0.05, ...source.map(note => note.onset + (note.duration && note.duration > 0 ? note.duration : 0.25)));
   const splitPitch = Math.max(0, Math.min(127, options.staff_split_pitch ?? 60));
   const secondsPerTick = 60 / (bpm * PPQ);
-  const measures = makeMeasures(duration, bpm, time);
-  const groups = assignVoices(groupPerformance(source, secondsPerTick, splitPitch));
+  const scoreSeconds = options.scoreSeconds ?? ((note: PerformanceNote) => note.onset);
+  const measures = makeMeasures(options.scoreDuration ?? duration, bpm, time);
+  const groups = assignVoices(groupPerformance(source, secondsPerTick, splitPitch, scoreSeconds));
   const events: NotationEvent[] = groups.map((group, index) => {
     const notes: NotationNote[] = [];
     const byPitch = new Map<number, PerformanceNote>();

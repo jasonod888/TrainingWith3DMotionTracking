@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  activeOccurrenceIds, addAnchor, alignmentFromSpans, alignmentProblem, effectiveSecondsToTick, spansProblem,
+  activeOccurrenceIds, addAnchor, alignmentFromSpans, alignmentProblem, effectiveSecondsToTick, scoreClock, spansProblem,
   estimatedAlignment, occurrenceIntervals, secondsToTick, tickToEffectiveSeconds, tickToSeconds,
   type Alignment,
 } from '../../../packages/music-notation/index.ts';
@@ -168,4 +168,61 @@ test('R3: overlapping or reversed authored spans are reported and not used', () 
   assert.equal(spansProblem([{start: 0, end: 5, kind: 'playing'}, {start: 5, end: 10, kind: 'explanation'}], 10), null);
   const overlapping = alignmentFromSpans(clip(), [{start: 0, end: 6, kind: 'playing'}, {start: 4, end: 10, kind: 'playing'}]);
   assert.equal(alignmentProblem(overlapping, 10), null, 'malformed spans fall back to a valid estimated map');
+});
+/* ------------------------------------------------------------------ R2 */
+
+test('R2: the engraved score and the map share one score-time domain', () => {
+  const spans = [
+    {start: 0, end: 4, kind: 'playing' as const},
+    {start: 4, end: 7, kind: 'explanation' as const},
+    {start: 7, end: 12, kind: 'playing' as const},
+  ];
+  const clock = scoreClock(spans, 12);
+  const document = buildNotation([note('before', 2, 60), note('after', 8, 72)], {
+    bpm: 120, duration: 12, scoreSeconds: item => clock.toScore(item.onset), scoreDuration: clock.scoreDuration,
+  });
+  const map = alignmentFromSpans(document, spans);
+  const after = document.events.find(event => event.notes.some(item => item.performance_ids.includes('after')))!;
+  const before = document.events.find(event => event.notes.some(item => item.performance_ids.includes('before')))!;
+
+  assert.equal(clock.scoreDuration, 9, 'three seconds of speech are not notated');
+  assert.equal(before.start, secondsToTick(map, 2), 'a note before the explanation maps exactly');
+  assert.equal(after.start, secondsToTick(map, 8), 'a note after the explanation maps exactly');
+  assert.equal(after.start, 5 * TICKS_PER_SECOND);
+  assert.ok(Math.abs(tickToSeconds(map, after.start) - 8) < 1e-6, 'clicking its written position seeks to 8 s');
+});
+
+test('R2: leading explanations and multiple playing passages stay in one domain', () => {
+  const spans = [
+    {start: 0, end: 3, kind: 'explanation' as const},
+    {start: 3, end: 6, kind: 'playing' as const},
+    {start: 6, end: 8, kind: 'explanation' as const},
+    {start: 8, end: 10, kind: 'playing' as const},
+  ];
+  const clock = scoreClock(spans, 10);
+  assert.equal(clock.toScore(1), 0, 'speech before playing adds no score time');
+  assert.equal(clock.toScore(4.5), 1.5);
+  assert.equal(clock.toScore(7), 3, 'the second explanation holds the score');
+  assert.equal(clock.toScore(9.5), 4.5);
+  assert.equal(clock.scoreDuration, 5);
+  const document = buildNotation([note('a', 4.5, 60), note('b', 9.5, 64)], {
+    bpm: 120, duration: 10, scoreSeconds: item => clock.toScore(item.onset), scoreDuration: clock.scoreDuration,
+  });
+  const map = alignmentFromSpans(document, spans);
+  const b = document.events.find(event => event.notes.some(item => item.performance_ids.includes('b')))!;
+  assert.equal(b.start, secondsToTick(map, 9.5));
+  assert.ok(Math.abs(tickToSeconds(map, b.start) - 9.5) < 1e-6);
+});
+
+test('R3: a trailing explanation returns the hold start for its held tick', () => {
+  const document = clip();
+  const alignment = alignmentFromSpans(document, [
+    {start: 0, end: 4, kind: 'playing'},
+    {start: 4, end: 10, kind: 'explanation'},
+  ]);
+  assert.equal(alignmentProblem(alignment, 10), null);
+  assert.equal(secondsToTick(alignment, 8), 4 * TICKS_PER_SECOND);
+  assert.ok(Math.abs(tickToSeconds(alignment, 4 * TICKS_PER_SECOND) - 4) < 1e-6,
+    'the held tick belongs to the start of the trailing hold');
+  assert.ok(Math.abs(tickToSeconds(alignment, 1e6) - 10) < 1e-6, 'past the score domain clamps to the clip end');
 });

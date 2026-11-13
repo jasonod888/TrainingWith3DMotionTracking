@@ -43,49 +43,96 @@ export function estimatedAlignment(document: NotationDocument): Alignment {
   };
 }
 
+export type ScoreClock = {
+  /** Source seconds → notated score seconds (explanation time contributes nothing). */
+  toScore: (seconds: number) => number;
+  /** Length of the notated score in score seconds. */
+  scoreDuration: number;
+  /** Set when the authored spans are unusable; the clock then follows the source. */
+  problem: string | null;
+};
+
+/**
+ * The single score-time domain shared by the builder, the alignment and the engraved
+ * geometry: playing passages advance score time, explanation passages and uncovered
+ * gaps hold it. Recorded seconds are never changed.
+ */
+export function scoreClock(spans: PassageSpan[] | null | undefined, duration: number): ScoreClock {
+  const problem = spansProblem(spans, duration);
+  if (!spans || !spans.length || problem) {
+    return {toScore: (seconds: number) => seconds, scoreDuration: duration, problem};
+  }
+  const ordered = [...spans].sort((left, right) => left.start - right.start);
+  const segments: {start: number; end: number; playing: boolean; scoreStart: number}[] = [];
+  let scoreElapsed = 0;
+  let cursor = 0;
+  for (const span of ordered) {
+    const start = clamp(Math.max(span.start, cursor), 0, duration);
+    const end = clamp(span.end, start, duration);
+    if (start > cursor + EPSILON) segments.push({start: cursor, end: start, playing: false, scoreStart: scoreElapsed});
+    segments.push({start, end, playing: span.kind === 'playing', scoreStart: scoreElapsed});
+    if (span.kind === 'playing') scoreElapsed += Math.max(0, end - start);
+    cursor = Math.max(cursor, end);
+  }
+  if (cursor < duration - EPSILON) segments.push({start: cursor, end: duration, playing: false, scoreStart: scoreElapsed});
+  const total = scoreElapsed > 0 ? scoreElapsed : duration;
+  const toScore = (seconds: number): number => {
+    const bounded = clamp(seconds, 0, duration);
+    for (const segment of segments) {
+      if (bounded >= segment.start - EPSILON && bounded <= segment.end + EPSILON) {
+        return segment.playing
+          ? clamp(segment.scoreStart + (bounded - segment.start), 0, total)
+          : clamp(segment.scoreStart, 0, total);
+      }
+    }
+    return total;
+  };
+  return {toScore, scoreDuration: total, problem: null};
+}
+
 /**
  * Build passages from the authored playing/explanation spans. Each playing span
  * advances the score by its own duration, so an explanation (or an uncovered gap)
  * holds the cursor and the next passage resumes from the same tick instead of
- * inventing beats or jumping ahead.
+ * inventing beats or jumping ahead. Boundaries come from `scoreClock`, so the map
+ * and the engraved score describe the same timeline.
  */
 export function alignmentFromSpans(document: NotationDocument, spans: PassageSpan[] | null | undefined): Alignment {
   if (!spans || !spans.length) return estimatedAlignment(document);
   if (spansProblem(spans, document.duration)) return estimatedAlignment(document);
   const secondsPerBeatTick = secondsPerTick(document);
+  const clock = scoreClock(spans, document.duration);
   const ordered = [...spans].sort((left, right) => left.start - right.start);
   const passages: AlignmentPassage[] = [];
   let cursor = 0;
-  let heldTick = 0;
 
   const push = (passage: AlignmentPassage) => {
     if (passage.source_seconds[1] - passage.source_seconds[0] <= EPSILON) return;
     passages.push(passage);
     cursor = passage.source_seconds[1];
   };
+  const tickAt = (seconds: number) => Math.round(clock.toScore(seconds) / secondsPerBeatTick);
 
   for (const span of ordered) {
     const start = clamp(Math.max(span.start, cursor), 0, document.duration);
     const end = clamp(span.end, start, document.duration);
     if (start > cursor + EPSILON) {
-      // Uncovered time holds the score at the last reached tick.
-      push({kind: 'held', source_seconds: [cursor, start], tick: heldTick});
+      push({kind: 'held', source_seconds: [cursor, start], tick: tickAt(cursor)});
     }
     if (span.kind === 'explanation') {
-      push({kind: 'held', source_seconds: [start, end], tick: heldTick});
+      push({kind: 'held', source_seconds: [start, end], tick: tickAt(start)});
     } else {
-      const advance = Math.max(1, Math.round((end - start) / secondsPerBeatTick));
-      const tickStart = heldTick;
-      const tickEnd = tickStart + advance;
+      const tickStart = tickAt(start);
+      const tickEnd = Math.max(tickStart + 1, tickAt(end));
       push({kind: 'timed', source_seconds: [start, end], ticks: [tickStart, tickEnd]});
-      heldTick = tickEnd;
     }
   }
   if (cursor < document.duration - EPSILON) {
-    push({kind: 'held', source_seconds: [cursor, document.duration], tick: heldTick});
+    push({kind: 'held', source_seconds: [cursor, document.duration], tick: tickAt(cursor)});
   }
   if (!passages.length) return estimatedAlignment(document);
-  return {alignment_version: 1, mode: 'estimated', basis: 'passages', passages};
+  const alignment: Alignment = {alignment_version: 1, mode: 'estimated', basis: 'passages', passages};
+  return alignmentProblem(alignment, document.duration) ? estimatedAlignment(document) : alignment;
 }
 
 /** Reports malformed authored spans: reversed, out of clip, or overlapping. */
@@ -178,9 +225,10 @@ export function tickToSeconds(alignment: Alignment, tick: number): number {
   const first = alignment.passages[0];
   const last = alignment.passages[alignment.passages.length - 1];
   const firstTick = first.kind === 'timed' ? first.ticks[0] : first.tick;
-  const lastTick = last.kind === 'timed' ? last.ticks[1] : last.tick;
   if (!Number.isFinite(tick) || tick <= firstTick) return first.source_seconds[0];
-  if (tick >= lastTick) return last.source_seconds[1];
+
+  // Scan in order so the earliest owner of a tick wins. A held tick also exists at the
+  // end of the preceding stretch, and a trailing hold keeps it at the hold's start.
   for (const passage of alignment.passages) {
     if (passage.kind === 'timed') {
       const [tickStart, tickEnd] = passage.ticks;
@@ -193,6 +241,9 @@ export function tickToSeconds(alignment: Alignment, tick: number): number {
       return passage.source_seconds[0];
     }
   }
+
+  const lastTick = last.kind === 'timed' ? last.ticks[1] : last.tick;
+  if (tick > lastTick) return last.source_seconds[1];
   return last.source_seconds[1];
 }
 

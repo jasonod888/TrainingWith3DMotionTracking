@@ -12,7 +12,7 @@ import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
   buildNotation, selectionForOccurrence,
   activeOccurrenceIds, alignmentFromSpans, effectiveSecondsToTick, occurrenceIntervals,
-  tickToEffectiveSeconds,
+  scoreClock, tickToEffectiveSeconds,
   type Alignment, type CorrectionSelection, type NotationDocument,
 } from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
@@ -153,15 +153,21 @@ export function PianoWorkspaceHarness() {
             {id: 'd-2', onset: 2.045, duration: 0.6, pitch: 66},
             {id: 'd-3', onset: 2.09, duration: 0.6, pitch: 69},
           ];
+      const demoSpans = demo === 'explanation'
+        ? [{start: 0, end: 4, kind: 'playing' as const}, {start: 4, end: 7, kind: 'explanation' as const}, {start: 7, end: 12, kind: 'playing' as const}]
+        : [{start: 0, end: 12, kind: 'playing' as const}];
+      const demoClock = scoreClock(demoSpans, 12);
       const document = buildNotation(events.map(event => ({
         ...event, velocity: 0.6, confidence: null, optional: false, string: null, fret: null,
-      })), {bpm: 120, duration: 12});
+      })), {
+        bpm: 120, duration: 12,
+        scoreSeconds: note => demoClock.toScore(note.onset),
+        scoreDuration: demoClock.scoreDuration,
+      });
       setBaseline(document);
       setState(createWorkspaceState(document));
       setTitle(demo === 'explanation' ? 'Fixture: explanation passage' : 'Fixture: arpeggiated chord');
-      setSpans(demo === 'explanation'
-        ? [{start: 0, end: 4, kind: 'playing'}, {start: 4, end: 7, kind: 'explanation'}, {start: 7, end: 12, kind: 'playing'}]
-        : [{start: 0, end: 12, kind: 'playing'}]);
+      setSpans(demoSpans);
       setVideoUrl(null);
       setLoading(false);
       return () => { stopped = true; };
@@ -173,11 +179,17 @@ export function PianoWorkspaceHarness() {
         if (!parsed.ok) throw new Error(parsed.message);
         if (stopped) return;
         const draft = parsed.value;
+        const draftSpans = draft.spans.map(span => ({start: span.start, end: span.end, kind: span.kind}));
+        const clock = scoreClock(draftSpans, draft.duration);
         const document = buildNotation(draft.events.map(event => ({
           id: event.id, onset: event.onset, duration: event.duration, pitch: event.pitch,
           velocity: event.velocity, confidence: event.confidence, optional: event.optional,
           string: event.string, fret: event.fret, notation_duration: event.notation_duration ?? null,
-        })), {duration: draft.duration});
+        })), {
+          duration: draft.duration,
+          scoreSeconds: note => clock.toScore(note.onset),
+          scoreDuration: clock.scoreDuration,
+        });
         setBaseline(document);
         setState(createWorkspaceState(document));
         setTitle(draft.title);
