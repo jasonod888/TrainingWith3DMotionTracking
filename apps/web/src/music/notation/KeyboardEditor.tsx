@@ -63,6 +63,7 @@ export function KeyboardEditor({document: score, selectedPitch, activePitches, o
         const active = activePitches.includes(pitch);
         return <g key={pitch}>
           <rect x={x} y="8" width={whiteWidth - 1.5} height="124" rx="3"
+            data-pitch={pitch}
             className={`keyboard-white${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
             onClick={() => { onKey(pitch, false); onSelectKey?.(pitch); }} role="button" tabIndex={0}
             onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onKey(pitch, false); onSelectKey?.(pitch); } }}
@@ -74,6 +75,7 @@ export function KeyboardEditor({document: score, selectedPitch, activePitches, o
         const selected = selectedPitch === pitch;
         const active = activePitches.includes(pitch);
         return <rect key={pitch} x={x} y="8" width={blackWidth} height="78" rx="3"
+          data-pitch={pitch}
           className={`keyboard-black${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
           onClick={() => { onKey(pitch, false); onSelectKey?.(pitch); }} role="button" tabIndex={0}
           onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onKey(pitch, false); onSelectKey?.(pitch); } }}

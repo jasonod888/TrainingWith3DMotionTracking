@@ -15,7 +15,32 @@ One source clock, a shared time↔score map, linked navigation and follow playba
 
 ---
 
-## 0.2 Correction round — all six items addressed
+## 0.4 Follow-up correction (this commit)
+
+| Item | Resolution | Evidence |
+| --- | --- | --- |
+| **F1** Piano bypassed asset verification | The harness now uses the existing `usePianoPreviewAsset` hook: the preview bytes are fetched, their length and SHA-256 checked, and only a verified asset yields a blob URL. Piano is disabled while pending or failed, no `src` is exposed, and the failure message keeps Original audio. | Probe: a three-byte preview with a wrong hash leaves Piano disabled, `src=null`, with the honest message; a fetch of the preview bytes is observed. |
+| **F2** Original-only playback did not stop audition | The audition-stop effect now depends on the harness's own source-derived `playing` state, not on the optional Piano controller, so it fires with or without a preview. Mode change and unmount also stop audition. | Probe: source-video draft with no preview; audition then `video.play()` produces `NotationAudio.stop()` calls. |
+| **F3** Timing evidence corrected | New `?demo=frames` fixture with attacks at **2.000 / 2.012 / 2.024 s** (12 ms apart), stepped with a 1 ms clock granularity and read after two rendered frames. Occurrence identities are compared as sets across roll (`data-occurrence`, `data-pitch`), score (`data-occurrences`) and keyboard (`data-pitch`) rather than by total counts. Measures now include rate 1, rate 0.5, a seek at a nonzero viewport, and the one-displayed-frame target (16.7 ms). | Measured: rate-1 worst cursor lag **12.3 ms** (≤ one frame), score tick within **14 ticks**, rate-0.5 advances **0.508 s** of media per wall second with the cursor in step, seek agrees, and the 12 ms fixture lights exactly one, two and three occurrences at 2.004 / 2.016 / 2.028 s with identical identity sets in all three views. |
+
+Probe (`docs/qualification/piano-workspace-phase-04/scripts/workspace-audio.probe.tsx`, run from `apps/web`
+with `npx tsx --test tests/workspace-audio.probe.tsx`): **2/2 pass**, exit 0. It renders the actual harness
+with a tracked synthetic draft, mocked media events and audition methods, and performs no service calls or
+writes. It is kept out of the shared suite because jsdom keeps media handles open; it exits explicitly.
+
+**Remaining limitation (honest):** the *valid, verified* preview path (Piano enabled with a blob URL after a
+correct hash) is wired through the same hook but is **not** covered by an automated probe in this submission —
+the jsdom audio element never settles after a blob `src`. The mismatch and unavailable paths are covered, and
+the hook's verification code is the one already used by the source-player pages, but the enabled-Piano case
+remains developer-verified only.
+
+431 web tests pass; `tsc` clean; timing script exits 0; audio probe exits 0.
+
+---
+
+## 0.5 Previous correction round (superseded)
+
+
 
 The earlier status block below is superseded. Commits `54813d0`, `d88017d`, `d9b4733`, `eb194bb` and
 the current commit address R1–R6 and the trailing-hold boundary.

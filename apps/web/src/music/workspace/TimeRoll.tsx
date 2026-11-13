@@ -181,7 +181,7 @@ export function TimeRoll({
             const active = liveActive.includes(note.id);
             return <rect key={note.id} className={`ws-roll-note${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
               x={left} y={y(note.pitch) - rowHeight / 2} width={noteWidth} height={Math.max(3, rowHeight - 1)} rx={2}
-              data-occurrence={note.id} role="button" tabIndex={0}
+              data-occurrence={note.id} data-pitch={note.pitch} role="button" tabIndex={0}
               aria-label={`${pitchName(note.pitch)} at ${note.onset.toFixed(2)} seconds${selected ? ', selected' : ''}`}
               onPointerDown={() => onSelect(note.id)}
               onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(note.id); } }}>

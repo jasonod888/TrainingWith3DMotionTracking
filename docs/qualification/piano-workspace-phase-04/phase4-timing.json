@@ -1,0 +1,415 @@
+{
+  "rate1": [
+    {
+      "video": 1.8342,
+      "rate": 1,
+      "roll_seconds": 1.829,
+      "score_tick": 2122,
+      "ticks_per_second": 1160,
+      "window_start": 0,
+      "roll_ids": [
+        "bp-3"
+      ],
+      "score_ids": [
+        "bp-3"
+      ],
+      "key_pitches": [
+        54
+      ],
+      "roll_pitches": [
+        54
+      ]
+    },
+    {
+      "video": 1.8364,
+      "rate": 1,
+      "roll_seconds": 1.829,
+      "score_tick": 2122,
+      "ticks_per_second": 1160,
+      "window_start": 0,
+      "roll_ids": [
+        "bp-3"
+      ],
+      "score_ids": [
+        "bp-3"
+      ],
+      "key_pitches": [
+        54
+      ],
+      "roll_pitches": [
+        54
+      ]
+    },
+    {
+      "video": 1.8383,
+      "rate": 1,
+      "roll_seconds": 1.829,
+      "score_tick": 2122,
+      "ticks_per_second": 1160,
+      "window_start": 0,
+      "roll_ids": [
+        "bp-3"
+      ],
+      "score_ids": [
+        "bp-3"
+      ],
+      "key_pitches": [
+        54
+      ],
+      "roll_pitches": [
+        54
+      ]
+    },
+    {
+      "video": 1.8399,
+      "rate": 1,
+      "roll_seconds": 1.829,
+      "score_tick": 2122,
+      "ticks_per_second": 1160,
+      "window_start": 0,
+      "roll_ids": [
+        "bp-3"
+      ],
+      "score_ids": [
+        "bp-3"
+      ],
+      "key_pitches": [
+        54
+      ],
+      "roll_pitches": [
+        54
+      ]
+    },
+    {
+      "video": 1.8413,
+      "rate": 1,
+      "roll_seconds": 1.829,
+      "score_tick": 2122,
+      "ticks_per_second": 1160,
+      "window_start": 0,
+      "roll_ids": [
+        "bp-3"
+      ],
+      "score_ids": [
+        "bp-3"
+      ],
+      "key_pitches": [
+        54
+      ],
+      "roll_pitches": [
+        54
+      ]
+    }
+  ],
+  "rate1_worst_lag": 0.0123,
+  "rate1_worst_tick": 14,
+  "rate_half": {
+    "first": {
+      "video": 1.9689,
+      "rate": 0.5,
+      "roll_seconds": 1.9667,
+      "score_tick": 2281,
+      "ticks_per_second": 1160,
+      "window_start": 0,
+      "roll_ids": [
+        "bp-3",
+        "bp-5",
+        "bp-6"
+      ],
+      "score_ids": [
+        "bp-3",
+        "bp-6",
+        "bp-5"
+      ],
+      "key_pitches": [
+        54,
+        61,
+        80
+      ],
+      "roll_pitches": [
+        54,
+        80,
+        61
+      ]
+    },
+    "second": {
+      "video": 2.4766,
+      "rate": 0.5,
+      "roll_seconds": 2.4744,
+      "score_tick": 2870,
+      "ticks_per_second": 1160,
+      "window_start": 0,
+      "roll_ids": [
+        "bp-7"
+      ],
+      "score_ids": [
+        "bp-7"
+      ],
+      "key_pitches": [
+        81
+      ],
+      "roll_pitches": [
+        81
+      ]
+    }
+  },
+  "rate_half_delta": 0.508,
+  "seek": {
+    "video": 2.4888,
+    "rate": 1,
+    "roll_seconds": 2.4888,
+    "score_tick": 2887,
+    "ticks_per_second": 1160,
+    "window_start": 0,
+    "roll_ids": [
+      "bp-7"
+    ],
+    "score_ids": [
+      "bp-7"
+    ],
+    "key_pitches": [
+      81
+    ],
+    "roll_pitches": [
+      81
+    ]
+  },
+  "frames": [
+    {
+      "requested": 1.996,
+      "roll_seconds": 1.996,
+      "score_tick": 1916,
+      "ticks_per_second": 960,
+      "roll_ids": [],
+      "score_ids": [],
+      "key_pitches": [],
+      "roll_pitches": []
+    },
+    {
+      "requested": 2,
+      "roll_seconds": 2,
+      "score_tick": 1920,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1"
+      ],
+      "score_ids": [
+        "f-1"
+      ],
+      "key_pitches": [
+        60
+      ],
+      "roll_pitches": [
+        60
+      ]
+    },
+    {
+      "requested": 2.004,
+      "roll_seconds": 2.004,
+      "score_tick": 1924,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1"
+      ],
+      "score_ids": [
+        "f-1"
+      ],
+      "key_pitches": [
+        60
+      ],
+      "roll_pitches": [
+        60
+      ]
+    },
+    {
+      "requested": 2.008,
+      "roll_seconds": 2.008,
+      "score_tick": 1928,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1"
+      ],
+      "score_ids": [
+        "f-1"
+      ],
+      "key_pitches": [
+        60
+      ],
+      "roll_pitches": [
+        60
+      ]
+    },
+    {
+      "requested": 2.012,
+      "roll_seconds": 2.012,
+      "score_tick": 1932,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "key_pitches": [
+        60,
+        64
+      ],
+      "roll_pitches": [
+        60,
+        64
+      ]
+    },
+    {
+      "requested": 2.016,
+      "roll_seconds": 2.016,
+      "score_tick": 1935,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "key_pitches": [
+        60,
+        64
+      ],
+      "roll_pitches": [
+        60,
+        64
+      ]
+    },
+    {
+      "requested": 2.02,
+      "roll_seconds": 2.02,
+      "score_tick": 1939,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2"
+      ],
+      "key_pitches": [
+        60,
+        64
+      ],
+      "roll_pitches": [
+        60,
+        64
+      ]
+    },
+    {
+      "requested": 2.024,
+      "roll_seconds": 2.024,
+      "score_tick": 1943,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        60,
+        64,
+        67
+      ],
+      "roll_pitches": [
+        60,
+        64,
+        67
+      ]
+    },
+    {
+      "requested": 2.028,
+      "roll_seconds": 2.028,
+      "score_tick": 1947,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        60,
+        64,
+        67
+      ],
+      "roll_pitches": [
+        60,
+        64,
+        67
+      ]
+    },
+    {
+      "requested": 2.032,
+      "roll_seconds": 2.032,
+      "score_tick": 1951,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        60,
+        64,
+        67
+      ],
+      "roll_pitches": [
+        60,
+        64,
+        67
+      ]
+    },
+    {
+      "requested": 2.036,
+      "roll_seconds": 2.036,
+      "score_tick": 1955,
+      "ticks_per_second": 960,
+      "roll_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "score_ids": [
+        "f-1",
+        "f-2",
+        "f-3"
+      ],
+      "key_pitches": [
+        60,
+        64,
+        67
+      ],
+      "roll_pitches": [
+        60,
+        64,
+        67
+      ]
+    }
+  ],
+  "console_errors": [],
+  "failures": []
+}

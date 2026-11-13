@@ -235,7 +235,7 @@ export function ContinuousScore({
                   .map(line => <line key={line} className="ws-score-ledger" x1={x - 9} y1={line} x2={x + 9} y2={line}/>)}
                 <ellipse className={`ws-score-notehead${hollow ? ' is-hollow' : ''}${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
                   cx={x} cy={cy} rx={4.8} ry={3.6} transform={`rotate(-20 ${x} ${cy})`}
-                  data-occurrence={occurrence ?? ''} data-ambiguous={ambiguous ? 'true' : 'false'}
+                  data-occurrence={occurrence ?? ''} data-occurrences={note.performance_ids.join(',')} data-ambiguous={ambiguous ? 'true' : 'false'}
                   role="button" tabIndex={0}
                   aria-label={`${note.spelling}, ${segment.value}${segment.dotted ? ' dotted' : ''}${selected ? ', selected' : ''}`}
                   onPointerDown={() => choose(note)}

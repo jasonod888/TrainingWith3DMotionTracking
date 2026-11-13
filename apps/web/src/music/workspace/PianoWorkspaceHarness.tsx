@@ -19,6 +19,8 @@ import {pitchName} from '../music-reference';
 import {KeyboardEditor} from '../notation/KeyboardEditor';
 import {NotationAudio} from '../notation/notation-audio';
 import {usePianoSourcePlayer} from '../usePianoSourcePlayer';
+import {usePianoPreviewAsset} from '../usePianoPreviewAsset';
+import type {Asset} from '../../../../../packages/lesson-schema/index';
 import {ClipOverview} from './ClipOverview';
 import {ContinuousScore} from './ContinuousScore';
 import {TimeRoll} from './TimeRoll';
@@ -116,9 +118,12 @@ export function PianoWorkspaceHarness() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const pianoRef = useRef<HTMLAudioElement>(null);
   const audioRef = useRef<NotationAudio | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
   const [previewIdentity, setPreviewIdentity] = useState('');
   const [audioMode, setAudioMode] = useState<'original' | 'piano'>('original');
+  // Bytes and SHA-256 are verified before Piano may be enabled; a pending or failed
+  // asset keeps Original audio and never exposes a URL.
+  const preview = usePianoPreviewAsset(previewAsset);
   const [keyboardRef, keyboardWidth] = useElementWidth<HTMLDivElement>();
   const compactKeyboard = keyboardWidth > 0 && keyboardWidth < 720;
   const [rollReveal, setRollReveal] = useState<{occurrenceId: string; token: number} | null>(null);
@@ -148,10 +153,17 @@ export function PianoWorkspaceHarness() {
     setLoading(true);
     setError('');
     const demo = params.get('demo');
-    if (demo === 'explanation' || demo === 'arpeggio') {
+    if (demo === 'explanation' || demo === 'arpeggio' || demo === 'frames') {
       // A local fixture for cases the real recording does not contain: an arpeggiated
       // chord, a spoken explanation passage and a held score cursor.
-      const events = demo === 'explanation'
+      const events = demo === 'frames'
+        ? [
+            {id: 'f-1', onset: 2.0, duration: 0.5, pitch: 60},
+            {id: 'f-2', onset: 2.012, duration: 0.5, pitch: 64},
+            {id: 'f-3', onset: 2.024, duration: 0.5, pitch: 67},
+            {id: 'f-4', onset: 6.0, duration: 0.5, pitch: 72},
+          ]
+        : demo === 'explanation'
         ? [
             {id: 'd-1', onset: 1.0, duration: 0.6, pitch: 60},
             {id: 'd-2', onset: 2.0, duration: 0.6, pitch: 62},
@@ -178,7 +190,7 @@ export function PianoWorkspaceHarness() {
       });
       setBaseline(document);
       setState(createWorkspaceState(document));
-      setTitle(demo === 'explanation' ? 'Fixture: explanation passage' : 'Fixture: arpeggiated chord');
+      setTitle(demo === 'explanation' ? 'Fixture: explanation passage' : demo === 'frames' ? 'Fixture: 12 ms attacks' : 'Fixture: arpeggiated chord');
       setSpans(demoSpans);
       setVideoUrl(null);
       setLoading(false);
@@ -208,7 +220,7 @@ export function PianoWorkspaceHarness() {
         setSpans(draft.spans.map(span => ({start: span.start, end: span.end, kind: span.kind})));
         setOffsetSeconds(draft.playback?.sync_offset_seconds ?? 0);
         setVideoUrl(draft.source_video ? assetUrl(draft.source_video.key) : null);
-        setPreviewUrl(draft.piano_preview ? assetUrl(draft.piano_preview.key) : null);
+        setPreviewAsset((draft.piano_preview as Asset | null) ?? null);
         setPreviewIdentity(draft.preview_identity ?? '');
       })
       .catch(cause => { if (!stopped) setError(cause instanceof Error ? cause.message : 'The draft could not be opened.'); })
@@ -251,7 +263,8 @@ export function PianoWorkspaceHarness() {
     () => setNotice('Piano audio is unavailable. The original video keeps playing.'));
 
   // Audition yields to real playback and to a source-mode change.
-  useEffect(() => { if (player.playing) audioRef.current?.stop(); }, [player.playing]);
+  useEffect(() => { if (playing) audioRef.current?.stop(); }, [playing]);
+  useEffect(() => { if (!preview.url && audioMode === 'piano') setAudioMode('original'); }, [preview.url, audioMode]);
   useEffect(() => { audioRef.current?.stop(); }, [audioMode]);
 
   const audition = useCallback((pitches: number[], seconds = 0.5) => {
@@ -580,20 +593,24 @@ export function PianoWorkspaceHarness() {
           {videoUrl
             ? <video ref={videoRef} src={videoUrl} controls playsInline preload="metadata" className="ws-video"/>
             : <p className="ws-hint">This draft has no source video.</p>}
-          {previewUrl ? <audio ref={pianoRef} src={previewUrl} preload="auto"/> : null}
+          {previewAsset ? <audio ref={pianoRef} src={preview.url || undefined} preload="auto"/> : null}
           <div className="ws-row" role="group" aria-label="Source audio">
             <button type="button" aria-pressed={audioMode === 'original'}
               className={audioMode === 'original' ? 'is-active' : ''}
               onClick={() => setAudioMode('original')}>Original</button>
             <button type="button" aria-pressed={audioMode === 'piano'}
               className={audioMode === 'piano' ? 'is-active' : ''}
-              disabled={!previewUrl}
-              title={previewUrl ? 'Mapped piano preview' : 'No verified piano preview for this draft'}
+              disabled={!preview.url}
+              title={preview.url ? 'Verified, mapped piano preview' : preview.error || 'Piano audio is not verified for this draft'}
               onClick={() => setAudioMode('piano')}>Piano</button>
             <span className="ws-hint">
-              {previewUrl
-                ? (player.error ? player.error : 'Piano preview follows the video clock; it never free-runs.')
-                : 'No verified piano preview: Original audio only.'}
+              {preview.url
+                ? 'Verified preview follows the video clock; it never free-runs.'
+                : preview.error
+                  ? `Piano unavailable: ${preview.error} Original audio remains active.`
+                  : previewAsset
+                    ? 'Verifying piano audio… Original plays until it is verified.'
+                    : 'No verified piano preview: Original audio only.'}
             </span>
           </div>
         </section>
