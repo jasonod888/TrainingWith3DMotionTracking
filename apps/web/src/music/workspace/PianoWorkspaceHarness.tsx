@@ -7,10 +7,10 @@
  * loads the same draft through the same API and writes nothing.
  */
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {assetUrl, request} from '../../api';
+import {assetUrl, getSession, request} from '../../api';
 import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
-  buildNotation, selectionForOccurrence,
+  buildNotation, parseNotationDocument, selectionForOccurrence,
   activeOccurrenceIds, alignmentFromSpans, effectiveSecondsToTick, occurrenceIntervals,
   applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, type AnchorPoint,
   type Alignment, type CorrectionSelection, type NotationDocument,
@@ -32,6 +32,12 @@ import {
 } from './workspace-state';
 import {useElementWidth} from './useElementWidth';
 import {createClock, useClockTime, type ClockStore} from './clock';
+import {
+  buildSaveBody, performanceChanged, restoreFromReference, serializeAlignment, type SavedSpan,
+} from './save-payload';
+import {
+  clearRecovery, readRecovery, writeRecovery, type RecoveryCheckpoint, type RecoveryIdentity,
+} from './recovery';
 
 const DURATION_CHOICES = [
   {label: 'Whole', ticks: 1920},
@@ -130,6 +136,18 @@ export function PianoWorkspaceHarness() {
   const [scoreReveal, setScoreReveal] = useState<{tick: number; token: number} | null>(null);
   const revealToken = useRef(0);
   const clockRef = useRef(createClock());
+  const [accountId, setAccountId] = useState('');
+  const [draftId, setDraftId] = useState('');
+  const [sourceSha256, setSourceSha256] = useState('');
+  const [savedRevisionId, setSavedRevisionId] = useState<string | null>(null);
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
+  const [confirmReviewed, setConfirmReviewed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [reopenMessage, setReopenMessage] = useState('');
+  const [recoveryOffer, setRecoveryOffer] = useState<RecoveryCheckpoint | null>(null);
+  const [recoveryNotice, setRecoveryNotice] = useState('');
 
   const dispatch = useCallback((action: WorkspaceAction) => {
     setState(previous => (previous ? workspaceReducer(previous, action) : previous));
@@ -220,6 +238,8 @@ export function PianoWorkspaceHarness() {
         setSpans(draft.spans.map(span => ({start: span.start, end: span.end, kind: span.kind})));
         setOffsetSeconds(draft.playback?.sync_offset_seconds ?? 0);
         setVideoUrl(draft.source_video ? assetUrl(draft.source_video.key) : null);
+        setDraftId(draft.draft_id);
+        setSourceSha256(draft.reference?.sha256 ?? '');
         setPreviewAsset((draft.piano_preview as Asset | null) ?? null);
         setPreviewIdentity(draft.preview_identity ?? '');
       })
@@ -334,6 +354,49 @@ export function PianoWorkspaceHarness() {
     requestReveal(selectionOccurrence);
   }, [selectionOccurrence, rollReveal?.occurrenceId, requestReveal]);
 
+  const documentSignature = useMemo(() => (document ? JSON.stringify(document) : ''), [document]);
+  const dirty = savedSignature === null ? Boolean(state?.dirty) : documentSignature !== savedSignature;
+  const previewStale = Boolean(baseline && document && performanceChanged(baseline, document));
+  const recoveryIdentity = useMemo<RecoveryIdentity>(
+    () => ({accountId, lessonId: lessonId ?? '', draftId, sourceSha256}),
+    [accountId, lessonId, draftId, sourceSha256],
+  );
+
+  useEffect(() => {
+    getSession().then(session => { if (session) setAccountId(session.account.id); }).catch(() => {});
+  }, []);
+
+  // A local checkpoint is offered only when its account, draft and source match.
+  useEffect(() => {
+    if (!accountId || !lessonId || !draftId || !sourceSha256 || !document) return;
+    const outcome = readRecovery(recoveryIdentity);
+    if (outcome.status === 'restored') setRecoveryOffer(outcome.checkpoint);
+    else if (outcome.status === 'rejected') setRecoveryNotice(outcome.reason);
+    // Only when the draft identity becomes available.
+  }, [accountId, lessonId, draftId, sourceSha256, document === null]);
+
+  // Autosave a local checkpoint while edits are unsaved; it is never called Saved.
+  useEffect(() => {
+    if (!document || !dirty || !accountId || !draftId || !sourceSha256) return;
+    const timer = setTimeout(() => {
+      writeRecovery({
+        identity: recoveryIdentity, title,
+        notation: document,
+        alignment: serializeAlignment(alignment, anchors, offsetSeconds),
+        offsetSeconds, spans,
+      });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [documentSignature, dirty, accountId, draftId, sourceSha256, title, alignment, anchors, offsetSeconds, spans, recoveryIdentity]);
+
+  // Any document change requires a fresh confirmation before it can be saved.
+  useEffect(() => { setConfirmReviewed(false); }, [documentSignature]);
+
+  // A stale preview must fall back to Original rather than pretend it is current.
+  useEffect(() => {
+    if (previewStale && audioMode === 'piano') setAudioMode('original');
+  }, [previewStale, audioMode]);
+
   // The roll opens at a readable window rather than fitting the whole recording.
   useEffect(() => {
     if (!document) return;
@@ -420,6 +483,77 @@ export function PianoWorkspaceHarness() {
       return zoomAround(current, document.duration, factor, anchor);
     });
   }, [document, playhead]);
+
+  /* ------------------------------------------------------ save and reopen */
+
+  const save = useCallback(async () => {
+    if (!document || !lessonId || !confirmReviewed || saving) return;
+    setSaving(true); setSaveError(''); setSaveMessage('');
+    const body = buildSaveBody({
+      title, document, spans, alignment, anchors, offsetSeconds, baseRevisionId: savedRevisionId,
+    });
+    try {
+      const manifest = await request<{ revision_id: string }>(
+        `/lessons/${encodeURIComponent(lessonId)}/${savedRevisionId ? 'music-revision' : 'music-draft/review'}`,
+        'POST', body);
+      setSavedRevisionId(manifest.revision_id);
+      setSavedSignature(documentSignature);
+      clearRecovery();
+      setRecoveryOffer(null);
+      setRecoveryNotice('');
+      setSaveMessage(`Saved privately · revision ${manifest.revision_id.slice(0, 8)}`);
+    } catch (cause) {
+      // Edits stay in place; the local checkpoint keeps the work recoverable.
+      setSaveError(cause instanceof Error ? cause.message : 'The save failed; your edits are kept.');
+    } finally {
+      setSaving(false);
+    }
+  }, [document, lessonId, confirmReviewed, saving, title, spans, alignment, anchors, offsetSeconds,
+      savedRevisionId, documentSignature]);
+
+  const reopen = useCallback(async () => {
+    if (!lessonId) return;
+    setReopenMessage('');
+    try {
+      const lesson = await request<{ revision_id: string; reference: { key: string }; title?: string }>(
+        `/lessons/${encodeURIComponent(lessonId)}`);
+      const response = await fetch(assetUrl(lesson.reference.key), {credentials: 'same-origin'});
+      if (!response.ok) throw new Error('The saved reference could not be read.');
+      const restored = restoreFromReference(await response.json());
+      if (!restored.ok) throw new Error(restored.message);
+      setBaseline(restored.value.document);
+      setState(createWorkspaceState(restored.value.document));
+      setSpans(restored.value.spans);
+      setOffsetSeconds(restored.value.offsetSeconds);
+      setAnchors(restored.value.alignment?.anchors ?? []);
+      setSavedRevisionId(lesson.revision_id);
+      setSavedSignature(JSON.stringify(restored.value.document));
+      if (restored.value.title) setTitle(restored.value.title);
+      setConfirmReviewed(false);
+      setReopenMessage(`Reopened revision ${lesson.revision_id.slice(0, 8)} from ${
+        restored.value.source === 'notation' ? 'the authored notation' : 'performance only (legacy reference)'}.`);
+    } catch (cause) {
+      setReopenMessage(cause instanceof Error ? cause.message : 'The saved revision could not be reopened.');
+    }
+  }, [lessonId]);
+
+  const restoreCheckpoint = useCallback(() => {
+    if (!recoveryOffer) return;
+    try {
+      const restored = parseNotationDocument(recoveryOffer.notation);
+      setState(createWorkspaceState(restored));
+      setSpans(recoveryOffer.spans);
+      setOffsetSeconds(recoveryOffer.offsetSeconds);
+      setAnchors(recoveryOffer.alignment?.anchors ?? []);
+      setConfirmReviewed(false);
+      setRecoveryOffer(null);
+      setReopenMessage(`Restored a local checkpoint from ${
+        new Date(recoveryOffer.savedAt).toLocaleString()} — it is not saved to the server.`);
+    } catch {
+      setRecoveryNotice('The local checkpoint could not be restored and was ignored.');
+      setRecoveryOffer(null);
+    }
+  }, [recoveryOffer]);
 
   /* --------------------------------------------------- alignment authoring */
 
@@ -509,6 +643,14 @@ export function PianoWorkspaceHarness() {
         <span><input type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)}/> Follow</span>
       </label>
       <button type="button" onClick={returnToPlayhead}>Return to playhead</button>
+      <label className="ws-field ws-inline">
+        <span><input type="checkbox" aria-label="Confirm reviewed" checked={confirmReviewed}
+          onChange={event => setConfirmReviewed(event.target.checked)}/> Reviewed</span>
+      </label>
+      <button type="button" onClick={save} disabled={!confirmReviewed || saving || !dirty}
+        data-save-button="true">{saving ? 'Saving…' : 'Save privately'}</button>
+      <button type="button" onClick={reopen}>Reopen saved</button>
+
       <button type="button" onClick={() => dispatch({type: 'undo'})} disabled={!state.past.length}>Undo</button>
       <button type="button" onClick={() => dispatch({type: 'redo'})} disabled={!state.future.length}>Redo</button>
       <label className="ws-field ws-inline">
@@ -543,11 +685,24 @@ export function PianoWorkspaceHarness() {
         {alignment?.mode === 'anchored' ? 'Score alignment anchored' : 'Score alignment estimated'}
         {spans.length > 1 ? ` · ${spans.filter(span => span.kind === 'explanation').length} explanation passage(s)` : ''}
       </span>
+      {saveMessage && <span className="ws-report" data-save-state="saved">{saveMessage}</span>}
+      {saveError && <span className="ws-report is-bad" data-save-state="error">{saveError}</span>}
+      {reopenMessage && <span className="ws-report" data-reopen-state="message">{reopenMessage}</span>}
       {report && <span className={report.status === 'rejected' ? 'ws-report is-bad' : 'ws-report'}>
         {report.status === 'rejected' ? report.message : report.label}
       </span>}
       {notice && <span className="ws-report">{notice}</span>}
     </div>
+
+    {recoveryOffer && <section className="ws-panel" role="status" aria-label="Local recovery" data-recovery="offer">
+      <p>A local checkpoint from {new Date(recoveryOffer.savedAt).toLocaleString()} is available.
+        It is <strong>not saved to the server</strong>.</p>
+      <div className="ws-row">
+        <button type="button" onClick={restoreCheckpoint}>Restore local checkpoint</button>
+        <button type="button" onClick={() => { clearRecovery(); setRecoveryOffer(null); }}>Discard</button>
+      </div>
+    </section>}
+    {recoveryNotice && <p className="ws-hint" role="status" data-recovery="rejected">{recoveryNotice}</p>}
 
     <div className="ws-grid">
       <div className="ws-edit">
@@ -602,17 +757,20 @@ export function PianoWorkspaceHarness() {
               onClick={() => setAudioMode('original')}>Original</button>
             <button type="button" aria-pressed={audioMode === 'piano'}
               className={audioMode === 'piano' ? 'is-active' : ''}
-              disabled={!preview.url}
-              title={preview.url ? 'Verified, mapped piano preview' : preview.error || 'Piano audio is not verified for this draft'}
+              disabled={!preview.url || previewStale}
+              title={previewStale ? 'The preview is stale: the notes changed since it was rendered'
+                : preview.url ? 'Verified, mapped piano preview' : preview.error || 'Piano audio is not verified for this draft'}
               onClick={() => setAudioMode('piano')}>Piano</button>
-            <span className="ws-hint">
-              {preview.url
-                ? 'Verified preview follows the video clock; it never free-runs.'
-                : preview.error
-                  ? `Piano unavailable: ${preview.error} Original audio remains active.`
-                  : previewAsset
-                    ? 'Verifying piano audio… Original plays until it is verified.'
-                    : 'No verified piano preview: Original audio only.'}
+            <span className="ws-hint" data-preview-state={previewStale ? 'stale' : preview.url ? 'verified' : 'unavailable'}>
+              {previewStale
+                ? 'Piano preview is stale: the notes changed since it was rendered. Original audio only.'
+                : preview.url
+                  ? 'Verified preview follows the video clock; it never free-runs.'
+                  : preview.error
+                    ? `Piano unavailable: ${preview.error} Original audio remains active.`
+                    : previewAsset
+                      ? 'Verifying piano audio… Original plays until it is verified.'
+                      : 'No verified piano preview: Original audio only.'}
             </span>
           </div>
         </section>
