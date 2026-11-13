@@ -7,32 +7,39 @@ Baseline audit and safe edit contracts.
 | Prepared | 13 November 2026 |
 | Phase | **1 — Baseline audit and safe edit contracts** |
 | Code audited | `ef4dfb6` — *Checkpoint piano implementation and correction workspace plans* (branch `baseline/piano-correction-2026-11-13`) |
-| Submission branch | `phase1/piano-workspace-audit`, created from `ef4dfb6`; this note and its evidence are the only additions |
-| Product code changed | **None.** No page replacement, no library adoption, no production data mutation |
+| Submission branch | `phase1/piano-workspace-audit` |
+| Revision | **Follow-up after CHANGES REQUIRED** — documentation and evidence only; no product code, no API, no UI |
+| Review record | [`piano-workspace-phase-01-review.md`](piano-workspace-phase-01-review.md) |
 | Next phase | **Not started** (Phase 2 has not begun) |
-| Review decision | NOT REVIEWED |
 
-Authority for this submission: [`docs/piano-correction-workspace-phases.md`](../piano-correction-workspace-phases.md) (phase 1 scope and acceptance gate) and [`docs/piano-correction-workspace-developer-plan.md`](../piano-correction-workspace-developer-plan.md) (UX and musical behaviour).
+This revision answers the reviewer's R1–R5 corrections and the non-blocking evidence wording. The findings of the original submission stand; what changed is that every reproduction now runs from this committed location, the contracts are precise, and the evidence is tracked rather than local.
 
 ---
 
-## 1. What was done, against the Phase 1 acceptance gate
+## 0. Corrections in this revision
+
+| Review item | Correction |
+| --- | --- |
+| **R1** Scripts unreproducible; paths disagreed with the instructions; raw logs absent | All scripts resolve the repository root explicitly (`scripts/lib/paths.ts`, `scripts/lib/paths.py`), take `--input`/`--out`, and default to a scratch directory. A tracked synthetic fixture (`--fixture`) runs every audit with no services. `fetch-draft-json.py` documents the real-data path and fails with a prerequisite message rather than a path error. Raw evidence is committed as `.txt` under `logs/`, and the capture scripts read credentials from the environment. §13 lists the exact commands and their results. |
+| **R2** Identity and scope rules contradicted the permitted many-to-one mapping; destructive `replace` branch; tie semantics | §9.1 states the many-to-one rules with one valid and two invalid examples. The `overlap: 'replace'` branch is removed: written overlap and insertion reject without mutation. Tie/untie are **not available** in Phase 2; a performance-scoped `MergeOccurrences` is specified as deferred so D4 cannot return under a new name. §9.4. |
+| **R3** Accidentals conflated with respelling; nullable legacy fields unspecified | §9.4 separates `ApplyAccidental` (changes sounding pitch, letter-based) from `Respell` (preserves sounding pitch and audio identity), with the three required examples. §9.5 defines `duration: null` and `velocity: null` as unknown-but-preserved, with display defaults kept out of persisted truth. |
+| **R4** Alignment residual mislabelled; internal gaps and inverse policy undefined | §9.3 rewrites alignment as a continuous piecewise map over timed and held passages, states which quantity is measured, defines the inverse policy on held intervals, the anchor reference frame and the offset interaction, and the estimated/one-anchor/no-anchor cases. The 26/52 ms figure is relabelled a quantisation residual, not alignment accuracy. |
+| **R5** “Carry notation forward” could preserve stale notation | §9.6 replaces it with a validation-gated policy: retain only when the stored notation still validates against the submitted performance; otherwise reject with an explicit reconciliation error and offer a reported regeneration. A v2 document is never posted to the v1 validator. |
+
+Non-blocking wording corrections: the added duration is now stated as **+960 ticks = a half note = two quarter-note beats**; the snapshot figure is labelled a serialised-size estimate; §6 is a reproduction matrix with a status and receipt for every claim; the API “live without restart” claim is corrected in §2; credentials are environment-driven and the capture scripts are described as authenticating and generating local evidence only.
+
+---
+
+## 1. Against the Phase 1 acceptance gate
 
 | Acceptance criterion | Result | Where |
 | --- | --- | --- |
-| Every existing editor surface and save boundary is identified accurately | Done — seven surfaces (three of them notation views), four write endpoints, one playback-settings endpoint | §4 |
-| Demonstrate why selecting one C4 must use an occurrence ID | Done, with real-example measurements. Note: **the real example contains no C4 (0 occurrences)**; the demonstration uses its actual most-repeated pitches (A5 171×, A4 134×, A3 125×) and a fixture for C4 | §7 |
-| Demonstrate why moving one chord member cannot reuse an event-wide command | Done — 89 of 180 real chord events contain members whose **recorded** onsets differ (max 92.8 ms) | §8 |
-| Proposed data contracts preserve exact seconds separately from score ticks | Done — commands and document schema keep `performance.onset/duration` canonical; ticks are interpretation only | §9 |
-| Existing test failures and real-example access limitations recorded honestly | Done — the example **is** reachable; one environment-only API test failure is recorded, not hidden | §5, §11 |
-| No unresolved destructive operation is assumed safe for reuse | Done — 12 destructive/unsafe behaviours identified, 8 reproduced dynamically on the real draft with before/after counts, 4 established by code and data analysis | §6 |
-
-The audit also produced four machine-checkable results that Phase 2 can build on directly:
-
-1. The current notation builder's output for the real 1,338-note clip **passes the server's existing `validate_notation`** — the integrity contract is reusable, not hypothetical.
-2. The same validator **rejects** a notation/performance pitch disagreement — so an occurrence edit that fails to update both sides will be caught at save time.
-3. A single-BPM score↔seconds map has a **26 ms mean / 52 ms maximum residual** against this performance, in steps of 103 ms — the number Phase 4's alignment work has to beat or honestly label.
-4. Building the full notation document for the real clip takes **45 ms**; ten sequential pitch edits cost **37 ms each**; the document serialises to **1.5 MB**.
+| Every existing editor surface and save boundary is identified accurately | Seven surfaces (three notation views), four write endpoints, one playback-settings endpoint | §4 |
+| Why selecting one occurrence needs an occurrence id | Real-example measurements; the brief's C4 is a fixture because this recording has none | §7 |
+| Why moving one chord member cannot reuse an event-wide command | 89 of 180 real chord events hold members with different recorded onsets (max 92.8 ms) | §8 |
+| Contracts keep exact seconds separate from score ticks | §9.1–9.2, §9.5 | — |
+| Existing failures and access limitations recorded honestly | §5, §11 | — |
+| No destructive operation assumed safe | 12 identified: 7 reproduced on the real recording, 3 on constructed fixtures, 2 by static analysis, plus 2 safe controls | §6 |
 
 ---
 
@@ -41,28 +48,20 @@ The audit also produced four machine-checkable results that Phase 2 can build on
 | Item | Value |
 | --- | --- |
 | Working tree | `D:\3d_trainer\developement` |
-| Web dev server | `http://127.0.0.1:5173` (Vite, proxies `/api` → `127.0.0.1:8001`) |
-| API server | `127.0.0.1:8001`, launched by `.local/piano-ui-test-runtime.py` (uid 23820) |
-| Database | PostgreSQL in `form-saas-postgres-1`, database **`form_ui_test`** (not `form`) |
-| Signed-in account | `owner@ui.test` (local UI-test account) |
-| Browser used | Chromium 156 (Playwright), 1440×900 and 390×844 |
+| Web dev server | `http://127.0.0.1:5173` (Vite; proxies `/api` → `127.0.0.1:8001`) |
+| API server | `127.0.0.1:8001`, launched by `.local/piano-ui-test-runtime.py` (pid 23820) |
+| API reload behaviour | **Not** hot-reloading. The launcher calls `uvicorn.run('apps.api.main:app', host=…, port=8001)` without `reload=True` (`.local/piano-ui-test-runtime.py:31`), so **API code changes require restarting the launcher**. Only the Vite frontend hot-reloads. |
+| Database | PostgreSQL `form-saas-postgres-1`, database **`form_ui_test`** (the `.env` default `form` holds no lessons) |
+| Account | `owner@ui.test` — disposable local UI-test user; the scripts read `PHASE1_UI_EMAIL` / `PHASE1_UI_PASSWORD` and fall back to this documented local account |
+| Browser | Chromium 156 via Playwright, 1440×900 and 390×844 |
 
-Two setup facts matter for later phases:
-
-- The API process runs `apps.api.main:app` **from this working tree**, so code changes are live on 8001 without a restart; the frontend hot-reloads on 5173.
-- The database is `form_ui_test`. The `.env` default (`form`) holds **no lessons at all**; querying the wrong database would have produced a false "example unavailable" result. The local launcher rewrites the database name; see `.local/piano-ui-test-runtime.py:12`.
+The capture scripts authenticate against the local API to generate evidence and screen captures. They do not submit a review, save a revision, or mutate musical data; `fetch-draft-json.py` performs a single `SELECT` and copies the document out of the container.
 
 ---
 
-## 3. Real-example baseline (209.6 s / 1,338 notes)
+## 3. Real-example baseline (209.594 s / 1,338 notes)
 
-The example named in the brief **is accessible** and was audited directly — not via a fixture.
-
-```
-http://127.0.0.1:5173/?page=music-review&id=0df28929d427406cb86d9bb5e2dcd35b
-```
-
-Verified through the real API and the real session cookie (`scripts/check-real-draft.py`):
+The example named in the brief **is accessible** and was audited directly. Verified through the real API and session cookie (`scripts/check-real-draft.py`, `logs/check-real-draft.txt`):
 
 | Property | Value |
 | --- | --- |
@@ -71,33 +70,45 @@ Verified through the real API and the real session cookie (`scripts/check-real-d
 | Duration | **209.594 s** |
 | Notes | **1,338** |
 | Provenance | Basic Pitch 0.4.0 (ONNX), profile `5014a423…193c` |
-| Source video | 18.4 MB, `…-source.mp4` |
-| Notation present | **No** — no `notation` key, `notation_duration` null on every note |
-| Alignment present | **No** — no alignment or anchor structure of any kind |
+| Source video | 18.4 MB `…-source.mp4` |
+| Notation | **absent** — no `notation` key; `notation_duration` null on every note |
+| Alignment | **absent** — no anchor/passage structure of any kind |
 | Playback settings | `null` (no sync offset stored) |
-| Working corrections | none (`working_document` is JSON `null`) |
-| Passages | 1 playing span `0 → 209.594`; no pedal; no explanation span |
+| Passages | one playing span `0 → 209.594`; no explanation span |
 
-### 3.1 Measured shape of the performance
+### 3.1 Performance shape
 
 | Measurement | Value |
 | --- | --- |
 | First / last attack | 0.917 s / 207.697 s (1.41 s tail silence) |
 | Distinct onsets | 974 |
-| Same-onset groups | 285, largest **5** notes |
+| Same-onset groups | 285, largest **5** |
 | Notes inside chords | 649 of 1,338 |
 | Distinct pitches | 28 |
 | Most repeated | A5 **171** (75 in chords), A4 **134** (53), A3 **125** (86) |
-| Max repeats of one pitch in any 2 s window | 7 (A5) |
+| Max repeats of one pitch in 2 s | 7 (A5) |
 | Same-pitch, same-onset duplicates | 0 |
-| Median gap between attacks | 0.197 s |
-| Longest silence | 3.94 s (at 4.5 s) — no spoken explanation passage |
+| Median gap / longest gap | 0.197 s / 3.94 s |
 | Recorded length | min 0.083 s, median 0.424 s, max 5.774 s |
 | **Middle C (60)** | **0 occurrences** |
 | Density | 63.8 notes per 10 s |
-| Events sorted by onset | yes |
+| Null duration / null velocity | 0 / 0 |
 
-### 3.2 The current review page, measured and captured
+### 3.2 Tracked synthetic fixture
+
+`fixtures/phase1-draft-fixture.json` — 20 occurrences over 12 s, designed for the cases the recording cannot supply:
+
+- six C4 attacks (MIDI 60): 0.0, 1.0, 1.4, 2.0 (two occurrences at one onset) and 9.5 s;
+- a **same-pitch, same-onset pair** (C4 at 2.0 s) for F1/F2;
+- a **three-way overlap** at 0.5 s (durations 0.2 / 0.4 / 1.2) for the third-voice case;
+- an **arpeggiated chord** (4.000 / 4.045 / 4.090 s) for chord-member independence;
+- an **explanation gap** in the spans (6.5–9.0 s, `kind: explanation`);
+- one `duration: null` and one `velocity: null` occurrence for legacy handling;
+- one long bass note (4.0 s) for tie/segment behaviour.
+
+The fixture passes the server validator unchanged (`logs/validate-notation-fixture.txt`), so it is a legal document, not a malformed stub.
+
+### 3.3 The current review page, measured
 
 `scripts/capture-review.py`, `scripts/capture-forms.py` → `measurements.json`, `captures/`.
 
@@ -105,361 +116,337 @@ Verified through the real API and the real session cookie (`scripts/check-real-d
 | --- | --- | --- |
 | Note forms mounted | 50 per page, **27 pages** | 50 per page, 27 pages |
 | Page height | **15,075 px** | **23,363 px** |
-| Note form height | 253 px each | 253 px |
-| Piano roll (whole clip) | 817 × 200 px | same |
+| Note form height | 253 px each (12,650 px per page) | 253 px |
+| Piano roll | 817 × 200 px for the whole clip | same |
 | Roll scale | **3.9 px per second** | 3.9 px/s |
-| Horizontal page overflow | none (1440 = 1440) | none (390 = 390) |
+| Horizontal page overflow | none | none |
 | `<video>` elements | 1 | 1 |
 | Console errors | 0 | 0 |
-| Time to note forms | 0.92 s | — |
 
-The roll compresses the entire 209.6 s recording into 817 px. A 10-second editing window at a readable scale needs roughly 76 px/s — about **19–22× the current density**. Every one of the 1,338 notes is drawn as a 3–6 px mark (reproduced in `captures/review-desktop-1440x900.png`), and the 50-per-page form list occupies 12,650 px of vertical space per page.
+A 10-second window at a readable scale needs roughly 76 px/s — about **20× the current density**. Every note is a 3–6 px mark.
 
-Observation, recorded without conclusion: `GET /api/lessons/summaries` returned an empty list for this owner even though the draft is reachable by URL. The library route to this lesson was not explored — it is outside Phase 1 scope, but Phase 7's “enter from the normal library/review route” must not assume it exists for this fixture.
+![Current review page: the whole 209.6 s clip compressed into one roll](piano-workspace-phase-01/captures/review-desktop-1440x900.png)
+
+![The 50-per-page note form list](piano-workspace-phase-01/captures/review-note-forms-1440x900.png)
+
+Observation, recorded without conclusion: `GET /api/lessons/summaries` returned an empty list for this owner, although the draft is reachable by URL. Phase 7 must not assume the library route exists for this fixture.
 
 ---
 
-## 4. Existing surfaces and save boundaries
+## 4. Surfaces and save boundaries
 
 ### 4.1 Editing surfaces
 
-| Surface | File | What it currently is | Owns a video? | Selection | History |
+| Surface | File | Current shape | Owns a video? | Selection | History |
 | --- | --- | --- | --- | --- | --- |
-| Draft review page | [`apps/web/src/music/MusicDraftReview.tsx`](../../apps/web/src/music/MusicDraftReview.tsx) | Full-page review: preview, video, audio mode, 50 note `<fieldset>`s per page, title/policy/sections, verification panel | Yes (single `<video>`) | verification finding only; **not shared with the forms** | none |
-| Whole-clip preview | [`apps/web/src/music/DraftNotePreview.tsx`](../../apps/web/src/music/DraftNotePreview.tsx) | Fixed-aspect roll (760-unit viewBox) + keyboard strip driven by the parent's video clock (rAF while playing, media events while paused) | No — reads the parent's `sourceRef` | highlight ids from findings | none |
-| Reviewed notation editor | [`apps/web/src/music/notation/NotationEditor.tsx`](../../apps/web/src/music/notation/NotationEditor.tsx) | Score (SVG) + roll + keyboard + inspector + duration/accidental/tie toolbars | **Yes** — its own `<video>` at :340-345 | one logical note, `note_id` | local `past`/`future` arrays of full documents, max 80 (:66-67, :128) |
-| Sheet strip | [`apps/web/src/music/notation/SheetMusic.tsx`](../../apps/web/src/music/notation/SheetMusic.tsx) | One continuous SVG, fixed 300 px per measure, no playhead, no virtualisation | No | logical note id | — |
-| Piano roll | [`apps/web/src/music/notation/PianoRoll.tsx`](../../apps/web/src/music/notation/PianoRoll.tsx) | Fixed 760 px viewBox; **whole clip in one viewport**; drag = move/resize/pitch | No | logical note id | — |
-| Keyboard | [`apps/web/src/music/notation/KeyboardEditor.tsx`](../../apps/web/src/music/notation/KeyboardEditor.tsx) | 3-octave audition/edit keys, octave shift | No | by pitch only | — |
-| Reviewed lesson host | [`apps/web/src/music/MusicLessonEditor.tsx`](../../apps/web/src/music/MusicLessonEditor.tsx) | Loads the reviewed reference, keeps a **duplicate** `notes` array beside the notation document (:86-91), saves a new revision | No (passes URL down) | — | — |
+| Draft review | [`MusicDraftReview.tsx`](../../apps/web/src/music/MusicDraftReview.tsx) | Whole-clip preview, one video, audio mode, 50 note fieldsets per page, title/policy/sections, verification panel | Yes (single `<video>`) | verification finding only, not shared with the forms | none |
+| Clip preview | [`DraftNotePreview.tsx`](../../apps/web/src/music/DraftNotePreview.tsx) | Fixed-aspect roll (760-unit viewBox) + keyboard, driven by the parent's video clock (rAF while playing, media events while paused) | No — reads the parent `sourceRef` | highlight ids from findings | none |
+| Notation editor | [`NotationEditor.tsx`](../../apps/web/src/music/notation/NotationEditor.tsx) | Score + roll + keyboard + inspector + duration/accidental/tie toolbars | **Yes** — its own `<video>` (:340-345) | one logical note | local `past`/`future` full-document snapshots, max 80 (:66-67, :128) |
+| Sheet strip | [`SheetMusic.tsx`](../../apps/web/src/music/notation/SheetMusic.tsx) | One continuous SVG, fixed 300 px per measure, no playhead, no virtualisation | No | logical note id | — |
+| Piano roll | [`PianoRoll.tsx`](../../apps/web/src/music/notation/PianoRoll.tsx) | Fixed 760 px viewBox; whole clip in one viewport; drag = move/resize/pitch | No | logical note id | — |
+| Keyboard | [`KeyboardEditor.tsx`](../../apps/web/src/music/notation/KeyboardEditor.tsx) | Three-octave audition/edit keys | No | by pitch only | — |
+| Reviewed host | [`MusicLessonEditor.tsx`](../../apps/web/src/music/MusicLessonEditor.tsx) | Loads the reviewed reference, keeps a duplicate `notes` array beside the notation document (:86-91), saves a revision | No (passes a URL down) | — | — |
 
-### 4.2 Save and persistence boundaries
+### 4.2 Save boundaries
 
-| Boundary | Endpoint | Accepts notation? | Accepts alignment? | Idempotency |
+| Boundary | Endpoint | Notation? | Alignment? | Idempotency |
 | --- | --- | --- | --- | --- |
-| Initial draft review | `POST /api/lessons/{id}/music-draft/review` — [`apps/api/music_review.py:66`](../../apps/api/music_review.py#L66) | **No** — `ReviewMusic` (:44-56) has no notation field; the reference document (:127-136) has no notation key | **No** | request SHA-256; identical retry returns the existing revision, different payload returns 409 |
-| Reviewed revision save | `POST /api/lessons/{id}/music-revision` — [`apps/api/music_edit.py:45`](../../apps/api/music_edit.py#L45) | **Yes** — optional `notation`, validated (:94-98) | **No** | request SHA-256 per base revision |
-| Playback / sync offset | `PATCH /api/lessons/{id}/music-draft/playback` — [`apps/api/lessons.py:375`](../../apps/api/lessons.py#L375) | n/a | n/a | revision counter, 409 on mismatch |
+| Initial draft review | `POST /music-draft/review` — [`music_review.py:66`](../../apps/api/music_review.py#L66) | **No** (`ReviewMusic` :44-56; reference document :127-136) | **No** | request SHA-256; identical retry returns the existing revision, different payload 409 |
+| Reviewed revision | `POST /music-revision` — [`music_edit.py:45`](../../apps/api/music_edit.py#L45) | **Yes**, optional, validated (:94-98) | **No** | request SHA-256 per base revision |
+| Playback / sync offset | `PATCH /music-draft/playback` — [`lessons.py:375`](../../apps/api/lessons.py#L375) | n/a | n/a | revision counter, 409 on mismatch |
 | Verification decisions | `POST …/verification-decision`, `…/corrections/rollback` | n/a | n/a | state token |
 
-Two consequences follow directly:
+### 4.3 Validation already available
 
-- **Persistence gap:** a correction made in any notation surface has nowhere to go in the initial review. The reviewed path can store notation but has no alignment, and no UI currently sends one.
-- **Contract asymmetry:** the reviewed reference stores notation inside the reference JSON; the draft review rebuilds the reference JSON from scratch, so adding notation there means extending `ReviewMusic`, not just the editor.
+[`music_notation.py`](../../apps/api/music_notation.py) enforces version, subject, duration equality, ppq, tempo mode, contiguous measures, grid, no same-voice overlap (:196-200), chord pitch uniqueness, spelling↔pitch agreement, performance-link existence, and an exact performance/event match on onset, pitch, duration, velocity and optional (:42-77).
 
-### 4.3 Validation already available on the server
-
-[`apps/api/music_notation.py`](../../apps/api/music_notation.py) already enforces: version, subject, duration equality, ppq, tempo mode, contiguous equal-length measures, grid alignment, no same-voice overlap (:196-200), no repeated chord pitch, spelling↔pitch agreement, performance-id existence, and an **exact** performance/event match on onset, pitch, duration, velocity and optional (:42-77).
-
-Verified against real data (`scripts/emit-notation.ts` + `scripts/validate-notation.py`):
+Against real data (`logs/validate-notation-real.txt`):
 
 ```
 events=1338 notation_events=1146 duration=209.594
-ACCEPTED: the current builder output satisfies validate_notation
-REFUSED after one pitch edit: A notation performance pitch does not match the reviewed event.
+builder_output: ACCEPTED
+after_one_pitch_edit: REFUSED: A notation performance pitch does not match the reviewed event.
 ```
 
-The validator is therefore a usable integrity net for Phase 5 **today**; its limit is that it validates notation against submitted events, and both can be wrong together if a command mutates both identically.
+The validator is a usable integrity net for Phase 5. Its limit: it checks notation against *submitted* events, so a command that mutates both incorrectly is not caught.
 
 ---
 
 ## 5. Test baseline
 
-### 5.1 Web
+Both suites were rerun for this revision. Logs are tracked.
 
-```
-cd apps/web
-npm test
-```
+| Suite | Command | Result | Log |
+| --- | --- | --- | --- |
+| Web | `cd apps/web; npm test` | **339 passed, 0 failed** (5.7 s) | `logs/web-tests.txt` |
+| API (full) | `.venv-saas\Scripts\python.exe -m pytest tests/api -q` | **836 passed, 2 skipped, 1 failed** (7 m 29 s) | `logs/pytest-api-full-2026-11-13.txt` |
+| API (review/notation/revision subset) | `pytest tests/api/test_music_{review,edit,contract,playback_settings,draft_handoff}.py -q` | **24 passed** (32.4 s) | `logs/pytest-api-music-subset.txt` |
 
-`tsx --test` over `tests/engine`, `tests/music-engine`, `apps/web/tests/*.test.mjs|tsx`:
-
-| Result | Value |
-| --- | --- |
-| Tests | **339** |
-| Pass | **339** |
-| Fail | **0** |
-| Duration | 6.5 s |
-
-Notable coverage for this work: `tests/music-engine/notation.test.ts` (build, pitch, duration, ties, staff move, round-trip, MusicXML), `apps/web/tests/notation-editor.test.tsx` (render, chord selection, undo/redo, add/delete, phone tabs), `piano-playback.test.tsx`, `piano-source-player.test.tsx`, `verification.test.tsx`.
-
-**Nothing covers**: scroll/viewport behaviour, zoom, linked scrolling, playhead geometry, pointer cancellation, drag thresholds, save payloads containing notation or alignment, or persistence round-trips through the API.
-
-### 5.2 API
-
-```
-.\.venv-saas\Scripts\python.exe -m pytest tests/api -q
-```
-
-| Result | Value |
-| --- | --- |
-| Passed | **836** |
-| Failed | **1** |
-| Skipped | **2** |
-| Duration | 7 m 29 s |
-
-The single failure is an **environment dependency, not a code defect**:
+The single API failure is environmental, not a regression:
 
 ```
 tests/api/test_piano_expression.py::test_audio_identity_is_measured_and_mismatches_rejected
 ModuleNotFoundError: No module named 'soundfile'
 ```
 
-`soundfile` 0.14.0 exists in `.venv-music` but not in `.venv-saas` (the only environment that also has FastAPI). Re-running the identical test with `.venv-music` site-packages on `PYTHONPATH` passes:
+`soundfile` 0.14.0 exists in `.venv-music` but not `.venv-saas` (the only environment with FastAPI). With `.venv-music` site-packages on `PYTHONPATH`, the identical test passes in 2.11 s. The reviewer independently confirmed the same log; the full-suite number remains developer-reported.
 
-```
-1 passed in 2.11s
-```
-
-Targeted review/notation/revision suite:
-
-```
-pytest tests/api/test_music_review.py tests/api/test_music_edit.py tests/api/test_music_contract.py \
-       tests/api/test_music_playback_settings.py tests/api/test_music_draft_handoff.py -q
-→ 24 passed in 36.25s
-```
-
-Logs: `logs/pytest-api-venv-saas.log`, `logs/pytest-music-subset.log`.
-
-### 5.3 What these tests do not prove
-
-The suite proves the commands do what they were written to do. It does **not** prove they are safe: `tests/music-engine/notation.test.ts:58-75` explicitly asserts that lengthening one note **deletes** a neighbouring note and its performance event. That is the current intended behaviour, and Phase 2 must change the test alongside the behaviour (see §10, fixture F4).
+Not covered by either suite: scroll/viewport behaviour, zoom, linked scrolling, playhead geometry, pointer cancellation, drag thresholds, notation or alignment in save payloads, persistence round-trips. `tests/music-engine/notation.test.ts:58-75` currently *asserts* the destructive overwrite (D1), so Phase 2 must change that test with the behaviour.
 
 ---
 
-## 6. Findings — destructive and unsafe paths, reproduced on the real draft
+## 6. Findings and reproduction matrix
 
-All figures come from `scripts/audit-destructive.ts` against the 1,338-note draft (`logs/destructive-audit.log`). The script rebuilds notation, preserves the original document, and measures before/after.
+Every outcome below was produced by `scripts/audit-destructive.ts`; the machine-readable form is `audit-matrix-real.json` (real draft) and `audit-matrix-fixture.json` (fixture). Logs: `logs/audit-destructive-real.txt`, `logs/audit-destructive-fixture.txt`.
 
-| # | Operation | Reproduced behaviour on the real clip | Severity | Location |
-| --- | --- | --- | --- | --- |
-| D1 | Written-duration change on one note | Lengthening one note from 600→1,560 ticks **deleted 4 sounding notes** (1,338→1,334 performance notes); the affected event and its performance links are gone, not muted | Critical | `packages/music-notation/edit.ts:80-104` (`removeOverlap`) via `:244-254` |
-| D2 | Move one note in the roll / “Performance start” field | Moves the **whole event** (all chord members, up to 4 in this clip's notation) and rewrites every linked `performance.onset` from ticks×tempo — exact seconds are replaced by a tempo approximation | Critical | `edit.ts:226-241`, called from `NotationEditor.tsx:447-449` and `PianoRoll.tsx:90-93` |
-| D3 | 10 ms free-time nudge with Snap off | Request 0.9272 s stored as 0.9310 s: the editor passes only 16th-note ticks, so a 10 ms adjustment is **rounded away** entirely | Critical | `NotationEditor.tsx:447-449`, `PianoRoll.tsx:92` |
-| D4 | Tie | Absorbs the second attack (deletes its performance note) and overwrites the first note's recorded length with the summed **written** length in tempo seconds (0.9404 s → 1.0345 s). `untieLast` does **not** restore the absorbed note | Critical | `edit.ts:380-399`, `:402-414` |
-| D5 | Add note over an existing note | Silent replacement: the target occurrence is deleted and the new note takes its place; total count unchanged, no warning | High | `edit.ts:157-199` + `removeOverlap` |
-| D6 | Build: same pitch, same onset | Two occurrences collapse to one logical note linked only to the first (`performance_ids: ["a"]`); the second stays in `performance` but is **unmapped and unselectable**. 0 such pairs exist in the real clip today, but nothing prevents them | High | `build.ts:160-167` |
-| D7 | Build: more than two overlapping voices | Third voice merges same-onset groups into a chord or **truncates the previous event's duration** (`previous.duration = max(GRID, start - previous.start)`) with no report | High | `build.ts:89-120` |
-| D8 | No-op commands | `respellAccidental(natural)` and `changeStaff(same)` return a **new object** without changing anything → spurious dirty flag and history entry | Medium | `edit.ts:120-143`, `:257-281` |
-| D9 | Generated-rest deletion | Generated rests have no event id, so the destructive delete path is unreachable today; but selecting a generated rest and pressing Delete **inserts an explicit rest** instead of doing nothing | Low | `edit.ts:311-326`, `NotationEditor.tsx:268-274` |
-| D10 | Every edit rebuilds the entire score | `refreshNotation` regenerates all 2,335 segments, 740 ties and 592 generated rests, and all derived ids, on every command | Medium (cost + identity) | `build.ts:229-383` |
-| D11 | Multi-occurrence logical note | Pitch/velocity/length commands apply to **every** linked performance id (`flatMap(note.performance_ids)`) with no split or rejection path | High (latent) | `edit.ts:55-57`, `:416-446` |
-| D12 | Reviewed editor vs sync offset | `MusicLessonEditor` passes no offset to `NotationEditor`; the roll draws raw performance onsets while the playhead is video time, so any non-zero offset misplaces every note relative to the playhead | High | `MusicLessonEditor.tsx:157-158`, `PianoRoll.tsx:113-136` |
+| # | Behaviour | Status | Receipt |
+| --- | --- | --- | --- |
+| D1 | Written-duration command deletes neighbouring occurrences | **reproduced-real** | `ev-treble-1-1080-0-bp-1` 600→1,560 ticks (**+960 = a half note = two quarter-note beats**); performance **1,338 → 1,334**; the neighbour occurrence and three further notes disappeared |
+| D2 | Event move rewrites every chord member to one tempo-derived onset | **reproduced-real** | `ev-treble-1-2160-3-bp-5`: distinct recorded onsets **2 → 1** after a one-sixteenth move |
+| D3 | Free-time nudge is snapped to the 16th grid | **reproduced-real** | requested 0.9272 s, only 1,080 ticks passable, stored 0.9310 s (net **+0.0138 s**; **3.8 ms** from the request). The achievable step is one grid unit (≈103 ms). On the fixture the same request nets 0.0000 s, i.e. genuinely rounded away. |
+| D4 | Tie deletes the second attack and rewrites recorded length | **reproduced-real** | `ev-treble-1-3360-6-bp-10`: 0.9404 s → 1.0345 s (tempo-derived), 1 occurrence absorbed, `untieLast` does not restore it |
+| D5 | Insert silently replaces the note it lands on | **reproduced-real** | inserting at 1,080 ticks removed `bp-1` (0.917 s); total unchanged (1,338 → 1,338) |
+| D6 | Same-pitch, same-onset occurrences lose their mapping | **constructed-fixture** | two occurrences → one logical note linked to `dup-a` only; the other is unmapped and unselectable |
+| D7 | A third overlapping voice is merged or truncates the previous event | **constructed-fixture** | three same-onset groups → 2 events, 1 shortened below a quarter note, no report |
+| D8 | No-op commands return a new document | **reproduced-real** | `respellAccidental(natural)` and `changeStaff(same)` return new objects; `changePitch(same)` correctly returns the original |
+| D9 | Generated-rest Delete inserts an explicit rest | **static-analysis** | generated rests carry no event id, so the destructive branch is unreachable and the handler falls through to `insertRest` (`NotationEditor.tsx:268-274`); a React handler, not a package command |
+| D10 | Every command rebuilds all segments, ties and rests | **reproduced-real (measured)** | 10 edits in 358 ms (**36 ms each**), each regenerating **2,335 segments, 740 ties, 592 generated rests**; serialised document **1.5 MB** |
+| D11 | A logical note with several occurrences is edited as a whole | **constructed-fixture** | one logical note linked to `m-a` (1.0 s) and `m-b` (3.0 s); one `changePitch` changed both; no split or rejection path |
+| D12 | Reviewed editor ignores the sync offset | **static-analysis** | `MusicLessonEditor` passes only a video URL; the roll draws raw onsets while the playhead is video time. Measuring needs a reviewed revision with a non-zero offset, absent locally |
+| C1 | Delete one chord member leaves the rest intact | **safe-control** | deleting pitch 61 kept pitch 80 at its recorded 0.3264 s |
+| C2 | Pitch change on one chord member leaves the rest intact | **safe-control** | neighbour pitch, onset and length unchanged |
 
-Supporting cost measurements for later phases:
+The two behaviours that cannot be executed from a package command (D9, D12) are marked static rather than claimed as reproductions. The two safe controls are included so the matrix distinguishes “destructive” from “already correct”.
+
+Cost and size figures:
 
 | Measurement | Value |
 | --- | --- |
 | Notation build, 1,338 notes | 45 ms |
-| Ten sequential pitch edits | 371 ms total, **37 ms each** |
+| Ten sequential pitch edits (real) | 358 ms, 36 ms each |
 | Serialised notation document | 1.5 MB |
-| 80-entry snapshot history, implied | **≈120 MB** |
-
-The last figure matters: the editor's undo model stores whole structured clones, and the clip is 1.5 MB per snapshot. Phase 2's “single history” cannot inherit that design unchanged.
+| 80-snapshot history, **serialised-size estimate** | ≈120 MB (JSON size × 80; not a measured heap) |
 
 ---
 
-## 7. Why a single occurrence needs its own id (not pitch, not index)
-
-Three selectors are available today; only one is valid.
+## 7. Why an occurrence needs its own id
 
 | Selector | Why it fails |
 | --- | --- |
-| Pitch alone | A5 occurs **171 times** in this clip (75 inside chords); up to **7 A5 attacks fall inside one 2 s window**. Selecting “the A5 at 84 s” would be ambiguous. |
-| Pitch + time window | Still ambiguous at 7-per-2 s density, and any tolerance window that fixes it also selects the neighbouring A5 in a repeated-note passage. |
-| Array index / event id | Broken by insert/delete/move: `PianoRoll` maps index→note per render, and event ids are derived from staff/voice/start (`build.ts:122-125`), so any rhythmic edit re-keys them. |
+| Pitch alone | A5 occurs **171 times** (75 inside chords); up to **7 A5 attacks in one 2 s window** |
+| Pitch + time window | Still ambiguous at that density; any tolerance wide enough to catch one also catches its neighbour in a repeated-note passage |
+| Array index / event id | Broken by insert/delete/move; event ids embed staff/voice/start (`build.ts:122-125`), so rhythmic edits re-key them |
 
-The model already has exactly the right handle: the performance occurrence id (`bp-1` … `bp-1338`). It is unique, stable across edits, and preserved through save. What is missing is that the editor selects `note_id` (a logical note) and mutates through it, and that the review page selects by array index (`MusicDraftReview.tsx:127-128`).
+The model already has the right handle: the performance occurrence id (`bp-1` … `bp-1338`). What is wrong is that the editor selects a logical note and mutates through it, and that the review page edits by array index (`MusicDraftReview.tsx:127-128`).
 
-Two honest caveats for the reviewer:
+Caveats stated plainly:
 
-- The brief's example (“selecting one C4”) does not occur in this recording: **MIDI 60 appears 0 times**. The behavioural requirement is unaffected; the fixture must supply the C4 case, and the real-example case must use A5/A4/A3.
-- Occurrence identity is not the same as logical-note identity. A logical note may eventually map several occurrences (the model permits `performance_ids: string[]`). The contract in §9 therefore keeps **both** and makes the scope of every command explicit rather than collapsing them.
+- The brief's “selecting one C4” is illustrative: **MIDI 60 appears 0 times** in this recording. The C4 case is covered by the fixture (six C4 attacks, two of them at one onset), and real-data checks use A5/A4/A3.
+- Occurrence identity is not logical-note identity: the model permits many occurrences per logical note. §9.1 keeps both and makes scope explicit.
 
 ---
 
 ## 8. Why a chord member cannot reuse an event-wide command
 
-A `NotationEvent` is a **notational** container: notes that share staff, voice, quantised start and quantised written duration (`build.ts:70-87`). It is not an occurrence group. On the real clip:
+A `NotationEvent` is a **notational** container: notes sharing staff, voice, quantised start and quantised written duration (`build.ts:70-87`). It is not an occurrence group. On the real clip (`logs/chord-spread-real.txt`):
 
 | Measurement | Value |
 | --- | --- |
 | Chord events (≥2 notes) | 180 |
-| Chord events whose members have **different recorded onsets** | **89 (49%)** |
-| Largest recorded-onset spread inside one event | **92.8 ms** (`ev-treble-1-75000-235-bp-390`) |
+| Members have **different recorded onsets** | **89 (49%)** |
+| Largest spread inside one event | **92.8 ms** |
 | Median spread | 11.6 ms |
-| Chord events whose members have different recorded durations | **172 (96%)** |
+| Members have different recorded durations | **172 (96%)** |
 
-Therefore:
-
-- `moveEvent(event, start)` — the only onset command the roll exposes — rewrites the recorded onset of every chord member to the same tick. For half the chords it destroys a stagger that the performer actually played, and it substitutes tempo-derived seconds for exact ones (D2).
-- `changeDuration(event, ticks)` changes every member's written length and can delete the neighbours behind them (D1).
-- Pitch edits are already per-note (`changePitch`), which is the one safe axis in the current command set.
-
-This is the required conclusion of the Phase 1 gate, and it is also the reason the current `notation.test.ts` “overwrites the same voice” assertion has to change rather than be preserved.
+So `moveEvent` — the only onset command the roll exposes — collapses a stagger the performer actually played (D2), and `changeDuration` can delete the neighbours behind it (D1). Pitch edits are already per-note, the one safe axis today.
 
 ---
 
-## 9. Proposed contracts (Phase 2 implementation targets)
+## 9. Contracts
 
-### 9.1 Identity and invariants
+### 9.1 Identity, ownership and scope
 
-| Object | Identity | Invariant |
-| --- | --- | --- |
-| Performance occurrence | `performance.id` (unchanged, `bp-*` / `authored-*`) | Unique, ≤80 chars, immutable for the document's life, never derived from pitch or position |
-| Logical note | `NotationNote.id` | Unique, stable; **not** derived from position; may map 1..n occurrences |
-| Notation event | `NotationEvent.id` | Stable; must not embed start/voice once movable (today it does, `build.ts:122-125`) |
-| Segment / segment note | derived | **Never** selected or persisted as identity; regenerated freely |
-| Selection | `{occurrence_id, logical_note_id?, scope}` | A session value, not a document field; survives unrelated edits; cleared when its targets disappear |
+**Rules**
 
-Rules the server must be able to check:
+1. Every sounding performance occurrence belongs to **exactly one** logical note.
+2. Every sounding logical note owns **one or more** occurrences.
+3. Several occurrences may map to one logical note — this is **many-to-one**, not injective.
+4. No occurrence may be owned by two logical notes (duplicate ownership).
+5. No occurrence may be absent from the map while present in `performance` (missing ownership).
+6. Forward and reverse mappings must agree: rebuilding `performance_map` from the notes yields the same object.
+7. Rests own no occurrences and have no logical note.
+8. Chord pitch uniqueness within an event; at most two voices per staff.
+9. Ids are stable and never position-derived; segments are derived and never identity.
 
-- every occurrence maps to exactly one logical note (`performance_map` total and injective-on-notes);
-- no logical note without at least one occurrence;
-- no dangling `performance_ids`, in either direction;
-- chord pitch uniqueness within an event (already enforced);
-- at most two voices per staff (already enforced).
+**Valid many-to-one example**
 
-Migration note: existing saved documents use `n-${performance.id}` and `ev-${staff}-${voice}-${start}-${index}-${first}`. Both remain valid; the contract adds that new ids must not be position-derived, and that a derived id may never be re-derived after an edit.
+```json
+{
+  "performance": [{"id": "bp-1", "onset": 1.0}, {"id": "bp-2", "onset": 3.0}],
+  "events": [{"id": "ev-1", "notes": [{"id": "n-1", "pitch": 60, "performance_ids": ["bp-1", "bp-2"]}]}],
+  "performance_map": {"bp-1": "n-1", "bp-2": "n-1"}
+}
+```
 
-### 9.2 Time: seconds are canonical, ticks are interpretation
+**Invalid: duplicate ownership** — `bp-1` appears in two logical notes, or the forward map disagrees with the reverse index.
 
-| Quantity | Unit | Canonical? | Rule |
+```json
+{
+  "events": [
+    {"id": "ev-1", "notes": [{"id": "n-1", "performance_ids": ["bp-1"]}]},
+    {"id": "ev-2", "notes": [{"id": "n-2", "performance_ids": ["bp-1"]}]}
+  ],
+  "performance_map": {"bp-1": "n-1"}
+}
+```
+
+**Invalid: missing ownership** — `bp-2` exists in `performance` but is in no note's `performance_ids` and has no `performance_map` entry. This is what D6 and the current builder produce.
+
+**Scope.** Every command declares `scope: 'occurrence' | 'logical' | 'event'`. The default for pitch/onset/recorded-length/velocity is `occurrence`. If a logical note has several occurrences and an occurrence edit would make them diverge, the command **splits** the logical note (new id, same event) or splits the event into an available voice; if neither is representable it **rejects** with `MultiOccurrenceScope`. It never edits the repetitions implicitly (D11).
+
+### 9.2 Time
+
+| Quantity | Unit | Canonical | Rule |
 | --- | --- | --- | --- |
-| `performance.onset`, `performance.duration` | seconds (float) | **Yes** | Exact. Never recomputed from ticks. Never snapped implicitly. |
-| `notation.events[].start/duration`, `segments` | ticks (ppq 480, grid 120) | No | Written interpretation. Never used to derive performance seconds. |
-| `playback.sync_offset_seconds` | seconds, [−10, +10] | Yes, playback setting | Applied once at one boundary. Not part of notation. |
-| Display/playhead | seconds | No | `effective = stored + offset`, clamped to `[0, duration]` for display only |
+| `performance.onset`, `performance.duration` | seconds | **Yes** | exact; never recomputed from ticks; never implicitly snapped |
+| `events[].start/duration`, `segments` | ticks (ppq 480, grid 120) | No | written interpretation only |
+| `playback.sync_offset_seconds` | seconds, ±10 | Yes (playback setting) | applied once at render/seek, never in notation |
+| Display / playhead | seconds | No | `effective = stored + offset`, clamped for display only |
 
-Bounds and failure rules:
+Bounds: `0 ≤ stored_onset`, `onset + recorded_duration ≤ duration`; written `ticks % 120 == 0`, `duration ≥ 120`, `start + duration ≤ last measure end`. Out-of-bounds edits reject; a drag preview clamps but never writes outside the range. Snap is applied only when the user enabled it — never inside the roll→tick conversion as today.
 
-- `0 ≤ stored_onset`; `stored_onset + recorded_duration ≤ duration`; reject, do not clamp silently.
-- Written: `ticks % 120 === 0`, `duration ≥ 120`, `start + duration ≤ last measure end`.
-- A drag that would leave `[0, duration]` clamps the **drag preview** and commits the clamped value; it never writes outside the bounds.
-- Offset editing does not touch note fields; note editing does not touch the offset (already true, `lessons.py:388-393`).
+### 9.3 Alignment
 
-The 10 ms requirement is implemented by carrying a float `seconds` through the command and the drag, with snapping applied only when the user has selected a snap value — never inside the editor's tick conversion as it is today (D3).
+**What is measured, and what is not.** The reported 26 ms mean / 52 ms maximum is the difference between performance onsets and the score ticks produced by quantising *the same* data. It is a **quantisation residual**, not independent alignment accuracy and not measured playback drift. Nothing here proves the tempo map is musically right. Phase 4 measures three separate things: (a) continuity of the interpolated cursor at frame rate; (b) activation of occurrences at their exact recorded intervals; (c) alignment error against an **annotated fixture** with known beat times. Beating the circular residual is not a success criterion. (A 103 ms grid does not itself turn `tick = seconds / secondsPerTick` into a step; that conversion is continuous. What is stepped is a nearest-event lookup, which must be labelled as such if it is ever used.)
 
-### 9.3 Alignment: a versioned monotonic map
-
-The document has no alignment today. Proposed addition:
+**Representation.** Strictly increasing anchor pairs cannot represent an internal explanation gap, because the score must hold while time advances. Alignment is therefore a contiguous list of passages:
 
 ```ts
-type AlignmentAnchor = { id: string; source_seconds: number; tick: number };
+type TimedPassage = {kind: 'timed'; source_seconds: [number, number]; ticks: [number, number]};
+type HeldPassage  = {kind: 'held';  source_seconds: [number, number]; tick: number};
 
 type Alignment = {
   alignment_version: 1;
   mode: 'estimated' | 'anchored';
-  basis: 'tempo' | 'anchors';
-  anchors: AlignmentAnchor[];       // sorted, strictly increasing on both axes
+  basis: 'tempo' | 'passages';
+  passages: (TimedPassage | HeldPassage)[];   // contiguous, ordered, covering 0..duration
 };
 ```
 
-- `notation_version` becomes `2`; a v1 document is read as `{mode:'estimated', basis:'tempo', anchors:[]}` and is labelled *estimated*. Nothing in `performance` changes on migration.
-- Mapping is piecewise linear between anchors; outside the anchor range the map **holds** at the boundary value rather than extrapolating (honest behaviour for explanation passages).
-- Inverse: `secondsToTick` and `tickToSeconds` are monotonic and mutual inverses within one tick; clicking a note seeks to its **occurrence onset**, never to a tempo approximation; clicking empty space inverts the map, or offers the nearest passage boundary.
-- Anchors cannot reverse time or score order (`source_seconds` and `tick` must both increase). Duplicate ticks for chord members are grouped into one anchor; per-note deviation is derived at render time, never stored as an anchor.
-- Estimated state is displayed as “Score alignment estimated” with an explicit alignment action.
+Invariants: passages tile `[0, duration]` without gaps or overlaps; ticks are non-decreasing across the list; a `timed` passage has `ticks[1] > ticks[0]`; a `held` passage has a single tick; `mode: 'anchored'` requires at least one timed passage with a non-zero tick span.
 
-Scope note for the reviewer: on this clip a constant-tempo map is already within **26 ms mean / 52 ms max** because the builder snaps every onset to a 103 ms grid. That does not make the map correct — it makes it a **step function** with 103 ms steps, while the engraved score has fixed spacing. Phase 4 must interpolate between anchors, not re-derive per note, and must label the result honestly.
+**Mapping.** Within a timed passage `tick = k0 + (seconds − s0) · (k1 − k0)/(s1 − s0)` — continuous, strictly increasing. Within a held passage the tick is constant.
 
-### 9.4 Command contracts
+**Inverse policy.** `secondsToTick` is defined everywhere. `tickToSeconds` is unique on timed passages. For a tick that exists only inside a held passage, the inverse returns the **start** of the hold: seeking to such a tick lands on the previous valid boundary, and the next timed passage resumes from there. The pair is therefore *not* claimed to be globally mutually invertible; the policy is fixed, documented and testable (F11).
 
-Every command: `(document, args) → Result<document', error>`; validates before mutating; returns the **same object identity** on no-op or failure; commits at most one history entry; resets review confirmation; flags dirty only on a committed change.
+**Estimated and degenerate cases**
+
+- *No anchors, `basis: 'tempo'`*: one timed passage over the whole clip at the estimated tempo; `mode: 'estimated'`; UI shows “Score alignment estimated”.
+- *One anchor*: pins one point; slope elsewhere comes from tempo; still `estimated` until a second, later anchor exists. A single anchor never changes the mode.
+- *Anchors*: `SetAlignmentAnchor` inserts a timed passage boundary; anchors that would reverse time or score order are rejected. Chord members on one tick share one anchor.
+
+**Reference frame and the offset.** Passages are stored in **performance seconds**, the same frame as `performance.onset`, and are unaffected by `sync_offset_seconds`. Rendering and seeking convert once: `effective = stored + offset`. Changing the offset never rewrites passages or notes, and the score is never shifted twice.
+
+**Spans.** `spans` remain the authored playing/explanation segments. An `explanation` span becomes a held passage at the tick reached when the preceding timed passage ends; a `playing` span becomes a timed passage. The real clip has one playing span and no explanation span, so the held case is exercised by the fixture only.
+
+### 9.4 Commands
+
+Every command: `(document, args) → Result<document', error>`; validates before mutating; returns the **same identity** on no-op or failure; commits one history entry; resets review confirmation; flags dirty only on a committed change.
 
 **Occurrence scope (default for sound and timing)**
 
 | Command | Arguments | Validation | Failure |
 | --- | --- | --- | --- |
-| `SetPerformancePitch` | occurrence_id, pitch, optional spelling | 0..127; linked performance ids consistent | keep spelling rules: default spelling from key, explicit accidental preserved |
-| `SetPerformanceOnset` | occurrence_id, seconds, snap? | bounds; snap applied only if requested | reject at bounds; never silently shift global offset |
-| `SetPerformanceDuration` | occurrence_id, seconds | > 0; onset + seconds ≤ duration | reject |
-| `SetVelocity` | occurrence_id, velocity | 0..1 | reject |
+| `SetPerformancePitch` | occurrence, pitch, spelling? | 0..127; scope rules of §9.1 | reject without mutation |
+| `SetPerformanceOnset` | occurrence, seconds, snap? | bounds; snap only when requested | reject at bounds; never touches the global offset |
+| `SetPerformanceDuration` | occurrence, seconds | > 0; onset + seconds ≤ duration | reject |
+| `SetVelocity` | occurrence, velocity | 0..1 | reject |
+| `DeleteOccurrence` | occurrence | exists | clears selection; removes only that occurrence and its notation link |
 
-**Written/score scope (written rhythm, spelling, voices)**
+**Written scope**
 
 | Command | Arguments | Validation | Failure |
 | --- | --- | --- | --- |
-| `SetWrittenDuration` | target, ticks, scope: `event` \| `logical-note`, overlap: `reject` \| `replace` | grid; `replace` performs today's destructive behaviour **explicitly and as one undo step** | `WrittenOverlap{neighbours}` leaves document unchanged |
-| `MoveWrittenStart` | event_id, ticks | grid; no overlap | reject |
-| `ApplyAccidental` | logical_note_id, sharp \| flat \| natural | spelling must exist for that pitch | reject with explanation |
-| `Respell` | logical_note_id, target spelling | enharmonic-equivalent pitch | reject; changes notation only |
-| `InsertNote` | pitch, seconds, duration, staff?, voice?, written | duplicate check; overlap policy as above | `AmbiguousTarget` / `DuplicateOccurrence` |
-| `DeleteOccurrence` | occurrence_id | — | clears selection; removes only that occurrence and its notation link |
-| `DeleteLogicalNote` | logical_note_id, `include_tied_segments` | — | — |
-| `SetAlignmentAnchor` / `RemoveAlignmentAnchor` | seconds, tick / id | monotonicity, duplicates | reject, document intact |
+| `SetWrittenDuration` | target, ticks, scope | grid; **must not overlap** another written event | `WrittenOverlap{neighbours}` — document unchanged |
+| `MoveWrittenStart` | event, ticks | grid; no overlap | reject |
+| `ApplyAccidental` | logical note, sharp/flat/natural | must resolve the chosen letter/octave | reject with explanation |
+| `Respell` | logical note, target spelling | enharmonic equivalent only | reject |
+| `InsertNote` | pitch, seconds, duration, staff?, voice? | duplicate check; overlap rejects; “add to chord” only when the same start/voice event exists and the pitch differs | `AmbiguousInsert` / `DuplicateOccurrence` |
+| `DeleteLogicalNote` | logical note | — | removes all linked segments by derivation |
 
-**Scope and split rules (the part that must not be skipped)**
+**Overlap policy — deliberately non-destructive.** There is **no** `overlap: 'replace'` branch in Phase 2 and no silent neighbour trimming, in any command. A written edit that would collide is rejected; the user must shorten the neighbour through the neighbour's own command, which states what changes. This is stricter than the original proposal, where a replace option was offered.
 
-- When a logical note maps several occurrences and an occurrence-scoped edit would make them diverge, **split** the logical note (new id, same event) or split the event into an available voice; if neither is representable, reject with `MultiOccurrenceScope` and leave the document untouched.
-- When a written change needs a third voice, reject with `NeedsThirdVoice` (wording from the plan: “This change needs another voice”) and leave the document untouched. Never overwrite neighbours to make room.
-- Tied segments are always derived. Removing one segment independently requires an explicit `SplitTie` command that does not exist yet; until then the inspector states “Entire tied note”.
+**Tie and untie — not available in Phase 2.** A tie in notation implies one sustained sound, while the two occurrences currently carry separate attacks. Implementing it by absorbing the second attack is exactly D4. Therefore:
 
-**Explicitly forbidden in Phase 2**
+- `MarkNotationTie` and `Untie` are unavailable, and the UI must say so rather than offer a command that misrepresents playback.
+- The deferred replacement is a performance-scoped `MergeOccurrences(target, absorbed)`: keeps the target onset, sets its recorded length to `absorbed.end − target.onset` (exact seconds, clamped to the clip), removes the absorbed occurrence, updates the notation event, one undo step, and reports the length that changed. It is not implemented in Phase 2 and must not be approximated by any other command.
 
-- any command that deletes or truncates a *different* occurrence as a side effect;
-- any command that computes performance seconds from ticks;
-- selection changes that mark the document dirty or enter undo history.
+**Accidentals versus respelling** — different operations, never one handler:
 
-### 9.5 Persistence contract changes (Phase 5, specified now)
+| Action | Effect on sounding pitch | Effect on notation | Audio identity |
+| --- | --- | --- | --- |
+| `ApplyAccidental(note, sharp)` | **changes**: C4 → MIDI 61 | letter kept, accidental `sharp` | invalidates preview |
+| `ApplyAccidental(note, flat)` | changes: D4 → 61 | letter kept, accidental `flat` | invalidates preview |
+| `ApplyAccidental(note, natural)` | changes: C♯4 → MIDI 60 | letter kept, accidental cleared | invalidates preview |
+| `Respell(note, "D♭4")` | **unchanged**: 61 → 61 | new spelling and accidental | no invalidation |
 
-- `ReviewMusic` gains optional `notation` (document v2, including alignment), validated by the existing `validate_notation` plus a new `validate_alignment`; the reference JSON gains the same key.
-- `EditMusic` already accepts `notation`; it gains alignment validation and must carry the existing notation forward when an older client omits it (today it would silently drop it).
-- Both keep: request-hash idempotency, verification state token, ownership, source hash, single finalisation.
-- Audio invalidation keeps comparing **performance events only** (`music_preview.py:7-12`), so spelling/alignment-only edits do not invalidate rendered piano audio.
-- Legacy v1 references without notation open normally (already the case for the reviewed editor via `createNotation`), and must now also load with alignment marked `estimated`.
+`ApplyAccidental` derives the pitch from the note's letter and octave, then applies ±1 or 0; it is the action the plan describes, not the old “that pitch cannot be written” limitation. Both actions go through occurrence scope, so a multi-occurrence logical note splits or rejects instead of changing repetitions.
+
+### 9.5 Nullable legacy fields
+
+| Field | `null` means | On load | Editing | Display |
+| --- | --- | --- | --- | --- |
+| `performance.duration` | length never determined | preserved as `null`; never converted to a written value or to zero | `SetPerformanceDuration` may set it | a 0.1 s bar is drawn as a **display default only**; it is never persisted |
+| `performance.velocity` | intensity unknown | preserved as `null` | `SetVelocity` may set it; `ClearVelocity` is **unavailable** until legacy nulls are migrated | neutral fill, no velocity-dependent styling |
+| `notation_duration` | written value not authored | preserved | written-duration commands may set the event | falls back to the grid-derived value |
+| `confidence` | unmeasured | preserved | not editable | not shown as a percentage |
+
+“Unknown length” is not “zero duration”: commands that require a length (tie/merge, alignment passages derived from note ends) refuse until a length exists, naming the occurrence.
+
+### 9.6 Persistence and legacy clients
+
+- `ReviewMusic` gains optional `notation` (Phase 5); `EditMusic` already accepts it. Both validate with the existing `validate_notation` plus a new `validate_alignment` when alignment is present.
+- **Legacy omission is validation-gated.** When a client omits notation, the server may retain the stored document **only if** it still validates against the submitted events and the alignment identity is unchanged. Otherwise it rejects with `NotationOutOfDate` (409) naming the mismatched occurrence ids and offering two explicit options: update the client, or regenerate. Regeneration is an explicit, reported action that lists what is lost (spelling, voices, ties, anchors) before it happens.
+- Never silently keep stale notation. Never silently regenerate authored work.
+- A v2 document (alignment present) must not be posted to the v1-only validator. The server gates on `notation_version`; until Phase 5 supports 2, the workspace harness does not send 2 to the current endpoint, and the existing reviewed-editor and review routes keep their current behaviour.
+- Idempotency, verification state tokens, ownership and source hashes are unchanged.
+- Audio invalidation keeps comparing performance events only (`music_preview.py:7-12`), so spelling and alignment edits do not invalidate rendered piano audio, while pitch/time edits do.
 
 ---
 
-## 10. Fixtures and reproducible checks required before Phase 2 is accepted
+## 10. Fixtures required before Phase 2 acceptance
 
 | Id | Fixture / check | Proves |
 | --- | --- | --- |
-| F1 | Two notes, same pitch and onset | No occurrence is silently unmapped (D6) |
-| F2 | Arpeggiated chord, 90 ms spread (mirrors `ev-treble-1-75000-235-bp-390`) | Per-note onset edit leaves the chord's other onsets intact |
-| F3 | Chord member with longer written value than a same-voice neighbour | Voice split or explicit rejection; never neighbour deletion |
-| F4 | Written overlap, `reject` and `replace` policies | Destructive replace is opt-in, one undo step, and the test that asserts silent overwrite is rewritten |
-| F5 | Tie across a barline | Recorded duration survives tie/untie; no tempo substitution |
+| F1 | Repeated C4 attacks (fixture has six, two at one onset) plus real A5 repetitions | One occurrence selected and edited; the others untouched |
+| F2 | Overlapping same-pitch occurrences | No duplicate ownership; the ambiguity is surfaced |
+| F3 | Arpeggiated chord with 90 ms spread (fixture and real) | Per-note onset edits leave the chord's other onsets intact |
+| F4 | Written overlap on duration and on move | Rejection without mutation; no neighbour deletion (replaces the test that asserts D1) |
+| F5 | Tie request | Unavailable, with an explicit message; `MergeOccurrences` contract test only when implemented |
 | F6 | Logical note with two occurrences | Split or `MultiOccurrenceScope`; never both edited |
-| F7 | Generated rest selected, Delete pressed | No document mutation |
-| F8 | Three voices required | Exact rejection message; document identity unchanged |
-| F9 | 12.347 → 12.357 s, Snap off, save/reload | 10 ms survives with no offset applied twice |
-| F10 | Offset ±10 s with notes at both boundaries | One application; invalid stored onsets rejected, never clamped |
-| F11 | Explanation span between playing spans | Cursor holds and resumes; no invented beats (fixture required — the real clip has none) |
-| F12 | Legacy reference without notation/alignment | Opens, marked estimated, saves without data loss |
-| F13 | No-op command set | Identity-equal document; no dirty flag; no history entry |
+| F7 | Generated rest selected, Delete pressed | No mutation |
+| F8 | Third voice required | Exact rejection, document identity unchanged |
+| F9 | 12.347 → 12.357 s with Snap off, save and reload | 10 ms survives; no double offset |
+| F10 | Offset ±10 s with notes at both boundaries | One application; invalid stored onsets rejected |
+| F11 | Internal explanation gap (fixture spans 6.5–9.0 s) | Cursor holds, resumes, and the inverse returns the hold start |
+| F12 | Legacy reference without notation/alignment; legacy v1 client save | Opens marked estimated; stale notation is refused, not retained |
+| F13 | No-op command set | Identity-equal document, no dirty flag, no history entry |
 | F14 | 20,000 events / 512 measures limits; empty clip | Clear rejection, no partial write |
+| F15 | Rubato fixture with annotated beat times | Alignment accuracy measured against ground truth, not a quantisation residual |
 
 ---
 
-## 11. Known limitations, deviations and outstanding checks
+## 11. Limitations and outstanding checks
 
-**Access limitations**
+- The real draft is reachable, but **not through the library list** for this owner; Phase 7 must verify the normal route rather than assume it.
+- No reviewed piano revision exists locally, so the `MusicLessonEditor` save path and D12 are audited statically; Phase 5 needs a reviewed fixture.
+- The production `.env` database holds no lessons; only `form_ui_test` does. Evidence runs must name the database.
+- The recording has **no C4** and **no explanation passage**; both are covered by fixtures. There is also no annotated beat ground truth, so the audit cannot separate rubato from decode jitter.
+- API full suite: one environment-only failure (`soundfile`), verified passing with the music environment on `PYTHONPATH`.
+- The 80-snapshot figure is a serialised-size estimate, not a heap measurement.
+- D9 and D12 remain static analyses; executing them needs the React handler and a reviewed revision respectively.
 
-- The real draft is accessible, but it is **not the normal library route** (`/api/lessons/summaries` returned empty for this owner). Phase 7 must verify entry from the library rather than assuming it.
-- No reviewed piano revision exists in `form_ui_test`, so the `MusicLessonEditor` + `NotationEditor` save path was audited statically and through its unit tests only. A reviewed fixture is needed for Phase 5 evidence.
-- The production `.env` database (`form`) holds no lessons; only `form_ui_test` does. Any later evidence run must name its database.
-
-**Real-data gaps against the plans' examples**
-
-- “Selecting one C4” — this recording contains **no C4** (0 occurrences). The C4 case must be a fixture (F1/F6); the real clip exercises A5/A4/A3 instead.
-- “Explanation passage” — the clip has one playing span and no explanation passage (longest silence 3.94 s). F11 is fixture-only.
-- “Rubato” — quantisation residuals are bounded (52 ms), but no ground-truth beat annotation exists for this clip, so the audit cannot separate genuine rubato from decode jitter. Phase 4 must not claim rubato handling from this example.
-
-**Environment**
-
-- API suite: one failure is a missing `soundfile` in `.venv-saas`; passes when `.venv-music` site-packages are on `PYTHONPATH`. No code change implied.
-
-**Deviations from the plan**
-
-- None. No product code was modified; the only additions are read-only audit scripts, captures and this note.
-- The audit used direct database reads to obtain the draft JSON for structural analysis. This is read-only, but it bypasses the API's ownership check for *evidence gathering only*; no write path was used and no production database was touched (`form_ui_test`).
-
-**Explicitly not investigated (out of scope for Phase 1)**
-
-- Verification decision editing and its conflict merge (`VerificationReview`, `working-edits.ts`), beyond noting that a visual editor must not bypass its token.
-- Guitar paths.
-- `usePianoSourcePlayer` drift/realignment tuning (the controller is reused, not re-designed).
+**Evidence in Git versus local only.** Tracked: this note, the review record, `fixtures/`, `scripts/`, `logs/*.txt`, `captures/*.png`, `measurements.json`, `audit-matrix-{real,fixture}.json`. Not tracked: the private raw recording, the full draft document dump (`draft-document.json`, 249 KB), the full TAP stream and the intermediate notation JSON (1.5 MB). They are regenerated by the commands in §13 into `.local/phase1-audit/`.
 
 ---
 
@@ -468,44 +455,59 @@ Every command: `(document, args) → Result<document', error>`; validates before
 | Item | Value |
 | --- | --- |
 | Phase | 1 — Baseline audit and safe edit contracts |
-| Submitted code | `ef4dfb6` (audited implementation) + documentation-only commit on `phase1/piano-workspace-audit` |
-| Developer summary | Audited all seven editor surfaces and four write boundaries; verified the real 209.594 s / 1,338-note example is reachable; captured baseline test evidence (339 web, 837 API incl. the environment re-run); identified 12 destructive/unsafe behaviours (8 reproduced on the real draft with before/after counts); proposed occurrence, timing, offset and alignment contracts |
-| Evidence | §3 measurements, `measurements.json`, `captures/*.png`, `logs/*.log`, `scripts/*` (all read-only and re-runnable) |
-| Deviations / limitations | None from plan; see §11 |
-| Review decision | **NOT REVIEWED** |
-| Blocking findings | None raised by the developer; reviewer to confirm the destructive paths in §6 are the correct target set |
-| Follow-up submission | Pending review |
-| Next phase authorised | None — Phase 2 must not start without an explicit GO |
-
-### Reproducing this submission
-
-```powershell
-# code identity
-git checkout phase1/piano-workspace-audit
-git rev-parse HEAD^        # ef4dfb6
-
-# web tests (339 pass)
-cd apps/web; npm test
-
-# api tests (836 pass, 1 env-blocked)
-cd ..\..; .\.venv-saas\Scripts\python.exe -m pytest tests/api -q
-$env:PYTHONPATH="$PWD\.venv-music\Lib\site-packages"
-.\.venv-saas\Scripts\python.exe -m pytest "tests/api/test_piano_expression.py::test_audio_identity_is_measured_and_mismatches_rejected" -q
-Remove-Item Env:\PYTHONPATH
-
-# real-example checks (read-only)
-.\.venv-saas\Scripts\python.exe docs\qualification\piano-workspace-phase-01\scripts\check-real-draft.py
-docker exec form-saas-postgres-1 psql -U form -d form_ui_test -t -A -c "select document::text from music_drafts where lesson_id='0df28929d427406cb86d9bb5e2dcd35b'" -o /tmp/doc.json
-docker cp form-saas-postgres-1:/tmp/doc.json .local/phase1-audit/draft-document.json
-
-# destructive-path audit (read-only)
-cd apps/web; npx tsx ..\..\docs\qualification\piano-workspace-phase-01\scripts\audit-destructive.ts
-```
-
-Screenshots were taken with Chromium 156 at 1440×900 and 390×844 against the live dev servers; no page state was submitted or saved during capture.
+| First submission | `4583e74` — audit documentation and scripts (parent `ef4dfb6`) |
+| Review decision | **CHANGES REQUIRED** — see [review note](piano-workspace-phase-01-review.md); D1–D12 confirmed as the target set; duration-overwrite change approved; fixtures approved |
+| This revision | Documentation and evidence only: corrected scripts, tracked logs, revised §9 contracts, reproduction matrix, corrected evidence wording |
+| Developer summary | R1–R5 addressed as in §0; no product code, API or UI changed; Phase 2 not started |
+| Evidence | §3 measurements, `measurements.json`, `audit-matrix-{real,fixture}.json`, `captures/`, `logs/`, `scripts/` (all re-runnable) |
+| Deviations / limitations | §11 |
+| Blocking findings | None raised by the developer; reviewer to confirm R1–R5 are resolved |
+| Next phase authorised | **None** — Phase 2 requires an explicit GO |
 
 ---
 
-## 13. Statement of scope
+## 13. Reproducing this revision
 
-Phase 1 is complete as scoped: audit, baseline evidence, destructive-path identification and contract proposals. **Phase 2 has not started.** No component has been extracted, no shared controller or history exists, no selection model has changed, and the current review page and note forms are untouched. This submission awaits review and an explicit GO.
+All commands run from the repository root. `npx --prefix apps/web tsx …` uses the `tsx` already installed in `apps/web/node_modules`; nothing is copied or relocated.
+
+```powershell
+# 1. Fixture-only path: no services, no private data
+npx --prefix apps/web tsx docs/qualification/piano-workspace-phase-01/scripts/audit-destructive.ts --fixture
+npx --prefix apps/web tsx docs/qualification/piano-workspace-phase-01/scripts/emit-notation.ts --fixture
+.\.venv-saas\Scripts\python.exe docs\qualification\piano-workspace-phase-01\scripts\validate-notation.py --fixture
+.\.venv-saas\Scripts\python.exe docs\qualification\piano-workspace-phase-01\scripts\analyze-draft.py --fixture
+
+# 2. Real-data path (needs the local stack; read-only)
+.\.venv-saas\Scripts\python.exe docs\qualification\piano-workspace-phase-01\scripts\fetch-draft-json.py
+npx --prefix apps/web tsx docs/qualification/piano-workspace-phase-01/scripts/audit-destructive.ts
+npx --prefix apps/web tsx docs/qualification/piano-workspace-phase-01/scripts/emit-notation.ts
+.\.venv-saas\Scripts\python.exe docs\qualification\piano-workspace-phase-01\scripts\validate-notation.py
+.\.venv-saas\Scripts\python.exe docs\qualification\piano-workspace-phase-01\scripts\chord-spread.py
+.\.venv-saas\Scripts\python.exe docs\qualification\piano-workspace-phase-01\scripts\check-real-draft.py
+.\.venv-saas\Scripts\python.exe docs\qualification\piano-workspace-phase-01\scripts\capture-review.py
+
+# 3. Test suites
+cd apps/web; npm test; cd ..\..
+.\.venv-saas\Scripts\python.exe -m pytest tests/api -q
+```
+
+Observed results for this revision (all exit code 0 unless stated):
+
+| Command | Result |
+| --- | --- |
+| fixture audit | 12 receipts written to `audit-matrix-fixture.json`; D1/D2/D4/D8 reproduced, D6/D7/D11 constructed, C1/C2 safe |
+| real audit | 12 receipts written to `audit-matrix-real.json`; D1–D5, D8, D10 reproduced, D6/D7/D11 constructed, D9/D12 static |
+| `emit-notation` (real) | 1,146 events, 2,335 segments, 127 measures, 145 BPM |
+| `validate-notation` (real) | builder output **ACCEPTED**; one pitch edit **REFUSED** |
+| `validate-notation` (fixture) | builder output **ACCEPTED**; one pitch edit **REFUSED** |
+| `chord-spread` (real) | 180 chords, 89 with differing onsets, max 92.8 ms, median 11.6 ms |
+| `check-real-draft` | 1,338 events, 209.594 s, no notation, no alignment |
+| `capture-review` | 50 fieldsets, 27 pages, 15,075 px page, 3.9 px/s, no overflow |
+| `npm test` | 339 passed |
+| `pytest tests/api` | 836 passed, 2 skipped, 1 env-blocked (targeted subset also green) |
+
+---
+
+## 14. Scope statement
+
+This revision is documentation and evidence only. No component has been extracted, no shared controller or history exists, no selection model has changed, and the review page and note forms are untouched. **Phase 2 has not started** and awaits an explicit GO.

@@ -1,25 +1,34 @@
-﻿"""Phase 1 evidence: capture the existing review experience for the real draft.
+"""Phase 1 evidence: capture the existing review experience for the real draft.
 
-Read-only: no edits, no saves. Records screenshots plus DOM/geometry measurements that the
-audit cites. Credentials are read from the local UI-test account used by the dev server.
+Read-only: it authenticates, loads the page, records DOM/geometry measurements and
+screenshots. Nothing is submitted and no musical data is modified.
+
+Usage (from the repository root):
+  python docs/qualification/piano-workspace-phase-01/scripts/capture-review.py
 """
+from __future__ import annotations
+
+import argparse
 import json
 import sys
 import time
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib.paths import SCRATCH, write_json
+from lib.ui import launch, login, require_server
 
-BASE = 'http://127.0.0.1:5173'
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    print('ERROR: playwright is not installed in this interpreter.\n'
+          'HINT: pip install playwright && python -m playwright install chromium', file=sys.stderr)
+    raise SystemExit(2)
+
 LESSON = '0df28929d427406cb86d9bb5e2dcd35b'
-URL = f'{BASE}/?page=music-review&id={LESSON}'
-OUT = Path(__file__).resolve().parent.parent / 'captures'
-OUT.mkdir(exist_ok=True)
-
-SUMMARY = {}
 
 
-def measure(page):
+def measure(page) -> dict:
     return page.evaluate("""() => {
       const q = s => document.querySelectorAll(s);
       const text = document.body.innerText;
@@ -31,7 +40,6 @@ def measure(page):
         page_scroll_width: document.documentElement.scrollWidth,
         page_client_width: document.documentElement.clientWidth,
         page_scroll_height: document.documentElement.scrollHeight,
-        body_text_head: text.slice(0, 240),
         shows_edit_heading: text.includes('Edit proposed notes'),
         note_count_claim: (text.match(/(\\d+) notes\\. Changes reset/) || [])[1] || null,
         pagination: (text.match(/Page (\\d+) of (\\d+)/) || [null, null, null]).slice(1),
@@ -39,36 +47,43 @@ def measure(page):
     }""")
 
 
-with sync_playwright() as p:
-    browser = p.chromium.launch()
-    context = browser.new_context(viewport={'width': 1440, 'height': 900})
-    login = context.request.post(f'{BASE}/api/auth/login',
-        data={'email': 'owner@ui.test', 'password': 'PianoDemo2026!'},
-        headers={'Origin': BASE, 'X-Form-Request': '1'})
-    SUMMARY['login_status'] = login.status
+def main() -> None:
+    parser = argparse.ArgumentParser(description='Capture the current review page (read-only).')
+    parser.add_argument('--base-url', default='http://127.0.0.1:5173')
+    parser.add_argument('--lesson', default=LESSON)
+    parser.add_argument('--out', type=Path, default=SCRATCH)
+    args = parser.parse_args()
 
-    page = context.new_page()
-    errors = []
-    page.on('console', lambda m: errors.append(m.text) if m.type == 'error' else None)
-    started = time.time()
-    page.goto(URL, wait_until='domcontentloaded')
-    page.wait_for_selector('.music-review-notes', timeout=90_000)
-    SUMMARY['seconds_to_note_forms'] = round(time.time() - started, 2)
-    SUMMARY['desktop'] = measure(page)
-    page.screenshot(path=str(OUT / 'review-desktop-1440x900.png'), full_page=False)
-    page.screenshot(path=str(OUT / 'review-desktop-full.png'), full_page=True)
+    base = args.base_url.rstrip('/')
+    url = f'{base}/?page=music-review&id={args.lesson}'
+    captures = args.out / 'captures'
+    captures.mkdir(parents=True, exist_ok=True)
+    require_server(base)
 
-    # Long example: how tall is the page once every note row has rendered?
-    page.set_viewport_size({'width': 390, 'height': 844})
-    page.wait_for_timeout(800)
-    SUMMARY['mobile'] = measure(page)
-    page.screenshot(path=str(OUT / 'review-mobile-390x844.png'), full_page=False)
+    summary: dict = {'url': url}
+    with sync_playwright() as pw:
+        browser = launch(pw)
+        context = browser.new_context(viewport={'width': 1440, 'height': 900})
+        summary['login_status'] = login(context, base)
+        page = context.new_page()
+        errors: list[str] = []
+        page.on('console', lambda message: errors.append(message.text) if message.type == 'error' else None)
+        started = time.time()
+        page.goto(url, wait_until='domcontentloaded')
+        page.wait_for_selector('.music-review-notes', timeout=90_000)
+        summary['seconds_to_note_forms'] = round(time.time() - started, 2)
+        summary['desktop'] = measure(page)
+        page.screenshot(path=str(captures / 'review-desktop-1440x900.png'))
+        page.set_viewport_size({'width': 390, 'height': 844})
+        page.wait_for_timeout(800)
+        summary['mobile'] = measure(page)
+        page.screenshot(path=str(captures / 'review-mobile-390x844.png'))
+        summary['console_errors'] = errors[:10]
+        browser.close()
 
-    SUMMARY['console_errors'] = errors[:10]
-    SUMMARY['library'] = context.request.get(f'{BASE}/api/lessons/summaries',
-        headers={'X-Lesson-Formats': '1,2'}).json()
-    browser.close()
+    write_json(args.out / 'measurements.json', summary)
+    print(json.dumps(summary, indent=2))
 
-(OUT.parent / 'measurements.json').write_text(json.dumps(SUMMARY, indent=2, default=str), encoding='utf-8')
-print(json.dumps(SUMMARY, indent=2, default=str)[:4000])
 
+if __name__ == '__main__':
+    main()

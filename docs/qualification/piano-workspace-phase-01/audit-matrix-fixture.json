@@ -1,0 +1,201 @@
+{
+  "input": "D:\\3d_trainer\\developement\\docs\\qualification\\piano-workspace-phase-01\\fixtures\\phase1-draft-fixture.json",
+  "label": "fixture",
+  "generated_from": "synthetic Phase 1 fixture",
+  "events": 20,
+  "duration": 12,
+  "tempo_bpm": 60,
+  "receipts": [
+    {
+      "id": "D1",
+      "title": "Written-duration command deletes neighbouring occurrences",
+      "status": "reproduced-fixture",
+      "detail": "Lengthened ev-treble-1-0-0-fx-01 from 480 to 1440 ticks (+960 ticks = a half note = two quarter-note beats at ppq 480). 1 linked occurrence(s) of ev-treble-1-480-2-fx-06 disappeared: performance 20 -> 15.",
+      "numbers": {
+        "edited_event": "ev-treble-1-0-0-fx-01",
+        "ticks_before": 480,
+        "ticks_after": 1440,
+        "added_ticks": 960,
+        "neighbour_event": "ev-treble-1-480-2-fx-06",
+        "neighbour_occurrences": 1,
+        "neighbour_onset_s": 1,
+        "neighbour_recorded_duration_s": 0.4,
+        "performance_before": 20,
+        "performance_after": 15,
+        "victim_survivors": 0
+      }
+    },
+    {
+      "id": "D2",
+      "title": "Event move rewrites every chord member to one tempo-derived onset",
+      "status": "reproduced-fixture",
+      "detail": "Moved ev-treble-1-1920-7-fx-12 (3 notes) by one sixteenth. Distinct recorded onsets before: 3; after: 1. Every member is re-stamped from ticks x tempo, so exact seconds are replaced.",
+      "numbers": {
+        "event": "ev-treble-1-1920-7-fx-12",
+        "notes": 3,
+        "onsets_before_s": [
+          4,
+          4.045,
+          4.09
+        ],
+        "onsets_after_s": [
+          3.75,
+          3.75,
+          3.75
+        ],
+        "spread_before_s": 0.09,
+        "spread_after_s": 0
+      }
+    },
+    {
+      "id": "D3",
+      "title": "A 10 ms recorded-onset nudge with Snap off is rounded away",
+      "status": "reproduced-fixture",
+      "detail": "Requested 1.0100 s; the editor can only pass 480 ticks, so 1.0000 s was stored. Net change 0.0000 s.",
+      "numbers": {
+        "requested_s": 1.01,
+        "stored_s": 1,
+        "ticks": 480,
+        "error_s": -0.01
+      }
+    },
+    {
+      "id": "D4",
+      "title": "Tie deletes the second attack and rewrites the recorded length",
+      "status": "reproduced-fixture",
+      "detail": "Tied ev-treble-1-0-0-fx-01: recorded length 1 s -> 1.5 s (tempo-derived), 1 absorbed occurrence(s) removed, and untie did not restore them.",
+      "numbers": {
+        "event": "ev-treble-1-0-0-fx-01",
+        "recorded_before_s": 1,
+        "recorded_after_s": 1.5,
+        "tempo_derived_s": 1.5,
+        "absorbed_occurrences": 1,
+        "absorbed_present_after_tie": 0,
+        "absorbed_restored_by_untie": false
+      }
+    },
+    {
+      "id": "D5",
+      "title": "Insert silently replaces the note it lands on",
+      "status": "reproduced-fixture",
+      "detail": "Inserting at 720 ticks removed fx-07 (1.400 s) with no error or warning; total occurrences unchanged (20 -> 19).",
+      "numbers": {
+        "insertion_ticks": 720,
+        "insertion_s": 1.5,
+        "victim": "fx-07",
+        "victim_present_after": false,
+        "performance_before": 20,
+        "performance_after": 19
+      }
+    },
+    {
+      "id": "D6",
+      "title": "Same-pitch, same-onset occurrences lose their mapping at build time",
+      "status": "constructed-fixture",
+      "detail": "Two occurrences at the same pitch and onset produce one logical note linked only to \"dup-a\". The other stays in performance (2) but is unmapped (1 unmapped), so it is unselectable and uneditable.",
+      "numbers": {
+        "performance_notes": 2,
+        "logical_notes": 1,
+        "linked_ids": [
+          "dup-a"
+        ],
+        "unmapped": 1
+      }
+    },
+    {
+      "id": "D7",
+      "title": "A third overlapping voice is merged or truncates the previous event",
+      "status": "constructed-fixture",
+      "detail": "Three same-onset groups produce 2 event(s); 1 event(s) were shortened below a quarter note without any report. The third voice is merged into a chord or absorbed by truncating the previous event.",
+      "numbers": {
+        "events_at_onset": 2,
+        "durations": [
+          1200,
+          360
+        ],
+        "truncated_events": 1
+      }
+    },
+    {
+      "id": "D8",
+      "title": "No-op commands return a new document",
+      "status": "reproduced-fixture",
+      "detail": "respellAccidental(natural) returned a new object: true; changeStaff(same) returned a new object: true. changePitch(same) returns the original identity: true.",
+      "numbers": {
+        "respell_natural_new_object": true,
+        "change_staff_new_object": true,
+        "content_changed": false
+      }
+    },
+    {
+      "id": "D10",
+      "title": "Every command rebuilds all segments, ties and generated rests",
+      "status": "reproduced-fixture",
+      "detail": "Ten sequential pitch edits took 3 ms (0 ms each). Each edit regenerates 29 segments, 4 ties and 14 generated rests. Serialised document size 0.02 MB (serialised-size estimate, not a measured heap).",
+      "numbers": {
+        "ten_edits_ms": 3,
+        "ms_per_edit": 0,
+        "segments": 29,
+        "ties": 4,
+        "generated_rests": 14,
+        "serialised_bytes": 18580,
+        "estimated_80_snapshot_mb": 1.4
+      }
+    },
+    {
+      "id": "D11",
+      "title": "A logical note with several occurrences is edited as a whole",
+      "status": "constructed-fixture",
+      "detail": "One logical note linked to two occurrences (1.0 s and 3.0 s). A single changePitch(n-m-a, 61) changed both: m-a, m-b. There is no split or rejection path in the command.",
+      "numbers": {
+        "linked_occurrences": [
+          "m-a",
+          "m-b"
+        ],
+        "pitches_after_edit": [
+          61,
+          61
+        ],
+        "changed": [
+          "m-a",
+          "m-b"
+        ]
+      }
+    },
+    {
+      "id": "C1",
+      "title": "Delete one chord member leaves the rest intact",
+      "status": "safe-control",
+      "detail": "Deleting pitch 64 from ev-treble-2-240-1-fx-02 kept pitch 67 at its recorded length 0.4 s.",
+      "numbers": {
+        "chord": "ev-treble-2-240-1-fx-02",
+        "other_present": true,
+        "recorded_duration_before": 0.4,
+        "recorded_duration_after": 0.4
+      }
+    },
+    {
+      "id": "C2",
+      "title": "Pitch change on one chord member leaves the rest intact",
+      "status": "safe-control",
+      "detail": "Changing 64 kept neighbour 67 at 67 with onset 0.5 s and length 0.4 s.",
+      "numbers": {
+        "other_pitch_after": 67,
+        "other_onset_after": 0.5,
+        "other_duration_after": 0.4
+      }
+    },
+    {
+      "id": "D9",
+      "title": "Selecting a generated rest then Delete inserts an explicit rest",
+      "status": "static-analysis",
+      "detail": "Generated rests carry no event id, so the destructive delete branch is unreachable; the editor instead falls through to insertRest (NotationEditor deleteSelection). Not executed because it is a React handler, not a package command."
+    },
+    {
+      "id": "D12",
+      "title": "Reviewed editor ignores the sync offset",
+      "status": "static-analysis",
+      "detail": "MusicLessonEditor passes only a video URL to NotationEditor; the roll draws raw performance onsets while the playhead is video time. Measuring it needs a reviewed revision with a non-zero offset, which the local database does not contain."
+    }
+  ]
+}

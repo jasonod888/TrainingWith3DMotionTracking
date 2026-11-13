@@ -1,25 +1,36 @@
 /**
- * Phase 1 check: can the current builder's output be persisted at all?
+ * Emit the notation document built from a draft dump, for the Python server-side
+ * validator. Read-only.
  *
- * Writes the notation built from the REAL draft to .local/phase1-audit/notation-real.json
- * so the server validator can be run against it in Python. Read-only.
+ * Usage (from the repository root):
+ *   npx tsx docs/qualification/piano-workspace-phase-01/scripts/emit-notation.ts --fixture
+ *   npx tsx docs/qualification/piano-workspace-phase-01/scripts/emit-notation.ts --input=.local/phase1-audit/draft-document.json
  */
-import {readFileSync, writeFileSync} from 'node:fs';
-import {buildNotation, type PerformanceNote} from '../../packages/music-notation/index.ts';
+import {mkdirSync, writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {loadNotation} from './lib/notation.ts';
+import {parseOptions, readJson, USAGE} from './lib/paths.ts';
 
-const raw = readFileSync(new URL('./draft-document.json', import.meta.url));
-const text = (raw[0] === 0xff && raw[1] === 0xfe ? raw.toString('utf16le') : raw.toString('utf8'))
-  .replace(/^\uFEFF/, '');
-const draft = JSON.parse(text);
+const options = parseOptions();
+if (options.help) { console.log(USAGE); process.exit(0); }
 
-const performance: PerformanceNote[] = draft.events.map((event: any) => ({
+const draft = readJson(options.input);
+const {buildNotation} = loadNotation();
+const score = buildNotation(draft.events.map((event: any) => ({
   id: event.id, onset: event.onset, duration: event.duration, pitch: event.pitch,
   velocity: event.velocity, confidence: event.confidence, optional: event.optional,
   string: event.string, fret: event.fret,
-}));
+})), {duration: draft.duration});
 
-const score = buildNotation(performance, {duration: draft.duration});
-const out = new URL('./notation-real.json', import.meta.url);
-writeFileSync(out, JSON.stringify(score));
-console.log(JSON.stringify({written: out.pathname, bytes: JSON.stringify(score).length,
-  events: score.events.length, segments: score.segments.length, measures: score.measures.length}));
+mkdirSync(options.out, {recursive: true});
+const target = join(options.out, options.fixture ? 'notation-fixture.json' : 'notation-real.json');
+const json = JSON.stringify(score);
+writeFileSync(target, json, 'utf-8');
+console.log(JSON.stringify({
+  written: target,
+  bytes: json.length,
+  events: score.events.length,
+  segments: score.segments.length,
+  measures: score.measures.length,
+  tempo: score.tempo.bpm,
+}, null, 2));

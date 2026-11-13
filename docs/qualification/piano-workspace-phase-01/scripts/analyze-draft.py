@@ -1,78 +1,66 @@
-"""Read-only structural analysis of the real piano draft document.
+"""Structural analysis of a draft document (read-only).
 
-Developer diagnostic only; no production import, no mutation.
+Usage (from the repository root):
+  python docs/qualification/piano-workspace-phase-01/scripts/analyze-draft.py --fixture
+  python docs/qualification/piano-workspace-phase-01/scripts/analyze-draft.py --input=.local/phase1-audit/draft-document.json
 """
+from __future__ import annotations
+
+import argparse
 import json
 import statistics
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-path = Path(__file__).with_name('draft-document.json')
-raw = path.read_bytes()
-text = raw.decode('utf-16' if raw[:2] in (b'\xff\xfe', b'\xfe\xff') else 'utf-8')
-data = json.loads(text)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib.paths import add_common_args, read_json, resolve_input, write_json
 
-print('TOP-LEVEL KEYS:', list(data.keys()))
-print('duration:', data.get('duration'))
-print('subject:', data.get('subject'))
-print('instrument:', json.dumps(data.get('instrument'))[:200])
-print('spans:', len(data.get('spans') or []))
-print('pedal:', len(data.get('pedal') or []))
-print('guitar_chords:', len(data.get('guitar_chords') or []))
-print('warnings:', data.get('warnings'))
-print('playback:', json.dumps(data.get('playback')))
-print('piano_preview:', json.dumps(data.get('piano_preview'))[:400])
-print('preview_identity:', json.dumps(data.get('preview_identity'))[:300])
-print('source_video:', json.dumps(data.get('source_video'))[:300])
-print('provenance:', json.dumps(data.get('provenance'))[:400])
-print('has notation key:', 'notation' in data, '| has alignment key:', 'alignment' in data)
-print('reference:', json.dumps(data.get('reference'))[:300])
 
-events = data.get('events') or []
-print('\nEVENTS:', len(events))
-print('EVENT KEYS:', sorted({k for e in events for k in e}))
-print('first 3 events:', json.dumps(events[:3], indent=None)[:600])
-print('last event:', json.dumps(events[-1])[:300])
+def main() -> None:
+    parser = argparse.ArgumentParser(description='Summarise a draft document.')
+    add_common_args(parser, 'draft document JSON (default: <scratch>/draft-document.json)')
+    args = parser.parse_args()
+    data = read_json(resolve_input(args))
+    events = data.get('events') or []
 
-onsets = [float(e['onset']) for e in events]
-ends = [float(e['onset']) + float(e['duration']) for e in events]
-print('\nONSET min/max: %.4f / %.4f' % (min(onsets), max(onsets)))
-print('END max: %.4f  (clip duration %s)' % (max(ends), data.get('duration')))
+    onsets = [float(event['onset']) for event in events]
+    ends = [float(event['onset']) + float(event['duration'] or 0.25) for event in events]
+    by_onset = defaultdict(list)
+    for event in events:
+        by_onset[round(float(event['onset']), 6)].append(event)
+    groups = [group for group in by_onset.values() if len(group) > 1]
+    duplicates = [key for key, group in by_onset.items() if len({event['pitch'] for event in group}) != len(group)]
+    distinct = sorted(by_onset)
+    gaps = [round(b - a, 3) for a, b in zip(distinct, distinct[1:])]
 
-vel = [e.get('velocity') for e in events if e.get('velocity') is not None]
-print('velocity count:', len(vel), 'min/max:', (min(vel), max(vel)) if vel else None)
+    summary = {
+        'input': str(resolve_input(args)),
+        'keys': sorted(data.keys()),
+        'duration': data.get('duration'),
+        'event_count': len(events),
+        'span_count': len(data.get('spans') or []),
+        'spans': data.get('spans'),
+        'has_notation': 'notation' in data,
+        'has_alignment': 'alignment' in data,
+        'playback': data.get('playback'),
+        'first_onset': min(onsets) if onsets else None,
+        'last_end': max(ends) if ends else None,
+        'distinct_onsets': len(distinct),
+        'chord_groups': len(groups),
+        'largest_chord': max((len(group) for group in groups), default=1),
+        'notes_in_chords': sum(len(group) for group in groups),
+        'same_pitch_same_onset_duplicates': len(duplicates),
+        'median_gap_s': statistics.median(gaps) if gaps else None,
+        'longest_gap_s': max(gaps) if gaps else None,
+        'null_duration_events': sum(1 for event in events if event.get('duration') is None),
+        'null_velocity_events': sum(1 for event in events if event.get('velocity') is None),
+        'distinct_pitches': len({event['pitch'] for event in events}),
+        'most_repeated': Counter(event['pitch'] for event in events).most_common(8),
+    }
+    write_json(args.out / ('analysis-fixture.json' if args.fixture else 'analysis-real.json'), summary)
+    print(json.dumps(summary, indent=2))
 
-pitches = Counter(e['pitch'] for e in events)
-print('distinct pitches:', len(pitches))
-print('most repeated:', pitches.most_common(8))
 
-# same-onset groups = chords
-by_onset = defaultdict(list)
-for e in events:
-    by_onset[round(float(e['onset']), 6)].append(e)
-groups = [g for g in by_onset.values() if len(g) > 1]
-print('\nchord groups (same onset, >1 note):', len(groups))
-print('max chord size:', max((len(g) for g in groups), default=1))
-print('example chord:', json.dumps(sorted(groups[0], key=lambda e: e['pitch']) if groups else None)[:400])
-
-# exact duplicate pitch+onset pairs (would collide in a naive id scheme)
-dupes = [k for k, g in by_onset.items() if len({e['pitch'] for e in g}) != len(g)]
-print('same pitch+onset duplicates:', len(dupes))
-
-# gaps between successive distinct onsets
-uniq = sorted({round(float(e['onset']), 6) for e in events})
-gaps = [round(b - a, 3) for a, b in zip(uniq, uniq[1:])]
-big = [(a, round(b - a, 2)) for a, b in zip(uniq, uniq[1:]) if b - a > 3]
-print('\ndistinct onsets:', len(uniq))
-print('median gap: %.3f  max gap: %.3f' % (statistics.median(gaps), max(gaps)))
-print('gaps > 3 s (possible explanation passages):', big)
-
-durs = [float(e['duration']) for e in events]
-print('\nduration min/median/max: %.3f / %.3f / %.3f' % (min(durs), statistics.median(durs), max(durs)))
-
-print('\nGAP TO CLIP END: %.3f' % (float(data['duration']) - max(ends)))
-
-# structural read of event ordering
-ordered = all(float(events[i]['onset']) <= float(events[i + 1]['onset']) + 1e-9 for i in range(len(events) - 1))
-print('events sorted by onset:', ordered)
+if __name__ == '__main__':
+    main()

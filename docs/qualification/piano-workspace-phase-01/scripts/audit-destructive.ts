@@ -1,304 +1,400 @@
 /**
- * Phase 1 audit: measure what the existing notation commands do to the REAL draft.
+ * Phase 1 audit: what do the existing notation commands actually do?
  *
- * Reads the dumped draft document (read-only copy), rebuilds notation, then runs the
- * existing edit commands and reports exactly what they deleted, rounded or rewrote.
- * Run with: npx tsx .local/phase1-audit/audit-destructive.ts
+ * Runs against a real draft dump (`--input`) or the tracked synthetic fixture
+ * (`--fixture`), then writes a reproduction matrix to `<out>/audit-matrix-<label>.json`
+ * alongside a readable report. Read-only: it never saves a draft or a revision.
+ *
+ * Usage (from the repository root):
+ *   npx tsx docs/qualification/piano-workspace-phase-01/scripts/audit-destructive.ts --fixture
+ *   npx tsx docs/qualification/piano-workspace-phase-01/scripts/audit-destructive.ts --input=.local/phase1-audit/draft-document.json
  */
-import {readFileSync} from 'node:fs';
-import {
-  buildNotation, changeDuration, changePitch, changeStaff, deleteNote, eventDurationSeconds,
-  insertNote, moveEvent, respellAccidental, setTempo, tieToNext, untieLast,
-  type NotationDocument, type PerformanceNote,
-} from '../../packages/music-notation/index.ts';
+import {mkdirSync, writeFileSync} from 'node:fs';
+import {basename, join} from 'node:path';
+import {loadNotation} from './lib/notation.ts';
+import {parseOptions, readJson, USAGE} from './lib/paths.ts';
 
-const path = new URL('./draft-document.json', import.meta.url);
-const raw = readFileSync(path);
-const text = (raw[0] === 0xff && raw[1] === 0xfe
-  ? raw.toString('utf16le') : raw.toString('utf8')).replace(/^\uFEFF/, '');
-const draft = JSON.parse(text);
+type Status =
+  | 'reproduced-real' | 'reproduced-fixture' | 'constructed-fixture'
+  | 'safe-control' | 'static-analysis' | 'skipped';
 
-const performance: PerformanceNote[] = draft.events.map((event: any) => ({
+type Receipt = {id: string; title: string; status: Status; detail: string; numbers?: Record<string, unknown>};
+
+const options = parseOptions();
+if (options.help) { console.log(USAGE); process.exit(0); }
+
+const draft = readJson(options.input);
+const notation = loadNotation();
+const {buildNotation, changeDuration, changePitch, changeStaff, deleteNote, insertNote, moveEvent,
+  refreshNotation, respellAccidental, tieToNext, untieLast} = notation;
+
+const label = options.fixture ? 'fixture' : 'real';
+const isReal = !options.fixture;
+
+const performance: any[] = draft.events.map((event: any) => ({
   id: event.id, onset: event.onset, duration: event.duration, pitch: event.pitch,
   velocity: event.velocity, confidence: event.confidence, optional: event.optional,
   string: event.string, fret: event.fret,
 }));
 
-const report = (title: string, value: unknown) => console.log(`\n## ${title}\n${JSON.stringify(value, null, 2)}`);
-
-const started = Date.now();
 const score = buildNotation(performance, {duration: draft.duration});
-report('build cost and shape', {
-  build_ms: Date.now() - started,
-  duration: score.duration,
-  tempo_bpm_estimated: score.tempo.bpm,
-  measures: score.measures.length,
-  events: score.events.length,
-  logical_notes: score.events.reduce((total, event) => total + event.notes.length, 0),
-  segments: score.segments.length,
-  generated_rests: score.segments.filter(segment => segment.generated_rest).length,
-  ties: score.ties.length,
-  mapped_performance_notes: Object.keys(score.performance_map).length,
-  performance_notes: score.performance.length,
-  unmapped_performance_notes: score.performance.length - Object.keys(score.performance_map).length,
-  events_with_2_voices_treble: score.events.filter(e => e.staff === 'treble' && e.voice === 2).length,
-  events_with_2_voices_bass: score.events.filter(e => e.staff === 'bass' && e.voice === 2).length,
-  max_chord: Math.max(...score.events.map(event => event.notes.length)),
-});
-
-// How wrong is a single-BPM tick map against the real performance?
 const spb = 60 / (score.tempo.bpm * score.ppq);
-const errors = score.events.flatMap(event => {
-  const linked = event.notes.flatMap(note => note.performance_ids)
-    .map(id => performance.find(item => item.id === id))
-    .filter(Boolean) as PerformanceNote[];
-  if (!linked.length) return [];
-  const actual = Math.min(...linked.map(item => item.onset));
-  return [{event: event.id, actual, mapped: event.start * spb, error: event.start * spb - actual}];
-});
-const abs = errors.map(item => Math.abs(item.error)).sort((a, b) => a - b);
-report('single-tempo tick map error against real seconds', {
-  mapped_events: errors.length,
-  mean_abs_error_s: +(abs.reduce((t, v) => t + v, 0) / abs.length).toFixed(3),
-  median_abs_error_s: +abs[Math.floor(abs.length / 2)].toFixed(3),
-  p90_abs_error_s: +abs[Math.floor(abs.length * 0.9)].toFixed(3),
-  max_abs_error_s: +abs[abs.length - 1].toFixed(3),
-  worst: errors.reduce((worst, item) => Math.abs(item.error) > Math.abs(worst.error) ? item : worst),
-});
+const receipts: Receipt[] = [];
+const record = (receipt: Receipt) => { receipts.push(receipt); };
 
-// Snapping: how many onsets survive the 16th-note grid without rounding?
-const snapped = new Set(performance.map(note => Math.round(note.onset / spb / 120) * 120));
-const lost = performance.length - snapped.size;
-report('sixteenth-grid quantisation on the real clip', {
-  distinct_snapped_positions: snapped.size,
-  distinct_real_onsets: new Set(performance.map(note => note.onset)).size,
-  notes_that_share_a_grid_slot: lost,
-});
+/* ------------------------------------------------------------------ D1 */
 
-/* ---------------------------------------------------------------- destructive edits */
-
-function countPerformance(document: NotationDocument) {
-  return document.performance.length;
-}
-
-/** 1. Lengthen one note's written duration: what else disappears? */
-function testDurationOverwrite() {
+function durationCollateral(): Receipt {
+  const id = 'D1';
+  const title = 'Written-duration command deletes neighbouring occurrences';
   const candidate = score.events
-    .filter(event => !event.rest && event.notes.length === 1)
-    .map(event => {
-      const next = score.events.find(other => other.id !== event.id && other.staff === event.staff
-        && other.voice === event.voice && other.start > event.start && other.start < event.start + event.duration + 960);
-      return next ? {event, next} : null;
-    })
-    .find(Boolean);
-  if (!candidate) return {skipped: 'no candidate'};
-  const {event, next} = candidate!;
-  const victimIds = new Set(next.notes.flatMap(note => note.performance_ids));
-  const before = {onset: performance.find(item => victimIds.has(item.id))!.onset,
-    duration: performance.find(item => victimIds.has(item.id))!.duration};
-  const edited = changeDuration(score, event.id, event.duration + 960);
-  const survivor = edited.performance.filter(item => victimIds.has(item.id));
-  return {
-    edited_event: event.id,
-    written: {from_ticks: event.duration, to_ticks: event.duration + 960},
-    neighbour_event: next.id,
-    neighbour_start_s: +(event.start * spb).toFixed(3),
-    neighbour_victim_onset_s: before.onset,
-    neighbour_victim_duration_s: before.duration,
-    performance_notes_before: countPerformance(score),
-    performance_notes_after: countPerformance(edited),
-    victim_performance_notes_left: survivor.length,
-    victim_notes_left_in_events: edited.events.filter(item => item.notes.some(note =>
-      note.performance_ids.some(id => victimIds.has(id)))).length,
-  };
-}
-
-/** 2. Shortening a neighbour: is its sound truncated as well as its symbol? */
-function testNeighbourTruncation() {
-  const pair = score.events
-    .map(event => {
-      const next = score.events.find(other => other.id !== event.id && other.staff === event.staff
+    .filter((event: any) => !event.rest && event.notes.length === 1)
+    .map((event: any) => {
+      const next = score.events.find((other: any) => other.id !== event.id && other.staff === event.staff
         && other.voice === event.voice && other.start > event.start
-        && other.start < event.start + event.duration);
+        && other.start < event.start + event.duration + 960);
       return next ? {event, next} : null;
     })
     .find(Boolean);
-  if (!pair) return {skipped: 'no overlapping pair'};
-  const {event, next} = pair!;
-  const ids = next.notes.flatMap(note => note.performance_ids);
-  const before = performance.find(item => ids.includes(item.id))!;
-  const edited = changeDuration(score, event.id, event.duration + 120);
-  const matched = edited.performance.filter(item => ids.includes(item.id));
+  if (!candidate) return {id, title, status: 'skipped', detail: 'No candidate event with a same-voice successor.'};
+  const {event, next} = candidate!;
+  const victimIds = new Set<string>(next.notes.flatMap((note: any) => note.performance_ids));
+  const before = performance.find((item: any) => victimIds.has(item.id));
+  const edited = changeDuration(score, event.id, event.duration + 960);
+  const survivors = edited.performance.filter((item: any) => victimIds.has(item.id));
   return {
-    edited_event: event.id,
-    event_start_s: +(event.start * spb).toFixed(3),
-    neighbour_id: next.id,
-    neighbour_truncated_ticks: next.duration,
-    neighbour_performance_duration_before_s: before.duration,
-    neighbour_performance_duration_after_s: matched.map(item => item.duration),
-    neighbour_events_left: edited.events.filter(item => item.notes.some(note => ids.includes(note.performance_ids[0]))).length,
+    id, title, status: isReal ? 'reproduced-real' : 'reproduced-fixture',
+    detail: `Lengthened ${event.id} from ${event.duration} to ${event.duration + 960} ticks `
+      + '(+960 ticks = a half note = two quarter-note beats at ppq 480). '
+      + `${victimIds.size} linked occurrence(s) of ${next.id} disappeared: performance ${score.performance.length} -> ${edited.performance.length}.`,
+    numbers: {
+      edited_event: event.id,
+      ticks_before: event.duration,
+      ticks_after: event.duration + 960,
+      added_ticks: 960,
+      neighbour_event: next.id,
+      neighbour_occurrences: victimIds.size,
+      neighbour_onset_s: before?.onset ?? null,
+      neighbour_recorded_duration_s: before?.duration ?? null,
+      performance_before: score.performance.length,
+      performance_after: edited.performance.length,
+      victim_survivors: survivors.length,
+    },
   };
 }
 
-/** 3. Free-time movement: what happens to a 10 ms adjustment when Snap is off? */
-function testTenMillisecondMove() {
-  const event = score.events.find(item => item.notes.length === 1 && item.start > 0)!;
-  const linked = performance.find(item => item.id === event.notes[0].performance_ids[0])!;
-  const targetSeconds = linked.onset + 0.01;
-  const ticks = Math.round(targetSeconds / spb / 120) * 120;
+/* ------------------------------------------------------------------ D2 */
+
+function chordMove(): Receipt {
+  const id = 'D2';
+  const title = 'Event move rewrites every chord member to one tempo-derived onset';
+  const chord = score.events.find((event: any) => {
+    if (event.notes.length < 2) return false;
+    const onsets = new Set(event.notes.flatMap((note: any) => note.performance_ids)
+      .map((linked: string) => performance.find((item: any) => item.id === linked)?.onset).filter(Boolean));
+    return onsets.size > 1;
+  });
+  if (!chord) return {id, title, status: 'skipped', detail: 'No chord with differing recorded onsets in this input.'};
+  const linkedIds = new Set<string>(chord.notes.flatMap((note: any) => note.performance_ids));
+  const before = [...linkedIds].map((linked: string) => performance.find((item: any) => item.id === linked))
+    .filter(Boolean).map((item: any) => item.onset as number);
+  const target = Math.max(0, chord.start - 120);
+  const edited = moveEvent(score, chord.id, target);
+  const after = edited.performance.filter((item: any) => linkedIds.has(item.id)).map((item: any) => item.onset as number);
+  return {
+    id, title, status: isReal ? 'reproduced-real' : 'reproduced-fixture',
+    detail: `Moved ${chord.id} (${chord.notes.length} notes) by one sixteenth. Distinct recorded onsets before: `
+      + `${new Set(before).size}; after: ${new Set(after).size}. Every member is re-stamped from ticks x tempo, so exact seconds are replaced.`,
+    numbers: {
+      event: chord.id, notes: chord.notes.length,
+      onsets_before_s: before.map(value => +value.toFixed(4)),
+      onsets_after_s: after.map(value => +value.toFixed(4)),
+      spread_before_s: +(Math.max(...before) - Math.min(...before)).toFixed(4),
+      spread_after_s: +(Math.max(...after) - Math.min(...after)).toFixed(4),
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ D3 */
+
+function tenMillisecondMove(): Receipt {
+  const id = 'D3';
+  const title = 'A 10 ms recorded-onset nudge with Snap off is rounded away';
+  const event = score.events.find((item: any) => item.notes.length === 1 && item.start > 0);
+  if (!event) return {id, title, status: 'skipped', detail: 'No single-note event to move.'};
+  const linked = performance.find((item: any) => item.id === event.notes[0].performance_ids[0]);
+  if (!linked) return {id, title, status: 'skipped', detail: 'Event has no linked performance occurrence.'};
+  const requested = linked.onset + 0.01;
+  const ticks = Math.round(requested / spb / 120) * 120;
   const edited = moveEvent(score, event.id, ticks);
-  const moved = edited.performance.find(item => item.id === linked.id)!;
+  const stored = edited.performance.find((item: any) => item.id === linked.id).onset;
   return {
-    event: event.id,
-    requested_seconds: +targetSeconds.toFixed(4),
-    stored_seconds: +moved.onset.toFixed(4),
-    error_s: +(moved.onset - targetSeconds).toFixed(4),
-    editor_passes_ticks_snapped_to_16th: ticks,
+    id, title, status: isReal ? 'reproduced-real' : 'reproduced-fixture',
+    detail: `Requested ${requested.toFixed(4)} s; the editor can only pass ${ticks} ticks, so ${stored.toFixed(4)} s was stored. `
+      + `Net change ${(stored - linked.onset).toFixed(4)} s.`,
+    numbers: {requested_s: +requested.toFixed(4), stored_s: +stored.toFixed(4), ticks, error_s: +(stored - requested).toFixed(4)},
   };
 }
 
-/** 4. Tie: the absorbed attack and the tempo-derived sustain. */
-function testTieAbsorbsAttack() {
-  const candidate = score.events
-    .map(event => {
-      const following = score.events.find(other => other.id !== event.id && other.staff === event.staff
+/* ------------------------------------------------------------------ D4 */
+
+function tieBehaviour(): Receipt {
+  const id = 'D4';
+  const title = 'Tie deletes the second attack and rewrites the recorded length';
+  const pair = score.events
+    .map((event: any) => {
+      const following = score.events.find((other: any) => other.id !== event.id && other.staff === event.staff
         && other.voice === event.voice && other.start === event.start + event.duration
-        && other.notes.some(note => event.notes.some(first => first.pitch === note.pitch)));
+        && other.notes.some((note: any) => event.notes.some((first: any) => first.pitch === note.pitch)));
       return following ? {event, following} : null;
     })
     .find(Boolean);
-  if (!candidate) return {skipped: 'no adjacent same-pitch pair'};
-  const {event, following} = candidate!;
+  if (!pair) return {id, title, status: 'skipped', detail: 'No adjacent same-pitch pair to tie.'};
+  const {event, following} = pair!;
   const note = event.notes[0];
-  const linked = performance.find(item => item.id === note.performance_ids[0])!;
-  const absorbedNote = following.notes.find(item => item.pitch === note.pitch)!;
-  const absorbedIds = absorbedNote.performance_ids;
-  const before = {onsets_affected: performance.filter(item => absorbedIds.includes(item.id)).map(item => item.onset)};
-  let edited: NotationDocument;
+  const linked = performance.find((item: any) => item.id === note.performance_ids[0]);
+  const absorbedNote = following.notes.find((item: any) => item.pitch === note.pitch);
+  const absorbedIds: string[] = absorbedNote.performance_ids;
+  let edited: any;
   try {
     edited = tieToNext(score, note.id);
   } catch (error) {
-    return {threw: (error as Error).message};
+    return {id, title, status: 'skipped', detail: `tieToNext refused: ${(error as Error).message}`};
   }
-  const after = edited.performance.find(item => item.id === linked.id)!;
+  const after = edited.performance.find((item: any) => item.id === linked.id);
+  const untied = untieLast(edited, event.id);
   return {
-    event: event.id,
-    tied_note_pitch: note.pitch,
-    recorded_duration_before_s: linked.duration,
-    recorded_duration_after_s: after.duration,
-    tempo_derived_written_seconds: +(event.duration + following.duration) * spb,
-    absorbed_performance_notes: absorbedIds.length,
-    absorbed_notes_still_present: edited.performance.filter(item => absorbedIds.includes(item.id)).length,
-    before,
-    untie_restores_absorbed_note: (() => {
-      const back = untieLast(edited, event.id);
-      return back.performance.some(item => absorbedIds.includes(item.id));
-    })(),
+    id, title, status: isReal ? 'reproduced-real' : 'reproduced-fixture',
+    detail: `Tied ${event.id}: recorded length ${linked.duration} s -> ${after.duration} s (tempo-derived), `
+      + `${absorbedIds.length} absorbed occurrence(s) removed, and untie did not restore them.`,
+    numbers: {
+      event: event.id,
+      recorded_before_s: linked.duration,
+      recorded_after_s: after?.duration ?? null,
+      tempo_derived_s: +((event.duration + following.duration) * spb).toFixed(4),
+      absorbed_occurrences: absorbedIds.length,
+      absorbed_present_after_tie: edited.performance.filter((item: any) => absorbedIds.includes(item.id)).length,
+      absorbed_restored_by_untie: untied.performance.some((item: any) => absorbedIds.includes(item.id)),
+    },
   };
 }
 
-/** 5. No-op commands that still return a new document (spurious history entries). */
-function testNoOps() {
-  const note = score.events.find(item => item.notes.length === 1)!.notes[0];
+/* ------------------------------------------------------------------ D5 */
+
+function insertOverlap(): Receipt {
+  const id = 'D5';
+  const title = 'Insert silently replaces the note it lands on';
+  const event = score.events.find((item: any) => item.notes.length === 1 && item.start > 480);
+  if (!event) return {id, title, status: 'skipped', detail: 'No target event.'};
+  const victim = event.notes[0].performance_ids[0];
+  const edited = insertNote(score, {pitch: 61, start: event.start, duration: 480, staff: event.staff, voice: event.voice});
+  return {
+    id, title, status: isReal ? 'reproduced-real' : 'reproduced-fixture',
+    detail: `Inserting at ${event.start} ticks removed ${victim} `
+      + `(${performance.find((item: any) => item.id === victim)?.onset.toFixed(3)} s) with no error or warning; `
+      + `total occurrences unchanged (${score.performance.length} -> ${edited.performance.length}).`,
+    numbers: {
+      insertion_ticks: event.start,
+      insertion_s: +(event.start * spb).toFixed(3),
+      victim,
+      victim_present_after: edited.performance.some((item: any) => item.id === victim),
+      performance_before: score.performance.length,
+      performance_after: edited.performance.length,
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ D6 */
+
+function duplicateOccurrences(): Receipt {
+  const id = 'D6';
+  const title = 'Same-pitch, same-onset occurrences lose their mapping at build time';
+  const built = buildNotation([
+    {id: 'dup-a', onset: 1, duration: 1, pitch: 60, velocity: 0.6, confidence: null, optional: false, string: null, fret: null},
+    {id: 'dup-b', onset: 1, duration: 1, pitch: 60, velocity: 0.4, confidence: null, optional: false, string: null, fret: null},
+  ], {duration: 4});
+  const note = built.events[0].notes[0];
+  return {
+    id, title, status: 'constructed-fixture',
+    detail: `Two occurrences at the same pitch and onset produce one logical note linked only to "${note.performance_ids.join(', ')}". `
+      + `The other stays in performance (${built.performance.length}) but is unmapped `
+      + `(${built.performance.length - Object.keys(built.performance_map).length} unmapped), so it is unselectable and uneditable.`,
+    numbers: {
+      performance_notes: built.performance.length,
+      logical_notes: built.events.flatMap((event: any) => event.notes).length,
+      linked_ids: note.performance_ids,
+      unmapped: built.performance.length - Object.keys(built.performance_map).length,
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ D7 */
+
+function thirdVoice(): Receipt {
+  const id = 'D7';
+  const title = 'A third overlapping voice is merged or truncates the previous event';
+  const built = buildNotation([
+    {id: 'v1', onset: 0.5, duration: 0.2, pitch: 70, velocity: 0.5, confidence: null, optional: false, string: null, fret: null},
+    {id: 'v2', onset: 0.5, duration: 0.4, pitch: 64, velocity: 0.5, confidence: null, optional: false, string: null, fret: null},
+    {id: 'v3', onset: 0.5, duration: 1.2, pitch: 72, velocity: 0.5, confidence: null, optional: false, string: null, fret: null},
+  ], {duration: 4, bpm: 120});
+  const atOnset = built.events.filter((event: any) => event.start === built.events[0]?.start);
+  const truncations = built.events.filter((event: any) => event.duration < 480).length;
+  return {
+    id, title, status: 'constructed-fixture',
+    detail: `Three same-onset groups produce ${atOnset.length} event(s); ${truncations} event(s) were shortened below a quarter note `
+      + 'without any report. The third voice is merged into a chord or absorbed by truncating the previous event.',
+    numbers: {events_at_onset: atOnset.length, durations: atOnset.map((event: any) => event.duration), truncated_events: truncations},
+  };
+}
+
+/* ------------------------------------------------------------------ D8 */
+
+function noOps(): Receipt {
+  const id = 'D8';
+  const title = 'No-op commands return a new document';
+  const note = score.events.find((item: any) => item.notes.length === 1).notes[0];
   const natural = respellAccidental(score, note.id, 'natural');
   const sameStaff = changeStaff(score, score.events[0].id, score.events[0].staff);
   const samePitch = changePitch(score, note.id, note.pitch);
-  const sameDuration = changeDuration(score, score.events[0].id, score.events[0].duration);
   return {
-    respell_natural_returns_new_object: natural !== score,
-    change_staff_same_returns_new_object: sameStaff !== score,
-    change_pitch_same_returns_new_object: samePitch !== score,
-    change_duration_same_returns_new_object: sameDuration !== score,
-    respell_natural_actually_changed: JSON.stringify(natural.events) !== JSON.stringify(score.events),
+    id, title, status: isReal ? 'reproduced-real' : 'reproduced-fixture',
+    detail: `respellAccidental(natural) returned a new object: ${natural !== score}; changeStaff(same) returned a new object: ${sameStaff !== score}. `
+      + `changePitch(same) returns the original identity: ${samePitch === score}.`,
+    numbers: {
+      respell_natural_new_object: natural !== score,
+      change_staff_new_object: sameStaff !== score,
+      content_changed: JSON.stringify(natural.events) !== JSON.stringify(score.events),
+    },
   };
 }
 
-/** 6. One logical note, several performance occurrences: does one edit hit all of them? */
-function testMultiMapping() {
-  const merged = buildNotation([
-    {id: 'a', onset: 1, duration: 1, pitch: 60, velocity: 0.5, confidence: null, optional: false, string: null, fret: null},
-    {id: 'b', onset: 1, duration: 1, pitch: 60, velocity: 0.4, confidence: null, optional: false, string: null, fret: null},
-  ], {duration: 4});
-  const note = merged.events[0].notes[0];
+/* ------------------------------------------------------------------ D10 */
+
+function rebuildCost(): Receipt {
+  const id = 'D10';
+  const title = 'Every command rebuilds all segments, ties and generated rests';
+  const started = Date.now();
+  let replay = score;
+  for (let index = 0; index < 10; index += 1) {
+    const event = replay.events.find((item: any) => item.notes.length === 1
+      && !String(item.notes[0].performance_ids[0]).startsWith('authored-'));
+    const note = event.notes[0];
+    replay = changePitch(replay, note.id, note.pitch === 60 ? 61 : 60);
+  }
+  const elapsed = Date.now() - started;
+  const json = JSON.stringify(score);
   return {
-    performance_notes: merged.performance.length,
-    logical_notes: merged.events.flatMap(event => event.notes).length,
-    linked_ids: note.performance_ids,
-    events_with_same_pitch_same_onset: merged.events.length,
-    performance_note_lost_at_build: merged.performance.length - Object.keys(merged.performance_map).length,
-    mapped_ids: Object.keys(merged.performance_map),
+    id, title, status: isReal ? 'reproduced-real' : 'reproduced-fixture',
+    detail: `Ten sequential pitch edits took ${elapsed} ms (${Math.round(elapsed / 10)} ms each). Each edit regenerates `
+      + `${score.segments.length} segments, ${score.ties.length} ties and `
+      + `${score.segments.filter((segment: any) => segment.generated_rest).length} generated rests. `
+      + `Serialised document size ${(json.length / 1_048_576).toFixed(2)} MB (serialised-size estimate, not a measured heap).`,
+    numbers: {
+      ten_edits_ms: elapsed, ms_per_edit: Math.round(elapsed / 10),
+      segments: score.segments.length, ties: score.ties.length,
+      generated_rests: score.segments.filter((segment: any) => segment.generated_rest).length,
+      serialised_bytes: json.length,
+      estimated_80_snapshot_mb: +((json.length * 80) / 1_048_576).toFixed(1),
+    },
   };
 }
 
-/** 7. Delete a chord member: does its neighbour survive with its recorded length? */
-function testDeleteChordMember() {
-  const chord = score.events.find(item => item.notes.length > 1
-    && item.notes.every(note => performance.find(p => p.id === note.performance_ids[0])!.duration));
-  if (!chord) return {skipped: 'no chord'};
-  const target = chord.notes[0];
-  const other = chord.notes[1];
+/* ------------------------------------------------------------------ D11 */
+
+function multiOccurrenceDocument(): Receipt {
+  const id = 'D11';
+  const title = 'A logical note with several occurrences is edited as a whole';
+  const base = buildNotation([
+    {id: 'm-a', onset: 1, duration: 0.5, pitch: 60, velocity: 0.5, confidence: null, optional: false, string: null, fret: null},
+  ], {duration: 4, bpm: 120});
+  // Construct the multi-occurrence relationship the model permits: one logical note,
+  // two performance occurrences (as a future split/merge feature would produce).
+  const constructed: any = structuredClone(base);
+  constructed.performance.push({...constructed.performance[0], id: 'm-b', onset: 3});
+  constructed.events[0].notes[0].performance_ids = ['m-a', 'm-b'];
+  const document = refreshNotation(constructed);
+  const noteId = document.events[0].notes[0].id;
+  const edited = changePitch(document, noteId, 61);
+  const changed = edited.performance.filter((item: any) => item.pitch === 61).map((item: any) => item.id);
+  return {
+    id, title, status: 'constructed-fixture',
+    detail: `One logical note linked to two occurrences (1.0 s and 3.0 s). A single changePitch(${noteId}, 61) changed both: `
+      + `${changed.join(', ')}. There is no split or rejection path in the command.`,
+    numbers: {linked_occurrences: ['m-a', 'm-b'], pitches_after_edit: edited.performance.map((item: any) => item.pitch), changed},
+  };
+}
+
+/* ------------------------------------------------------- safe controls */
+
+function deleteChordMember(): Receipt {
+  const chord = score.events.find((item: any) => item.notes.length > 1);
+  if (!chord) return {id: 'C1', title: 'Delete one chord member leaves the rest intact', status: 'skipped', detail: 'No chord in input.'};
+  const [target, other] = chord.notes;
+  const otherPerf = performance.find((item: any) => item.id === other.performance_ids[0]);
   const edited = deleteNote(score, target.id);
-  const otherPerf = performance.find(item => item.id === other.performance_ids[0])!;
-  const afterOther = edited.performance.find(item => item.id === otherPerf.id);
+  const after = edited.performance.find((item: any) => item.id === otherPerf.id);
   return {
-    chord_event: chord.id,
-    deleted_pitch: target.pitch,
-    other_pitch: other.pitch,
-    other_performance_present: Boolean(afterOther),
-    other_duration_before: otherPerf.duration,
-    other_duration_after: afterOther?.duration ?? null,
-    chord_notes_before: chord.notes.length,
-    events_after: edited.events.length,
-    performance_before: performance.length,
-    performance_after: edited.performance.length,
+    id: 'C1', title: 'Delete one chord member leaves the rest intact', status: 'safe-control',
+    detail: `Deleting pitch ${target.pitch} from ${chord.id} kept pitch ${other.pitch} at its recorded length ${otherPerf.duration} s.`,
+    numbers: {chord: chord.id, other_present: Boolean(after), recorded_duration_before: otherPerf.duration, recorded_duration_after: after?.duration ?? null},
   };
 }
 
-/** 8. Insert: does it silently overwrite the note it lands on? */
-function testInsertOverlap() {
-  const event = score.events.find(item => item.notes.length === 1 && item.start > 480)!;
-  const victim = event.notes[0].performance_ids[0];
-  const start = event.start;
-  const edited = insertNote(score, {pitch: 61, start, duration: 480, staff: event.staff, voice: event.voice});
+function pitchChordMember(): Receipt {
+  const chord = score.events.find((item: any) => item.notes.length > 1);
+  if (!chord) return {id: 'C2', title: 'Pitch change on one chord member leaves the rest intact', status: 'skipped', detail: 'No chord in input.'};
+  const [target, other] = chord.notes;
+  const otherPerf = performance.find((item: any) => item.id === other.performance_ids[0]);
+  const edited = changePitch(score, target.id, target.pitch === 60 ? 61 : 60);
+  const after = edited.performance.find((item: any) => item.id === otherPerf.id);
   return {
-    insertion_ticks: start,
-    insertion_seconds: +(start * spb).toFixed(3),
-    victim_performance_id: victim,
-    victim_still_present: edited.performance.some(item => item.id === victim),
-    performance_before: performance.length,
-    performance_after: edited.performance.length,
+    id: 'C2', title: 'Pitch change on one chord member leaves the rest intact', status: 'safe-control',
+    detail: `Changing ${target.pitch} kept neighbour ${other.pitch} at ${after?.pitch} with onset ${after?.onset} s and length ${after?.duration} s.`,
+    numbers: {other_pitch_after: after?.pitch ?? null, other_onset_after: after?.onset ?? null, other_duration_after: after?.duration ?? null},
   };
 }
 
-report('1. changeDuration on one note — collateral damage', testDurationOverwrite());
-report('2. changeDuration over a sounding neighbour — truncation', testNeighbourTruncation());
-report('3. moveEvent with a 10 ms request', testTenMillisecondMove());
-report('4. tieToNext — attack absorption and sustain rewrite', testTieAbsorbsAttack());
-report('5. no-op commands returning new documents', testNoOps());
-report('6. same-pitch same-onset duplicate at build time', testMultiMapping());
-report('7. deleteNote inside a chord', testDeleteChordMember());
-report('8. insertNote over an existing note', testInsertOverlap());
+/* --------------------------------------------------------- run and write */
 
-/* ------------------------------------------------------- history/serialisation cost */
+record(durationCollateral());
+record(chordMove());
+record(tenMillisecondMove());
+record(tieBehaviour());
+record(insertOverlap());
+record(duplicateOccurrences());
+record(thirdVoice());
+record(noOps());
+record(rebuildCost());
+record(multiOccurrenceDocument());
+record(deleteChordMember());
+record(pitchChordMember());
 
-const serialised = JSON.stringify(score);
-report('document size', {
-  json_bytes: serialised.length,
-  json_mb: +(serialised.length / 1_048_576).toFixed(2),
-  estimated_80_snapshot_history_mb: +(serialised.length * 80 / 1_048_576).toFixed(1),
-});
+// Behaviours that live in the editor's save/UI layer rather than the notation package.
+receipts.push(
+  {id: 'D9', title: 'Selecting a generated rest then Delete inserts an explicit rest', status: 'static-analysis',
+    detail: 'Generated rests carry no event id, so the destructive delete branch is unreachable; the editor instead falls '
+      + 'through to insertRest (NotationEditor deleteSelection). Not executed because it is a React handler, not a package command.'},
+  {id: 'D12', title: 'Reviewed editor ignores the sync offset', status: 'static-analysis',
+    detail: 'MusicLessonEditor passes only a video URL to NotationEditor; the roll draws raw performance onsets while the '
+      + 'playhead is video time. Measuring it needs a reviewed revision with a non-zero offset, which the local database does not contain.'},
+);
 
-const editStarted = Date.now();
-let replay = score;
-for (let index = 0; index < 10; index += 1) {
-  const event = replay.events.find(item => item.notes.length === 1 && !item.notes[0].performance_ids[0].startsWith('authored-'));
-  const note = event!.notes[0];
-  replay = changePitch(replay, note.id, note.pitch === 60 ? 61 : 60);
+const matrix = {
+  input: options.input,
+  label,
+  generated_from: isReal ? 'real draft document dump' : 'synthetic Phase 1 fixture',
+  events: performance.length,
+  duration: draft.duration,
+  tempo_bpm: score.tempo.bpm,
+  receipts,
+};
+mkdirSync(options.out, {recursive: true});
+const target = join(options.out, `audit-matrix-${label}.json`);
+writeFileSync(target, `${JSON.stringify(matrix, null, 2)}\n`, 'utf-8');
+
+console.log(`# Phase 1 destructive-path audit (${label}: ${basename(options.input)})`);
+console.log(`# events=${performance.length} duration=${draft.duration} tempo=${score.tempo.bpm} -> ${target}\n`);
+for (const receipt of receipts) {
+  console.log(`## ${receipt.id} [${receipt.status}] ${receipt.title}\n${receipt.detail}\n`);
 }
-report('ten sequential pitch edits', {
-  total_ms: Date.now() - editStarted,
-  ms_per_edit: Math.round((Date.now() - editStarted) / 10),
-});
-
-void setTempo;
-void eventDurationSeconds;

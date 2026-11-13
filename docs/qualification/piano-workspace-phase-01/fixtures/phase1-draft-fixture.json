@@ -1,0 +1,42 @@
+{
+  "draft_version": 1,
+  "subject": "piano",
+  "instrument": {"instrument": "piano", "tuning": null, "capo": null, "handedness": null, "reference_pitch_hz": null},
+  "duration": 12.0,
+  "reference": {"key": "fixtures/phase1-draft-fixture.json", "mime": "application/json", "bytes": 0,
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+  "source_video": null,
+  "spans": [
+    {"start": 0.0, "end": 6.5, "kind": "playing"},
+    {"start": 6.5, "end": 9.0, "kind": "explanation"},
+    {"start": 9.0, "end": 12.0, "kind": "playing"}
+  ],
+  "pedal": [],
+  "guitar_chords": [],
+  "provenance": {"adapter": "phase1-fixture", "engine": "synthetic", "model": null, "model_version": null,
+    "code_version": "phase1-fixture-v1", "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+  "warnings": ["Synthetic Phase 1 audit fixture. Not a transcription of any recording."],
+  "events": [
+    {"id": "fx-01", "onset": 0.0,  "duration": 1.0,  "pitch": 60, "velocity": 0.6, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-02", "onset": 0.5,  "duration": 0.4,  "pitch": 64, "velocity": 0.5, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-03", "onset": 0.5,  "duration": 0.4,  "pitch": 67, "velocity": 0.5, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-04", "onset": 0.5,  "duration": 1.2,  "pitch": 72, "velocity": 0.55, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-05", "onset": 0.5,  "duration": 0.2,  "pitch": 70, "velocity": 0.5, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-06", "onset": 1.0,  "duration": 0.4,  "pitch": 60, "velocity": 0.6, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-07", "onset": 1.4,  "duration": 0.5,  "pitch": 60, "velocity": 0.6, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-08", "onset": 2.0,  "duration": 0.5,  "pitch": 60, "velocity": 0.6, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-09", "onset": 2.0,  "duration": 0.5,  "pitch": 60, "velocity": 0.4, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-10", "onset": 2.5,  "duration": 0.3,  "pitch": 62, "velocity": null, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-11", "onset": 2.8,  "duration": null, "pitch": 65, "velocity": 0.5, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-12", "onset": 4.0,  "duration": 0.4,  "pitch": 62, "velocity": 0.55, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-13", "onset": 4.045,"duration": 0.4,  "pitch": 66, "velocity": 0.55, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-14", "onset": 4.09, "duration": 0.4,  "pitch": 69, "velocity": 0.55, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-15", "onset": 5.0,  "duration": 1.6,  "pitch": 67, "velocity": 0.6, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-16", "onset": 6.6,  "duration": 0.4,  "pitch": 67, "velocity": 0.5, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-17", "onset": 9.5,  "duration": 0.5,  "pitch": 60, "velocity": 0.6, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-18", "onset": 10.0, "duration": 0.5,  "pitch": 57, "velocity": 0.55, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-19", "onset": 10.0, "duration": 0.5,  "pitch": 60, "velocity": 0.55, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null},
+    {"id": "fx-20", "onset": 11.5, "duration": 0.4,  "pitch": 48, "velocity": 0.5, "confidence": null, "optional": false, "string": null, "fret": null, "notation_duration": null}
+  ]
+}
