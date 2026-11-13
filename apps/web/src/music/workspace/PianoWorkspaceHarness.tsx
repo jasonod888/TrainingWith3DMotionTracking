@@ -11,7 +11,9 @@ import {assetUrl, request} from '../../api';
 import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
   buildNotation, selectionForOccurrence,
-  type CorrectionSelection, type NotationDocument,
+  activeOccurrenceIds, alignmentFromSpans, effectiveSecondsToTick, occurrenceIntervals,
+  tickToEffectiveSeconds,
+  type Alignment, type CorrectionSelection, type NotationDocument,
 } from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
 import {KeyboardEditor} from '../notation/KeyboardEditor';
@@ -21,8 +23,7 @@ import {ContinuousScore} from './ContinuousScore';
 import {TimeRoll} from './TimeRoll';
 import {
   clampTimeWindow, DEFAULT_SPAN_SECONDS, layoutMeasures, zoomAround, type TimeWindow,
-} from './viewport';
-import {
+} from './viewport';import {
   createWorkspaceState, historySummary, workspaceReducer, workspaceStatus,
   type WorkspaceAction, type WorkspaceState,
 } from './workspace-state';
@@ -97,6 +98,13 @@ export function PianoWorkspaceHarness() {
   const [respellDraft, setRespellDraft] = useState('');
   const [notice, setNotice] = useState('');
   const [window, setWindow] = useState<TimeWindow>({start: 0, span: DEFAULT_SPAN_SECONDS});
+  const [spans, setSpans] = useState<{ start: number; end: number; kind: 'playing' | 'explanation' }[]>([]);
+  const [offsetSeconds, setOffsetSeconds] = useState(0);
+  const [follow, setFollow] = useState(true);
+  const [playing, setPlaying] = useState(false);
+  const [rate, setRate] = useState(1);
+  const [scoreTarget, setScoreTarget] = useState<{ tick: number; token: number } | null>(null);
+  const linkToken = useRef(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<NotationAudio | null>(null);
@@ -127,6 +135,37 @@ export function PianoWorkspaceHarness() {
     let stopped = false;
     setLoading(true);
     setError('');
+    const demo = params.get('demo');
+    if (demo === 'explanation' || demo === 'arpeggio') {
+      // A local fixture for cases the real recording does not contain: an arpeggiated
+      // chord, a spoken explanation passage and a held score cursor.
+      const events = demo === 'explanation'
+        ? [
+            {id: 'd-1', onset: 1.0, duration: 0.6, pitch: 60},
+            {id: 'd-2', onset: 2.0, duration: 0.6, pitch: 62},
+            {id: 'd-3', onset: 2.045, duration: 0.6, pitch: 66},
+            {id: 'd-4', onset: 2.09, duration: 0.6, pitch: 69},
+            {id: 'd-5', onset: 8.0, duration: 0.6, pitch: 72},
+            {id: 'd-6', onset: 9.0, duration: 0.6, pitch: 64},
+          ]
+        : [
+            {id: 'd-1', onset: 2.0, duration: 0.6, pitch: 62},
+            {id: 'd-2', onset: 2.045, duration: 0.6, pitch: 66},
+            {id: 'd-3', onset: 2.09, duration: 0.6, pitch: 69},
+          ];
+      const document = buildNotation(events.map(event => ({
+        ...event, velocity: 0.6, confidence: null, optional: false, string: null, fret: null,
+      })), {bpm: 120, duration: 12});
+      setBaseline(document);
+      setState(createWorkspaceState(document));
+      setTitle(demo === 'explanation' ? 'Fixture: explanation passage' : 'Fixture: arpeggiated chord');
+      setSpans(demo === 'explanation'
+        ? [{start: 0, end: 4, kind: 'playing'}, {start: 4, end: 7, kind: 'explanation'}, {start: 7, end: 12, kind: 'playing'}]
+        : [{start: 0, end: 12, kind: 'playing'}]);
+      setVideoUrl(null);
+      setLoading(false);
+      return () => { stopped = true; };
+    }
     if (!lessonId) { setError('Add ?id=<lesson id> to the harness URL.'); setLoading(false); return; }
     request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft`)
       .then(value => {
@@ -142,6 +181,8 @@ export function PianoWorkspaceHarness() {
         setBaseline(document);
         setState(createWorkspaceState(document));
         setTitle(draft.title);
+        setSpans(draft.spans.map(span => ({start: span.start, end: span.end, kind: span.kind})));
+        setOffsetSeconds(draft.playback?.sync_offset_seconds ?? 0);
         setVideoUrl(draft.source_video ? assetUrl(draft.source_video.key) : null);
       })
       .catch(cause => { if (!stopped) setError(cause instanceof Error ? cause.message : 'The draft could not be opened.'); })
@@ -153,12 +194,20 @@ export function PianoWorkspaceHarness() {
     const media = videoRef.current;
     if (!media) return;
     let frame = 0;
-    const update = () => {
+    let lastPaint = 0;
+    const update = (force = false) => {
       frame = 0;
-      setPlayhead(media.currentTime);
-      if (!media.paused && !media.ended) frame = requestAnimationFrame(update);
+      const now = performance.now();
+      // Paint the shared clock at ~20 fps rather than every frame: the visual layers are
+      // cheap but the surrounding inspector and forms should not re-render at 60 Hz.
+      if (force || now - lastPaint >= 50) {
+        lastPaint = now;
+        setPlayhead(media.currentTime);
+        setPlaying(!media.paused && !media.ended);
+      }
+      if (!media.paused && !media.ended) frame = requestAnimationFrame(() => update());
     };
-    const refresh = () => { if (frame) cancelAnimationFrame(frame); update(); };
+    const refresh = () => { if (frame) cancelAnimationFrame(frame); update(true); };
     const events = ['play', 'pause', 'seeked', 'timeupdate', 'ended', 'loadedmetadata'];
     events.forEach(name => media.addEventListener(name, refresh));
     refresh();
@@ -184,11 +233,15 @@ export function PianoWorkspaceHarness() {
   }, [state?.document.duration]);
 
   const select = useCallback((occurrenceId: string | null) => {
-    if (occurrenceId) videoRef.current?.pause();
     setNotice('');
     dispatch({type: 'select', occurrenceId});
-    if (occurrenceId) requestReveal(occurrenceId);
-  }, [dispatch, requestReveal]);
+    if (!occurrenceId) return;
+    videoRef.current?.pause();
+    // Clicking a note seeks to its exact effective onset, never a score approximation.
+    const note = state?.document.performance.find(item => item.id === occurrenceId);
+    if (note) seek(note.onset + offsetSeconds);
+    requestReveal(occurrenceId);
+  }, [dispatch, offsetSeconds, requestReveal, seek, state?.document]);
 
   const selection = state?.selection ?? null;
   const selected = selection && document ? noteFacts(document, selection) : null;
@@ -213,6 +266,12 @@ export function PianoWorkspaceHarness() {
 
   const boxes = useMemo(() => (document ? layoutMeasures(document).boxes : []), [document]);
 
+  const alignment = useMemo<Alignment | null>(
+    () => (document ? alignmentFromSpans(document, spans) : null), [document, spans]);
+  const intervals = useMemo(() => (document ? occurrenceIntervals(document, offsetSeconds) : []), [document, offsetSeconds]);
+  const activeIds = useMemo(() => activeOccurrenceIds(intervals, playhead), [intervals, playhead]);
+  const playheadTick = alignment ? effectiveSecondsToTick(alignment, playhead, offsetSeconds) : null;
+
   // A selection that changes for any reason (click, undo, insert) requests one reveal.
   const selectionOccurrence = state?.selection?.occurrenceId ?? null;
   useEffect(() => {
@@ -227,10 +286,76 @@ export function PianoWorkspaceHarness() {
     setWindow(clampTimeWindow({start: 0, span: DEFAULT_SPAN_SECONDS}, document.duration));
   }, [document?.duration]);
 
-  const changeWindow = useCallback((next: TimeWindow) => {
+  const changeWindow = useCallback((next: TimeWindow, origin: 'user' | 'reveal' | 'playback' = 'reveal') => {
     if (!document) return;
-    setWindow(clampTimeWindow(next, document.duration));
-  }, [document]);
+    const clamped = clampTimeWindow(next, document.duration);
+    setWindow(clamped);
+    if (origin === 'user') {
+      // A manual pan suspends Follow and drives the score by musical position.
+      setFollow(false);
+      if (alignment) {
+        linkToken.current += 1;
+        setScoreTarget({tick: effectiveSecondsToTick(alignment, clamped.start, offsetSeconds), token: linkToken.current});
+      }
+    }
+  }, [document, alignment, offsetSeconds]);
+
+  const onScoreScroll = useCallback((tick: number) => {
+    if (!document || !alignment) return;
+    setFollow(false);
+    linkToken.current += 1;
+    setScoreTarget({tick, token: linkToken.current});
+    setWindow(clampTimeWindow({start: tickToEffectiveSeconds(alignment, tick, offsetSeconds), span: window.span}, document.duration));
+  }, [document, alignment, offsetSeconds, window.span]);
+
+  const seekToTick = useCallback((tick: number) => {
+    if (!alignment) return;
+    seek(tickToEffectiveSeconds(alignment, tick, offsetSeconds));
+  }, [alignment, offsetSeconds, seek]);
+
+  const returnToPlayhead = useCallback(() => {
+    if (!document || !alignment) return;
+    setWindow(clampTimeWindow({start: playhead - window.span / 4, span: window.span}, document.duration));
+    linkToken.current += 1;
+    setScoreTarget({tick: playheadTick ?? 0, token: linkToken.current});
+    setFollow(true);
+  }, [document, alignment, playhead, playheadTick, window.span]);
+
+  const toggleTransport = useCallback(() => {
+    const media = videoRef.current;
+    if (!media) return;
+    if (media.paused) void media.play().catch(() => setNotice('The video could not start.'));
+    else media.pause();
+  }, []);
+
+  const changeRate = useCallback((value: number) => {
+    setRate(value);
+    const media = videoRef.current;
+    if (media) media.playbackRate = value;
+  }, []);
+
+  // Follow playback: edge-based scroll that keeps the cursor comfortably visible.
+  useEffect(() => {
+    if (!follow || !playing || !document) return;
+    setWindow(current => {
+      const lead = playhead - current.start;
+      if (lead >= 0 && lead <= current.span * 0.75) return current;
+      return clampTimeWindow({start: playhead - current.span * 0.25, span: current.span}, document.duration);
+    });
+  }, [playhead, follow, playing, document]);
+
+  // The score follows the same clock by musical position.
+  useEffect(() => {
+    if (!follow || playheadTick === null) return;
+    linkToken.current += 1;
+    setScoreTarget({tick: playheadTick, token: linkToken.current});
+  }, [playheadTick, follow]);
+
+  // Keep the source clock's rate when the video (re)mounts.
+  useEffect(() => {
+    const media = videoRef.current;
+    if (media) media.playbackRate = rate;
+  }, [videoUrl, rate]);
 
   const zoom = useCallback((factor: number) => {
     if (!document) return;
@@ -253,7 +378,7 @@ export function PianoWorkspaceHarness() {
   return <main className="ws-shell">
     <header className="ws-head">
       <div>
-        <p className="ws-eyebrow">Developer harness · Phase 3 · writes nothing</p>
+        <p className="ws-eyebrow">Developer harness · Phase 4 · writes nothing</p>
         <h1>{title || 'Piano correction workspace'}</h1>
         <p className="ws-sub">
           {document.performance.length} notes · {document.events.length} events · {document.measures.length} measures ·{' '}
@@ -268,6 +393,17 @@ export function PianoWorkspaceHarness() {
     </header>
 
     <div className="ws-toolbar">
+      <button type="button" onClick={toggleTransport}>{playing ? 'Pause' : 'Play'}</button>
+      <label className="ws-field ws-inline">
+        <span>Rate</span>
+        <select value={rate} onChange={event => changeRate(Number(event.target.value))}>
+          {[0.5, 0.75, 1].map(value => <option key={value} value={value}>{value}×</option>)}
+        </select>
+      </label>
+      <label className="ws-field ws-inline">
+        <span><input type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)}/> Follow</span>
+      </label>
+      <button type="button" onClick={returnToPlayhead}>Return to playhead</button>
       <button type="button" onClick={() => dispatch({type: 'undo'})} disabled={!state.past.length}>Undo</button>
       <button type="button" onClick={() => dispatch({type: 'redo'})} disabled={!state.future.length}>Redo</button>
       <label className="ws-field ws-inline">
@@ -275,6 +411,13 @@ export function PianoWorkspaceHarness() {
         <select value={snapTicks} onChange={event => setSnapTicks(Number(event.target.value))}>
           {SNAP_CHOICES.map(choice => <option key={choice.label} value={choice.ticks}>{choice.label}</option>)}
         </select>
+      </label>
+      <label className="ws-field ws-inline">
+        <span>Offset</span>
+        <input type="number" step={0.01} min={-10} max={10} value={offsetSeconds} style={{width: 72}}
+          aria-label="Sync offset in seconds (not saved)"
+          onChange={event => setOffsetSeconds(Math.max(-10, Math.min(10, Number(event.target.value) || 0)))}/>
+        <span className="ws-hint">s · not saved</span>
       </label>
       <div className="ws-zoom" role="group" aria-label="Zoom">
         <button type="button" onClick={() => zoom(1.25)} aria-label="Zoom out">−</button>
@@ -284,6 +427,17 @@ export function PianoWorkspaceHarness() {
         <button type="button" onClick={() => zoom(0.8)} aria-label="Zoom in">+</button>
       </div>
       <span className="ws-time">{playhead.toFixed(2)} s / {document.duration.toFixed(2)} s</span>
+      {!videoUrl && <label className="ws-field ws-inline">
+        <span>Fixture clock</span>
+        <input type="range" min={0} max={document.duration} step={0.01} value={playhead}
+          aria-label="Fixture clock"
+          onChange={event => { setPlayhead(Number(event.target.value)); setPlaying(false); }}/>
+      </label>}
+      <span className="ws-alignment" data-alignment-mode={alignment?.mode ?? 'none'} data-playhead-tick={playheadTick ?? ''}
+        data-ticks-per-second={alignment ? Math.round((1 / secondsPerTick) * 1000) / 1000 : ''}>
+        {alignment?.mode === 'anchored' ? 'Score alignment anchored' : 'Score alignment estimated'}
+        {spans.length > 1 ? ` · ${spans.filter(span => span.kind === 'explanation').length} explanation passage(s)` : ''}
+      </span>
       {report && <span className={report.status === 'rejected' ? 'ws-report is-bad' : 'ws-report'}>
         {report.status === 'rejected' ? report.message : report.label}
       </span>}
@@ -303,23 +457,28 @@ export function PianoWorkspaceHarness() {
         </section>
 
         <section className="ws-panel ws-surface" aria-label="Piano roll">
-          <TimeRoll document={document} window={window} onWindowChange={changeWindow}
+          <TimeRoll document={document} window={window} onWindowChange={next => changeWindow(next, 'reveal')}
+            onWindowChangeOrigin={changeWindow}
+            offsetSeconds={offsetSeconds} activeOccurrenceIds={activeIds}
             selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={rollReveal}
             playhead={playhead} onSelect={select} onSeek={seek}/>
-          <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Dragging notes is Phase 6.</p>
+          <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Scrolling never seeks. Dragging notes is Phase 6.</p>
         </section>
 
         <section className="ws-panel ws-surface" aria-label="Score">
           <ContinuousScore document={document} boxes={boxes} selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={scoreReveal} onSelect={select}
+            playheadTick={playheadTick} activeOccurrenceIds={activeIds}
+            scrollTarget={scoreTarget} onSeekTick={seekToTick} onUserScroll={onScoreScroll}
             onAmbiguous={(logicalNoteId, occurrenceIds) => setNotice(
               `This written note maps ${occurrenceIds.length} occurrences; choose one in the roll (logical ${logicalNoteId}).`)}/>
-          <p className="ws-hint">One continuous grand staff; only the visible measures are rendered. Click a notehead to select it.</p>
+          <p className="ws-hint">One continuous grand staff; the cursor is the mapped musical position. Click the ruler to seek, a notehead to select.</p>
         </section>
 
         <section className="ws-panel ws-surface" aria-label="Overview">
-          <ClipOverview document={document} window={window} playhead={playhead} onWindowChange={changeWindow}/>
+          <ClipOverview document={document} window={window} playhead={playhead}
+            onWindowChange={next => changeWindow(next, 'user')}/>
         </section>
       </div>
 

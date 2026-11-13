@@ -32,12 +32,19 @@ type Props = {
   /** A navigation request: performed once per token, never on viewport updates. */
   reveal: RevealRequest | null;
   playhead: number;
+  /** Applied once: notes are drawn at their effective (video) time. */
+  offsetSeconds?: number;
+  /** Occurrences sounding at the current source time. */
+  activeOccurrenceIds?: string[];
   onSelect: (occurrenceId: string) => void;
   onSeek: (seconds: number) => void;
+  /** Distinguishes a user scroll from a reveal or playback pan. */
+  onWindowChangeOrigin?: (window: TimeWindow, origin: 'user' | 'reveal' | 'playback') => void;
 };
 
 export function TimeRoll({
-  document, window, onWindowChange, selectedOccurrenceId, reveal, playhead, onSelect, onSeek,
+  document, window, onWindowChange, selectedOccurrenceId, reveal, playhead, offsetSeconds = 0,
+  activeOccurrenceIds = [], onSelect, onSeek, onWindowChangeOrigin,
 }: Props) {
   const [viewportRef, measuredWidth, element] = useElementWidth<HTMLDivElement>();
   const [labelOffset, setLabelOffset] = useState(0);
@@ -46,6 +53,9 @@ export function TimeRoll({
   const changeRef = useRef(onWindowChange);
   windowRef.current = window;
   changeRef.current = onWindowChange;
+  const originRef = useRef(onWindowChangeOrigin);
+  originRef.current = onWindowChangeOrigin;
+  const effectiveOffset = offsetSeconds;
 
   const width = Math.max(120, measuredWidth);
   const pps = pixelsPerSecond(width, window);
@@ -65,8 +75,9 @@ export function TimeRoll({
   const ticks = rulerTicks(window, document.duration);
   const range = visibleTimeRange(window);
   const visibleNotes = document.performance.filter(note => {
-    const end = note.onset + (note.duration ?? 0.25);
-    return note.onset <= range.to && end >= range.from;
+    const onset = note.onset + effectiveOffset;
+    const end = onset + (note.duration ?? 0.25);
+    return onset <= range.to && end >= range.from;
   });
 
   // A scrollable pitch canvas opens around the music, not at the highest row.
@@ -98,8 +109,11 @@ export function TimeRoll({
     const note = document.performance.find(item => item.id === reveal.occurrenceId);
     if (!note) return;
     const current = windowRef.current;
-    const next = revealWindow(current, document.duration, note.onset);
-    if (next.start !== current.start || next.span !== current.span) changeRef.current(next);
+    const next = revealWindow(current, document.duration, note.onset + effectiveOffset);
+    if (next.start !== current.start || next.span !== current.span) {
+      if (originRef.current) originRef.current(next, 'reveal');
+      else changeRef.current(next);
+    }
     const node = element;
     if (!node) return;
     const targetY = (high - note.pitch) * rowHeight + rowHeight / 2;
@@ -113,7 +127,9 @@ export function TimeRoll({
     setLabelOffset(node.scrollTop);
     const start = node.scrollLeft / pps;
     const next = clampTimeWindow({start, span: window.span}, document.duration);
-    if (Math.abs(next.start - window.start) > 1e-4) onWindowChange(next);
+    if (Math.abs(next.start - window.start) <= 1e-4) return;
+    if (originRef.current) originRef.current(next, 'user');
+    else onWindowChange(next);
   };
 
   const seekFromEvent = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -150,10 +166,11 @@ export function TimeRoll({
           {Array.from({length: rows}, (_, index) => high - index).filter(pitch => pitch % 12 === 0).map(pitch =>
             <line key={`row-${pitch}`} className="ws-roll-octave" x1={0} y1={y(pitch)} x2={totalWidth} y2={y(pitch)}/>)}
           {visibleNotes.map(note => {
-            const left = note.onset * pps;
+            const left = (note.onset + effectiveOffset) * pps;
             const noteWidth = Math.max(2, (note.duration ?? 0.25) * pps - 1);
             const selected = selectedOccurrenceId === note.id;
-            return <rect key={note.id} className={`ws-roll-note${selected ? ' is-selected' : ''}`}
+            const active = activeOccurrenceIds.includes(note.id);
+            return <rect key={note.id} className={`ws-roll-note${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
               x={left} y={y(note.pitch) - rowHeight / 2} width={noteWidth} height={Math.max(3, rowHeight - 1)} rx={2}
               data-occurrence={note.id} role="button" tabIndex={0}
               aria-label={`${pitchName(note.pitch)} at ${note.onset.toFixed(2)} seconds${selected ? ', selected' : ''}`}

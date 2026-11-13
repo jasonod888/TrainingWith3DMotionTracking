@@ -11,7 +11,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import type {NotationDocument, NotationSegment, NotationValue} from '../../../../../packages/music-notation/index.ts';
 import {
-  measureAtTick, scrollForMeasure, visibleMeasureIndexes, type MeasureBox,
+  measureAtTick, scrollForMeasure, tickAtX, visibleMeasureIndexes, xForTick, type MeasureBox,
 } from './viewport';
 import {useElementWidth} from './useElementWidth';
 
@@ -49,6 +49,7 @@ function ledgerLines(y: number, top: number, bottom: number): number[] {
 }
 
 export type ScoreReveal = { tick: number; token: number };
+export type ScoreScrollTarget = { tick: number; token: number };
 
 type Props = {
   document: NotationDocument;
@@ -56,16 +57,28 @@ type Props = {
   selectedOccurrenceId: string | null;
   /** A navigation request performed once per token. */
   reveal: ScoreReveal | null;
+  /** Score cursor position from the shared source clock (Phase 4). */
+  playheadTick?: number | null;
+  /** Occurrences sounding at the current source time. */
+  activeOccurrenceIds?: string[];
+  /** Linked-navigation target from the roll or playback, performed once per token. */
+  scrollTarget?: ScoreScrollTarget | null;
   onSelect: (occurrenceId: string) => void;
   /** Called instead of guessing when one written note maps several occurrences. */
   onAmbiguous?: (logicalNoteId: string, occurrenceIds: string[]) => void;
+  /** A ruler click maps back to source time; scrolling never does. */
+  onSeekTick?: (tick: number) => void;
+  /** Reports the tick at the left edge when the user scrolls the strip. */
+  onUserScroll?: (tickAtLeft: number) => void;
 };
 
 export function ContinuousScore({
-  document, boxes, selectedOccurrenceId, reveal, onSelect, onAmbiguous,
+  document, boxes, selectedOccurrenceId, reveal, playheadTick = null, activeOccurrenceIds = [],
+  scrollTarget = null, onSelect, onAmbiguous, onSeekTick, onUserScroll,
 }: Props) {
   const [hostRef, width] = useElementWidth<HTMLDivElement>();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const programmatic = useRef(false);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [first, last] = visibleMeasureIndexes(boxes, scrollLeft, width);
   const totalWidth = boxes.length ? boxes[boxes.length - 1].x + boxes[boxes.length - 1].width : 0;
@@ -74,11 +87,15 @@ export function ContinuousScore({
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
-    const update = () => setScrollLeft(element.scrollLeft);
-    update();
+    const update = () => {
+      setScrollLeft(element.scrollLeft);
+      if (programmatic.current || !onUserScroll) return;
+      onUserScroll(tickAtX(boxes, document, element.scrollLeft + CONTEXT_WIDTH + 4));
+    };
+    setScrollLeft(element.scrollLeft);
     element.addEventListener('scroll', update, {passive: true});
     return () => element.removeEventListener('scroll', update);
-  }, [width]);
+  }, [width, boxes, document, onUserScroll]);
 
   // Reveal once per token: panning or editing must not pull the strip back.
   useEffect(() => {
@@ -87,9 +104,26 @@ export function ContinuousScore({
     if (!element) return;
     const index = measureAtTick(boxes, document, reveal.tick);
     const target = scrollForMeasure(boxes, index, Math.max(120, width), element.scrollLeft);
-    if (Math.abs(target - element.scrollLeft) > 1) element.scrollLeft = target;
+    if (Math.abs(target - element.scrollLeft) > 1) {
+      programmatic.current = true;
+      element.scrollLeft = target;
+      requestAnimationFrame(() => { programmatic.current = false; });
+    }
     // Keyed on the token only.
   }, [reveal?.token]);
+
+  // Linked navigation: roll scrolling or playback moves the strip once per token.
+  useEffect(() => {
+    if (!scrollTarget) return;
+    const element = scrollRef.current;
+    if (!element) return;
+    const target = Math.max(0, xForTick(boxes, document, scrollTarget.tick) - CONTEXT_WIDTH - 24);
+    if (Math.abs(target - element.scrollLeft) <= 1) return;
+    programmatic.current = true;
+    element.scrollLeft = target;
+    requestAnimationFrame(() => { programmatic.current = false; });
+    // Keyed on the token only.
+  }, [scrollTarget?.token]);
 
   const visibleSegments = useMemo(() => {
     if (last < first) return [] as NotationSegment[];
@@ -131,6 +165,18 @@ export function ContinuousScore({
         data-rendered-notes={visibleSegments.reduce((total, segment) => total + segment.notes.length, 0)}
         data-rendered-values={JSON.stringify([...new Set(visibleSegments.map(segment => segment.value))])}>
         <rect className="ws-score-paper" x={0} y={0} width={canvasWidth} height={HEIGHT}/>
+        <rect className="ws-score-ruler" x={CONTEXT_WIDTH} y={0} width={totalWidth} height={RULER_HEIGHT}
+          onClick={event => {
+            if (!onSeekTick) return;
+            const element = scrollRef.current;
+            if (!element) return;
+            const rect = element.getBoundingClientRect();
+            const x = element.scrollLeft + (event.clientX - rect.left);
+            onSeekTick(tickAtX(boxes, document, x));
+          }}/>
+        {playheadTick !== null ? <line className="ws-score-playhead" data-playhead-tick={playheadTick}
+          x1={xForTick(boxes, document, playheadTick)} y1={RULER_HEIGHT}
+          x2={xForTick(boxes, document, playheadTick)} y2={HEIGHT - 10}/> : null}
         {[0, 1, 2, 3, 4].map(line => <g key={`staff-${line}`}>
           <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={TREBLE_TOP + line * LINE} x2={CONTEXT_WIDTH + totalWidth} y2={TREBLE_TOP + line * LINE}/>
           <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={BASS_TOP + line * LINE} x2={CONTEXT_WIDTH + totalWidth} y2={BASS_TOP + line * LINE}/>
@@ -168,12 +214,13 @@ export function ContinuousScore({
             {segment.notes.map(note => {
               const cy = yForNote(segment.staff, note.spelling);
               const selected = selectedOccurrenceId !== null && note.performance_ids.includes(selectedOccurrenceId);
+              const active = activeOccurrenceIds.some(id => note.performance_ids.includes(id));
               const occurrence = occurrenceFor(note);
               const ambiguous = occurrence === null;
               return <g key={note.id}>
                 {ledgerLines(cy, staffTop, staffBottom)
                   .map(line => <line key={line} className="ws-score-ledger" x1={x - 9} y1={line} x2={x + 9} y2={line}/>)}
-                <ellipse className={`ws-score-notehead${hollow ? ' is-hollow' : ''}${selected ? ' is-selected' : ''}`}
+                <ellipse className={`ws-score-notehead${hollow ? ' is-hollow' : ''}${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
                   cx={x} cy={cy} rx={4.8} ry={3.6} transform={`rotate(-20 ${x} ${cy})`}
                   data-occurrence={occurrence ?? ''} data-ambiguous={ambiguous ? 'true' : 'false'}
                   role="button" tabIndex={0}

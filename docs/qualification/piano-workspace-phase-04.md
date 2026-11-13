@@ -1,0 +1,139 @@
+# Piano correction workspace — Phase 4 submission
+
+One source clock, a shared time↔score map, linked navigation and follow playback.
+
+| | |
+| --- | --- |
+| Prepared | 13 November 2026 |
+| Phase | **4 — Shared playback, linked navigation and musical alignment** |
+| Branch | `phase4/shared-playback` |
+| Scope | Score playhead, alignment passages and anchors, exact occurrence activation, inverse seeking, linked scroll, Follow / manual suspension / Return to playhead, offset applied once |
+| Routes touched | **None.** The harness only; review page, note forms, reviewed-lesson editor and API unchanged |
+| Phase 5 | **Not started** |
+
+---
+
+## 0. What was built
+
+| Deliverable | Where |
+| --- | --- |
+| Alignment map: timed and held passages, anchors, validation | [`packages/music-notation/alignment.ts`](../../packages/music-notation/alignment.ts) |
+| Score playhead and ruler-to-tick inverse | [`ContinuousScore.tsx`](../../apps/web/src/music/workspace/ContinuousScore.tsx) + `xForTick`/`tickAtX` in [`viewport.ts`](../../apps/web/src/music/workspace/viewport.ts) |
+| Exact activation lighting in roll, score and keyboard | `occurrenceIntervals` / `activeOccurrenceIds`, consumed by the surfaces |
+| One transport over the existing video clock | Harness Play/Pause and rate controls driving the same `<video>`; `usePianoSourcePlayer` still owns audio mapping |
+| Linked navigation with a single origin | Roll window ↔ score scroll by musical position, both keyed on request tokens |
+| Follow playback, manual suspension, Return to playhead | Harness effects and toolbar |
+| Offset applied once | `effectiveSecondsToTick` / `tickToEffectiveSeconds`; notes drawn at `onset + offset` |
+| Fixtures for the cases the recording lacks | `?demo=explanation` and `?demo=arpeggio`, plus a fixture clock |
+
+---
+
+## 1. Acceptance gate
+
+| Criterion | Evidence |
+| --- | --- |
+| One source clock; no second transport | The harness has a single `<video>` (`videos: 1`) and its Play/Pause and rate controls drive it; the playhead state is derived from `video.currentTime` (repainted at ~20 fps, not a separate clock) |
+| Play/pause/seek/rate update both views consistently | Playing advances the clock and both cursed lines move; the score ruler click seeks the video (time change > 0.2 s); rate 0.5 applied to the video |
+| Both cursors represent the same musical moment | At 1.538 s the roll-derived position maps to tick **1784**, and the score cursor reports **1784** (`cursor_agreement`, tolerance 12 ticks) |
+| Clicking a note seeks to the actual effective onset | `select()` now pauses, selects, seeks to `onset + offset` and reveals — never a quantised position |
+| Scrolling does not seek or edit; scrubbing does | Panning the roll moved the window and the score by musical position with `video_time` unchanged; the score ruler click changed `video_time` |
+| Manual scroll disables Follow; no oscillation | Pan sets `follow: false`; the score followed once (`score_scroll` changed) and no scroll events looped; Return re-enabled Follow |
+| Active notes light at exact recorded times | Arpeggio fixture: **0** active at 1.9 s, **1** at 2.01 s, **2** at 2.05 s, **3** at 2.1 s — the three attacks share one engraved chord but light individually |
+| Explanation passages hold the cursor honestly | Fixture: the score cursor stays at tick **3840** from 4.4 to 6.9 s while the clock advances, then resumes to **4800** at 8 s |
+| Offset applied once, in both directions | Offset 0.5 s moves the mapped tick by exactly **580** ticks at 1160 ticks/s (3027 → 2447); dragging the offset back restores it; note drawing shifts by the same half second |
+| Anchors cannot reverse time or score order | Unit tests: an anchor splitting at (4 s, 4000 ticks) is accepted and re-slopes both stretches; edge ticks, out-of-clip times and anchors inside a held passage are rejected |
+| Follow keeps the cursor visible without fighting the user | Edge-based scroll resumes only while playing with Follow on; any manual pan turns it off |
+
+![Playback with both cursors and the shared transport](piano-workspace-phase-04/captures/playback-desktop.png)
+
+![Explanation fixture: the score cursor holds while the clock advances](piano-workspace-phase-04/captures/explanation-hold.png)
+
+---
+
+## 2. The alignment model
+
+```ts
+type TimedPassage = {kind:'timed'; source_seconds:[number,number]; ticks:[number,number]};
+type HeldPassage  = {kind:'held';  source_seconds:[number,number]; tick:number};
+type Alignment = {alignment_version:1; mode:'estimated'|'anchored'; basis:'tempo'|'passages'; passages:...};
+```
+
+- **Estimated vs anchored** is explicit in the data and in the toolbar label (“Score alignment estimated”).
+- **Spans build passages sequentially:** a playing span advances the score by its own duration; an explanation span (or an uncovered gap) holds the cursor at the tick reached, and the next playing span resumes from that tick rather than jumping ahead or inventing beats.
+- **The hold policy is fixed and tested:** a tick that exists inside a hold also exists at the end of the preceding stretch; the inverse returns the **start** of the hold.
+- **Anchors** are authored points strictly inside a timed stretch; they split it and set `mode: 'anchored'`. Anchors at a stretch edge, outside the clip, or inside a hold are rejected with a message.
+- **The offset is a boundary conversion**, never stored in a passage: `effectiveToTick = secondsToTick(effective − offset)` and `tickToEffective = tickToSeconds(tick) + offset`.
+- **Activation uses the recorded intervals** (`onset + offset` to `onset + offset + recorded length`), so an arpeggiated chord lights one note at a time even though the score engraves one chord.
+
+---
+
+## 3. Navigation and Follow
+
+- The roll window and the score scroll are separate containers; each reports **user** movement with an origin tag and accepts **request** targets keyed on a token, so a programmatic scroll cannot echo back.
+- Rolling the roll computes the tick at the window's left edge and scrolls the score to it; scrolling the score computes the tick at its left edge and moves the roll. Neither touches the video clock or the document.
+- Follow playback is edge-based: while playing, if the cursor leaves the comfortable band the window scrolls to keep it at a quarter of the viewport; the score follows the mapped tick. Any manual pan disables Follow and the toolbar shows the checkbox state. **Return to playhead** re-centres both views and re-enables Follow without starting playback.
+- Painting is throttled to ~20 fps so the inspector and forms do not re-render at frame rate; the source video remains the only clock.
+
+---
+
+## 4. Tests
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Web (full) | `cd apps/web; npm test` | **421 passed, 0 failed** — 410 previous + 11 alignment/activation tests |
+| Type check | `cd apps/web; node_modules\.bin\tsc --noEmit` | clean |
+| Production build | `cd apps/web; npm run build` | succeeds (pre-existing chunk-size warning) |
+| Browser evidence | `python docs/qualification/piano-workspace-phase-04/scripts/check-playback.py` | exit 0, all assertions pass |
+
+New tests ([`workspace-alignment.test.tsx`](../../apps/web/tests/workspace-alignment.test.tsx)) cover: linear estimation; playing/explanation passage construction; the held-tick inverse; offset applied once both ways; anchor acceptance and both rejection families; exact occurrence intervals and activation (including two attacks 12 ms apart); gap holds; and structural validation of a malformed alignment.
+
+---
+
+## 5. Deviations and limitations
+
+| Item | Status |
+| --- | --- |
+| Anchors are derivable and tested but have no authoring UI yet | The plan's “Align beat to video” flow is a Phase 6/7 interaction; the contract and command exist. |
+| The harness clock is painted at ~20 fps | Deliberate throttle; a cursor layer outside React is a later performance task if 20 fps reads poorly on device. |
+| Follow uses an edge-based rule, not frame-locked sticky centring | Matches the plan's “jump to 25 %” allowance; no oscillation at boundaries because only out-of-band positions move the window. |
+| No persistence of alignment or offset | Phase 5. The offset control is labelled “not saved”. |
+| Fixtures are synthetic | The real recording has no explanation passage and no arpeggio, so `?demo=…` supplies both; the real clip covers normal playback, seeking, rate, linking and offset. |
+| Legacy `NotationEditor` still owns its video | Isolated by design; migration is Phase 7. |
+
+---
+
+## 6. Review record
+
+| Item | Value |
+| --- | --- |
+| Phase | 4 — Shared playback, linked navigation and musical alignment |
+| Accepted predecessor | `e240588` (Phase 3 GO) |
+| Submitted code | Branch `phase4/shared-playback` from `e240588`; see the commit that adds this note |
+| Developer summary | Alignment passages/anchors, score cursor, exact activation, inverse ruler seeking, linked scroll with request tokens, Follow with manual suspension and Return, offset once, transport over the single video |
+| Evidence | `phase4-result.json`, two captures, `logs/web-tests.txt`, `logs/web-build.txt`, `scripts/check-playback.py` |
+| Deviations / limitations | §5 |
+| Review decision | **NOT REVIEWED** |
+| Next phase authorised | **None** — Phase 5 requires an explicit GO |
+
+### Reproducing
+
+```powershell
+cd apps/web
+npm test                    # 421 pass
+node_modules\.bin\tsc --noEmit
+npm run build
+
+cd ..\..
+.\.venv-saas\Scripts\python.exe docs\qualification\piano-workspace-phase-04\scripts\check-playback.py
+
+# Harness (dev servers running):
+#   http://127.0.0.1:5173/workspace-harness.html?id=0df28929d427406cb86d9bb5e2dcd35b
+#   http://127.0.0.1:5173/workspace-harness.html?demo=explanation
+#   http://127.0.0.1:5173/workspace-harness.html?demo=arpeggio
+```
+
+---
+
+## 7. Scope statement
+
+No persistence, recovery, gesture editing, formatted score or production review replacement is included. The harness keeps its feature boundary, the ordinary review route and reviewed-lesson editor are unchanged, and the legacy editor's video remains isolated. Phase 5 has not started and awaits an explicit GO.

@@ -305,6 +305,11 @@ body {
   fill: #5f9a75;
 }
 
+/* Sounding notes are green; selection keeps the blue accent. */
+.ws-roll-note.is-active:not(.is-selected) {
+  fill: #4f9a6a;
+}
+
 .ws-roll-note.is-selected {
   fill: #2a7be0;
   stroke: #144a8c;
@@ -374,6 +379,31 @@ body {
   fill: #2a7be0;
   stroke: #144a8c;
   stroke-width: 1.5;
+}
+
+/* Sounding notes light green; a sounding selected note stays blue. */
+.ws-score-notehead.is-active:not(.is-selected) {
+  fill: #4f9a6a;
+}
+
+.ws-score-notehead.is-hollow.is-active:not(.is-selected) {
+  fill: #dcefe2;
+  stroke: #2f6b48;
+}
+
+.ws-score-notehead.is-hollow.is-selected {
+  fill: #dceafb;
+}
+
+.ws-score-ruler {
+  fill: transparent;
+  cursor: crosshair;
+}
+
+.ws-score-playhead {
+  stroke: #d9822b;
+  stroke-width: 1.5;
+  pointer-events: none;
 }
 
 .ws-score-notehead.is-hollow.is-selected {

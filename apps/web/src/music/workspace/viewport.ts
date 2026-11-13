@@ -191,3 +191,30 @@ export function measureAtTick(boxes: MeasureBox[], document: NotationDocument, t
   if (!measure) return Math.max(0, boxes.length - 1);
   return clamp(measure.index, 0, Math.max(0, boxes.length - 1));
 }
+
+const SCORE_CONTEXT_WIDTH = 62;
+const SCORE_MEASURE_PAD = 14;
+
+/** Horizontal position of a score tick inside the strip (content coordinates). */
+export function xForTick(
+  boxes: MeasureBox[], document: NotationDocument, tick: number, contextWidth = SCORE_CONTEXT_WIDTH,
+): number {
+  if (!boxes.length) return contextWidth;
+  const index = measureAtTick(boxes, document, tick);
+  const box = boxes[index];
+  const measure = document.measures[box.index];
+  const local = measure.duration > 0 ? clamp((tick - measure.start) / measure.duration, 0, 1) : 0;
+  return contextWidth + box.x + SCORE_MEASURE_PAD + local * (box.width - SCORE_MEASURE_PAD * 2);
+}
+
+/** Inverse: which score tick sits at a content x position (used by the ruler). */
+export function tickAtX(
+  boxes: MeasureBox[], document: NotationDocument, x: number, contextWidth = SCORE_CONTEXT_WIDTH,
+): number {
+  if (!boxes.length) return 0;
+  const local = x - contextWidth;
+  const box = boxes.find(item => local >= item.x && local < item.x + item.width) ?? boxes[boxes.length - 1];
+  const measure = document.measures[box.index];
+  const within = clamp((local - box.x - SCORE_MEASURE_PAD) / Math.max(1, box.width - SCORE_MEASURE_PAD * 2), 0, 1);
+  return Math.round(measure.start + within * measure.duration);
+}
