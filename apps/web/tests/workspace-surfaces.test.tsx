@@ -14,6 +14,7 @@ globalThis.Element = window.Element;
 globalThis.Node = window.Node;
 globalThis.SVGElement = window.SVGElement;
 globalThis.getComputedStyle = window.getComputedStyle;
+globalThis.location = window.location;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.requestAnimationFrame = (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0) as unknown as number;
 globalThis.cancelAnimationFrame = (handle: number) => clearTimeout(handle as unknown as ReturnType<typeof setTimeout>);
@@ -203,4 +204,15 @@ test('R4: a written note mapping several occurrences is not silently guessed', (
   assert.deepEqual(selected, [], 'must not select the first repetition implicitly');
   assert.equal(ambiguous.length, 1);
   assert.deepEqual([...ambiguous[0]].sort(), ['one', 'two']);
+});
+
+test('R5: Piano is unavailable without a verified preview and Original stays active', async () => {
+  window.history.replaceState(null, '', '/?demo=arpeggio');
+  const {PianoWorkspaceHarness} = await import('../src/music/workspace/PianoWorkspaceHarness.tsx');
+  const view = render(<PianoWorkspaceHarness/>);
+  const piano = view.getByRole('button', {name: 'Piano'}) as HTMLButtonElement;
+  assert.equal(piano.disabled, true, 'Piano must be disabled when the draft has no verified preview');
+  assert.ok(view.getByText(/No verified piano preview/i));
+  const original = view.getByRole('button', {name: 'Original'});
+  assert.equal(original.getAttribute('aria-pressed'), 'true');
 });

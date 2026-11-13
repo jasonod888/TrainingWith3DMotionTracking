@@ -18,6 +18,7 @@ import {
 import {pitchName} from '../music-reference';
 import {KeyboardEditor} from '../notation/KeyboardEditor';
 import {NotationAudio} from '../notation/notation-audio';
+import {usePianoSourcePlayer} from '../usePianoSourcePlayer';
 import {ClipOverview} from './ClipOverview';
 import {ContinuousScore} from './ContinuousScore';
 import {TimeRoll} from './TimeRoll';
@@ -108,7 +109,11 @@ export function PianoWorkspaceHarness() {
   const linkToken = useRef(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const pianoRef = useRef<HTMLAudioElement>(null);
   const audioRef = useRef<NotationAudio | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewIdentity, setPreviewIdentity] = useState('');
+  const [audioMode, setAudioMode] = useState<'original' | 'piano'>('original');
   const [keyboardRef, keyboardWidth] = useElementWidth<HTMLDivElement>();
   const compactKeyboard = keyboardWidth > 0 && keyboardWidth < 720;
   const [rollReveal, setRollReveal] = useState<{occurrenceId: string; token: number} | null>(null);
@@ -198,6 +203,8 @@ export function PianoWorkspaceHarness() {
         setSpans(draft.spans.map(span => ({start: span.start, end: span.end, kind: span.kind})));
         setOffsetSeconds(draft.playback?.sync_offset_seconds ?? 0);
         setVideoUrl(draft.source_video ? assetUrl(draft.source_video.key) : null);
+        setPreviewUrl(draft.piano_preview ? assetUrl(draft.piano_preview.key) : null);
+        setPreviewIdentity(draft.preview_identity ?? '');
       })
       .catch(cause => { if (!stopped) setError(cause instanceof Error ? cause.message : 'The draft could not be opened.'); })
       .finally(() => { if (!stopped) setLoading(false); });
@@ -233,6 +240,14 @@ export function PianoWorkspaceHarness() {
   }, [videoUrl]);
 
   useEffect(() => () => { audioRef.current?.dispose(); }, []);
+
+  // The existing source-driven controller: one clock, Piano mapped to it, never free-running.
+  const player = usePianoSourcePlayer(videoRef, pianoRef, audioMode, offsetSeconds, previewIdentity,
+    () => setNotice('Piano audio is unavailable. The original video keeps playing.'));
+
+  // Audition yields to real playback and to a source-mode change.
+  useEffect(() => { if (player.playing) audioRef.current?.stop(); }, [player.playing]);
+  useEffect(() => { audioRef.current?.stop(); }, [audioMode]);
 
   const audition = useCallback((pitches: number[], seconds = 0.5) => {
     if (!pitches.length) return;
@@ -505,6 +520,22 @@ export function PianoWorkspaceHarness() {
           {videoUrl
             ? <video ref={videoRef} src={videoUrl} controls playsInline preload="metadata" className="ws-video"/>
             : <p className="ws-hint">This draft has no source video.</p>}
+          {previewUrl ? <audio ref={pianoRef} src={previewUrl} preload="auto"/> : null}
+          <div className="ws-row" role="group" aria-label="Source audio">
+            <button type="button" aria-pressed={audioMode === 'original'}
+              className={audioMode === 'original' ? 'is-active' : ''}
+              onClick={() => setAudioMode('original')}>Original</button>
+            <button type="button" aria-pressed={audioMode === 'piano'}
+              className={audioMode === 'piano' ? 'is-active' : ''}
+              disabled={!previewUrl}
+              title={previewUrl ? 'Mapped piano preview' : 'No verified piano preview for this draft'}
+              onClick={() => setAudioMode('piano')}>Piano</button>
+            <span className="ws-hint">
+              {previewUrl
+                ? (player.error ? player.error : 'Piano preview follows the video clock; it never free-runs.')
+                : 'No verified piano preview: Original audio only.'}
+            </span>
+          </div>
         </section>
 
         <section className="ws-panel" aria-label="Selected note">
