@@ -25,6 +25,9 @@ export type RecoveryCheckpoint = {
   alignment: SavedAlignment | null;
   offsetSeconds: number;
   spans: SavedSpan[];
+  /** Server identity the local work was based on, so a retry is not a first review. */
+  baseRevisionId?: string | null;
+  verificationToken?: string | null;
 };
 
 export type RecoveryRead =

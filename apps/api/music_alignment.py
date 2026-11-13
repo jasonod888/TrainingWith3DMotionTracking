@@ -49,6 +49,7 @@ def validate_alignment(value: Any, duration: float) -> dict[str, Any]:
         _fail('The alignment has too many anchors.')
     normalised_anchors = []
     previous_seconds = -1.0
+    previous_anchor_tick = -1
     for index, anchor in enumerate(anchors):
         if not isinstance(anchor, dict):
             _fail('The alignment has an invalid anchor.')
@@ -60,7 +61,10 @@ def validate_alignment(value: Any, duration: float) -> dict[str, Any]:
             _fail('An alignment anchor has a negative tick.')
         if seconds <= previous_seconds:
             _fail('Alignment anchors must be ordered and distinct.')
+        if tick <= previous_anchor_tick:
+            _fail('Alignment anchor ticks must increase with their times.')
         previous_seconds = seconds
+        previous_anchor_tick = tick
         normalised_anchors.append({'seconds': seconds, 'tick': tick})
 
     offset = value.get('offset_seconds', 0)
@@ -115,6 +119,22 @@ def validate_alignment(value: Any, duration: float) -> dict[str, Any]:
         last_tick = previous_tick
     if abs(last_end - duration) > 1e-6:
         _fail('The alignment must reach the end of the clip.')
+    # The authored points must describe the saved map, not a different timeline.
+    for anchor in normalised_anchors:
+        expected = None
+        for passage in normalised:
+            start, end = passage['source_seconds']
+            if anchor['seconds'] < start - 1e-9 or anchor['seconds'] > end + 1e-9:
+                continue
+            if passage['kind'] == 'timed':
+                tick_start, tick_end = passage['ticks']
+                fraction = 0.0 if end <= start else (anchor['seconds'] - start) / (end - start)
+                expected = round(tick_start + fraction * (tick_end - tick_start))
+            else:
+                expected = passage['tick']
+            break
+        if expected is None or abs(expected - anchor['tick']) > 1:
+            _fail('An alignment anchor does not agree with the saved passage map.')
     if mode == 'anchored' and not normalised_anchors:
         _fail('An anchored alignment needs at least one authored point.')
     if mode == 'estimated' and normalised_anchors:

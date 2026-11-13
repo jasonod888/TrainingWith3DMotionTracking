@@ -119,3 +119,29 @@ def test_edit_round_trips_alignment_and_authored_spelling(tmp_path):
             again = client.post(f'/api/lessons/{lesson_id}/music-revision', json=edit)
         assert again.status_code == 200
         assert again.json()['revision_id'] == edited['revision_id']
+
+
+def test_persisted_integrity_invariants_are_enforced(tmp_path):
+    with real_media_app(tmp_path) as (client, app, settings, store, mail):
+        lesson_id, view, _lease, _base, _payload = proposal(client, app, media(tmp_path, 'audio'))
+        url = f'/api/lessons/{lesson_id}/music-draft/review'
+        body = review_body(view)
+        notation = _notation_for(body['events'], duration=view['duration'])
+
+        reversing = alignment(view['duration'], anchors=[{'seconds': 1, 'tick': 1500},
+                                                         {'seconds': 1.5, 'tick': 500}])
+        assert client.post(url, json={**body, 'alignment': reversing}).status_code == 422
+
+        disagreeing = alignment(view['duration'], anchors=[{'seconds': 1, 'tick': 1500}])
+        disagreeing['mode'] = 'anchored'
+        assert client.post(url, json={**body, 'alignment': disagreeing}).status_code == 422
+
+        wrong_pitch = copy.deepcopy(notation)
+        wrong_pitch['events'][0]['notes'][0]['pitch'] = 127
+        assert client.post(url, json={**body, 'notation': wrong_pitch}).status_code == 422
+
+        unowned = copy.deepcopy(notation)
+        for event in unowned['events']:
+            for note in event['notes']:
+                note['performance_ids'] = []
+        assert client.post(url, json={**body, 'notation': unowned}).status_code == 422

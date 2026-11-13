@@ -74,7 +74,7 @@ export type MusicDraftView={draft_version:1;draft_id:string;lesson_id:string;tit
  subject:'piano'|'guitar';instrument:InstrumentConfig;duration:number;reference:Asset;source_video:Asset|null;
  piano_preview?:Asset|null;playback?:MusicPlaybackSettings;pedal?:MusicPedalSpan[];preview_identity?:string|null;raw_model?:boolean;correction_operations?:number;
  events:MusicDraftEvent[];spans:{start:number;end:number;kind:'playing'|'explanation'}[];guitar_chords:MusicDraftGuitarChord[];analysis:{key:string;mime:string;bytes:number;sha256:string}|null;warnings:string[];
- baseline_events?:MusicDraftEvent[];working_corrected?:boolean;automatic_corrections?:MusicDraftCorrection[];
+ baseline_events?:MusicDraftEvent[];working_corrected?:boolean;automatic_corrections?:MusicDraftCorrection[];verification_state_token?:string|null;
  provenance:{adapter:string;engine:string;model:string|null;model_version:string|null;code_version:string;audio_sha256:string;profile_sha256?:string|null}};
 
 export type MusicLessonManifest = {

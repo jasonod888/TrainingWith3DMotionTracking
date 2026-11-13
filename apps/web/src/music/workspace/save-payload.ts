@@ -13,12 +13,17 @@ import {
 export type SavedSpan = { start: number; end: number; kind: 'playing' | 'explanation' };
 export type AnchorPointSaved = { seconds: number; tick: number };
 
+export type SavedPassage =
+  | { kind: 'timed'; source_seconds: [number, number]; ticks: [number, number] }
+  | { kind: 'held'; source_seconds: [number, number]; tick: number };
+
 export type SavedAlignment = {
   alignment_version: 1;
   mode: 'estimated' | 'anchored';
   basis: 'tempo' | 'passages';
   offset_seconds: number;
   anchors: AnchorPointSaved[];
+  passages: SavedPassage[];
 };
 
 export type RestoredReference = {
@@ -37,12 +42,17 @@ export function serializeAlignment(
   alignment: Alignment | null, anchors: AnchorPointSaved[], offsetSeconds: number,
 ): SavedAlignment | null {
   if (!alignment) return null;
+  const passages: SavedPassage[] = alignment.passages.map(passage => passage.kind === 'timed'
+    ? {kind: 'timed', source_seconds: [passage.source_seconds[0], passage.source_seconds[1]],
+        ticks: [passage.ticks[0], passage.ticks[1]]}
+    : {kind: 'held', source_seconds: [passage.source_seconds[0], passage.source_seconds[1]], tick: passage.tick});
   return {
     alignment_version: 1,
     mode: anchors.length ? 'anchored' : alignment.mode,
     basis: alignment.basis,
     offset_seconds: offsetSeconds,
     anchors: anchors.map(anchor => ({seconds: anchor.seconds, tick: anchor.tick})),
+    passages,
   };
 }
 
@@ -73,15 +83,28 @@ export function buildSaveBody(input: {
   anchors: AnchorPointSaved[];
   offsetSeconds: number;
   baseRevisionId?: string | null;
+  draftId?: string | null;
+  referenceSha256?: string | null;
+  verificationStateToken?: string | null;
+  sections?: { id: string; label: string; start: number; end: number }[];
+  assessment?: unknown;
 }) {
   const duration = input.document.duration;
   return {
-    ...(input.baseRevisionId ? {base_revision_id: input.baseRevisionId} : {}),
+    // The review contract names the draft; the revision contract names its base.
+    // Sending both would be rejected, so each payload carries only its own identity.
+    ...(input.baseRevisionId
+      ? {base_revision_id: input.baseRevisionId}
+      : {
+          ...(input.draftId ? {draft_id: input.draftId} : {}),
+          ...(input.referenceSha256 ? {reference_sha256: input.referenceSha256} : {}),
+          ...(input.verificationStateToken ? {verification_state_token: input.verificationStateToken} : {}),
+        }),
     title: input.title || 'Piano correction',
     events: performanceOf(input.document),
     spans: input.spans,
-    sections: [{id: 'whole', label: 'Whole lesson', start: 0, end: duration}],
-    assessment: {assessment: 'none', input_modes: ['none'], dimensions: [], rubric_version: 'music-watch-v1'},
+    sections: input.sections?.length ? input.sections : [{id: 'whole', label: 'Whole lesson', start: 0, end: duration}],
+    assessment: input.assessment ?? {assessment: 'none', input_modes: ['none'], dimensions: [], rubric_version: 'music-watch-v1'},
     confirm_reviewed: true as const,
     notation: input.document,
     alignment: serializeAlignment(input.alignment, input.anchors, input.offsetSeconds),
@@ -103,7 +126,32 @@ function savedAlignment(value: unknown, fallbackOffset: number): SavedAlignment 
     ? value.anchors.filter(isRecord).map(anchor => ({seconds: Number(anchor.seconds), tick: Number(anchor.tick)}))
       .filter(anchor => Number.isFinite(anchor.seconds) && Number.isInteger(anchor.tick))
     : [];
-  return {alignment_version: 1, mode, basis, offset_seconds: offset, anchors};
+  // The complete map is restored as stored; malformed passages are refused, not filtered.
+  if (!Array.isArray(value.passages) || !value.passages.length) return null;
+  const passages: SavedPassage[] = [];
+  for (const passage of value.passages) {
+    if (!isRecord(passage)) return null;
+    const seconds = passage.source_seconds;
+    if (!Array.isArray(seconds) || seconds.length !== 2) return null;
+    const start = Number(seconds[0]);
+    const end = Number(seconds[1]);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+    if (passage.kind === 'timed') {
+      const ticks = passage.ticks;
+      if (!Array.isArray(ticks) || ticks.length !== 2) return null;
+      const first = Number(ticks[0]);
+      const last = Number(ticks[1]);
+      if (!Number.isInteger(first) || !Number.isInteger(last) || last <= first) return null;
+      passages.push({kind: 'timed', source_seconds: [start, end], ticks: [first, last]});
+    } else if (passage.kind === 'held') {
+      const tick = Number(passage.tick);
+      if (!Number.isInteger(tick) || tick < 0) return null;
+      passages.push({kind: 'held', source_seconds: [start, end], tick});
+    } else {
+      return null;
+    }
+  }
+  return {alignment_version: 1, mode, basis, offset_seconds: offset, anchors, passages};
 }
 
 export function restoreFromReference(value: unknown): RestoreResult {
@@ -116,6 +164,12 @@ export function restoreFromReference(value: unknown): RestoreResult {
       })).filter(span => Number.isFinite(span.start) && Number.isFinite(span.end) && span.end > span.start)
     : [];
   const alignment = savedAlignment(value.alignment, 0);
+  if (value.alignment !== undefined && value.alignment !== null && alignment === null) {
+    return {ok: false, message: 'The saved alignment is not a supported version.'};
+  }
+  if (alignment && !alignment.passages.length) {
+    return {ok: false, message: 'The saved alignment has no passages.'};
+  }
   const offsetSeconds = alignment?.offset_seconds ?? (Number.isFinite(value.offset_seconds) ? Number(value.offset_seconds) : 0);
 
   if (value.notation !== undefined && value.notation !== null) {
@@ -123,6 +177,36 @@ export function restoreFromReference(value: unknown): RestoreResult {
       const document = parseNotationDocument(value.notation);
       if (Number.isFinite(duration) && Math.abs(document.duration - duration) > 1e-6) {
         return {ok: false, message: 'The saved notation duration does not match its reference.'};
+      }
+      // The reference events and the notation performance must describe the same
+      // recorded performance; a disagreement means the stored reference is corrupt.
+      if (Array.isArray(value.events)) {
+        const recorded = new Map<string, {onset: number; duration: number | null; pitch: number}>();
+        for (const event of value.events) {
+          if (!isRecord(event) || typeof event.id !== 'string') {
+            return {ok: false, message: 'The saved reference has an invalid performance event.'};
+          }
+          recorded.set(event.id, {
+            onset: Number(event.onset), pitch: Number(event.pitch),
+            duration: event.duration === null || event.duration === undefined ? null : Number(event.duration),
+          });
+        }
+        if (recorded.size !== value.events.length) {
+          return {ok: false, message: 'The saved reference repeats a performance id.'};
+        }
+        const owned = new Set<string>();
+        for (const note of document.performance) {
+          const stored = recorded.get(note.id);
+          if (!stored || stored.pitch !== note.pitch || Math.abs(stored.onset - note.onset) > 1e-6 ||
+            stored.duration !== note.duration) {
+            return {ok: false, message: 'The saved reference disagrees with its notation performance.'};
+          }
+          if (owned.has(note.id)) return {ok: false, message: 'The saved reference repeats an occurrence.'};
+          owned.add(note.id);
+        }
+        if (owned.size !== recorded.size) {
+          return {ok: false, message: 'The saved reference leaves an occurrence unmapped.'};
+        }
       }
       return {ok: true, value: {document, alignment, offsetSeconds, spans, source: 'notation', title: typeof value.title === 'string' ? value.title : null}};
     } catch (cause) {

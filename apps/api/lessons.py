@@ -14,7 +14,9 @@ from sqlalchemy.orm import Session
 
 from .contracts import (LessonManifest, LessonSummary, MusicLessonManifest,
                         MusicPlaybackSettings, Section, SectionSet, SummaryCapabilities)
-from .database import Account, Lesson, LessonAsset, LessonRevision, MusicDraft, PracticeProgress, LessonGrant
+from .music_verification import current_state_token
+from .database import (Account, Lesson, LessonAsset, LessonRevision, MusicDraft, MusicVerificationDecision,
+                       PracticeProgress, LessonGrant)
 from .storage import storage_client
 from .permissions import access_reasons, latest_acceptance, owned_lesson,latest_revision,public_lesson,public_manifest,readable_lesson
 from .auth import now
@@ -365,6 +367,10 @@ def install_lessons(app, engine, settings, identity, db):
                              'automatic_corrections':row.correction_history or []})
         response.update({'raw_model':bool(row.raw_model),
                          'correction_operations':int(row.correction_operations or 0)})
+        decisions=list(session.scalars(select(MusicVerificationDecision).where(
+            MusicVerificationDecision.draft_id==row.id)).all())
+        if decisions or row.working_document or (row.correction_history or []):
+            response['verification_state_token']=current_state_token(row,decisions)
         return response
 
     class MusicPlaybackInput(BaseModel):

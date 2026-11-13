@@ -139,6 +139,13 @@ export function PianoWorkspaceHarness() {
   const [accountId, setAccountId] = useState('');
   const [draftId, setDraftId] = useState('');
   const [sourceSha256, setSourceSha256] = useState('');
+  const [verificationToken, setVerificationToken] = useState('');
+  const [savedSections, setSavedSections] = useState<{id: string; label: string; start: number; end: number}[] | null>(null);
+  const [savedAssessment, setSavedAssessment] = useState<unknown>(null);
+  const [serverSignature, setServerSignature] = useState<string | null>(null);
+  const [storedAlignment, setStoredAlignment] = useState<Alignment | null>(null);
+  const [previewBaseline, setPreviewBaseline] = useState<NotationDocument | null>(null);
+  const pendingSavedSignature = useRef(false);
   const [savedRevisionId, setSavedRevisionId] = useState<string | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [confirmReviewed, setConfirmReviewed] = useState(false);
@@ -241,6 +248,7 @@ export function PianoWorkspaceHarness() {
         setVideoUrl(draft.source_video ? assetUrl(draft.source_video.key) : null);
         setDraftId(draft.draft_id);
         setSourceSha256(draft.reference?.sha256 ?? '');
+        setVerificationToken(draft.verification_state_token ?? '');
         setPreviewAsset((draft.piano_preview as Asset | null) ?? null);
         setPreviewIdentity(draft.preview_identity ?? '');
       })
@@ -327,7 +335,7 @@ export function PianoWorkspaceHarness() {
   const anchored = useMemo(
     () => (document && baseAlignment ? applyAnchors(baseAlignment, document, anchors) : null),
     [document, baseAlignment, anchors]);
-  const alignment = anchored?.alignment ?? baseAlignment;
+  const alignment = storedAlignment ?? anchored?.alignment ?? baseAlignment;
   const intervals = useMemo(() => (document ? occurrenceIntervals(document, offsetSeconds) : []), [document, offsetSeconds]);
   const activeIds = useMemo(() => activeOccurrenceIds(intervals, playhead), [intervals, playhead]);
   const playheadTick = alignment ? effectiveSecondsToTick(alignment, playhead, offsetSeconds) : null;
@@ -356,8 +364,15 @@ export function PianoWorkspaceHarness() {
   }, [selectionOccurrence, rollReveal?.occurrenceId, requestReveal]);
 
   const documentSignature = useMemo(() => (document ? JSON.stringify(document) : ''), [document]);
-  const dirty = savedSignature === null ? Boolean(state?.dirty) : documentSignature !== savedSignature;
-  const previewStale = Boolean(baseline && document && performanceChanged(baseline, document));
+  // Every persisted edit participates in dirty state and confirmation, not just notes.
+  const workspaceSignature = useMemo(() => (document ? JSON.stringify({
+    document, alignment: serializeAlignment(alignment, anchors, offsetSeconds),
+    anchors, offsetSeconds, spans, title,
+  }) : ''), [documentSignature, alignment, anchors, offsetSeconds, spans, title]);
+  const dirty = savedSignature !== null
+    ? workspaceSignature !== savedSignature
+    : workspaceSignature !== (serverSignature ?? '') || Boolean(state?.dirty);
+  const previewStale = Boolean(previewBaseline && document && performanceChanged(previewBaseline, document));
   const recoveryIdentity = useMemo<RecoveryIdentity>(
     () => ({accountId, lessonId: lessonId ?? '', draftId, sourceSha256}),
     [accountId, lessonId, draftId, sourceSha256],
@@ -366,6 +381,19 @@ export function PianoWorkspaceHarness() {
   useEffect(() => {
     getSession().then(session => { if (session) setAccountId(session.account.id); }).catch(() => {});
   }, []);
+
+  // A reopened reference becomes the clean saved state once its document is applied.
+  useEffect(() => {
+    if (pendingSavedSignature.current && workspaceSignature) {
+      pendingSavedSignature.current = false;
+      setSavedSignature(workspaceSignature);
+    }
+  }, [workspaceSignature]);
+
+  // The server baseline is the loaded draft, kept separate from any local restoration.
+  useEffect(() => {
+    if (workspaceSignature && serverSignature === null) setServerSignature(workspaceSignature);
+  }, [workspaceSignature, serverSignature]);
 
   // A local checkpoint is offered only when its account, draft and source match.
   useEffect(() => {
@@ -382,16 +410,18 @@ export function PianoWorkspaceHarness() {
     const timer = setTimeout(() => {
       writeRecovery({
         identity: recoveryIdentity, title,
+        baseRevisionId: savedRevisionId, verificationToken: verificationToken || null,
         notation: document,
         alignment: serializeAlignment(alignment, anchors, offsetSeconds),
         offsetSeconds, spans,
       });
     }, 600);
     return () => clearTimeout(timer);
-  }, [documentSignature, dirty, accountId, draftId, sourceSha256, title, alignment, anchors, offsetSeconds, spans, recoveryIdentity]);
+  }, [workspaceSignature, dirty, accountId, draftId, sourceSha256, title, alignment, anchors, offsetSeconds,
+      spans, recoveryIdentity, savedRevisionId, verificationToken]);
 
   // Any document change requires a fresh confirmation before it can be saved.
-  useEffect(() => { setConfirmReviewed(false); }, [documentSignature]);
+  useEffect(() => { setConfirmReviewed(false); }, [workspaceSignature]);
 
   // A stale preview must fall back to Original rather than pretend it is current.
   useEffect(() => {
@@ -489,22 +519,31 @@ export function PianoWorkspaceHarness() {
 
   const save = useCallback(async (baseOverride?: string) => {
     if (!document || !lessonId || !confirmReviewed || saving) return;
+    const snapshot = workspaceSignature;
     setSaving(true); setSaveError(''); setSaveMessage(''); setSaveConflict(false);
     const base = baseOverride ?? savedRevisionId;
     const body = buildSaveBody({
       title, document, spans, alignment, anchors, offsetSeconds, baseRevisionId: base,
+      draftId, referenceSha256: sourceSha256, verificationStateToken: verificationToken || null,
+      sections: savedSections ?? undefined, assessment: savedAssessment ?? undefined,
     });
     try {
       const manifest = await request<{ revision_id: string }>(
         `/lessons/${encodeURIComponent(lessonId)}/${base ? 'music-revision' : 'music-draft/review'}`,
         'POST', body);
       setSavedRevisionId(manifest.revision_id);
-      setSavedSignature(documentSignature);
+      setSavedSignature(snapshot);
       setSaveConflict(false);
-      clearRecovery();
-      setRecoveryOffer(null);
-      setRecoveryNotice('');
-      setSaveMessage(`Saved privately · revision ${manifest.revision_id.slice(0, 8)}`);
+      if (snapshot === workspaceSignature) {
+        // The acknowledged snapshot is still the current work.
+        clearRecovery();
+        setRecoveryOffer(null);
+        setRecoveryNotice('');
+        setSaveMessage(`Saved privately · revision ${manifest.revision_id.slice(0, 8)}`);
+      } else {
+        // Newer edits exist; keep their checkpoint and say so rather than claim Saved.
+        setSaveMessage(`Saved an earlier version · revision ${manifest.revision_id.slice(0, 8)}; newer edits remain unsaved.`);
+      }
     } catch (cause) {
       // Edits stay in place; the local checkpoint keeps the work recoverable. A stale
       // base is a conflict with an explicit resolution, never silent data loss.
@@ -518,7 +557,7 @@ export function PianoWorkspaceHarness() {
       setSaving(false);
     }
   }, [document, lessonId, confirmReviewed, saving, title, spans, alignment, anchors, offsetSeconds,
-      savedRevisionId, documentSignature]);
+      savedRevisionId, workspaceSignature, draftId, sourceSha256, verificationToken, savedSections, savedAssessment]);
 
   const saveOnLatestRevision = useCallback(async () => {
     if (!lessonId) return;
@@ -543,12 +582,23 @@ export function PianoWorkspaceHarness() {
       const restored = restoreFromReference(await response.json());
       if (!restored.ok) throw new Error(restored.message);
       setBaseline(restored.value.document);
+      setPreviewBaseline(restored.value.document);
       setState(createWorkspaceState(restored.value.document));
       setSpans(restored.value.spans);
       setOffsetSeconds(restored.value.offsetSeconds);
       setAnchors(restored.value.alignment?.anchors ?? []);
+      setStoredAlignment(restored.value.alignment?.passages?.length ? {
+        alignment_version: 1, mode: restored.value.alignment.mode, basis: restored.value.alignment.basis,
+        passages: restored.value.alignment.passages,
+      } : null);
+      setAnchorPast([]); setAnchorFuture([]);
       setSavedRevisionId(lesson.revision_id);
-      setSavedSignature(JSON.stringify(restored.value.document));
+      const manifest = lesson as { section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
+        assessment?: unknown; piano_preview?: Asset | null };
+      setSavedSections(manifest.section_set?.sections ?? null);
+      setSavedAssessment(manifest.assessment ?? null);
+      setPreviewAsset((manifest.piano_preview as Asset | null) ?? null);
+      pendingSavedSignature.current = true;
       if (restored.value.title) setTitle(restored.value.title);
       setConfirmReviewed(false);
       setReopenMessage(`Reopened revision ${lesson.revision_id.slice(0, 8)} from ${
@@ -566,6 +616,13 @@ export function PianoWorkspaceHarness() {
       setSpans(recoveryOffer.spans);
       setOffsetSeconds(recoveryOffer.offsetSeconds);
       setAnchors(recoveryOffer.alignment?.anchors ?? []);
+      // Recovered work keeps its server base so a retry is not a first review.
+      if (recoveryOffer.baseRevisionId) setSavedRevisionId(recoveryOffer.baseRevisionId);
+      if (recoveryOffer.verificationToken) setVerificationToken(recoveryOffer.verificationToken);
+      if (recoveryOffer.alignment?.passages?.length) {
+        setStoredAlignment({alignment_version: 1, mode: recoveryOffer.alignment.mode,
+          basis: recoveryOffer.alignment.basis, passages: recoveryOffer.alignment.passages});
+      }
       setConfirmReviewed(false);
       setRecoveryOffer(null);
       setReopenMessage(`Restored a local checkpoint from ${
@@ -668,7 +725,7 @@ export function PianoWorkspaceHarness() {
         <span><input type="checkbox" aria-label="Confirm reviewed" checked={confirmReviewed}
           onChange={event => setConfirmReviewed(event.target.checked)}/> Reviewed</span>
       </label>
-      <button type="button" onClick={() => save()} disabled={!confirmReviewed || saving || !dirty}
+      <button type="button" onClick={() => save()} disabled={!confirmReviewed || saving || !(dirty || savedRevisionId === null)}
         data-save-button="true">{saving ? 'Saving…' : 'Save privately'}</button>
       <button type="button" onClick={reopen}>Reopen saved</button>
 

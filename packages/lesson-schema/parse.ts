@@ -406,10 +406,12 @@ export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
  if(!isRecord(value)||value.draft_version!==1||!isId(value.draft_id)||!isId(value.lesson_id)||!isTitle(value.title)||
    !['draft','reviewed'].includes(String(value.status))||!isNumber(value.duration)||value.duration<=0||
    (value.subject!=='piano'&&value.subject!=='guitar'))return bad();
- const keys=['draft_version','draft_id','lesson_id','revision_id','title','status','subject','instrument','duration','reference','source_video','piano_preview','playback','pedal','preview_identity','raw_model','correction_operations','events','spans','guitar_chords','analysis','provenance','warnings','baseline_events','working_corrected','automatic_corrections'];
+ const keys=['draft_version','draft_id','lesson_id','revision_id','title','status','subject','instrument','duration','reference','source_video','piano_preview','playback','pedal','preview_identity','raw_model','correction_operations','events','spans','guitar_chords','analysis','provenance','warnings','baseline_events','working_corrected','automatic_corrections','verification_state_token'];
  if(Object.keys(value).some(key=>!keys.includes(key)))return bad();
  const instrument=readInstrument(value.instrument),reference=readAsset(value.reference),source=readAsset(value.source_video??null),pianoPreview=readAsset(value.piano_preview??null);
  const playback=readPlayback(value.playback),pedal=readPedal(value.pedal);
+ const verificationToken=value.verification_state_token??null;
+ if(verificationToken!==null&&(typeof verificationToken!=='string'||!/^[a-f0-9]{64}$/.test(verificationToken)))return bad();
  const previewIdentity=value.preview_identity??null;
  if(previewIdentity!==null&&(typeof previewIdentity!=='string'||!/^[a-f0-9]{64}$/.test(previewIdentity)))return bad();
  if(!instrument||instrument.instrument!==value.subject||!reference||reference.mime!=='application/json'||source===undefined||source&&!isVideo(source)||pianoPreview===undefined||pianoPreview&&pianoPreview.mime!=='audio/wav'||playback===null||pedal===null)return bad();

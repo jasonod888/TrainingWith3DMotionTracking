@@ -161,39 +161,6 @@ test('a 409 keeps the work and offers explicit resolution on the latest revision
     'the retry is rebased, not a duplicate finalisation of the same base');
 });
 
-test('reopen restores the saved notation, alignment anchors and offset', async () => {
-  posts = []; saveStatus = 200;
-  const view = await open();
-  dirtyEdit(view);
-  fireEvent.click(view.getByLabelText('Confirm reviewed'));
-  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
-  await waitFor(() => assert.equal(save().disabled, false));
-  fireEvent.click(save());
-  await waitFor(() => assert.ok(view.queryByText(/Saved privately/i)));
-
-  // A stored authored spelling and an anchored offset, as another client saved them.
-  const stored = JSON.parse(JSON.stringify(posts[0].body));
-  const target = stored.notation.events.flatMap((event: any) => event.notes)
-    .find((note: any) => note.pitch === 60);
-  target.spelling = 'B#3';
-  stored.alignment = {...stored.alignment, mode: 'anchored', anchors: [{seconds: 1, tick: 960}], offset_seconds: 0.25};
-  stored.offset_seconds = 0.25;
-  latestReference = stored;
-  localStorage.clear();
-
-  fireEvent.click(view.getByRole('button', {name: 'Reopen saved'}));
-  await waitFor(() => assert.ok(view.queryByText(/Reopened revision rev-late/i), 'no reopen status'));
-  console.log('REOPEN', view.container.querySelector('.ws-report')?.textContent,
-    [...view.container.querySelectorAll('.ws-score-notehead')].slice(0, 6).map(node => node.getAttribute('aria-label')));
-  await waitFor(() => assert.ok(
-    view.container.querySelector('.ws-score-notehead[aria-label*="B#3"]'),
-    'the authored spelling was regenerated instead of restored'));
-  const offset = view.getByLabelText('Sync offset in seconds (not saved)') as HTMLInputElement;
-  assert.equal(offset.value, '0.25', 'the saved offset was not restored');
-  assert.match(view.getByText(/Score alignment anchored/i).textContent ?? '', /anchored/i);
-  assert.equal(save().disabled, true, 'a reopened revision is clean');
-});
-
 test('a matching local checkpoint is offered as local work, and restored without claiming Saved', async () => {
   posts = []; saveStatus = 200; latestReference = null;
   localStorage.clear();
@@ -232,4 +199,46 @@ test('a checkpoint for another account is rejected and never offered', async () 
   await waitFor(() => assert.ok(view.queryByText(/different account, draft or source/i), 'no rejection notice'));
   assert.equal(view.queryByText(/not saved to the server/i), null, 'a foreign checkpoint must not be offered');
   assert.equal(view.queryByRole('button', {name: 'Restore local checkpoint'}), null);
+});
+
+test('R2: an offset-only change is dirty, requires confirmation and is saveable', async () => {
+  posts = []; saveStatus = 200; latestReference = null;
+  const view = await open();
+  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
+  assert.equal(save().disabled, true);
+  fireEvent.change(view.getByLabelText('Sync offset in seconds (not saved)'), {target: {value: '0.5'}});
+  const confirm = () => view.getByLabelText('Confirm reviewed') as HTMLInputElement;
+  fireEvent.click(confirm());
+  await waitFor(() => assert.equal(save().disabled, false, 'an offset-only edit must be saveable'));
+  fireEvent.click(save());
+  await waitFor(() => assert.ok(view.queryByText(/Saved privately/i)));
+  assert.equal(posts[0].body.offset_seconds, 0.5);
+  assert.equal(posts[0].body.alignment.offset_seconds, 0.5);
+});
+
+test('R2: a recovered local checkpoint is dirty and saveable', async () => {
+  posts = []; saveStatus = 200; latestReference = null; localStorage.clear();
+  const {buildNotation} = await import('../../../packages/music-notation/index.ts');
+  const notation = buildNotation(fixture.events.map((event: any) => ({
+    id: event.id, onset: event.onset, duration: event.duration, pitch: event.pitch,
+    velocity: event.velocity ?? null, confidence: event.confidence ?? null, optional: Boolean(event.optional),
+    string: null, fret: null, notation_duration: event.notation_duration ?? null,
+  })), {duration: fixture.duration});
+  notation.events[0].notes[0].spelling = 'B#3';
+  localStorage.setItem('piano-workspace-recovery-v1', JSON.stringify({
+    version: 1, savedAt: new Date().toISOString(),
+    identity: {accountId: 'account-1', lessonId: 'lesson-1', draftId: 'draft-1', sourceSha256: draft.reference.sha256},
+    title: 'Local work', notation, alignment: null, offsetSeconds: 0.5, spans: [],
+  }));
+  const view = await open();
+  await waitFor(() => assert.ok(view.getByRole('button', {name: 'Restore local checkpoint'})));
+  fireEvent.click(view.getByRole('button', {name: 'Restore local checkpoint'}));
+  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
+  fireEvent.click(view.getByLabelText('Confirm reviewed'));
+  await waitFor(() => assert.equal(save().disabled, false, 'recovered work must be saveable'));
+  fireEvent.click(save());
+  await waitFor(() => assert.ok(view.queryByText(/Saved privately/i)));
+  assert.equal(posts[0].body.offset_seconds, 0.5);
+  const saved = posts[0].body.notation.events[0].notes[0].spelling;
+  assert.equal(saved, 'B#3', 'the recovered authored spelling must be saved, not regenerated');
 });

@@ -137,6 +137,7 @@ def validate_notation(value: Any, events: list[Any], duration: float) -> dict[st
     note_count = 0
     by_voice: dict[tuple[str, int], list[tuple[int, int, str]]] = {}
     performance_ids = {event.id for event in events}
+    owned: dict[str, int] = {}
     last_measure_end = measures[-1]['start'] + measures[-1]['duration']
     for index, event in enumerate(raw_events):
         if not isinstance(event, dict):
@@ -187,6 +188,10 @@ def validate_notation(value: Any, events: list[Any], duration: float) -> dict[st
                 links = note.get('performance_ids')
                 if not isinstance(links, list) or len(links) > 64 or any(link not in performance_ids for link in links):
                     _fail('A notation note links to a missing performance event.')
+                for link in links:
+                    if link in owned:
+                        _fail('A performance occurrence is linked to more than one written note.')
+                    owned[link] = pitch
                 note_ids.update([note_id])
         if note_count > MAX_NOTES:
             _fail('The notation has too many notes.')
@@ -199,4 +204,14 @@ def validate_notation(value: Any, events: list[Any], duration: float) -> dict[st
             if current[0] < previous[1]:
                 _fail('Notation events overlap in the same voice.')
     _performance_matches(value, events, duration)
+    # Every recorded occurrence must be owned by exactly one written note, and the
+    # written pitch must agree with the performance pitch it is linked to. Written and
+    # recorded durations are deliberately allowed to differ.
+    recorded = {event.id: event.pitch for event in events}
+    missing = [identifier for identifier in recorded if identifier not in owned]
+    if missing:
+        _fail('Every recorded occurrence must be linked to a written note.')
+    for identifier, written in owned.items():
+        if recorded.get(identifier) != written:
+            _fail('A written note pitch disagrees with the occurrence it is linked to.')
     return value

@@ -94,13 +94,32 @@ def install_music_edit(app, settings, identity, db):
             sections = SectionSet(id=uuid4().hex, revision=version, duration=proposal.duration, sections=body.sections)
         except ValidationError as exc:
             raise HTTPException(422, 'Keep notes, spans and contiguous sections inside the clip.') from exc
+        # Validation-gated legacy retention: an older client that omits notation or
+        # alignment keeps the authored data when it still agrees with the submitted
+        # performance, and is refused clearly when it does not. Omission is never read
+        # as a request to delete authored work.
         notation = None
         if body.notation is not None:
             try:
                 notation = validate_notation(body.notation, proposal.events, proposal.duration)
             except ValueError as exc:
                 raise HTTPException(422, str(exc)) from exc
+        elif previous_reference.get('notation') is not None:
+            try:
+                notation = validate_notation(previous_reference['notation'], proposal.events, proposal.duration)
+            except ValueError as exc:
+                raise HTTPException(422, 'The saved notation no longer matches these notes. '
+                                         'Update the notation explicitly before saving.') from exc
         alignment = None
+        if body.alignment is None and previous_reference.get('alignment') is not None:
+            retained = dict(previous_reference['alignment'])
+            if body.offset_seconds is not None:
+                retained['offset_seconds'] = body.offset_seconds
+            try:
+                alignment = validate_alignment(retained, proposal.duration)
+            except ValueError as exc:
+                raise HTTPException(422, 'The saved alignment no longer matches this clip. '
+                                         'Reopen the reference and re-align it before saving.') from exc
         if body.alignment is not None:
             candidate = dict(body.alignment)
             if body.offset_seconds is not None:
