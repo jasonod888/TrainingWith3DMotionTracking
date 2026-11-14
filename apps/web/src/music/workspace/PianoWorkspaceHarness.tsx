@@ -207,6 +207,10 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   }, []);
 
   const document = state?.document ?? null;
+  const documentRef = useRef<NotationDocument | null>(null);
+  const verificationRef = useRef<VerificationState | null>(null);
+  documentRef.current = document;
+  verificationRef.current = verification;
 
   /** A navigation request: bumped only by a selection change or an explicit Reveal. */
   const requestReveal = useCallback((occurrenceId: string) => {
@@ -731,65 +735,230 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     return () => { stopped = true; };
   }, [lessonId, draftId]);
 
-  // Apply a finding through the same occurrence commands as manual edits; the
-  // workspace never keeps a second event array.
-  const applyFinding = useCallback((finding: VerificationFinding) => {
-    if (!document) return;
-    let applied = 0;
-    const run = (command: Parameters<typeof applyCommand>[1]) => {
-      const outcome = applyCommand(document, command);
-      if (outcome.status === 'applied') { dispatch({type: 'command', command}); applied += 1; }
+  /** Compare one edit's before snapshot with the live document. */
+  const editMatches = useCallback((doc: NotationDocument, edit: {op: string; event_ids: string[];
+    before: unknown}): boolean => {
+    const find = (id: string) => doc.performance.find(note => note.id === id);
+    const matchEvent = (event: {pitch: number; onset: number; duration: number | null} | undefined,
+                        before: unknown): boolean => {
+      if (!before || typeof before !== 'object' || Array.isArray(before)) return Boolean(event);
+      const fields = before as Record<string, unknown>;
+      if (fields.id !== undefined && event === undefined) return false;
+      if (!event) return false;
+      return Object.entries(fields).every(([key, value]) => {
+        if (key === 'id') return true;
+        const actual = (event as unknown as Record<string, unknown>)[key];
+        if (['onset', 'duration', 'velocity'].includes(key)) {
+          if (value === null || actual === null || actual === undefined) return value === actual;
+          return Math.abs(Number(actual) - Number(value)) < 1e-6;
+        }
+        if (value === null && actual === undefined) return true;
+        return actual === value;
+      });
     };
+    if (edit.op === 'merge' || edit.op === 'split_note') {
+      const snapshots = Array.isArray(edit.before) ? edit.before : [];
+      return edit.event_ids.every((id, index) => matchEvent(find(id), snapshots[index] ?? snapshots[0]));
+    }
+    if (edit.op === 'delete_note') {
+      return edit.event_ids.every(id => matchEvent(find(id), edit.before));
+    }
+    if (edit.op === 'add_note') return true;
+    return edit.event_ids.every(id => {
+      const note = find(id);
+      if (!note) return false;
+      const before = edit.before;
+      if (!before || typeof before !== 'object' || Array.isArray(before)) return true;
+      return Object.entries(before as Record<string, unknown>).every(([key, value]) => {
+        if (key === 'id') return true;
+        const actual = (note as unknown as Record<string, unknown>)[key];
+        if (['onset', 'duration', 'velocity'].includes(key)) {
+          if (value === null || actual === null || actual === undefined) return value === actual;
+          return Math.abs(Number(actual) - Number(value)) < 1e-6;
+        }
+        if (value === null && actual === undefined) return true;
+        return actual === value;
+      });
+    });
+  }, []);
+
+  /** Translate a decision's edits into occurrence commands for the atomic reducer. */
+  const commandsFor = useCallback((doc: NotationDocument, finding: VerificationFinding,
+    invert: boolean): {commands: Parameters<typeof applyCommand>[1][]; problem?: string} => {
+    const commands: Parameters<typeof applyCommand>[1][] = [];
+    const tickFor = (seconds: number) => alignment
+      ? Math.max(0, Math.round(secondsToTick(alignment, seconds) / 120) * 120) : undefined;
+    const insert = (id: string, data: Record<string, unknown>, velocity?: number | null) => {
+      const onset = Number(data.onset), duration = Math.max(0.02, Number(data.duration) || 0.25);
+      commands.push({type: 'insert-note', pitch: Number(data.pitch), onsetSeconds: onset,
+        durationSeconds: duration, startTicks: tickFor(onset), id, addToChord: true,
+        velocity: velocity === null || velocity === undefined ? 0.7 : Number(velocity)});
+    };
+    const remove = (id: string) => commands.push({type: 'delete-occurrence', occurrenceId: id});
     for (const edit of finding.proposed_edits) {
       const after = (edit.after ?? {}) as Record<string, unknown>;
-      if (edit.op === 'set_pitch') {
-        for (const id of edit.event_ids) run({type: 'set-occurrence-pitch', occurrenceId: id, pitch: Number(after.pitch)});
-      } else if (edit.op === 'set_onset') {
-        for (const id of edit.event_ids) run({type: 'set-occurrence-onset', occurrenceId: id, seconds: Number(after.onset)});
-      } else if (edit.op === 'delete_note') {
-        for (const id of edit.event_ids) run({type: 'delete-occurrence', occurrenceId: id});
-      } else if (edit.op === 'add_note') {
-        run({type: 'insert-note', pitch: Number(after.pitch), onsetSeconds: Number(after.onset),
-          durationSeconds: Math.max(0.02, Number(after.duration) || 0.25)});
-      } else if (edit.op === 'merge') {
-        for (const id of edit.event_ids) run({type: 'delete-occurrence', occurrenceId: id});
-        run({type: 'insert-note', pitch: Number(after.pitch), onsetSeconds: Number(after.onset),
-          durationSeconds: Math.max(0.02, Number(after.duration) || 0.25)});
-      } else if (edit.op === 'split_note') {
-        for (const id of edit.event_ids) run({type: 'delete-occurrence', occurrenceId: id});
-        for (const piece of Array.isArray(edit.after) ? edit.after as Record<string, unknown>[] : []) {
-          run({type: 'insert-note', pitch: Number(piece.pitch), onsetSeconds: Number(piece.onset),
-            durationSeconds: Math.max(0.02, Number(piece.duration) || 0.25)});
+      const before = edit.before;
+      const beforeEvents = (Array.isArray(before) ? before : before && typeof before === 'object'
+        ? [before] : []) as Record<string, unknown>[];
+      if (invert) {
+        if (edit.op === 'set_pitch' || edit.op === 'set_onset') {
+          for (const id of edit.event_ids) {
+            if (edit.op === 'set_pitch' && beforeEvents[0]?.pitch !== undefined) {
+              commands.push({type: 'set-occurrence-pitch', occurrenceId: id, pitch: Number(beforeEvents[0].pitch)});
+            } else if (edit.op === 'set_onset' && beforeEvents[0]?.onset !== undefined) {
+              commands.push({type: 'set-occurrence-onset', occurrenceId: id, seconds: Number(beforeEvents[0].onset)});
+            }
+          }
+        } else if (edit.op === 'delete_note') {
+          for (const event of beforeEvents) insert(String(event.id), event, event.velocity as number | null);
+        } else if (edit.op === 'add_note') {
+          remove(`vf-${finding.id}-a`);
+        } else if (edit.op === 'merge') {
+          remove(`vf-${finding.id}-m`);
+          for (const event of beforeEvents) insert(String(event.id), event, event.velocity as number | null);
+        } else if (edit.op === 'split_note') {
+          const pieces = Array.isArray(edit.after) ? edit.after as Record<string, unknown>[] : [];
+          pieces.forEach((_, index) => remove(`vf-${finding.id}-${index + 1}`));
+          for (const event of beforeEvents) insert(String(event.id), event, event.velocity as number | null);
+        } else {
+          return {commands: [], problem: `The ${edit.op} suggestion cannot be reverted safely.`};
         }
+        continue;
+      }
+      if (edit.op === 'set_pitch') {
+        for (const id of edit.event_ids) commands.push({type: 'set-occurrence-pitch', occurrenceId: id, pitch: Number(after.pitch)});
+      } else if (edit.op === 'set_onset') {
+        for (const id of edit.event_ids) commands.push({type: 'set-occurrence-onset', occurrenceId: id, seconds: Number(after.onset)});
+      } else if (edit.op === 'delete_note') {
+        for (const id of edit.event_ids) remove(id);
+      } else if (edit.op === 'add_note') {
+        insert(`vf-${finding.id}-a`, after, after.velocity as number | null);
+      } else if (edit.op === 'merge') {
+        for (const id of edit.event_ids) remove(id);
+        const velocity = Math.max(0, ...beforeEvents.map(event => Number(event.velocity ?? 0)));
+        insert(`vf-${finding.id}-m`, after, velocity || 0.7);
+      } else if (edit.op === 'split_note') {
+        const original = beforeEvents[0];
+        for (const id of edit.event_ids) remove(id);
+        const pieces = Array.isArray(edit.after) ? edit.after as Record<string, unknown>[] : [];
+        pieces.forEach((piece, index) => insert(`vf-${finding.id}-${index + 1}`, piece,
+          original?.velocity as number | null));
       } else {
-        setNotice(`Suggestion ${finding.id} uses an unsupported edit (${edit.op}); it was not applied.`);
+        return {commands: [], problem: `The ${edit.op} suggestion is not supported.`};
       }
     }
-    if (applied > 0) setConfirmReviewed(false);
-  }, [document, dispatch]);
+    return {commands};
+  }, [alignment]);
+
+  /** Preflight every before snapshot against the candidate document. */
+  const findingMatches = useCallback((doc: NotationDocument, finding: VerificationFinding,
+    invert: boolean): boolean => {
+    if (invert) {
+      // The accepted state must still be present before a revert is safe.
+      const current = new Set(doc.performance.map(note => note.id));
+      return finding.proposed_edits.every(edit => {
+        if (edit.op === 'set_pitch' || edit.op === 'set_onset') return edit.event_ids.every(id => current.has(id));
+        if (edit.op === 'add_note') return current.has(`vf-${finding.id}-a`);
+        if (edit.op === 'merge') return current.has(`vf-${finding.id}-m`);
+        if (edit.op === 'split_note') return Array.isArray(edit.after)
+          && (edit.after as unknown[]).every((_, index) => current.has(`vf-${finding.id}-${index + 1}`));
+        return true;
+      });
+    }
+    return finding.proposed_edits.every(edit => editMatches(doc, {
+      op: edit.op, event_ids: edit.event_ids.map(String), before: edit.before,
+    }));
+  }, [editMatches]);
+
   const decideFinding = useCallback(async (finding: VerificationFinding, decision: 'accepted' | 'rejected') => {
-    if (!lessonId || !draftId || !verification || verificationBusy) return;
+    const current = verificationRef.current;
+    const live = documentRef.current;
+    if (!lessonId || !draftId || !current || !live || verificationBusy) return;
+    const previous = findingDecision(current, finding.id);
+    // V2: never accept over a manual change the proposal's before snapshot does not match.
+    if (decision === 'accepted' && !findingMatches(live, finding, false)) {
+      setNotice('This suggestion conflicts with your local edits and was not applied. '
+        + 'Review or undo your change before accepting it.');
+      return;
+    }
+    const wasAccepted = previous?.decision === 'accepted';
+    if (decision === 'rejected' && wasAccepted && !findingMatches(live, finding, true)) {
+      setNotice('The suggestion was accepted earlier, but the notes have since changed. '
+        + 'It was rejected on the server and your manual edits were kept.');
+    }
     setVerificationBusy(true);
     try {
-      const value = await decideVerification(lessonId, draftId, verification.proposal_sha256,
-        verification.state_token, verification.report_sha256, finding.id, decision);
+      const value = await decideVerification(lessonId, draftId, current.proposal_sha256,
+        current.state_token, current.report_sha256, finding.id, decision);
       const parsed = parseVerificationState(value);
       if (!parsed.ok) throw new Error(parsed.message);
       setVerification(parsed.value);
       setVerificationToken(parsed.value.state_token);
-      if (decision === 'accepted') applyFinding(finding);
+      // Revalidate against the document as it is now, not at click time.
+      const latest = documentRef.current;
+      if (!latest) return;
+      if (decision === 'accepted') {
+        if (!findingMatches(latest, finding, false)) {
+          setNotice('The server accepted this suggestion, but your notes changed while the request was pending. '
+            + 'The local document was not overwritten; save will report a conflict until you reconcile it.');
+          return;
+        }
+        const {commands, problem} = commandsFor(latest, finding, false);
+        if (problem) { setNotice(problem); return; }
+        const preflight = commands.reduce<{doc: NotationDocument; ok: boolean}>((acc, command) => {
+          if (!acc.ok) return acc;
+          const outcome = applyCommand(acc.doc, command);
+          if (outcome.status === 'rejected') return {doc: acc.doc, ok: false};
+          return {doc: outcome.status === 'applied' ? outcome.document : acc.doc, ok: true};
+        }, {doc: latest, ok: true});
+        if (!preflight.ok) {
+          setNotice('This suggestion cannot be represented on the current score; nothing was changed.');
+          return;
+        }
+        dispatch({type: 'commands', commands, label: `Verification: ${finding.kind}`});
+        setConfirmReviewed(false);
+      } else if (wasAccepted && findingMatches(latest, finding, true)) {
+        const {commands, problem} = commandsFor(latest, finding, true);
+        if (problem) { setNotice(problem); return; }
+        const preflight = commands.reduce<{doc: NotationDocument; ok: boolean}>((acc, command) => {
+          if (!acc.ok) return acc;
+          const outcome = applyCommand(acc.doc, command);
+          if (outcome.status === 'rejected') return {doc: acc.doc, ok: false};
+          return {doc: outcome.status === 'applied' ? outcome.document : acc.doc, ok: true};
+        }, {doc: latest, ok: true});
+        if (!preflight.ok) {
+          setNotice('The decision was rejected on the server, but the accepted edit could not be reverted safely. '
+            + 'The local document was kept.');
+          return;
+        }
+        dispatch({type: 'commands', commands, label: 'Verification: reverted suggestion'});
+        setConfirmReviewed(false);
+      }
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message
         : 'The verification decision conflicted; the working document was kept.');
       void loadVerification(lessonId, draftId).then(value => {
         if (value === null) return;
         const parsed = parseVerificationState(value);
-        if (parsed.ok) setVerification(parsed.value);
+        if (!parsed.ok) return;
+        setVerification(parsed.value);
+        // Advance the save token only when the server's working performance equals
+        // the live local document; otherwise keep it and surface the conflict.
+        const liveDoc = documentRef.current;
+        const same = liveDoc && parsed.value.events.length === liveDoc.performance.length
+          && parsed.value.events.every((event, index) => {
+            const local = liveDoc.performance[index];
+            return local && event.id === local.id && event.pitch === local.pitch
+              && Math.abs(event.onset - local.onset) < 1e-6;
+          });
+        if (same) setVerificationToken(parsed.value.state_token);
+        else setNotice('Verification changed on the server and the local notes differ. '
+          + 'The save token was not advanced; review the diagnostics before saving.');
       }).catch(() => {});
     } finally {
       setVerificationBusy(false);
     }
-  }, [lessonId, draftId, verification, verificationBusy, applyFinding]);
+  }, [lessonId, draftId, verificationBusy, findingMatches, commandsFor, dispatch]);
 
   useEffect(() => {
     if (pendingSavedSignature.current && workspaceSignature) {
@@ -827,6 +996,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         offsetSeconds, spans,
         sections: sectionsDraft.length ? sectionsDraft : undefined,
         assessment: {policy: assessmentPolicy},
+        durationSeconds: document.duration,
       });
     }, 600);
     return () => clearTimeout(timer);
@@ -1293,7 +1463,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             <input type="number" step={0.01} min={0} max={section.end - 0.05} value={section.start}
               onChange={event => {
                 const raw = Number(event.target.value);
-                const start = index === 0 ? 0 : Math.max(0, Math.min(section.end - 0.05, raw));
+                const floor = index === 0 ? 0 : (sectionsDraft[index - 1]?.start ?? 0) + 0.05;
+                const start = index === 0 ? 0 : Math.max(floor, Math.min(section.end - 0.05, raw));
                 setSectionsDraft(current => current.map((item, position) => {
                   if (position === index) return {...item, start};
                   // Shared boundary: the previous section ends where this one starts.
@@ -1306,8 +1477,9 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             <input type="number" step={0.01} min={section.start + 0.05} max={document.duration} value={section.end}
               onChange={event => {
                 const raw = Number(event.target.value);
-                const end = index === sectionsDraft.length - 1 ? document.duration
-                  : Math.max(section.start + 0.05, Math.min(document.duration, raw));
+                const ceiling = index === sectionsDraft.length - 1 ? document.duration
+                  : (sectionsDraft[index + 1]?.end ?? document.duration) - 0.05;
+                const end = Math.max(section.start + 0.05, Math.min(ceiling, raw));
                 setSectionsDraft(current => current.map((item, position) => {
                   if (position === index) return {...item, end};
                   // Shared boundary: the next section starts where this one ends.

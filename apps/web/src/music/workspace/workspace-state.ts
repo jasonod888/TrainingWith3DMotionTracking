@@ -55,6 +55,7 @@ export type WorkspaceState = {
 export type WorkspaceAction =
   | { type: 'select'; occurrenceId: string | null }
   | { type: 'command'; command: CorrectionCommand }
+  | { type: 'commands'; commands: CorrectionCommand[]; label?: string }
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'reset'; document: NotationDocument };
@@ -132,6 +133,39 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         lastReport: reportOf(outcome, action.command.type),
         historyBytes: total,
       };
+    }
+
+    case 'commands': {
+      let candidate = state.document;
+      let selection = state.selection;
+      for (const command of action.commands) {
+        const outcome = applyCommand(candidate, command);
+        if (outcome.status === 'rejected') {
+          return {...state, lastReport: {status: 'rejected', label: 'Not applied',
+            code: outcome.code, message: outcome.message}};
+        }
+        if (outcome.status === 'applied') {
+          candidate = outcome.document;
+          selection = outcome.selection === undefined ? selection : outcome.selection;
+        }
+      }
+      if (candidate === state.document) return {...state, lastReport: {status: 'unchanged', label: 'No change'}};
+      const patch = diffDocuments(state.document, candidate);
+      if (isEmptyPatch(patch)) return {...state, lastReport: {status: 'unchanged', label: 'No change'}};
+      const selectionAfter = isValidSelection(candidate, selection);
+      const entry: HistoryEntry = {patch, label: action.label ?? 'Applied verification suggestion',
+        bytes: patchBytes(patch), selectionBefore: state.selection, selectionAfter};
+      const past = [...state.past, entry];
+      let total = entryBytes(past);
+      let evicted = state.evicted;
+      while ((past.length > HISTORY_LIMIT || total > HISTORY_BYTE_BUDGET) && past.length > 1) {
+        const dropped = past.shift()!;
+        total -= dropped.bytes;
+        evicted = true;
+      }
+      return {...state, document: candidate, selection: selectionAfter, past, future: [],
+        dirty: true, evicted, revision: state.revision + 1, historyBytes: total,
+        lastReport: {status: 'applied', label: entry.label}};
     }
 
     case 'undo': {

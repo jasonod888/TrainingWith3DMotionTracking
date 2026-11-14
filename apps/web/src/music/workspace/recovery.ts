@@ -33,6 +33,8 @@ export type RecoveryCheckpoint = {
   /** Added after v1 shipped: older checkpoints legitimately lack these. */
   sections?: {id: string; label: string; start: number; end: number}[];
   assessment?: {policy: 'none' | 'notes'};
+  /** Clip duration the sections were written against, for strict validation. */
+  durationSeconds?: number;
 };
 
 export type RecoveryRead =
@@ -113,7 +115,11 @@ export function readRecovery(identity: RecoveryIdentity): RecoveryRead {
         && Number.isFinite(section.start) && Number.isFinite(section.end)
         && section.start >= 0 && section.end > section.start)
       && sections.every((section, index) => index === 0
-        || section.start >= sections[index - 1].end - 1e-6);
+        || Math.abs(section.start - sections[index - 1].end) < 1e-6)
+      && sections[0].start === 0
+      && new Set(sections.map(section => section.id)).size === sections.length
+      && (typeof checkpoint.durationSeconds !== 'number'
+        || Math.abs(sections[sections.length - 1].end - checkpoint.durationSeconds) < 1e-6);
     if (!valid) return {status: 'rejected', reason: 'The local checkpoint has invalid teaching sections and was ignored.'};
   }
   if (checkpoint.assessment !== undefined

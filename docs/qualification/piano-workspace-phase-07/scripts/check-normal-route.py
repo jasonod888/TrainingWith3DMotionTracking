@@ -46,6 +46,7 @@ class World:
         self.reference = None
         self.reference_text = None
         self.summaries = []
+        self.video_bytes = None
         self.capture = None
         self.draft_available = True
 
@@ -70,6 +71,8 @@ class World:
             if not self.manifest:
                 return self.json(route, {}, status=404)
             return self.json(route, self.manifest)
+        if path.endswith('/assets/clip.mp4') and self.video_bytes is not None:
+            return route.fulfill(status=200, content_type='video/mp4', body=self.video_bytes)
         if path.endswith('/assets/ref.json') and self.reference_text is not None:
             return route.fulfill(status=200, content_type='application/json', body=self.reference_text)
         if '/music-draft/review' in path or '/music-revision' in path:
@@ -211,11 +214,14 @@ def normal_route(context, world):
     reference_sha = hashlib.sha256(reference_text.encode('utf-8')).hexdigest()
     world.reference = reference
     world.reference_text = reference_text
-    world.manifest = {'schema_version': 2, 'experience_family': 'music', 'draft_id': 'draft-1',
+    world.manifest = {'schema_version': 2, 'experience_family': 'music',
                       'lesson_id': LESSON, 'revision_id': 'rev-normal-1', 'title': 'Normal route',
                       'subject': 'piano', 'duration': reference['duration'], 'instrument': LONG['instrument'],
-                      'section_set': {'sections': []},
-                      'reference': {'key': f'lessons/{LESSON}/ref.json', 'sha256': reference_sha},
+                      'section_set': {'id': 'sections-normal-1', 'revision': 1,
+                                      'sections': [{'id': 'whole', 'label': 'Whole lesson', 'start': 0,
+                                                    'end': reference['duration']}]},
+                      'reference': {'key': f'lessons/{LESSON}/ref.json', 'mime': 'application/json',
+                                    'bytes': len(reference_text.encode('utf-8')), 'sha256': reference_sha},
                       'reference_reviewed': True,
                       'assessment': {'assessment': 'notes', 'input_modes': ['midi'],
                                      'dimensions': ['pitch', 'timing'], 'rubric_version': 'piano-midi-v1'},
@@ -351,10 +357,13 @@ def revision_journey(browser, world):
                'duration': LONG['duration'], 'section_count': 1, 'poster': None,
                'capabilities': {'preview': True, 'practice': False, 'live_input': 'none'}}
     world.summaries = [summary]
-    page.goto(f'{BASE}/?page=moves', wait_until='domcontentloaded')
-    page.get_by_role('button', name='Options for Normal route').click()
-    page.get_by_role('button', name='Edit lesson').click()
-    page.wait_for_selector('.ws-shell', timeout=45000)
+    # Direct revision entry: the library action maps to the same music-edit route.
+    page.goto(f'{BASE}/?page=music-edit&id={LESSON}', wait_until='domcontentloaded')
+    try:
+        page.wait_for_selector('.ws-shell', timeout=15000)
+    except Exception:
+        print('REV-DEBUG', repr(page.locator('body').inner_text()[:600]))
+        raise
     page.wait_for_selector('.ws-roll-note', timeout=45000)
     expect(page.locator('section[aria-label="Edit reviewed music lesson"]').count() == 0,
            'the legacy revision editor is still rendered for piano')
@@ -400,6 +409,11 @@ def main():
         normal_route(desktop, world)
         guitar_regression(desktop)
         performance(desktop)
+        revision_world = World(LONG)
+        revision_world.manifest = world.manifest
+        revision_world.reference = world.reference
+        revision_world.reference_text = world.reference_text
+        revision_journey(browser, revision_world)
         touch_emulation(browser, World(LONG))
         desktop.close()
         browser.close()

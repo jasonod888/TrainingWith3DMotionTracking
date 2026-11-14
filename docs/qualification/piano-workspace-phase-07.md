@@ -108,3 +108,32 @@ Phase 8 has not started. No deployment or release action was taken.
 - **C5 physical touch and loaded-video qualification remain BLOCKED.** No hardware is available; the touch evidence is Chromium emulation and the normal-route run has no playable video.
 - **Library → private revision → save/reopen is still not driven end-to-end.** The loader and delayed-navigation code are corrected, but the controlled library card could not be made to render through the summaries fixture in this pass, so the POST-with-`base_revision_id` journey is unverified.
 - The verification diagnostics are implemented but have not been exercised against a real verification report/decision fixture in an end-to-end run.
+
+---
+
+## 7. Verification integration corrections (V1–V4)
+
+| Item | Resolution |
+| --- | --- |
+| V1 atomic findings | The reducer now accepts a `commands` batch that stages the whole finding against an evolving candidate document and commits one history entry only if every command applies. Unsupported operations are refused with a reason; inserted/merged/split notes keep the server's deterministic `vf-*` identity and velocity, and receive written ticks through the current alignment. |
+| V2 stale proposals | Each edit's `before` snapshot is compared with the live document before accepting (and again after the asynchronous decision). A manual change blocks the local application with an explicit conflict message; unrelated edits are preserved. |
+| V3 decision reconciliation | Rejecting a previously accepted finding builds the inverse command set (pitch/onset/delete/add/merge/split) and applies it atomically only when the accepted state is still present; otherwise the local document is kept and the conflict stated. Conflict reload advances the save token only when the server's working performance matches the local document. |
+| V4 revision path | `MusicLessonEditor` stops immediately after the piano manifest (no reference download, hash, parse, score or note array); the legacy piano JSX and notation branch are removed so the file only renders guitar. Revision save waits for the refreshed manifest and re-checks live dirty state before the app's navigation callback. |
+
+### Verification (V1–V4)
+
+| Check | Result |
+| --- | --- |
+| Reviewer verification checks | **3/3** (manual pitch 61 preserved; Accept→Reject returns 60; merge 20→19 with the merged note and server count 19) |
+| Reviewer settings checks | 2/2 |
+| Revision journey (revision route) | pitch 73→74, revision POST `base_revision_id=rev-normal-1`, manifest revision 2, reopened revision keeps 74 |
+| Normal-route E2E | 0 failures |
+| Phase 6 checks / probes / editing | 6/6, 8/8, pass |
+| Web suite / `tsc` | 471 / clean |
+
+### Still outstanding
+
+- **Loaded-video qualification was not completed.** A local 3 s fixture was generated, but the controlled draft did not surface a `<video>` element in the workspace (source-video asset path); the test was removed rather than reported as passing. It must be run in a desktop browser with a valid source-video fixture.
+- **Physical touch qualification remains BLOCKED** (no hardware).
+- The revision journey is driven through the direct `music-edit?id=` route, which is the same component the library action opens; the library card click itself was not exercised.
+- Section validation now requires contiguous sections starting at zero, unique ids and a final end matching the checkpoint clip duration; older checkpoints without a duration are validated without that final clamp.

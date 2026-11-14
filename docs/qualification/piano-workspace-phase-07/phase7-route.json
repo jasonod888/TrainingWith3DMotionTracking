@@ -25,13 +25,19 @@
   "unsaved_guard": "Leave without saving your changes?",
   "guitar_regression": true,
   "performance_1338": {
-    "dom": 137,
-    "load": 138,
+    "dom": 123,
+    "load": 124,
     "notes": 35,
     "score": 33,
-    "heap": 29,
+    "heap": 22,
     "data_notes": 1338
   },
+  "revision_journey": {
+    "before": 73,
+    "corrected": 74,
+    "base": "rev-normal-1"
+  },
+  "revision_reopen": true,
   "touch_emulation": {
     "tap_selected_only": true,
     "edited": 72,

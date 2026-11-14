@@ -42,6 +42,7 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const liveDirty = useRef(false);
 
   const changed = () => { setConfirmed(false); setNotice(''); };
 
@@ -54,6 +55,11 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
       const parsed = parseMusicLessonManifest(value);
       if (!parsed.ok) throw new Error(parsed.message);
       if (parsed.value.schema_version !== 2) throw new Error('Only reviewed music lessons can be edited here.');
+      if (parsed.value.subject === 'piano') {
+        // The shared workspace owns the piano load; do not fetch/parse a second copy.
+        if (!stopped) setManifest(parsed.value);
+        return;
+      }
       const response = await fetch(assetUrl(parsed.value.reference.key), {credentials: 'same-origin'});
       if (!response.ok) throw new Error('The reviewed reference could not be loaded.');
       const bytes = await response.arrayBuffer();
@@ -62,16 +68,13 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
       if (digest !== parsed.value.reference.sha256) throw new Error('The reference does not match its reviewed file.');
       const reference = parseMusicReference(JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes)), {includeNotation: true});
       if (stopped) return;
-      const score = parsed.value.subject === 'piano'
-        ? reference.notation !== undefined
-          ? parseNotationDocument(reference.notation)
-          : createNotation(reference.events, reference.duration)
-        : null;
+      // Piano never reaches this path: the shared workspace owns its notation load.
+      const score = null;
       setManifest(parsed.value);
       setTitle(parsed.value.title);
       notationRef.current = score;
       setNotation(score);
-      setNotes(editNotesFrom(score ? score.performance : reference.events));
+      setNotes(editNotesFrom(reference.events));
       setChords(reference.guitarChords);
       setSpans(reference.spans);
       setSections(parsed.value.section_set.sections);
@@ -149,9 +152,24 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
     return null;
   })();
 
-  if (manifest?.subject === 'piano' && notation) {
-    return <PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack} onDirty={onDirty}
-      onSaved={(_revisionId, current) => { if (current) { onDirty?.(false); void refreshReviewed(); } }}/>;
+  if (manifest?.subject === 'piano') {
+    const trackDirty = (dirty: boolean) => { liveDirty.current = dirty; onDirty?.(dirty); };
+    return <PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack} onDirty={trackDirty}
+      onSaved={(_revisionId, current) => {
+        if (!current) return;
+        // The saved snapshot is clean; only edits made during the refresh block exit.
+        liveDirty.current = false;
+        void (async () => {
+          const lesson = await refreshReviewed();
+          if (!lesson) { setNotice('The revision was saved, but the refreshed lesson could not be read.'); return; }
+          if (liveDirty.current) {
+            setNotice('Saved this revision; newer edits remain unsaved in the editor.');
+            return;
+          }
+          onDirty?.(false);
+          onSaved(lesson);
+        })();
+      }}/>;
   }
   return <section className="music-home music-review" aria-label="Edit reviewed music lesson">
     <button className="back-link" disabled={busy} onClick={onBack}><ArrowLeft size={16}/>Back</button>
@@ -166,16 +184,11 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
         <label className="review-checkbox"><input type="radio" name="assessment" checked={policy === 'none'} disabled={busy}
           onChange={() => { changed(); setPolicy('none'); }}/>Watch only — no feedback</label>
         <label className="review-checkbox"><input type="radio" name="assessment" checked={policy === 'notes'}
-          disabled={busy || manifest.subject !== 'piano'} onChange={() => { changed(); setPolicy('notes'); }}/>MIDI note feedback (unscored)</label>
+          disabled={busy} onChange={() => { changed(); setPolicy('notes'); }}/>MIDI note feedback (unscored)</label>
         <p className="small muted">Scoring stays disabled. Watch-only remains safe for this milestone.</p>
       </fieldset>
       <h2>Notes</h2>
-      {manifest.subject === 'piano'
-        ? notation
-          ? <NotationEditor title={title} document={notation} onChange={updateNotation} disabled={busy}
-              sourceVideoUrl={manifest.source_video ? assetUrl(manifest.source_video.key) : undefined}/>
-          : <p role="status">Preparing the notation from the reviewed performance…</p>
-        : <>
+      {<>
           <div className="music-review-notes">{notes.slice(page * PAGE, (page + 1) * PAGE).map((note, offset) => {
             const index = page * PAGE + offset;
             return <fieldset key={note.id} disabled={busy}><legend>Note {index + 1}</legend>

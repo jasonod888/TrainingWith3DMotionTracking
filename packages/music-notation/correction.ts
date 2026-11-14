@@ -77,6 +77,9 @@ export type CorrectionCommand =
       staff?: NotationStaff;
       voice?: NotationVoice;
       addToChord?: boolean;
+      /** Verification decisions carry deterministic occurrence ids. */
+      id?: string;
+      velocity?: number;
     }
   | { type: 'delete-occurrence'; occurrenceId: string }
   | { type: 'delete-logical-note'; logicalNoteId: string };
@@ -532,6 +535,14 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
   if (command.voice !== undefined && command.voice !== 1 && command.voice !== 2) {
     return rejection('invalid-scope', 'Unknown voice.');
   }
+  if (command.id !== undefined && (typeof command.id !== 'string' || !command.id
+    || command.id.length > 120 || document.performance.some(note => note.id === command.id))) {
+    return rejection('invalid-scope', 'That verification note identity is not available.');
+  }
+  if (command.velocity !== undefined && (!Number.isFinite(command.velocity)
+    || command.velocity < 0 || command.velocity > 1)) {
+    return rejection('invalid-velocity', 'A velocity must be between zero and one.');
+  }
 
   const spb = secondsPerTick(document);
   const startTicks = command.startTicks;
@@ -558,7 +569,7 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
   if (duplicate) return rejection('duplicate-occurrence', 'A note of that pitch already starts at this time.');
 
   const next = clone(document);
-  const occurrenceId = newId('authored');
+  const occurrenceId = command.id ?? newId('authored');
   const spelling = spellPitch(pitch, next.key_signature);
   const same = next.events.find(event => !event.rest && event.staff === staff && event.voice === voice
     && event.start === start && event.duration === duration);
@@ -585,7 +596,7 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
   }
   next.performance.push({
     id: occurrenceId, onset: onsetSeconds, duration: durationSeconds, notation_duration: null,
-    pitch, velocity: 0.7, confidence: null, optional: false, string: null, fret: null,
+    pitch, velocity: command.velocity ?? 0.7, confidence: null, optional: false, string: null, fret: null,
   });
   const outcome = finalise(next, `Inserted ${spelling.spelling}`);
   if (outcome.status !== 'applied') return outcome;
