@@ -137,3 +137,31 @@ Phase 8 has not started. No deployment or release action was taken.
 - **Physical touch qualification remains BLOCKED** (no hardware).
 - The revision journey is driven through the direct `music-edit?id=` route, which is the same component the library action opens; the library card click itself was not exercised.
 - Section validation now requires contiguous sections starting at zero, unique ids and a final end matching the checkpoint clip duration; older checkpoints without a duration are validated without that final clamp.
+
+---
+
+## 8. Transition corrections (T1–T2), library journey and loaded video
+
+| Item | Resolution |
+| --- | --- |
+| T1 later manual edits | A rejection now reverts only when the accepted state is still exactly present (pitch/onset of every affected note, plus inserted `vf-*` identities). A later manual edit makes the revert a no-op with an explicit message, so 62 → manual 63 → Reject keeps 63. |
+| T2 authored spelling | Authored spellings are snapshotted per finding before acceptance and passed back on the inverse `set-occurrence-pitch` (and reinserts), so B#3 → Accept → Reject restores B#3 rather than the key-derived C4. |
+| Library revision journey | The library card action (“Edit lesson”) now drives the journey: workspace opens, pitch 73→74, revision POST with `base_revision_id=rev-normal-1`, manifest becomes `rev-revision-2`, and the reopened revision keeps 74. |
+| Loaded video | A 3 s local fixture is served through the draft (no saved manifest this time, so the proposal is what loads). Verified: duration 3 s, play advances, rate 0.75 applies, pause holds, a score-ruler seek moves the video and the score cursor, and the video does not overlap the app header. |
+
+### Verification (T1–T2)
+
+| Check | Result |
+| --- | --- |
+| Reviewer transition checks | **2/2** (63 preserved; B#3 restored) |
+| Reviewer verification checks | 3/3 |
+| Reviewer settings checks | 2/2 |
+| Library revision journey | pass (base `rev-normal-1`, reopened 74) |
+| Loaded video | pass (3 s fixture, play/rate/pause/ruler-seek/cursor/header) |
+| Normal-route E2E | 0 failures |
+| Web suite / `tsc` | 471 / clean |
+
+### Outstanding
+
+- **Physical touch qualification remains BLOCKED.** No hardware is available; emulated touch is not a substitute.
+- The loaded-video performance figures are still a controlled dev-server run; interactive upper-bound timing has not been profiled beyond the long-example load/render numbers.

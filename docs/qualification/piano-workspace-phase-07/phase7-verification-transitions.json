@@ -1,0 +1,15 @@
+[
+  {
+    "name": "reject-preserves-manual-edit-after-acceptance",
+    "passed": true,
+    "manual_before_reject": 63,
+    "actual_after_reject": 63
+  },
+  {
+    "name": "accept-reject-restores-authored-spelling",
+    "passed": true,
+    "before": "B#3",
+    "after": "B#3",
+    "pitch": 60
+  }
+]

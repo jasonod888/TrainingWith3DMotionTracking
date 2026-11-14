@@ -209,6 +209,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const document = state?.document ?? null;
   const documentRef = useRef<NotationDocument | null>(null);
   const verificationRef = useRef<VerificationState | null>(null);
+  const authoredSpellings = useRef<Record<string, Record<string, string>>>({});
   documentRef.current = document;
   verificationRef.current = verification;
 
@@ -801,25 +802,39 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       const beforeEvents = (Array.isArray(before) ? before : before && typeof before === 'object'
         ? [before] : []) as Record<string, unknown>[];
       if (invert) {
+        const spellingOf = (id: string) => authoredSpellings.current[finding.id]?.[id];
         if (edit.op === 'set_pitch' || edit.op === 'set_onset') {
           for (const id of edit.event_ids) {
             if (edit.op === 'set_pitch' && beforeEvents[0]?.pitch !== undefined) {
-              commands.push({type: 'set-occurrence-pitch', occurrenceId: id, pitch: Number(beforeEvents[0].pitch)});
+              commands.push({type: 'set-occurrence-pitch', occurrenceId: id, pitch: Number(beforeEvents[0].pitch),
+                spelling: spellingOf(id)});
             } else if (edit.op === 'set_onset' && beforeEvents[0]?.onset !== undefined) {
               commands.push({type: 'set-occurrence-onset', occurrenceId: id, seconds: Number(beforeEvents[0].onset)});
             }
           }
         } else if (edit.op === 'delete_note') {
-          for (const event of beforeEvents) insert(String(event.id), event, event.velocity as number | null);
+          for (const event of beforeEvents) {
+            insert(String(event.id), event, event.velocity as number | null);
+            commands.push({type: 'set-occurrence-pitch', occurrenceId: String(event.id),
+              pitch: Number(event.pitch), spelling: spellingOf(String(event.id))});
+          }
         } else if (edit.op === 'add_note') {
           remove(`vf-${finding.id}-a`);
         } else if (edit.op === 'merge') {
           remove(`vf-${finding.id}-m`);
-          for (const event of beforeEvents) insert(String(event.id), event, event.velocity as number | null);
+          for (const event of beforeEvents) {
+            insert(String(event.id), event, event.velocity as number | null);
+            commands.push({type: 'set-occurrence-pitch', occurrenceId: String(event.id),
+              pitch: Number(event.pitch), spelling: spellingOf(String(event.id))});
+          }
         } else if (edit.op === 'split_note') {
           const pieces = Array.isArray(edit.after) ? edit.after as Record<string, unknown>[] : [];
           pieces.forEach((_, index) => remove(`vf-${finding.id}-${index + 1}`));
-          for (const event of beforeEvents) insert(String(event.id), event, event.velocity as number | null);
+          for (const event of beforeEvents) {
+            insert(String(event.id), event, event.velocity as number | null);
+            commands.push({type: 'set-occurrence-pitch', occurrenceId: String(event.id),
+              pitch: Number(event.pitch), spelling: spellingOf(String(event.id))});
+          }
         } else {
           return {commands: [], problem: `The ${edit.op} suggestion cannot be reverted safely.`};
         }
@@ -854,14 +869,24 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const findingMatches = useCallback((doc: NotationDocument, finding: VerificationFinding,
     invert: boolean): boolean => {
     if (invert) {
-      // The accepted state must still be present before a revert is safe.
-      const current = new Set(doc.performance.map(note => note.id));
+      // The accepted state must still be exactly present before a revert is safe;
+      // a later manual edit is preserved rather than overwritten.
+      const noteOf = (id: string) => doc.performance.find(note => note.id === id);
+      const same = (id: string, data: Record<string, unknown>) => {
+        const note = noteOf(id);
+        return Boolean(note) && note!.pitch === Number(data.pitch)
+          && Math.abs(note!.onset - Number(data.onset)) < 1e-6;
+      };
       return finding.proposed_edits.every(edit => {
-        if (edit.op === 'set_pitch' || edit.op === 'set_onset') return edit.event_ids.every(id => current.has(id));
-        if (edit.op === 'add_note') return current.has(`vf-${finding.id}-a`);
-        if (edit.op === 'merge') return current.has(`vf-${finding.id}-m`);
+        const after = (edit.after ?? {}) as Record<string, unknown>;
+        if (edit.op === 'set_pitch') return edit.event_ids.every(id => noteOf(id)?.pitch === Number(after.pitch));
+        if (edit.op === 'set_onset') return edit.event_ids.every(id => noteOf(id)
+          && Math.abs(noteOf(id)!.onset - Number(after.onset)) < 1e-6);
+        if (edit.op === 'add_note') return same(`vf-${finding.id}-a`, after);
+        if (edit.op === 'merge') return same(`vf-${finding.id}-m`, after);
         if (edit.op === 'split_note') return Array.isArray(edit.after)
-          && (edit.after as unknown[]).every((_, index) => current.has(`vf-${finding.id}-${index + 1}`));
+          && (edit.after as Record<string, unknown>[]).every((piece, index) =>
+            same(`vf-${finding.id}-${index + 1}`, piece));
         return true;
       });
     }
@@ -903,6 +928,11 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             + 'The local document was not overwritten; save will report a conflict until you reconcile it.');
           return;
         }
+        const spellings: Record<string, string> = {};
+        for (const note of latest.events.flatMap(event => event.notes)) {
+          for (const id of note.performance_ids) spellings[id] = note.spelling;
+        }
+        authoredSpellings.current[finding.id] = spellings;
         const {commands, problem} = commandsFor(latest, finding, false);
         if (problem) { setNotice(problem); return; }
         const preflight = commands.reduce<{doc: NotationDocument; ok: boolean}>((acc, command) => {

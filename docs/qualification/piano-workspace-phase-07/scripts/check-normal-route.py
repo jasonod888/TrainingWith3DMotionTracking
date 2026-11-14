@@ -58,6 +58,10 @@ class World:
         if path == '/capabilities':
             return self.json(route, {'subject_filter': False, 'music_midi_setup': False, 'music_history': True,
                                      'music_piano_library_ui': True, 'music_guitar_library_ui': True})
+        if path == '/workflow/lessons':
+            return self.json(route, {'lessons': []})
+        if path == '/shared-lessons/summaries':
+            return self.json(route, [])
         if path in ('/library', '/lessons', '/lessons/summaries'):
             return self.json(route, self.summaries)
         if path == f'/lessons/{LESSON}/music-draft':
@@ -347,6 +351,61 @@ def performance(context):
     page.close()
 
 
+def video_qualification(browser, world):
+    clip = ROOT / 'docs/qualification/piano-workspace-phase-07/fixtures/clip.mp4'
+    if not clip.exists():
+        return
+    world.manifest = None
+    world.video_bytes = clip.read_bytes()
+    digest = hashlib.sha256(world.video_bytes).hexdigest()
+    world.draft = {**world.draft,
+                   'source_video': {'key': f'lessons/{LESSON}/video/clip.mp4', 'mime': 'video/mp4',
+                                    'bytes': len(world.video_bytes), 'sha256': digest}}
+    context = browser.new_context(viewport={'width': 1440, 'height': 1000})
+    context.route('**/api/**', world.route)
+    page = context.new_page()
+    open_route(page)
+    page.wait_for_selector('video', state='attached', timeout=30000)
+    page.wait_for_function('() => { const v = document.querySelector("video"); return v && v.readyState >= 1 && v.duration > 0; }', timeout=30000)
+    meta = page.evaluate('() => { const v = document.querySelector("video"); return {duration: v.duration, muted: v.muted}; }')
+    expect(meta['duration'] > 2.5, f"video duration was {meta['duration']}")
+    header_box = (page.locator('header').first.bounding_box()
+                  if page.locator('header').count() else None)
+    video_box = page.locator('video').first.bounding_box()
+    if header_box and video_box:
+        overlap = not (video_box['y'] >= header_box['y'] + header_box['height'] - 1
+                       or video_box['y'] + video_box['height'] <= header_box['y'] + 1)
+        expect(not overlap, 'video overlaps the app header')
+    page.get_by_role('button', name='Play', exact=True).click()
+    page.wait_for_timeout(700)
+    played = page.evaluate('() => document.querySelector("video").currentTime')
+    expect(played > 0.1, f'loaded video did not play: {played}')
+    page.locator('select').filter(has_text='0.75').select_option('0.75')
+    page.wait_for_timeout(300)
+    rate = page.evaluate('() => document.querySelector("video").playbackRate')
+    expect(abs(rate - 0.75) < 0.01, f'rate was {rate}')
+    page.get_by_role('button', name='Pause', exact=True).click()
+    page.wait_for_timeout(200)
+    expect(page.evaluate('() => document.querySelector("video").paused'), 'pause did not stop video')
+    ruler = page.locator('.ws-score-ruler').first
+    ruler.scroll_into_view_if_needed()
+    box = ruler.bounding_box()
+    page.mouse.click(box['x'] + box['width'] * (1.5 / meta['duration']), box['y'] + box['height'] / 2)
+    page.wait_for_timeout(300)
+    seek = page.evaluate('() => document.querySelector("video").currentTime')
+    expect(seek > 0.3, f'seek did not move the video: {seek}')
+    cursors = page.evaluate("""() => {
+      const score = document.querySelector('.ws-score-playhead');
+      return {scoreTick: score && score.getAttribute('data-playhead-tick'),
+              video: document.querySelector('video').currentTime};
+    }""")
+    expect(cursors['scoreTick'] not in (None, ''), 'score cursor is not drawn')
+    RESULT['loaded_video'] = {**meta, 'rate': rate, 'seek': seek, 'cursors': cursors,
+                              'played': played, 'header_clear': True}
+    page.screenshot(path=str(OUT / 'loaded-video.png'))
+    context.close()
+
+
 def revision_journey(browser, world):
     context = browser.new_context(viewport={'width': 1440, 'height': 1000})
     context.route('**/api/**', world.route)
@@ -357,13 +416,15 @@ def revision_journey(browser, world):
                'duration': LONG['duration'], 'section_count': 1, 'poster': None,
                'capabilities': {'preview': True, 'practice': False, 'live_input': 'none'}}
     world.summaries = [summary]
-    # Direct revision entry: the library action maps to the same music-edit route.
-    page.goto(f'{BASE}/?page=music-edit&id={LESSON}', wait_until='domcontentloaded')
+    page.goto(f'{BASE}/?page=moves', wait_until='domcontentloaded')
     try:
-        page.wait_for_selector('.ws-shell', timeout=15000)
+        page.wait_for_selector('.feed-card', timeout=20000)
     except Exception:
-        print('REV-DEBUG', repr(page.locator('body').inner_text()[:600]))
+        print('LIB-DEBUG', repr(page.locator('body').inner_text()[:500]))
         raise
+    page.locator('.feed-card-menu summary').first.click()
+    page.get_by_role('button', name='Edit lesson').click()
+    page.wait_for_selector('.ws-shell', timeout=45000)
     page.wait_for_selector('.ws-roll-note', timeout=45000)
     expect(page.locator('section[aria-label="Edit reviewed music lesson"]').count() == 0,
            'the legacy revision editor is still rendered for piano')
@@ -413,6 +474,8 @@ def main():
         revision_world.manifest = world.manifest
         revision_world.reference = world.reference
         revision_world.reference_text = world.reference_text
+        video_world = World(LONG)
+        video_qualification(browser, video_world)
         revision_journey(browser, revision_world)
         touch_emulation(browser, World(LONG))
         desktop.close()
