@@ -38,6 +38,15 @@ export type RestoredReference = {
 
 export type RestoreResult = { ok: true; value: RestoredReference } | { ok: false; message: string };
 
+/** Canonical authoring order: by source time; the server also requires increasing ticks. */
+export function canonicalAnchors(anchors: AnchorPointSaved[]): AnchorPointSaved[] {
+  return anchors
+    .map(anchor => ({seconds: Number(anchor.seconds), tick: Number(anchor.tick)}))
+    .filter(anchor => Number.isFinite(anchor.seconds) && Number.isInteger(anchor.tick) && anchor.tick >= 0)
+    .sort((left, right) => left.seconds - right.seconds || left.tick - right.tick)
+    .filter((anchor, index, list) => index === 0 || anchor.seconds !== list[index - 1].seconds);
+}
+
 export function serializeAlignment(
   alignment: Alignment | null, anchors: AnchorPointSaved[], offsetSeconds: number,
 ): SavedAlignment | null {
@@ -51,7 +60,7 @@ export function serializeAlignment(
     mode: anchors.length ? 'anchored' : alignment.mode,
     basis: alignment.basis,
     offset_seconds: offsetSeconds,
-    anchors: anchors.map(anchor => ({seconds: anchor.seconds, tick: anchor.tick})),
+    anchors: canonicalAnchors(anchors),
     passages,
   };
 }

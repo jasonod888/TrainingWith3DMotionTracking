@@ -50,6 +50,7 @@ class World:
         self.manifest = None
         self.reference = None
         self.held = None          # stored Playwright route awaiting fulfilment
+        self.hold_next = False    # hold the next save instead of answering it
         self.capture = None       # last save body
         self.save_status = 200
         self.save_detail = 'The save could not be completed.'
@@ -83,11 +84,12 @@ def route_handler(world: World, route, request):
         return route.fulfill(status=200, content_type='application/json', body=json.dumps(world.reference))
     if '/music-draft/review' in path or '/music-revision' in path:
         world.capture = json.loads(request.post_data or '{}')
-        if world.held is None:
+        if world.hold_next:
+            world.hold_next = False
             world.held = route
             return
         status = world.save_status
-        body = {'revision_id': 'rev-saved-1'} if status == 200 else {'detail': world.save_detail}
+        body = {'revision_id': 'rev-saved-next'} if status == 200 else {'detail': world.save_detail}
         return route.fulfill(status=status, content_type='application/json', body=json.dumps(body))
     return route.fulfill(status=404, content_type='application/json', body=json.dumps({'detail': 'No route.'}))
 
@@ -137,6 +139,7 @@ def run():
         edit_note(page)
         confirm(page)
         expect(save_button(page).is_enabled(), 'an edited, confirmed draft should be saveable')
+        world.hold_next = True
         page.get_by_role('button', name='Save privately').click()
         page.wait_for_timeout(150)
         expect(world.held is not None, 'the save request was not held')
@@ -170,6 +173,7 @@ def run():
         open_harness(page)
         edit_note(page)
         confirm(page)
+        world.hold_next = True
         page.get_by_role('button', name='Save privately').click()
         page.wait_for_timeout(150)
         expect(world.held is not None, 'the failing save was not held')
@@ -235,12 +239,55 @@ def run():
         expect(piano.is_enabled(), 'a spelling edit must keep the verified preview enabled')
         expect(piano.get_attribute('aria-pressed') == 'true', 'Piano must stay active after a spelling edit')
 
+        # Reopened maps stay editable: anchors can be added, undone, redone and removed.
+        slider = page.locator('input[aria-label="Fixture clock"]')
+        slider.focus()
+        for _ in range(50):
+            slider.press('ArrowRight')
+        page.wait_for_function("() => document.querySelector('.ws-time')?.textContent?.startsWith('0.50')", timeout=5000)
+        page.get_by_role('button', name='Use current').click()
+        base_tick = int(page.get_by_label('Anchor tick').input_value())
+        page.get_by_label('Anchor tick').fill(str(base_tick + 100))
+        page.get_by_role('button', name='Apply anchor').click()
+        page.wait_for_function(
+            f"() => document.querySelector('[data-playhead-tick]')?.dataset.playheadTick === '{base_tick + 100}'",
+            timeout=5000)
+        page.get_by_role('button', name='Undo point').click()
+        page.wait_for_function(
+            f"() => document.querySelector('[data-playhead-tick]')?.dataset.playheadTick === '{base_tick}'",
+            timeout=5000)
+        page.get_by_role('button', name='Redo point').click()
+        page.wait_for_function(
+            f"() => document.querySelector('[data-playhead-tick]')?.dataset.playheadTick === '{base_tick + 100}'",
+            timeout=5000)
+        page.get_by_role('button', name='Remove').first.click()
+        page.wait_for_function(
+            f"() => document.querySelector('[data-playhead-tick]')?.dataset.playheadTick === '{base_tick}'",
+            timeout=5000)
+        RESULT['reopened_map_anchors'] = {'base': base_tick, 'apply': base_tick + 100,
+                                          'undo': base_tick, 'redo': base_tick + 100,
+                                          'remove': base_tick}
+
+        # A saved-only lesson saves a revision on its own base.
+        page.get_by_label('Sync offset in seconds (not saved)').fill('0.05')
+        page.get_by_label('Sync offset in seconds (not saved)').press('Tab')
+        confirm(page)
+        page.get_by_role('button', name='Save privately').click()
+        page.wait_for_selector('text=Saved privately', timeout=10000)
+        expect(world.capture is not None and world.capture.get('base_revision_id') == 'rev-preview-1',
+               f"saved-only save did not use its base: {world.capture and world.capture.get('base_revision_id')}")
+        expect(world.capture.get('draft_id') is None,
+               'a revision save must not send a draft identity')
+        RESULT['saved_only_revision'] = {'base': world.capture.get('base_revision_id'),
+                                         'offset': world.capture.get('offset_seconds')}
+
         page.get_by_role('button', name='+ semitone').click()
         page.wait_for_function("() => {const b=[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='Piano'); return b && b.disabled;}", timeout=10000)
         expect(page.locator('[data-preview-state]').get_attribute('data-preview-state') == 'stale',
                'a pitch edit did not mark the preview stale')
-        expect(page.get_by_role('button', name='Original', exact=True).get_attribute('aria-pressed') == 'true',
-               'a stale preview must restore Original audio')
+        page.wait_for_function(
+            "() => [...document.querySelectorAll('button')].some(n => n.textContent.trim() === 'Original' && n.getAttribute('aria-pressed') === 'true')",
+            timeout=5000)
         RESULT['preview_staleness'] = {'pitch_disabled': True, 'spelling_kept': True}
 
         # Reopening a revision whose preview was invalidated must not revive audio.

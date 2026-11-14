@@ -6,6 +6,17 @@
   "delayed_failure_recovery": {
     "checkpoint_restored": true
   },
+  "reopened_map_anchors": {
+    "base": 240,
+    "apply": 340,
+    "undo": 240,
+    "redo": 340,
+    "remove": 240
+  },
+  "saved_only_revision": {
+    "base": "rev-preview-1",
+    "offset": 0.05
+  },
   "preview_staleness": {
     "pitch_disabled": true,
     "spelling_kept": true

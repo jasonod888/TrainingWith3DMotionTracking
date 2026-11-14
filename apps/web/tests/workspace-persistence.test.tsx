@@ -10,10 +10,10 @@ Object.assign(globalThis, {window: dom.window, document: dom.window.document, lo
 
 import {buildNotation, applyCommand} from '../../../packages/music-notation/index.ts';
 import {
-  buildSaveBody, performanceChanged, restoreFromReference, serializeAlignment,
+  buildSaveBody, canonicalAnchors, performanceChanged, restoreFromReference, serializeAlignment,
 } from '../src/music/workspace/save-payload.ts';
 import {
-  clearRecovery, readRecovery, writeRecovery, type RecoveryIdentity,
+  clearRecovery, peekRecovery, readRecovery, writeRecovery, type RecoveryIdentity,
 } from '../src/music/workspace/recovery.ts';
 import {estimatedAlignment} from '../../../packages/music-notation/index.ts';
 
@@ -168,4 +168,35 @@ test('duplicate recorded attacks on one written note keep every occurrence mappe
   assert.deepEqual([...mapped].sort(), ['d1', 'd2', 'd3'], 'both attacks must map to the written note');
   const edited = applyCommand(doubled, {type: 'set-occurrence-pitch', occurrenceId: 'd2', pitch: 62});
   assert.equal(edited.status, 'applied', 'an edit against a doubled attack must apply');
+});
+
+test('anchors are canonicalised by source time at the save boundary', () => {
+  const map = estimatedAlignment(buildNotation([
+    {id: 'n', onset: 1, duration: 0.5, pitch: 60, velocity: 0.5, confidence: null, optional: false, string: null, fret: null},
+  ], {bpm: 120, duration: 12}));
+  const saved = serializeAlignment(map, [{seconds: 6, tick: 6000}, {seconds: 2, tick: 2000}], 0);
+  assert.deepEqual(saved?.anchors, [{seconds: 2, tick: 2000}, {seconds: 6, tick: 6000}]);
+  assert.deepEqual(canonicalAnchors([{seconds: 6, tick: 6000}, {seconds: 2, tick: 2000},
+    {seconds: 2, tick: 2000}]), [{seconds: 2, tick: 2000}, {seconds: 6, tick: 6000}],
+    'duplicates at the same second collapse and the list is ordered');
+});
+
+test('recovery refuses a checkpoint from an older saved revision and keeps it', () => {
+  clearRecovery();
+  writeRecovery({identity: {...identity, baseRevisionId: 'old-base'}, title: 'Older base',
+    notation: document(), alignment: null, offsetSeconds: 0, spans: [], baseRevisionId: 'old-base'});
+  const stale = readRecovery({...identity, baseRevisionId: 'new-base'});
+  assert.equal(stale.status, 'rejected');
+  if (stale.status === 'rejected') assert.match(stale.reason, /saved revision/i);
+  assert.ok(localStorage.getItem('piano-workspace-recovery-v1'), 'the checkpoint must be retained');
+  assert.ok(peekRecovery(), 'the stale checkpoint remains available for explicit recovery');
+});
+
+test('a v1 checkpoint without base identity is treated as stale, not current', () => {
+  clearRecovery();
+  writeRecovery({identity, title: 'Legacy local', notation: document(), alignment: null,
+    offsetSeconds: 0, spans: []});
+  const legacy = readRecovery({...identity, baseRevisionId: 'some-base'});
+  assert.equal(legacy.status, 'rejected');
+  if (legacy.status === 'rejected') assert.match(legacy.reason, /predates base-revision/i);
 });

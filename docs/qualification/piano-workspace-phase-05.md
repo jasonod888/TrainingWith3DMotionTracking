@@ -160,3 +160,36 @@ The controlled-route Chromium script still passes all checks (delayed success/fa
 
 - Removal/reset/undo/redo on a reopened stored map is implemented and exercised only through the map-state code path; the two component tests I wrote for it and for the saved-only revision save hung under jsdom and were removed, so they are not automated.
 - The saved-only revision-save round trip (edit → save as revision) is covered by the cross-language API test and the browser script, not by a component test.
+
+---
+
+## 10. Second follow-up corrections (this commit)
+
+### F1 — base revision is part of recovery identity
+
+`RecoveryIdentity` now carries `baseRevisionId`, and `readRecovery` compares it with the
+checkpoint. A checkpoint written against an older saved revision of the same clip is
+**rejected** with a stale-base reason and is **retained** in storage; the harness shows a
+separate “older revision” panel with *Restore older checkpoint* (keeps the current save base
+and creates a new revision) or *Discard*. Earlier v1 checkpoints without base identity are
+treated the same way and reported as predating base tracking — they are never silently
+restored and never deleted by the reader.
+
+### F2 — anchors are canonicalised at the editing boundary
+
+Anchor changes are sorted by source time before they enter state, history, recovery or the
+save payload (`canonicalAnchors`). Authoring 6 s then 2 s now serializes as 2 s, 6 s and is
+accepted by the real validator. Duplicate seconds collapse; non-integer or negative ticks are
+dropped at the boundary; the server remains strict (ordered, distinct, agreeing with the map).
+
+### Evidence
+
+| Check | Result |
+| --- | --- |
+| Reviewer lifecycle diagnostic | **4/4** |
+| Reviewer recovery/map diagnostic | **2/2** |
+| Web suite | **454 passed**, `tsc` clean |
+| Browser script | all checks pass, now including saved-only revision save (base `rev-preview-1`, offset 0.05) and reopened-map anchor apply/undo/redo/remove (`base 240 → 340 → 240 → 340 → 240`) |
+
+The browser script also still covers delayed success/failure, reload recovery, signed preview
+validity and invalidated-preview reopen.

@@ -33,10 +33,10 @@ import {
 import {useElementWidth} from './useElementWidth';
 import {createClock, useClockTime, type ClockStore} from './clock';
 import {
-  buildSaveBody, performanceChanged, restoreFromReference, serializeAlignment, type SavedSpan,
+  buildSaveBody, canonicalAnchors, performanceChanged, restoreFromReference, serializeAlignment, type SavedSpan,
 } from './save-payload';
 import {
-  clearRecovery, readRecovery, writeRecovery, type RecoveryCheckpoint, type RecoveryIdentity,
+  clearRecovery, peekRecovery, readRecovery, writeRecovery, type RecoveryCheckpoint, type RecoveryIdentity,
 } from './recovery';
 
 const DURATION_CHOICES = [
@@ -159,6 +159,7 @@ export function PianoWorkspaceHarness() {
   const [conflictKind, setConflictKind] = useState<'stale'|'verification'|'other'>('other');
   const [reopenMessage, setReopenMessage] = useState('');
   const [recoveryOffer, setRecoveryOffer] = useState<RecoveryCheckpoint | null>(null);
+  const [staleCheckpoint, setStaleCheckpoint] = useState<RecoveryCheckpoint | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState('');
 
   const dispatch = useCallback((action: WorkspaceAction) => {
@@ -510,7 +511,10 @@ export function PianoWorkspaceHarness() {
     if (!accountId || !lessonId || !sourceSha256 || !document) return;
     const outcome = readRecovery(recoveryIdentity);
     if (outcome.status === 'restored') setRecoveryOffer(outcome.checkpoint);
-    else if (outcome.status === 'rejected') setRecoveryNotice(outcome.reason);
+    else if (outcome.status === 'rejected') {
+      setRecoveryNotice(outcome.reason);
+      if (/saved revision/i.test(outcome.reason)) setStaleCheckpoint(peekRecovery());
+    }
     // Only when the draft identity becomes available.
   }, [accountId, lessonId, draftId, sourceSha256, document === null]);
 
@@ -712,6 +716,30 @@ export function PianoWorkspaceHarness() {
     }
   }, [lessonId, applyRestoredReference]);
 
+  const restoreStaleCheckpoint = useCallback(() => {
+    if (!staleCheckpoint) return;
+    try {
+      const restored = parseNotationDocument(staleCheckpoint.notation);
+      setState(createWorkspaceState(restored));
+      setSpans(staleCheckpoint.spans);
+      setOffsetSeconds(staleCheckpoint.offsetSeconds);
+      setAnchors(canonicalAnchors(staleCheckpoint.alignment?.anchors ?? []));
+      if (staleCheckpoint.alignment?.passages?.length) {
+        setMapState({alignment_version: 1, mode: staleCheckpoint.alignment.mode,
+          basis: staleCheckpoint.alignment.basis, passages: staleCheckpoint.alignment.passages});
+      }
+      // The current base is deliberately kept: saving creates a new revision on it.
+      setConfirmReviewed(false);
+      setStaleCheckpoint(null);
+      setRecoveryNotice('');
+      setReopenMessage('Restored a checkpoint written against an older revision. '
+        + 'Saving now creates a new revision on the current base.');
+    } catch {
+      setRecoveryNotice('The stale checkpoint could not be restored and was ignored.');
+      setStaleCheckpoint(null);
+    }
+  }, [staleCheckpoint]);
+
   const restoreCheckpoint = useCallback(() => {
     if (!recoveryOffer) return;
     try {
@@ -719,7 +747,7 @@ export function PianoWorkspaceHarness() {
       setState(createWorkspaceState(restored));
       setSpans(recoveryOffer.spans);
       setOffsetSeconds(recoveryOffer.offsetSeconds);
-      setAnchors(recoveryOffer.alignment?.anchors ?? []);
+      setAnchors(canonicalAnchors(recoveryOffer.alignment?.anchors ?? []));
       // Recovered work keeps its server base so a retry is not a first review.
       if (recoveryOffer.baseRevisionId) setSavedRevisionId(recoveryOffer.baseRevisionId);
       if (recoveryOffer.verificationToken) setVerificationToken(recoveryOffer.verificationToken);
@@ -771,7 +799,8 @@ export function PianoWorkspaceHarness() {
     // The anchor is applied to the map in use, so a reopened stored map stays editable.
     const result = addAnchor(alignment, document, storedPlayhead, tick);
     if (!result.ok) { setAnchorPreview(`Not applied: ${result.message}`); return; }
-    commitAnchors([...anchors, {seconds: storedPlayhead, tick}], result.alignment);
+    // Authoring order is not map order: canonicalise by source time before saving.
+    commitAnchors(canonicalAnchors([...anchors, {seconds: storedPlayhead, tick}]), result.alignment);
   }, [document, alignment, anchorTick, anchors, commitAnchors, storedPlayhead]);
 
   const removeAnchor = useCallback((index: number) => {
@@ -909,6 +938,14 @@ export function PianoWorkspaceHarness() {
       </div>
     </section>}
     {recoveryNotice && <p className="ws-hint" role="status" data-recovery="rejected">{recoveryNotice}</p>}
+    {staleCheckpoint && <section className="ws-panel" role="status" aria-label="Stale local recovery" data-recovery="stale">
+      <p>This checkpoint was written against an older saved revision. Restoring keeps your work but
+        saves as a new revision on the current base.</p>
+      <div className="ws-row">
+        <button type="button" onClick={restoreStaleCheckpoint}>Restore older checkpoint</button>
+        <button type="button" onClick={() => { clearRecovery(); setStaleCheckpoint(null); }}>Discard</button>
+      </div>
+    </section>}
 
     <div className="ws-grid">
       <div className="ws-edit">
