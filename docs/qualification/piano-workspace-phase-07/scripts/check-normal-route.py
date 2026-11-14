@@ -45,6 +45,7 @@ class World:
         self.manifest = None
         self.reference = None
         self.reference_text = None
+        self.summaries = []
         self.capture = None
         self.draft_available = True
 
@@ -56,8 +57,8 @@ class World:
         if path == '/capabilities':
             return self.json(route, {'subject_filter': False, 'music_midi_setup': False, 'music_history': True,
                                      'music_piano_library_ui': True, 'music_guitar_library_ui': True})
-        if path == '/library' or path == '/lessons':
-            return self.json(route, {'items': [], 'lessons': []})
+        if path in ('/library', '/lessons', '/lessons/summaries'):
+            return self.json(route, self.summaries)
         if path == f'/lessons/{LESSON}/music-draft':
             if not self.draft_available:
                 return self.json(route, {}, status=404)
@@ -73,6 +74,19 @@ class World:
             return route.fulfill(status=200, content_type='application/json', body=self.reference_text)
         if '/music-draft/review' in path or '/music-revision' in path:
             self.capture = json.loads(request.post_data or '{}')
+            if '/music-revision' in path and self.capture.get('notation'):
+                body = self.capture
+                reference = {'reference_version': 1, 'duration': body['notation']['duration'],
+                             'title': body.get('title', 'Revision'), 'events': body['events'],
+                             'spans': body['spans'], 'notation': body['notation'],
+                             'alignment': body.get('alignment')}
+                self.reference_text = json.dumps(reference)
+                self.reference = reference
+                sha = hashlib.sha256(self.reference_text.encode('utf-8')).hexdigest()
+                self.manifest = {**(self.manifest or {}), 'revision_id': 'rev-revision-2',
+                                 'reference': {'key': f'lessons/{LESSON}/ref.json', 'sha256': sha}}
+                self.summaries = [{**item, 'revision_id': 'rev-revision-2'} for item in self.summaries]
+                return self.json(route, {'revision_id': 'rev-revision-2'})
             return self.json(route, {'revision_id': 'rev-normal-1'})
         return self.json(route, {}, status=404)
 
@@ -325,6 +339,53 @@ def performance(context):
     RESULT['performance_1338'] = measured
     page.screenshot(path=str(OUT / 'normal-route-1338.png'))
     page.close()
+
+
+def revision_journey(browser, world):
+    context = browser.new_context(viewport={'width': 1440, 'height': 1000})
+    context.route('**/api/**', world.route)
+    page = context.new_page()
+    summary = {'summary_version': 1, 'lesson_id': LESSON, 'revision_id': 'rev-normal-1',
+               'title': 'Normal route', 'subject': 'piano', 'subject_label': 'Piano',
+               'experience_family': 'music', 'instrument': 'piano',
+               'duration': LONG['duration'], 'section_count': 1, 'poster': None,
+               'capabilities': {'preview': True, 'practice': False, 'live_input': 'none'}}
+    world.summaries = [summary]
+    page.goto(f'{BASE}/?page=moves', wait_until='domcontentloaded')
+    page.get_by_role('button', name='Options for Normal route').click()
+    page.get_by_role('button', name='Edit lesson').click()
+    page.wait_for_selector('.ws-shell', timeout=45000)
+    page.wait_for_selector('.ws-roll-note', timeout=45000)
+    expect(page.locator('section[aria-label="Edit reviewed music lesson"]').count() == 0,
+           'the legacy revision editor is still rendered for piano')
+    note = page.locator('.ws-roll-note').first
+    before = int(note.get_attribute('data-pitch'))
+    select_note(page, note)
+    page.get_by_role('button', name='+ semitone').click()
+    page.wait_for_timeout(200)
+    corrected = int(page.locator('.ws-roll-note').first.get_attribute('data-pitch'))
+    page.get_by_label('Confirm reviewed').check()
+    page.get_by_role('button', name='Save privately').click()
+    page.wait_for_selector('text=Saved privately', timeout=45000)
+    captured = world.capture
+    expect(captured and captured.get('base_revision_id') == 'rev-normal-1',
+           f"revision POST base was {captured.get('base_revision_id') if captured else None}")
+    expect(world.manifest and world.manifest.get('revision_id') == 'rev-revision-2',
+           'the revision did not become the saved manifest')
+    RESULT['revision_journey'] = {'before': before, 'corrected': corrected,
+                                  'base': captured.get('base_revision_id')}
+
+    # Reopen the new revision as saved-only and confirm the correction survived.
+    reopened = context.new_page()
+    reopened.goto(f'{BASE}/?page=music-review&id={LESSON}', wait_until='domcontentloaded')
+    reopened.wait_for_selector('text=Opened saved revision rev-rev', timeout=45000)
+    reopened.wait_for_selector('.ws-roll-note', timeout=45000)
+    expect(int(reopened.locator('.ws-roll-note').first.get_attribute('data-pitch')) == corrected,
+           'the reopened private revision lost the correction')
+    RESULT['revision_reopen'] = True
+    page.close()
+    reopened.close()
+    context.close()
 
 
 def main():

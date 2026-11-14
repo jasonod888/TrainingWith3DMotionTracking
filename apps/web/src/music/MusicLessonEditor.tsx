@@ -85,10 +85,11 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
       const value = await request<unknown>(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false,
         {'X-Lesson-Formats': '1,2'});
       const parsed = parseMusicLessonManifest(value);
-      if (parsed.ok) onSaved(parsed.value);
+      if (parsed.ok) return parsed.value;
     } catch {
       // The workspace reported the save; the caller can refresh on its next visit.
     }
+    return null;
   };
 
   const update = (index: number, patch: Partial<EditNote>) => {

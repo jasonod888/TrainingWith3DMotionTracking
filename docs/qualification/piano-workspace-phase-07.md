@@ -80,3 +80,31 @@ Phase 8 has not started. No deployment or release action was taken.
 - The library-driven **new private revision** journey (edit from the library, revision POST with `base_revision_id`) is wired but not driven end-to-end; only the review and saved-reference paths are covered.
 - **Verification decisions** (accepted/rejected suggestions, concurrent decisions) are preserved server-side as a token with conflict handling, but no decision UI is rendered in the workspace. Explanation/playing passages have an editor; verification findings do not.
 - Performance numbers remain a controlled dev-server run with mocked requests and no playable video.
+
+---
+
+## 6. Correction round: C1–C4
+
+| Item | Resolution |
+| --- | --- |
+| C1 settings recovery | `RecoveryCheckpoint` now carries validated `sections` and `assessment`; validation rejects malformed settings, both restore paths apply them, confirmation is reset and the work stays dirty. Older checkpoints without these fields restore only their notation and say the current settings were kept. The reviewer's `check-settings.py` passes both cases. |
+| C2 passage/map coherence | Passage kind, boundary and add/remove operations are rejected with an explicit message rather than declaring a hold while the cursor advances. Teaching-section edits now move shared boundaries (end adjusts the next start, start adjusts the previous end), the first start and last end are pinned to the clip, and Remove gives the removed span to the previous section (or re-starts the new first at zero). |
+| C3 verification | The compact settings panel now loads the verification state and renders findings with Accept/Reject. Decisions call the server, update the token, and apply supported edits (`set_pitch`, `set_onset`, `delete_note`, `add_note`, `merge`, `split_note`) through the same occurrence commands as manual editing, so no second event array exists. A 409/conflict keeps the working document, reloads the diagnostics and reports the conflict. |
+| C4 revision path | `MusicLessonEditor` stops after the manifest when the subject is piano: it no longer downloads, hashes or parses the reference or builds a note array before the workspace mounts. Navigation after a revision save waits for the refreshed manifest and re-checks live dirty state, so edits made during the refresh keep the editor mounted. |
+
+### Verification (correction C1–C4)
+
+| Check | Result |
+| --- | --- |
+| Reviewer settings checks | **2/2** (settings recovered; passage edit rejected and kind remains playing) |
+| Normal-route E2E | 0 failures |
+| Phase 6 correction checks | 6/6 |
+| Original probes | 8/8 |
+| Editing browser script | pass |
+| Web suite / `tsc` | 471 passed / clean |
+
+### Still outstanding
+
+- **C5 physical touch and loaded-video qualification remain BLOCKED.** No hardware is available; the touch evidence is Chromium emulation and the normal-route run has no playable video.
+- **Library → private revision → save/reopen is still not driven end-to-end.** The loader and delayed-navigation code are corrected, but the controlled library card could not be made to render through the summaries fixture in this pass, so the POST-with-`base_revision_id` journey is unverified.
+- The verification diagnostics are implemented but have not been exercised against a real verification report/decision fixture in an end-to-end run.

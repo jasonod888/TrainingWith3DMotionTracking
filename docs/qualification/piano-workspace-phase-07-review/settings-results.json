@@ -1,0 +1,37 @@
+[
+  {
+    "name": "settings-recovered-after-reload",
+    "passed": true,
+    "expected": {
+      "label": "Corrected section",
+      "policy": "notes"
+    },
+    "actual": {
+      "label": "Corrected section",
+      "policy": "notes"
+    },
+    "checkpoint_fields": [
+      "alignment",
+      "assessment",
+      "baseRevisionId",
+      "identity",
+      "notation",
+      "offsetSeconds",
+      "savedAt",
+      "sections",
+      "spans",
+      "title",
+      "verificationToken",
+      "version"
+    ]
+  },
+  {
+    "name": "passage-map-coherence-after-recovery",
+    "passed": true,
+    "source_second": 1,
+    "kind": "playing",
+    "before_tick": 1160.0,
+    "after_tick": 1160.0,
+    "expected": "reject incompatible edit or explicitly update map/score; do not declare a hold while cursor advances"
+  }
+]

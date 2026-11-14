@@ -1,7 +1,8 @@
-﻿# Phase 7 correction regression
+﻿# Phase 7 C1-C4 regression
 # web suite: 471 passed
 # tsc: clean
-# Phase 6 correction checks: 6/6
-# original probes: 8/8
+# reviewer settings checks: 2/2
+# Phase 6 correction: 6/6
+# probes: 8/8
 # editing browser: pass
-# normal-route E2E: pass (touch emulation only)
+# normal route: pass (touch emulation only)

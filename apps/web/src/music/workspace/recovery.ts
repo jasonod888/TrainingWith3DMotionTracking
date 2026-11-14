@@ -30,6 +30,9 @@ export type RecoveryCheckpoint = {
   /** Server identity the local work was based on, so a retry is not a first review. */
   baseRevisionId?: string | null;
   verificationToken?: string | null;
+  /** Added after v1 shipped: older checkpoints legitimately lack these. */
+  sections?: {id: string; label: string; start: number; end: number}[];
+  assessment?: {policy: 'none' | 'notes'};
 };
 
 export type RecoveryRead =
@@ -100,6 +103,22 @@ export function readRecovery(identity: RecoveryIdentity): RecoveryRead {
   }
   if (!checkpoint.notation || typeof checkpoint.notation !== 'object') {
     return {status: 'rejected', reason: 'The local checkpoint has no notation and was ignored.'};
+  }
+  if (checkpoint.sections !== undefined) {
+    const sections = checkpoint.sections;
+    const valid = Array.isArray(sections) && sections.length > 0 && sections.length <= 500
+      && sections.every(section => section && typeof section === 'object'
+        && typeof section.id === 'string' && section.id.length > 0 && section.id.length <= 80
+        && typeof section.label === 'string' && section.label.length <= 80
+        && Number.isFinite(section.start) && Number.isFinite(section.end)
+        && section.start >= 0 && section.end > section.start)
+      && sections.every((section, index) => index === 0
+        || section.start >= sections[index - 1].end - 1e-6);
+    if (!valid) return {status: 'rejected', reason: 'The local checkpoint has invalid teaching sections and was ignored.'};
+  }
+  if (checkpoint.assessment !== undefined
+    && (!checkpoint.assessment || !['none', 'notes'].includes(checkpoint.assessment.policy))) {
+    return {status: 'rejected', reason: 'The local checkpoint has an invalid assessment policy and was ignored.'};
   }
   return {status: 'restored', checkpoint: checkpoint as RecoveryCheckpoint};
 }

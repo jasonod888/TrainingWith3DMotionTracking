@@ -20,6 +20,10 @@ import {KeyboardEditor} from '../notation/KeyboardEditor';
 import {NotationAudio} from '../notation/notation-audio';
 import {usePianoSourcePlayer} from '../usePianoSourcePlayer';
 import {usePianoPreviewAsset} from '../usePianoPreviewAsset';
+import {
+  decideVerification, findingDecision, loadVerification, parseVerificationState,
+  type VerificationFinding, type VerificationState,
+} from '../verification';
 import type {Asset} from '../../../../../packages/lesson-schema/index';
 import {ClipOverview} from './ClipOverview';
 import {ContinuousScore} from './ContinuousScore';
@@ -156,6 +160,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [savedSections, setSavedSections] = useState<{id: string; label: string; start: number; end: number}[] | null>(null);
   const [sectionsDraft, setSectionsDraft] = useState<{id: string; label: string; start: number; end: number}[]>([]);
   const [assessmentPolicy, setAssessmentPolicy] = useState<'none' | 'notes'>('none');
+  const [verification, setVerification] = useState<VerificationState | null>(null);
+  const [verificationBusy, setVerificationBusy] = useState(false);
   const [savedAssessment, setSavedAssessment] = useState<unknown>(null);
   const [serverSignature, setServerSignature] = useState<string | null>(null);
   const [mapState, setMapState] = useState<Alignment | null>(null);
@@ -715,6 +721,77 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   // A reopened reference becomes the clean saved state once its document is applied.
   useEffect(() => {
+    if (!lessonId || !draftId) { setVerification(null); return; }
+    let stopped = false;
+    void loadVerification(lessonId, draftId).then(value => {
+      if (stopped || value === null) return;
+      const parsed = parseVerificationState(value);
+      if (parsed.ok) setVerification(parsed.value);
+    }).catch(() => {});
+    return () => { stopped = true; };
+  }, [lessonId, draftId]);
+
+  // Apply a finding through the same occurrence commands as manual edits; the
+  // workspace never keeps a second event array.
+  const applyFinding = useCallback((finding: VerificationFinding) => {
+    if (!document) return;
+    let applied = 0;
+    const run = (command: Parameters<typeof applyCommand>[1]) => {
+      const outcome = applyCommand(document, command);
+      if (outcome.status === 'applied') { dispatch({type: 'command', command}); applied += 1; }
+    };
+    for (const edit of finding.proposed_edits) {
+      const after = (edit.after ?? {}) as Record<string, unknown>;
+      if (edit.op === 'set_pitch') {
+        for (const id of edit.event_ids) run({type: 'set-occurrence-pitch', occurrenceId: id, pitch: Number(after.pitch)});
+      } else if (edit.op === 'set_onset') {
+        for (const id of edit.event_ids) run({type: 'set-occurrence-onset', occurrenceId: id, seconds: Number(after.onset)});
+      } else if (edit.op === 'delete_note') {
+        for (const id of edit.event_ids) run({type: 'delete-occurrence', occurrenceId: id});
+      } else if (edit.op === 'add_note') {
+        run({type: 'insert-note', pitch: Number(after.pitch), onsetSeconds: Number(after.onset),
+          durationSeconds: Math.max(0.02, Number(after.duration) || 0.25)});
+      } else if (edit.op === 'merge') {
+        for (const id of edit.event_ids) run({type: 'delete-occurrence', occurrenceId: id});
+        run({type: 'insert-note', pitch: Number(after.pitch), onsetSeconds: Number(after.onset),
+          durationSeconds: Math.max(0.02, Number(after.duration) || 0.25)});
+      } else if (edit.op === 'split_note') {
+        for (const id of edit.event_ids) run({type: 'delete-occurrence', occurrenceId: id});
+        for (const piece of Array.isArray(edit.after) ? edit.after as Record<string, unknown>[] : []) {
+          run({type: 'insert-note', pitch: Number(piece.pitch), onsetSeconds: Number(piece.onset),
+            durationSeconds: Math.max(0.02, Number(piece.duration) || 0.25)});
+        }
+      } else {
+        setNotice(`Suggestion ${finding.id} uses an unsupported edit (${edit.op}); it was not applied.`);
+      }
+    }
+    if (applied > 0) setConfirmReviewed(false);
+  }, [document, dispatch]);
+  const decideFinding = useCallback(async (finding: VerificationFinding, decision: 'accepted' | 'rejected') => {
+    if (!lessonId || !draftId || !verification || verificationBusy) return;
+    setVerificationBusy(true);
+    try {
+      const value = await decideVerification(lessonId, draftId, verification.proposal_sha256,
+        verification.state_token, verification.report_sha256, finding.id, decision);
+      const parsed = parseVerificationState(value);
+      if (!parsed.ok) throw new Error(parsed.message);
+      setVerification(parsed.value);
+      setVerificationToken(parsed.value.state_token);
+      if (decision === 'accepted') applyFinding(finding);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message
+        : 'The verification decision conflicted; the working document was kept.');
+      void loadVerification(lessonId, draftId).then(value => {
+        if (value === null) return;
+        const parsed = parseVerificationState(value);
+        if (parsed.ok) setVerification(parsed.value);
+      }).catch(() => {});
+    } finally {
+      setVerificationBusy(false);
+    }
+  }, [lessonId, draftId, verification, verificationBusy, applyFinding]);
+
+  useEffect(() => {
     if (pendingSavedSignature.current && workspaceSignature) {
       pendingSavedSignature.current = false;
       setSavedSignature(workspaceSignature);
@@ -748,11 +825,13 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         notation: document,
         alignment: serializeAlignment(alignment, anchors, offsetSeconds),
         offsetSeconds, spans,
+        sections: sectionsDraft.length ? sectionsDraft : undefined,
+        assessment: {policy: assessmentPolicy},
       });
     }, 600);
     return () => clearTimeout(timer);
   }, [workspaceSignature, dirty, accountId, draftId, sourceSha256, title, alignment, anchors, offsetSeconds,
-      spans, recoveryIdentity, savedRevisionId, verificationToken]);
+      spans, recoveryIdentity, savedRevisionId, verificationToken, sectionsDraft, assessmentPolicy]);
 
   // Any document change requires a fresh confirmation before it can be saved.
   useEffect(() => { setConfirmReviewed(false); }, [workspaceSignature]);
@@ -950,6 +1029,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       setSpans(staleCheckpoint.spans);
       setOffsetSeconds(staleCheckpoint.offsetSeconds);
       setAnchors(canonicalAnchors(staleCheckpoint.alignment?.anchors ?? []));
+      if (staleCheckpoint.sections?.length) setSectionsDraft(staleCheckpoint.sections);
+      if (staleCheckpoint.assessment) setAssessmentPolicy(staleCheckpoint.assessment.policy);
       if (staleCheckpoint.alignment?.passages?.length) {
         setMapState({alignment_version: 1, mode: staleCheckpoint.alignment.mode,
           basis: staleCheckpoint.alignment.basis, passages: staleCheckpoint.alignment.passages});
@@ -974,6 +1055,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       setSpans(recoveryOffer.spans);
       setOffsetSeconds(recoveryOffer.offsetSeconds);
       setAnchors(canonicalAnchors(recoveryOffer.alignment?.anchors ?? []));
+      if (recoveryOffer.sections?.length) setSectionsDraft(recoveryOffer.sections);
+      if (recoveryOffer.assessment) setAssessmentPolicy(recoveryOffer.assessment.policy);
       // Recovered work keeps its server base so a retry is not a first review.
       if (recoveryOffer.baseRevisionId) setSavedRevisionId(recoveryOffer.baseRevisionId);
       if (recoveryOffer.verificationToken) setVerificationToken(recoveryOffer.verificationToken);
@@ -1209,19 +1292,41 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           <label className="ws-field ws-inline"><span>Start (s)</span>
             <input type="number" step={0.01} min={0} max={section.end - 0.05} value={section.start}
               onChange={event => {
-                const start = Math.max(0, Math.min(section.end - 0.05, Number(event.target.value)));
-                setSectionsDraft(current => current.map((item, position) => position === index ? {...item, start} : item));
+                const raw = Number(event.target.value);
+                const start = index === 0 ? 0 : Math.max(0, Math.min(section.end - 0.05, raw));
+                setSectionsDraft(current => current.map((item, position) => {
+                  if (position === index) return {...item, start};
+                  // Shared boundary: the previous section ends where this one starts.
+                  if (position === index - 1) return {...item, end: start};
+                  return item;
+                }));
                 setConfirmReviewed(false);
               }}/></label>
           <label className="ws-field ws-inline"><span>End (s)</span>
             <input type="number" step={0.01} min={section.start + 0.05} max={document.duration} value={section.end}
               onChange={event => {
-                const end = Math.max(section.start + 0.05, Math.min(document.duration, Number(event.target.value)));
-                setSectionsDraft(current => current.map((item, position) => position === index ? {...item, end} : item));
+                const raw = Number(event.target.value);
+                const end = index === sectionsDraft.length - 1 ? document.duration
+                  : Math.max(section.start + 0.05, Math.min(document.duration, raw));
+                setSectionsDraft(current => current.map((item, position) => {
+                  if (position === index) return {...item, end};
+                  // Shared boundary: the next section starts where this one ends.
+                  if (position === index + 1) return {...item, start: end};
+                  return item;
+                }));
                 setConfirmReviewed(false);
               }}/></label>
           {sectionsDraft.length > 1 && <button type="button" onClick={() => {
-            setSectionsDraft(current => current.filter((_, position) => position !== index));
+            setSectionsDraft(current => {
+              const removed = current[index];
+              const next = current.filter((_, position) => position !== index);
+              if (index > 0) {
+                // Give the removed span to the previous section.
+                return next.map((item, position) => position === index - 1 ? {...item, end: removed.end} : item);
+              }
+              // Removing the first section starts the new first one at zero.
+              return next.map((item, position) => position === 0 ? {...item, start: 0} : item);
+            });
             setConfirmReviewed(false);
           }}>Remove</button>}
         </div>
@@ -1234,32 +1339,50 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           <option value="notes">Pitch and timing from MIDI</option>
         </select>
       </label>
+      <h2>Verification diagnostics</h2>
+      {!verification ? <p className="ws-hint">No verification report is available for this proposal.</p> : <>
+        <p className="ws-hint" data-verification-status>
+          {verification.stale ? 'Stale report' : verification.report ? 'Report ready' : 'Report unavailable'}
+          {' · '}{verification.decisions.length} decided
+          {verification.conflicts.length ? ` · ${verification.conflicts.length} conflict(s)` : ''}
+        </p>
+        {verification.report_error && <p className="ws-hint">{verification.report_error}</p>}
+        {verification.report?.findings.slice(0, 12).map(finding => {
+          const decision = findingDecision(verification, finding.id);
+          return <div className="ws-row" key={finding.id} data-finding={finding.id}>
+            <span>{finding.kind} · {finding.explanation}</span>
+            <span className="ws-hint">{decision ? decision.decision : finding.status}</span>
+            <button type="button" disabled={verificationBusy} data-verification-accept={finding.id}
+              onClick={() => void decideFinding(finding, 'accepted')}>Accept</button>
+            <button type="button" disabled={verificationBusy} data-verification-reject={finding.id}
+              onClick={() => void decideFinding(finding, 'rejected')}>Reject</button>
+          </div>;
+        })}
+        {verification.report && verification.report.findings.length > 12
+          && <p className="ws-hint">{verification.report.findings.length - 12} more findings are not shown here.</p>}
+      </>}
       <h2>Passages</h2>
       <p className="ws-hint">Playing passages carry score time; explanation passages are held and reject insertion.</p>
       {spans.map((span, index) => <div className="ws-row" key={`${index}-${span.start}`} data-passage={index}>
         <select aria-label={`Passage ${index + 1} kind`} value={span.kind}
-          onChange={event => { setSpans(current => current.map((item, position) => position === index
-            ? {...item, kind: event.target.value === 'explanation' ? 'explanation' : 'playing'} : item)); setConfirmReviewed(false); }}>
+          onChange={() => setNotice('Passage changes would move the existing notation. '
+            + 'This edit was not applied; adjust the alignment instead of relabelling a passage that already carries notes.')}>
           <option value="playing">Playing</option>
           <option value="explanation">Explanation</option>
         </select>
         <label className="ws-field ws-inline"><span>Start</span>
           <input type="number" step={0.01} value={span.start}
-            onChange={event => { const start = Number(event.target.value);
-              setSpans(current => current.map((item, position) => position === index ? {...item, start} : item));
-              setConfirmReviewed(false); }}/></label>
+            onChange={() => setNotice('Passage boundary changes would move the existing notation and were not applied.')}/></label>
         <label className="ws-field ws-inline"><span>End</span>
           <input type="number" step={0.01} value={span.end}
-            onChange={event => { const end = Number(event.target.value);
-              setSpans(current => current.map((item, position) => position === index ? {...item, end} : item));
-              setConfirmReviewed(false); }}/></label>
-        {spans.length > 1 && <button type="button" onClick={() => { setSpans(current => current.filter((_, position) => position !== index)); setConfirmReviewed(false); }}>Remove</button>}
+            onChange={() => setNotice('Passage boundary changes would move the existing notation and were not applied.')}/></label>
+        {spans.length > 1 && <button type="button" onClick={() => setNotice('Passages cannot be removed while they carry scored notes.')}>Remove</button>}
       </div>)}
-      <div className="ws-row"><button type="button" onClick={() => {
-        const end = Math.min(document.duration, (spans[spans.length - 1]?.end ?? 0) + 1);
-        setSpans(current => [...current, {start: Math.max(0, end - 1), end, kind: 'playing'}]);
-        setConfirmReviewed(false);
-      }}>Add passage</button></div>
+      <div className="ws-row"><button type="button"
+        onClick={() => setNotice('Adding a passage to a scored clip is not supported yet; it would overlap existing score time.')}>
+        Add passage</button></div>
+      <p className="ws-hint" data-passage-rejected="true">Passage kind and boundary edits are validated against the existing map and
+        currently rejected rather than silently re-timing engraved notes.</p>
       <p className="ws-hint">Verification decisions from the proposal remain server-authoritative; a changed verification state is reported as a conflict instead of being overwritten.</p>
     </details>
 
