@@ -153,6 +153,8 @@ export function ContinuousScore({
 
   const beginSheetDrag = (note: {logical_note_id: string; performance_ids: string[]; spelling: string}, event: React.PointerEvent) => {
     if (event.button !== 0) return;
+    // A second pointer must not replace an active transaction.
+    if (sheetDrag.current && sheetDrag.current.pointerId !== event.pointerId) return;
     const occurrence = occurrenceFor(note);
     if (!occurrence) { choose(note); return; }
     event.preventDefault();
@@ -205,6 +207,8 @@ export function ContinuousScore({
 
   const commitSheetDrag = (event: React.PointerEvent) => {
     const drag = sheetDrag.current;
+    // A foreign pointer cannot finish (or cancel) someone else's drag.
+    if (drag && event.pointerId !== drag.pointerId) return;
     sheetDrag.current = null;
     sheetCleanup.current?.();
     sheetCleanup.current = null;
@@ -215,7 +219,8 @@ export function ContinuousScore({
     onGestureCommit?.({kind: 'pitch', occurrenceId: drag.occurrence, pitch: next.pitch, spelling: next.spelling});
   };
 
-  const cancelSheetDrag = () => {
+  const cancelSheetDrag = (event?: React.PointerEvent) => {
+    if (event && sheetDrag.current && event.pointerId !== sheetDrag.current.pointerId) return;
     sheetDrag.current = null;
     sheetCleanup.current?.();
     sheetCleanup.current = null;
@@ -319,10 +324,11 @@ export function ContinuousScore({
           const hasStem = segment.value !== 'whole';
           return <g key={segment.id} className="ws-score-event" data-value={segment.value} data-dotted={segment.dotted ? 'true' : 'false'}>
             {segment.notes.map(note => {
-              const cy = yForNote(segment.staff, note.spelling);
+              const occurrence = occurrenceFor(note);
+              const preview = sheetPreview?.occurrence === occurrence ? sheetPreview : null;
+              const cy = yForNote(segment.staff, preview ? preview.spelling : note.spelling);
               const selected = selectedOccurrenceId !== null && note.performance_ids.includes(selectedOccurrenceId);
               const active = liveActive.some(id => note.performance_ids.includes(id));
-              const occurrence = occurrenceFor(note);
               const ambiguous = occurrence === null;
               return <g key={note.id}>
                 {ledgerLines(cy, staffTop, staffBottom)
@@ -343,9 +349,9 @@ export function ContinuousScore({
                       {note.accidental === 'sharp' ? '♯' : note.accidental === 'flat' ? '♭' : '♮'}
                     </text>
                   : null}
-                {sheetPreview?.occurrence === occurrence ? <text className="ws-score-drag-label"
-                  data-sheet-drag-label={sheetPreview.spelling}
-                  x={x + 10} y={cy - 10 + sheetPreview.steps * 6}>{sheetPreview.spelling}</text> : null}
+                {preview ? <text className="ws-score-drag-label"
+                  data-sheet-drag-label={preview.spelling}
+                  x={x + 12} y={cy - 9}>{preview.spelling}</text> : null}
                 {segment.dotted ? <circle className="ws-score-dot" cx={x + 8} cy={cy - 1} r={1.8}/> : null}
               </g>;
             })}

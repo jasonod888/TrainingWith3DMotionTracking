@@ -102,16 +102,30 @@ def demo_gestures(page):
     RESULT['resize'] = {'length': length}
     page.screenshot(path=str(OUT / 'resize.png'))
 
-    # Sheet drag: one diatonic step with a candidate label.
+    # Sheet drag: the candidate head follows the staff, then commits the spelling.
     page.reload(wait_until='domcontentloaded')
     page.wait_for_selector('.ws-score-notehead')
     head = page.locator('.ws-score-notehead').first
     label = head.get_attribute('aria-label')
-    drag(page, head, 0, -12)
-    page.wait_for_timeout(200)
-    expect(page.locator('.ws-score-notehead').first.get_attribute('aria-label') != label,
-           'sheet drag must change the written pitch')
-    RESULT['sheet_drag'] = {'from': label, 'to': page.locator('.ws-score-notehead').first.get_attribute('aria-label')}
+    spelling_before = (label or '').split(',')[0].strip()
+    original_cy = float(head.get_attribute('cy'))
+    box = head.bounding_box()
+    cx, cy = box['x'] + box['width'] / 2, box['y'] + box['height'] / 2
+    page.mouse.move(cx, cy)
+    page.mouse.down()
+    page.mouse.move(cx, cy - 5, steps=4)
+    page.wait_for_selector('[data-sheet-drag-label]')
+    candidate = page.locator('[data-sheet-drag-label]').first.get_attribute('data-sheet-drag-label')
+    preview_cy = float(page.locator('.ws-score-notehead').first.get_attribute('cy'))
+    expect(preview_cy < original_cy, f'the candidate head must move up: {original_cy} -> {preview_cy}')
+    expect(candidate != spelling_before, f'the candidate spelling must differ: {candidate}')
+    page.mouse.up()
+    page.wait_for_timeout(250)
+    facts = page.locator('.ws-facts').inner_text() if page.locator('.ws-facts').count() else ''
+    head_text = (page.locator('.ws-score-notehead').first.get_attribute('aria-label') or '')
+    expect(spelling_before not in head_text.split(',')[0], f'the committed spelling must change: {head_text}')
+    RESULT['sheet_drag'] = {'from': spelling_before, 'candidate': candidate, 'cy': [original_cy, preview_cy],
+                            'committed': head_text.split(',')[0].strip()}
     page.screenshot(path=str(OUT / 'sheet-drag.png'))
 
     # Replace pitch through the keyboard.
@@ -242,6 +256,9 @@ def long_round_trip(page, world):
     expect(abs(saved_target['onset'] - original[target_id]['onset']) < 1e-9, 'the correction moved its onset')
     expect(saved_unrelated['pitch'] == original[unrelated_id]['pitch'], 'an unrelated note changed')
     expect(abs(saved_unrelated['onset'] - original[unrelated_id]['onset']) < 1e-9, 'an unrelated onset changed')
+    changed_ids = [event['id'] for event in events
+                   if event != original.get(event['id']) and event['id'] != target_id]
+    expect(not changed_ids, f'unrelated notes changed: {changed_ids[:5]}')
 
     # Reopen the stored reference and confirm the correction and integrity survive.
     world['long_manifest'] = {'revision_id': 'rev-long-1',

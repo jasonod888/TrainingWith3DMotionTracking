@@ -54,7 +54,7 @@ type Props = {
   snapSeconds?: number | null;
   /** Add-note mode places a ghost instead of selecting. */
   addMode?: boolean;
-  ghost?: {seconds: number; pitch: number; durationSeconds?: number} | null;
+  ghost?: {seconds: number; pitch: number; durationSeconds?: number; invalid?: boolean} | null;
   /** Replace/Add modes disable direct manipulation in this surface. */
   editingEnabled?: boolean;
   onGhostPlace?: (seconds: number, pitch: number) => void;
@@ -160,7 +160,8 @@ export function TimeRoll({
     dragCleanup.current = null;
   };
 
-  const cancelDrag = () => {
+  const cancelDrag = (event?: React.PointerEvent) => {
+    if (event && dragRef.current && event.pointerId !== dragRef.current.pointerId) return;
     // Distinct from commit: nothing reaches the document or history.
     dragRef.current = null;
     teardownDrag();
@@ -173,6 +174,7 @@ export function TimeRoll({
   const beginDrag = (note: NotationDocument['performance'][number], event: React.PointerEvent, forced: GestureAxis | null) => {
     if (addMode) { onGhostPlace?.(note.onset + effectiveOffset, note.pitch); return; }
     if (event.button !== 0) return;
+    if (dragRef.current && dragRef.current.pointerId !== event.pointerId) return;
     if (!editingEnabled) { onSelect(note.id); return; }
     event.preventDefault();
     teardownDrag();
@@ -226,6 +228,7 @@ export function TimeRoll({
 
   const commitDrag = (event: React.PointerEvent) => {
     const drag = dragRef.current;
+    if (drag && event.pointerId !== drag.pointerId) return;
     dragRef.current = null;
     teardownDrag();
     setDragPreview(null);
@@ -317,7 +320,8 @@ export function TimeRoll({
             return <g key={note.id}>
               <rect className={`ws-roll-note${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}${dragging ? ' is-dragging' : ''}${invalid ? ' is-invalid' : ''}`}
                 x={left} y={y(pitch) - rowHeight / 2} width={noteWidth} height={Math.max(3, rowHeight - 1)} rx={2}
-                data-occurrence={note.id} data-pitch={pitch} data-drag-axis={preview?.axis ?? undefined} role="button" tabIndex={0}
+                data-occurrence={note.id} data-pitch={note.pitch} data-preview-pitch={preview?.pitch ?? undefined}
+                data-drag-axis={preview?.axis ?? undefined} role="button" tabIndex={0}
                 aria-label={`${pitchName(pitch)} at ${onset.toFixed(2)} seconds${selected ? ', selected' : ''}`}
                 onPointerDown={event => beginDrag(note, event, null)}
                 onPointerMove={moveDrag}
@@ -343,8 +347,9 @@ export function TimeRoll({
           {ghost ? (() => {
             const ghostLeft = (ghost.seconds + effectiveOffset) * pps;
             const clash = document.performance.some(note => note.pitch === ghost.pitch && Math.abs(note.onset - ghost.seconds) < 0.001);
-            return <rect className={`ws-roll-ghost${clash ? ' is-invalid' : ''}`} data-ghost="true"
-              data-ghost-invalid={clash ? 'true' : 'false'}
+            const invalid = Boolean(ghost.invalid) || clash;
+            return <rect className={`ws-roll-ghost${invalid ? ' is-invalid' : ''}`} data-ghost="true"
+              data-ghost-invalid={invalid ? 'true' : 'false'}
               x={ghostLeft} y={y(ghost.pitch) - rowHeight / 2} width={Math.max(4, (ghost.durationSeconds ?? 0.25) * pps)} height={Math.max(3, rowHeight - 1)} rx={2}
               aria-label={`New note ${pitchName(ghost.pitch)} at ${ghost.seconds.toFixed(2)} seconds`}/>;
           })() : null}

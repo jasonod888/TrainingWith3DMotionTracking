@@ -79,3 +79,29 @@ No persistence changes, no page replacement, no publication. Phase 7 has not sta
 | Browser editing script | exit 0, including {pitch drag 60→62, time 2.0→2.6 s, resize 1.0964 s, sheet C4→D4, replace 60→62, duplicate warning, accidentals/respell, chord isolation, overlap picker of 2, saved/reopened 60→63, and the long example 1,338 notes with target 69→72 and unrelated notes preserved} |
 
 Evidence: `phase6-editing.json`, `captures/` (accidentals-respell, chord-isolation, overlap-picker, long-saved-reopened and the original surfaces), `scripts/workspace-gestures.test.tsx`, `scripts/workspace-editing-journeys.test.tsx`, `scripts/check-editing.py`, `scripts/workspace-phase6-review-repro.tsx`.
+
+---
+
+## 6. Correction review F1–F6 (this commit)
+
+| Item | Resolution |
+| --- | --- |
+| F1 written duration | Insertions now send `durationTicks` (the chosen written value) independently of `durationSeconds`; all entry points carry the remembered written value. A deliberately different pair is tested: 0.25 s recorded with a half note yields **960 written ticks**, and inspection confirms recorded 0.250 s. |
+| F2 history shortcuts | Undo/redo shortcuts follow the same transaction policy as the buttons: blocked while Replace or Add is active (and for Add in the toolbar too), scoped to an active workspace via a pointer-focus guard, and the replacement target is not edited underneath the banner. |
+| F3 written position | The control exposes an explicit **This note / Whole written event** scope. Single-note events move; a chord member in note scope is rejected with an explanation instead of silently moving the chord; whole-event movement requires choosing that scope. The draft is controlled and re-bound on selection change, so no stale value leaks to another note. |
+| F4 invalid insertion | Ghosts are no longer clamped: placing before the offset stores the attempted source time, shows an invalid ghost and the reason, and Insert is rejected without a command or history entry (count unchanged). |
+| F5 pointer ownership | Element-level commit/cancel handlers now check pointer id as well as the global handlers, and a second pointer cannot replace an active transaction. `data-pitch` reports the committed document pitch while the drag preview is exposed separately, so a refused foreign release leaves the original transaction and pitch untouched. |
+| F6 sheet preview | The candidate notehead and label follow the staff position (`cy` 84 → 79 for one space) and the browser check compares the committed spelling (C4 → D4), not a “selected” label suffix. A separate committed-spelling assertion and the collision rejection remain distinct. |
+
+### Verification (correction)
+
+| Check | Result |
+| --- | --- |
+| Independent six correction browser checks | **6/6** |
+| Original eight reviewer probes | **8/8** |
+| Gesture + journey tests | **17** (8 gesture, 9 journey) |
+| Web suite | **471 passed**, `tsc` clean |
+| Long fixture save/reopen | 1,338 notes; target 69→72; **every** unrelated event identical (pitch, onset, duration); reopened pitch preserved |
+| Submitted browser script | exit 0; sheet check now asserts the committed spelling (C4→D4) and candidate head movement |
+
+Evidence files: `phase6-editing.json` (own surfaces + long example), `scripts/check-correction.py` and `phase6-correction.json` (reviewer checks), `scripts/workspace-editing-journeys.test.tsx`, `scripts/workspace-gestures.test.tsx`, `scripts/workspace-phase6-review-repro.tsx`.

@@ -109,6 +109,7 @@ export function PianoWorkspaceHarness() {
   const [writtenScope, setWrittenScope] = useState<'note' | 'event'>('note');
   const [respellDraft, setRespellDraft] = useState('');
   const [writtenStartDraft, setWrittenStartDraft] = useState('');
+  const [writtenStartScope, setWrittenStartScope] = useState<'note' | 'event'>('note');
   const [notice, setNotice] = useState('');
   const [window, setWindow] = useState<TimeWindow>({start: 0, span: DEFAULT_SPAN_SECONDS});
   const [spans, setSpans] = useState<{ start: number; end: number; kind: 'playing' | 'explanation' }[]>([]);
@@ -169,6 +170,8 @@ export function PianoWorkspaceHarness() {
   const [overlap, setOverlap] = useState<{pitch: number; ids: string[]} | null>(null);
   const lastWrittenTicks = useRef(480);
   const alignmentRef = useRef<Alignment | null>(null);
+  const workspaceActive = useRef(false);
+  const shellRef = useRef<HTMLElement | null>(null);
   const selectedRef = useRef<{ pitch: number } | null>(null);
   const selectionOccurrenceRef = useRef<string | null>(null);
   const lastRecordedSeconds = useRef(0.5);
@@ -370,6 +373,8 @@ export function PianoWorkspaceHarness() {
     return placement.ok ? {performed: placement.performed, tick: placement.tick} : {problem: placement.problem};
   }, [document, offsetSeconds]);
 
+  const addPlacement = addMode ? placementFor(addMode.seconds + offsetSeconds) : null;
+  const addProblem = addPlacement && 'problem' in addPlacement ? addPlacement.problem : null;
   const ghostDuplicate = Boolean(addMode && document?.performance.some(note =>
     note.pitch === addMode.pitch && Math.abs(note.onset - addMode.seconds) < 0.001));
   const ghostDuplicateId = ghostDuplicate && document
@@ -382,7 +387,7 @@ export function PianoWorkspaceHarness() {
     if ('problem' in placement) { setNotice(placement.problem); return; }
     const command = {type: 'insert-note' as const, pitch: selectedRef.current?.pitch ?? 60,
       onsetSeconds: placement.performed, durationSeconds: lastRecordedSeconds.current,
-      startTicks: placement.tick, addToChord};
+      startTicks: placement.tick, durationTicks: lastWrittenTicks.current, addToChord};
     const outcome = applyCommand(state.document, command);
     if (outcome.status === 'applied') {
       dispatch({type: 'command', command});
@@ -398,7 +403,8 @@ export function PianoWorkspaceHarness() {
     const placement = placementFor(addMode.seconds + offsetSeconds);
     if ('problem' in placement) { setNotice(placement.problem); return; }
     const command = {type: 'insert-note' as const, pitch: addMode.pitch, onsetSeconds: placement.performed,
-      durationSeconds: Math.max(0.02, addMode.durationSeconds), startTicks: placement.tick};
+      durationSeconds: Math.max(0.02, addMode.durationSeconds), startTicks: placement.tick,
+      durationTicks: addMode.ticks};
     const outcome = applyCommand(state.document, command);
     if (outcome.status === 'rejected') { setNotice(outcome.message); return; }
     if (outcome.status === 'unchanged') {
@@ -429,18 +435,34 @@ export function PianoWorkspaceHarness() {
   const selection = state?.selection ?? null;
   const selected = selection && document ? noteFacts(document, selection) : null;
   useEffect(() => {
+    const onDown = (event: Event) => {
+      const root = shellRef.current;
+      const target = event.target as Node | null;
+      if (root && target && root.contains(target)) workspaceActive.current = true;
+    };
+    globalThis.window.addEventListener('pointerdown', onDown, true);
+    return () => globalThis.window.removeEventListener('pointerdown', onDown, true);
+  }, []);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
       const modifier = event.metaKey || event.ctrlKey;
       if (modifier && !event.shiftKey && event.key.toLowerCase() === 'z') {
-        event.preventDefault(); dispatch({type: 'undo'}); return;
+        event.preventDefault();
+        // History is an editing transaction too: modes block it.
+        if (!replaceMode && !addMode && workspaceActive.current) dispatch({type: 'undo'});
+        return;
       }
       if (modifier && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) {
-        event.preventDefault(); dispatch({type: 'redo'}); return;
+        event.preventDefault();
+        if (!replaceMode && !addMode && workspaceActive.current) dispatch({type: 'redo'});
+        return;
       }
       const occurrence = selectionOccurrenceRef.current;
-      if ((event.key === 'Delete' || event.key === 'Backspace') && occurrence && !replaceMode && !addMode) {
+      if ((event.key === 'Delete' || event.key === 'Backspace') && occurrence && !replaceMode && !addMode
+        && workspaceActive.current) {
         event.preventDefault();
         dispatch({type: 'command', command: {type: 'delete-occurrence', occurrenceId: occurrence}});
       }
@@ -449,6 +471,10 @@ export function PianoWorkspaceHarness() {
     return () => globalThis.window.removeEventListener('keydown', onKey);
   }, [dispatch, replaceMode, addMode]);
 
+  useEffect(() => {
+    setWrittenStartDraft(selected ? String(selected.writtenStartTicks) : '');
+    // Re-bind whenever the selected written position changes.
+  }, [selection?.eventId, selection?.logicalNoteId, selected?.writtenStartTicks, document]);
   const tiedSegmentCount = useMemo(() => {
     if (!document || !selection) return 0;
     return document.segments
@@ -1002,7 +1028,8 @@ export function PianoWorkspaceHarness() {
   const report = state.lastReport;
   const summary = historySummary(state);
 
-  return <main className="ws-shell">
+  return <main className="ws-shell" ref={shellRef}
+    onPointerDownCapture={() => { workspaceActive.current = true; }}>
     <header className="ws-head">
       <div>
         <p className="ws-eyebrow">Developer harness · Phase 4 · writes nothing</p>
@@ -1037,10 +1064,10 @@ export function PianoWorkspaceHarness() {
       </label>
       <button type="button" onClick={() => save()} disabled={!confirmReviewed || saving || !(dirty || savedRevisionId === null)}
         data-save-button="true">{saving ? 'Saving…' : 'Save privately'}</button>
-      <button type="button" onClick={reopen} disabled={Boolean(replaceMode)}>Reopen saved</button>
+      <button type="button" onClick={reopen} disabled={Boolean(replaceMode) || Boolean(addMode)}>Reopen saved</button>
 
-      <button type="button" onClick={() => dispatch({type: 'undo'})} disabled={!state.past.length || Boolean(replaceMode)}>Undo</button>
-      <button type="button" onClick={() => dispatch({type: 'redo'})} disabled={!state.future.length || Boolean(replaceMode)}>Redo</button>
+      <button type="button" onClick={() => dispatch({type: 'undo'})} disabled={!state.past.length || Boolean(replaceMode) || Boolean(addMode)}>Undo</button>
+      <button type="button" onClick={() => dispatch({type: 'redo'})} disabled={!state.future.length || Boolean(replaceMode) || Boolean(addMode)}>Redo</button>
       <label className="ws-field ws-inline">
         <span>Snap</span>
         <select value={snapTicks} onChange={event => setSnapTicks(Number(event.target.value))}>
@@ -1143,9 +1170,9 @@ export function PianoWorkspaceHarness() {
             snapSeconds={snapTicks ? snapTicks * secondsPerTick : null}
             addMode={Boolean(addMode)}
             ghost={addMode ? {seconds: addMode.seconds, pitch: addMode.pitch,
-              durationSeconds: addMode.durationSeconds} : null}
+              durationSeconds: addMode.durationSeconds, invalid: Boolean(addProblem)} : null}
             onGhostPlace={(seconds, pitch) => setAddMode(mode => ({
-              seconds: Math.max(0, Math.min(document.duration, seconds - offsetSeconds)), pitch,
+              seconds: seconds - offsetSeconds, pitch,
               ticks: mode?.ticks ?? lastWrittenTicks.current,
               durationSeconds: mode?.durationSeconds ?? lastRecordedSeconds.current}))}
             playhead={playhead} onSelect={select} onSeek={seek}/>
@@ -1256,16 +1283,26 @@ export function PianoWorkspaceHarness() {
               </div>
 
               <div className="ws-row" role="group" aria-label="Written beat position">
+                <span className="ws-hint">Written position for</span>
+                <button type="button" aria-pressed={writtenStartScope === 'note'} data-written-scope="note"
+                  className={writtenStartScope === 'note' ? 'is-active' : ''}
+                  onClick={() => setWrittenStartScope('note')}>This note</button>
+                <button type="button" aria-pressed={writtenStartScope === 'event'} data-written-scope="event"
+                  className={writtenStartScope === 'event' ? 'is-active' : ''}
+                  onClick={() => setWrittenStartScope('event')}>Whole written event</button>
                 <label className="ws-field ws-inline"><span>Written beat position (ticks)</span>
                   <input type="number" min={0} step={120} data-written-start
-                    defaultValue={selected.writtenStartTicks}
-                    key={`${selection.eventId}-${selected.writtenStartTicks}`}
+                    value={writtenStartDraft}
                     onChange={event => setWrittenStartDraft(event.target.value)}/>
                 </label>
                 <button type="button" data-written-start-apply disabled={!writtenStartDraft.trim()}
                   onClick={() => {
                     const ticks = Number(writtenStartDraft);
                     if (!Number.isInteger(ticks) || ticks < 0) { setNotice('Enter a whole, non-negative tick value.'); return; }
+                    if (writtenStartScope === 'note' && selected.notesInEvent > 1) {
+                      setNotice('Moving one chord member needs its own voice; choose “Whole written event” or split the note first.');
+                      return;
+                    }
                     const command = {type: 'move-written-start' as const, eventId: selection.eventId, ticks};
                     const outcome = applyCommand(state.document, command);
                     if (outcome.status === 'rejected') { setNotice(outcome.message); return; }
@@ -1353,6 +1390,7 @@ export function PianoWorkspaceHarness() {
               <button type="button" data-add="cancel"
                 onClick={() => { setAddMode(null); setDuplicateId(null); setNotice('Add note cancelled.'); }}>Cancel</button>
             </div>
+            {addProblem && <p className="ws-report is-bad" data-add="invalid">{addProblem}</p>}
             {ghostDuplicate && <p className="ws-report is-bad" data-add="duplicate">
               A {pitchName(addMode.pitch)} already starts here.
               <button type="button" onClick={() => { if (ghostDuplicateId) select(ghostDuplicateId); setAddMode(null); }}>Select existing</button>

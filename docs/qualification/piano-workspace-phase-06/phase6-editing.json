@@ -14,8 +14,13 @@
     "length": "1.0964"
   },
   "sheet_drag": {
-    "from": "C4, quarter",
-    "to": "C4, quarter, selected"
+    "from": "C4",
+    "candidate": "D4",
+    "cy": [
+      84.0,
+      79.0
+    ],
+    "committed": "D4"
   },
   "replace_pitch": {
     "from": 60,

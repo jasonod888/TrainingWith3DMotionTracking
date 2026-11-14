@@ -72,20 +72,21 @@ test('the add ghost shows and commits the chosen recorded length and written val
   const start = total(view);
   fireEvent.click(view.container.querySelector('[data-add="toggle"]')!);
   await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-add-layer')));
-  fireEvent.change(view.container.querySelector('[data-add="length"]')!, {target: {value: '1'}});
+  fireEvent.change(view.container.querySelector('[data-add="length"]')!, {target: {value: '0.25'}});
   fireEvent.change(view.container.querySelector('[data-add="written"]')!, {target: {value: '960'}});
   fireEvent.pointerDown(view.container.querySelector('.ws-roll-add-layer')!, {clientX: 300, clientY: 120});
   await waitFor(() => assert.ok(view.container.querySelector('[data-ghost="true"]')));
   const ghostWidth = Number(view.container.querySelector('[data-ghost="true"]')!.getAttribute('width'));
-  assert.ok(ghostWidth >= 55 && ghostWidth <= 62, `ghost should be one second wide, got ${ghostWidth}`);
+  assert.ok(ghostWidth >= 13 && ghostWidth <= 17, `ghost should be 0.25 s wide, got ${ghostWidth}`);
   fireEvent.click(view.getByRole('button', {name: 'Insert'}));
   await waitFor(() => assert.equal(total(view), start + 1));
   const inserted = [...view.container.querySelectorAll('.ws-roll-note')]
     .find(node => Number(node.getAttribute('x')) > 295 && Number(node.getAttribute('x')) < 305)!;
   fireEvent.pointerDown(inserted, {clientX: 300, clientY: 120, pointerId: 9, button: 0});
   fireEvent.pointerUp(inserted, {pointerId: 9});
-  await waitFor(() => assert.equal((view.getByLabelText('Recorded length (s)') as HTMLInputElement).value, '1'));
-  assert.match(view.getByText(/written 960 ticks/).textContent ?? '', /960/);
+  await waitFor(() => assert.equal((view.getByLabelText('Recorded length (s)') as HTMLInputElement).value, '0.25'));
+  assert.match(view.getByText(/written 960 ticks/).textContent ?? '', /960/,
+    'the chosen written value must be independent of the 0.25 s recorded length');
 });
 
 test('Replace reports a rejected command and stays in mode', async () => {
@@ -122,11 +123,12 @@ test('Delete and undo/redo shortcuts work outside text fields only', async () =>
   const start = total(view);
   fireEvent.pointerDown(view.container.querySelector('.ws-roll-note')!, {clientX: 100, clientY: 100, pointerId: 1, button: 0});
   fireEvent.pointerUp(view.container.querySelector('.ws-roll-note')!, {pointerId: 1});
-  fireEvent.keyDown(window, {key: 'Delete'});
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-facts')));
+  fireEvent.keyDown(view.container.querySelector('.ws-roll-svg')!, {key: 'Delete'});
   await waitFor(() => assert.equal(total(view), start - 1));
-  fireEvent.keyDown(window, {key: 'z', ctrlKey: true});
+  fireEvent.keyDown(view.container.querySelector('.ws-roll-svg')!, {key: 'z', ctrlKey: true});
   await waitFor(() => assert.equal(total(view), start));
-  fireEvent.keyDown(window, {key: 'y', ctrlKey: true});
+  fireEvent.keyDown(view.container.querySelector('.ws-roll-svg')!, {key: 'y', ctrlKey: true});
   await waitFor(() => assert.equal(total(view), start - 1));
 
   const offset = view.getByLabelText('Sync offset in seconds (not saved)') as HTMLInputElement;
@@ -142,6 +144,7 @@ test('the written beat position moves written time without touching the recorded
   fireEvent.pointerUp(view.container.querySelector('.ws-roll-note')!, {pointerId: 1});
   const facts = () => view.container.querySelector('.ws-facts')?.textContent ?? '';
   const onsetBefore = facts().match(/recorded ([0-9.]+) s/)?.[1];
+  fireEvent.click(view.container.querySelector('[data-written-scope="event"]')!);
   const field = view.container.querySelector('[data-written-start]') as HTMLInputElement;
   const next = Number(field.value) + 240;
   fireEvent.change(field, {target: {value: String(next)}});
@@ -150,4 +153,58 @@ test('the written beat position moves written time without touching the recorded
   assert.equal((view.container.querySelector('[data-written-start]') as HTMLInputElement).value, String(next));
   assert.equal(facts().match(/recorded ([0-9.]+) s/)?.[1], onsetBefore, 'recorded onset must not move');
   assert.equal(view.getByRole('button', {name: 'Undo', exact: true}).hasAttribute('disabled'), false);
+});
+
+test('a foreign pointer cannot finish or cancel the original drag', async () => {
+  const view = await open();
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  const before = note.getAttribute('data-pitch');
+  fireEvent.pointerDown(note, {clientX: 100, clientY: 100, pointerId: 31, button: 0});
+  fireEvent.pointerMove(note, {clientX: 100, clientY: 78, pointerId: 31});
+  fireEvent.pointerUp(note, {clientX: 100, clientY: 78, pointerId: 99});
+  assert.equal(view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch'), before,
+    'a foreign release must not commit the preview');
+  fireEvent.pointerCancel(window, {pointerId: 31});
+  assert.equal(view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch'), before);
+  assert.equal(view.getByRole('button', {name: 'Undo', exact: true}).hasAttribute('disabled'), true);
+});
+
+test('an unapplied written-position draft does not leak to another selection', async () => {
+  const view = await open('?demo=explanation');
+  const first = view.container.querySelector('.ws-roll-note[data-occurrence="d-1"]') as SVGRectElement;
+  fireEvent.pointerDown(first, {clientX: 100, clientY: 100, pointerId: 1, button: 0});
+  fireEvent.pointerUp(first, {pointerId: 1});
+  const field = view.container.querySelector('[data-written-start]') as HTMLInputElement;
+  const previous = field.value;
+  fireEvent.change(field, {target: {value: String(Number(previous) + 240)}});
+  const typed = field.value;
+  const second = view.container.querySelector('.ws-roll-note[data-occurrence="d-2"]') as SVGRectElement;
+  fireEvent.pointerDown(second, {clientX: 120, clientY: 100, pointerId: 2, button: 0});
+  fireEvent.pointerUp(second, {pointerId: 2});
+  await waitFor(() => assert.equal((view.container.querySelector('[data-written-start]') as HTMLInputElement).value, '1920'));
+  assert.notEqual('1920', typed, 'the sibling keeps its own written position');
+});
+
+test('exclusive modes block keyboard history as well as the toolbar', async () => {
+  const view = await open();
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  fireEvent.pointerDown(note, {clientX: 100, clientY: 100, pointerId: 1, button: 0});
+  fireEvent.pointerUp(note, {pointerId: 1});
+  view.getByRole('button', {name: '+ semitone'}).click();
+  await waitFor(() => assert.equal(view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch'), '61'));
+  const raised = view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch');
+  view.getByRole('button', {name: 'Replace pitch'}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('[data-replace="active"]')));
+  fireEvent.keyDown(window, {key: 'z', ctrlKey: true});
+  await waitFor(() => assert.equal(view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch'), raised,
+    'Ctrl+Z must not edit while replacing'));
+  assert.ok(view.container.querySelector('[data-replace="active"]'));
+  fireEvent.keyDown(window, {key: 'Escape'});
+
+  fireEvent.click(view.container.querySelector('[data-add="toggle"]')!);
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-add-layer')));
+  fireEvent.keyDown(window, {key: 'z', ctrlKey: true});
+  await waitFor(() => assert.equal(view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch'), raised,
+    'Ctrl+Z must not edit while adding'));
+  assert.equal(view.getByRole('button', {name: 'Undo', exact: true}).hasAttribute('disabled'), true);
 });
