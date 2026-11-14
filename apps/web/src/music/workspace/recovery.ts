@@ -107,10 +107,22 @@ export function readRecovery(identity: RecoveryIdentity): RecoveryRead {
         : 'A local checkpoint was written against an older saved revision of this clip; it is stale.',
     };
   }
-  if (checkpoint.acceptedBaselines !== undefined
-    && (!checkpoint.acceptedBaselines || typeof checkpoint.acceptedBaselines !== 'object'
-      || Array.isArray(checkpoint.acceptedBaselines))) {
-    return {status: 'rejected', reason: 'The local checkpoint has an invalid reversal baseline and was ignored.'};
+  if (checkpoint.acceptedBaselines !== undefined) {
+    const value = checkpoint.acceptedBaselines;
+    const validEntry = (entry: unknown) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+      const item = entry as Record<string, unknown>;
+      return typeof item.pitch === 'number' && Number.isFinite(item.pitch)
+        && typeof item.onset === 'number' && Number.isFinite(item.onset)
+        && typeof item.spelling === 'string' && typeof item.staff === 'string'
+        && typeof item.voice === 'number' && typeof item.eventStart === 'number'
+        && typeof item.eventDuration === 'number';
+    };
+    const valid = value && typeof value === 'object' && !Array.isArray(value)
+      && Object.values(value).every(group => group && typeof group === 'object' && !Array.isArray(group)
+        && Object.values(group).every(validEntry));
+    // Drop an unusable baseline but keep the recovered work; reversal will refuse.
+    if (!valid) delete checkpoint.acceptedBaselines;
   }
   if (checkpoint.authoredSpellings !== undefined) {
     const value = checkpoint.authoredSpellings;
@@ -118,7 +130,7 @@ export function readRecovery(identity: RecoveryIdentity): RecoveryRead {
       && Object.values(value).every(entry => entry && typeof entry === 'object' && !Array.isArray(entry)
         && Object.entries(entry).every(([id, spelling]) => id.length <= 120
           && typeof spelling === 'string' && spelling.length > 0 && spelling.length <= 12));
-    if (!valid) return {status: 'rejected', reason: 'The local checkpoint has invalid authored spellings and was ignored.'};
+    if (!valid) delete checkpoint.authoredSpellings;
   }
   if (!checkpoint.notation || typeof checkpoint.notation !== 'object') {
     return {status: 'rejected', reason: 'The local checkpoint has no notation and was ignored.'};

@@ -1,6 +1,7 @@
-﻿# Phase 7 W2 regression
+﻿# Phase 7 W2 closure regression
 # web suite: 471 passed
 # tsc: clean
+# empty baseline: 1/1
 # legacy reversal: 1/1
 # written reversal: 1/1
 # recovery: 2/2

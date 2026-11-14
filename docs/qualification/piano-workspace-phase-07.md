@@ -240,3 +240,27 @@ The refusal is limited to reversal application: the rejected decision is still r
 
 - **Physical touch qualification remains BLOCKED** — no hardware.
 - Interactive/upper-bound performance profiling remains a separate evidence item.
+
+---
+
+## 12. Baseline completeness validation (W2 closure)
+
+A reversal baseline must now be present **and complete** for the finding being reversed. The guard computes the required occurrence set from the finding (every `event_ids` entry plus the deterministic `vf-*` identity for add/merge/split), rejects an empty or missing group, requires every required id to have a full entry, and validates each entry's types (pitch/onset, nullable duration/velocity, authored spelling, staff, voice, written start/duration).
+
+Malformed baseline data in an older checkpoint no longer discards the whole recovery: the unusable baseline is dropped, the recovered notation/settings still restore, and any destructive reversal is refused for lack of a validated baseline. Missing, empty, partial and malformed cases therefore all preserve the recovered note/rhythm.
+
+### Verification (W2 closure)
+
+| Check | Result |
+| --- | --- |
+| Reviewer empty-baseline reversal | **1/1** — recovered 960-tick note retained |
+| Reviewer legacy-checkpoint reversal | 1/1 |
+| Reviewer written-reversal | 1/1 |
+| Reviewer recovery / transitions / verification / settings | 2/2, 2/2, 3/3, 2/2 |
+| Reviewer loaded clock | 4/4 |
+| Web suite / `tsc` | 471 / clean |
+
+### Outstanding
+
+- **Physical touch qualification remains BLOCKED** — no hardware.
+- Interactive/upper-bound performance profiling remains a separate evidence item.

@@ -889,7 +889,33 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       // accepted-state baseline (e.g. an older checkpoint) a destructive inverse
       // cannot be proven safe, so it is refused rather than guessed from performance.
       const baseline = acceptedBaselines.current[finding.id];
-      if (!baseline) return false;
+      // A baseline must exist, cover every occurrence the finding touches, and
+      // contain complete entries; empty/partial/malformed baselines are refused.
+      const requiredIds = new Set<string>();
+      for (const edit of finding.proposed_edits) {
+        edit.event_ids.forEach(id => requiredIds.add(String(id)));
+        if (edit.op === 'add_note') requiredIds.add(`vf-${finding.id}-a`);
+        if (edit.op === 'merge') requiredIds.add(`vf-${finding.id}-m`);
+        if (edit.op === 'split_note' && Array.isArray(edit.after)) {
+          (edit.after as unknown[]).forEach((_, index) => requiredIds.add(`vf-${finding.id}-${index + 1}`));
+        }
+      }
+      if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)
+        || Object.keys(baseline).length === 0) return false;
+      const validEntry = (entry: unknown): boolean => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+        const value = entry as Record<string, unknown>;
+        return typeof value.pitch === 'number' && Number.isFinite(value.pitch)
+          && typeof value.onset === 'number' && Number.isFinite(value.onset)
+          && (value.duration === null || typeof value.duration === 'number')
+          && (value.velocity === null || typeof value.velocity === 'number')
+          && typeof value.spelling === 'string'
+          && typeof value.staff === 'string'
+          && typeof value.voice === 'number'
+          && typeof value.eventStart === 'number'
+          && typeof value.eventDuration === 'number';
+      };
+      for (const id of requiredIds) if (!validEntry((baseline as Record<string, unknown>)[id])) return false;
       if (baseline) {
         for (const [id, expected] of Object.entries(baseline)) {
           const actual = authoredState(doc, id);
