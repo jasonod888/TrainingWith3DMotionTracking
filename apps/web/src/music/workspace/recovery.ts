@@ -37,6 +37,8 @@ export type RecoveryCheckpoint = {
   durationSeconds?: number;
   /** finding id → occurrence id → authored spelling, for faithful reversals. */
   authoredSpellings?: Record<string, Record<string, string>>;
+  /** Accepted performance+notation baseline per finding, for guarded reversal. */
+  acceptedBaselines?: Record<string, Record<string, unknown>>;
 };
 
 export type RecoveryRead =
@@ -104,6 +106,11 @@ export function readRecovery(identity: RecoveryIdentity): RecoveryRead {
         ? 'A local checkpoint predates base-revision tracking; confirm before restoring it.'
         : 'A local checkpoint was written against an older saved revision of this clip; it is stale.',
     };
+  }
+  if (checkpoint.acceptedBaselines !== undefined
+    && (!checkpoint.acceptedBaselines || typeof checkpoint.acceptedBaselines !== 'object'
+      || Array.isArray(checkpoint.acceptedBaselines))) {
+    return {status: 'rejected', reason: 'The local checkpoint has an invalid reversal baseline and was ignored.'};
   }
   if (checkpoint.authoredSpellings !== undefined) {
     const value = checkpoint.authoredSpellings;

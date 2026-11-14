@@ -210,6 +210,21 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const documentRef = useRef<NotationDocument | null>(null);
   const verificationRef = useRef<VerificationState | null>(null);
   const authoredSpellings = useRef<Record<string, Record<string, string>>>({});
+  const acceptedBaselines = useRef<Record<string, Record<string, {
+    pitch: number; onset: number; duration: number | null; velocity: number | null;
+    spelling: string | null; staff: string | null; voice: number | null;
+    eventStart: number | null; eventDuration: number | null;
+  }>>>({});
+  const authoredState = (doc: NotationDocument, id: string) => {
+    const note = doc.performance.find(item => item.id === id);
+    if (!note) return null;
+    const event = doc.events.find(item => item.notes.some(n => n.performance_ids.includes(id)));
+    const written = event?.notes.find(n => n.performance_ids.includes(id));
+    return {pitch: note.pitch, onset: note.onset, duration: note.duration,
+      velocity: note.velocity, spelling: written?.spelling ?? null,
+      staff: event?.staff ?? null, voice: event?.voice ?? null,
+      eventStart: event?.start ?? null, eventDuration: event?.duration ?? null};
+  };
   documentRef.current = document;
   verificationRef.current = verification;
 
@@ -871,6 +886,23 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     if (invert) {
       // The accepted state must still be exactly present before a revert is safe;
       // a later manual edit is preserved rather than overwritten.
+      const baseline = acceptedBaselines.current[finding.id];
+      if (baseline) {
+        for (const [id, expected] of Object.entries(baseline)) {
+          const actual = authoredState(doc, id);
+          if (!actual) return false;
+          if (actual.pitch !== expected.pitch
+            || Math.abs(actual.onset - expected.onset) > 1e-6
+            || (actual.duration ?? 0) !== (expected.duration ?? 0)
+            || (actual.velocity ?? 0) !== (expected.velocity ?? 0)
+            || actual.spelling !== expected.spelling
+            || actual.staff !== expected.staff
+            || actual.voice !== expected.voice
+            || actual.eventStart !== expected.eventStart
+            || actual.eventDuration !== expected.eventDuration) return false;
+        }
+        return true;
+      }
       const noteOf = (id: string) => doc.performance.find(note => note.id === id);
       const same = (id: string, data: Record<string, unknown>) => {
         const note = noteOf(id);
@@ -951,6 +983,25 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           setNotice('This suggestion cannot be represented on the current score; nothing was changed.');
           return;
         }
+        // Snapshot the accepted performance and authored notation so a later written
+        // rhythm/spelling/mapping edit blocks destructive reversal (W1).
+        const touched = new Set<string>();
+        for (const edit of finding.proposed_edits) {
+          edit.event_ids.forEach(id => touched.add(String(id)));
+        }
+        if (finding.proposed_edits.some(edit => edit.op === 'add_note')) touched.add(`vf-${finding.id}-a`);
+        if (finding.proposed_edits.some(edit => edit.op === 'merge')) touched.add(`vf-${finding.id}-m`);
+        for (const edit of finding.proposed_edits) {
+          if (edit.op === 'split_note' && Array.isArray(edit.after)) {
+            (edit.after as unknown[]).forEach((_, index) => touched.add(`vf-${finding.id}-${index + 1}`));
+          }
+        }
+        const baseline: Record<string, NonNullable<ReturnType<typeof authoredState>>> = {};
+        for (const id of touched) {
+          const state = authoredState(preflight.doc, id);
+          if (state) baseline[id] = state;
+        }
+        acceptedBaselines.current[finding.id] = baseline;
         dispatch({type: 'commands', commands, label: `Verification: ${finding.kind}`});
         setConfirmReviewed(false);
       } else if (wasAccepted && findingMatches(latest, finding, true)) {
@@ -1042,6 +1093,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         assessment: {policy: assessmentPolicy},
         durationSeconds: document.duration,
         authoredSpellings: authoredSpellings.current,
+        acceptedBaselines: acceptedBaselines.current,
       });
     }, 600);
     return () => clearTimeout(timer);
@@ -1247,6 +1299,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       if (staleCheckpoint.sections?.length) setSectionsDraft(staleCheckpoint.sections);
       if (staleCheckpoint.assessment) setAssessmentPolicy(staleCheckpoint.assessment.policy);
       authoredSpellings.current = staleCheckpoint.authoredSpellings ?? {};
+      acceptedBaselines.current = (staleCheckpoint.acceptedBaselines ?? {}) as typeof acceptedBaselines.current;
       if (staleCheckpoint.alignment?.passages?.length) {
         setMapState({alignment_version: 1, mode: staleCheckpoint.alignment.mode,
           basis: staleCheckpoint.alignment.basis, passages: staleCheckpoint.alignment.passages});
@@ -1274,6 +1327,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       if (recoveryOffer.sections?.length) setSectionsDraft(recoveryOffer.sections);
       if (recoveryOffer.assessment) setAssessmentPolicy(recoveryOffer.assessment.policy);
       authoredSpellings.current = recoveryOffer.authoredSpellings ?? {};
+      acceptedBaselines.current = (recoveryOffer.acceptedBaselines ?? {}) as typeof acceptedBaselines.current;
       // Recovered work keeps its server base so a retry is not a first review.
       if (recoveryOffer.baseRevisionId) setSavedRevisionId(recoveryOffer.baseRevisionId);
       if (recoveryOffer.verificationToken) setVerificationToken(recoveryOffer.verificationToken);

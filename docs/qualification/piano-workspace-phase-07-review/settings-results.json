@@ -11,6 +11,7 @@
       "policy": "notes"
     },
     "checkpoint_fields": [
+      "acceptedBaselines",
       "alignment",
       "assessment",
       "authoredSpellings",

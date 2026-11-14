@@ -193,3 +193,27 @@ Phase 8 has not started. No deployment or release action was taken.
 - **Physical touch qualification remains BLOCKED** — no hardware; emulated touch is not a substitute.
 - The video pass uses the 209 s long draft with a 3 s fixture at source second 1.5; it validates the transport/cursors against the current map, not a short-document domain. That limitation is explicit.
 - Performance figures remain controlled dev-server measurements; interactive upper-bound profiling is still separate.
+
+---
+
+## 10. Written-rhythm reversal guard (W1)
+
+Reversal safety now uses an accepted-state baseline that covers both performance and authored notation. Before an accepted finding is dispatched, the resulting candidate document is snapshotted per affected occurrence: pitch, onset, recorded duration, velocity, authored spelling, staff, voice, and the owning event's written start/duration. The baseline is persisted in the versioned recovery checkpoint alongside the spelling map.
+
+A destructive inverse runs only when every snapshotted field is still identical. Changing the accepted added note's written duration to a half note (960 written ticks) therefore makes the rejection a no-op with an explicit reconciliation message instead of deleting the corrected note. Missing baselines from older checkpoints continue to refuse reversals that would need authored restoration.
+
+### Verification (W1)
+
+| Check | Result |
+| --- | --- |
+| Reviewer written-reversal case | **1/1** — note retained after Accept → written half note → Reject |
+| Reviewer recovery cases | 2/2 |
+| Reviewer verification / transitions / settings | 3/3, 2/2, 2/2 |
+| Reviewer loaded clock | 4/4 |
+| Normal-route E2E | 0 failures |
+| Web suite / `tsc` | 471 / clean |
+
+### Outstanding
+
+- **Physical touch qualification remains BLOCKED** — no hardware.
+- Interactive/upper-bound performance profiling remains a separate evidence item.

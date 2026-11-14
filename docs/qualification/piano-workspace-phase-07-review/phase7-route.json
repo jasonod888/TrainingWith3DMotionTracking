@@ -25,8 +25,8 @@
   "unsaved_guard": "Leave without saving your changes?",
   "guitar_regression": true,
   "performance_1338": {
-    "dom": 124,
-    "load": 126,
+    "dom": 129,
+    "load": 130,
     "notes": 35,
     "score": 33,
     "heap": 29,
@@ -36,13 +36,24 @@
     "duration": 3,
     "muted": false,
     "rate": 0.75,
-    "seek": 1.03013,
+    "seek": 1.5,
+    "seekable": [
+      0,
+      3
+    ],
     "cursors": {
-      "scoreTick": "1195",
-      "video": 1.03013
+      "scoreTick": 1740.0,
+      "mappedTick": 1740.0,
+      "roll_seconds": 1.5
     },
-    "played": 0.659323,
-    "header_clear": true
+    "played": 0.667987,
+    "ended": {
+      "ended": true,
+      "paused": true,
+      "time": 3
+    },
+    "header_clear": true,
+    "header_scroll_clear": true
   },
   "revision_journey": {
     "before": 73,
