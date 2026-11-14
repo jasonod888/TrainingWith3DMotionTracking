@@ -1,0 +1,21 @@
+[
+  {
+    "name": "A2 related edit during pending decision is preserved",
+    "passed": true,
+    "manual": 61,
+    "after": 61
+  },
+  {
+    "name": "A3 unrelated edit during pending decision is preserved and target applies",
+    "passed": true,
+    "unrelated": 65,
+    "unrelated_after": 65,
+    "target": 62
+  },
+  {
+    "name": "A4 conflict keeps the document and reports the conflict",
+    "passed": true,
+    "before": 60,
+    "after": 60
+  }
+]

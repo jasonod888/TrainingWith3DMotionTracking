@@ -8,6 +8,7 @@ import {
   captureOccurrence, invertFinding, matchesBaseline, prepareFinding, validateBaseline,
 } from '../src/music/workspace/verification-transaction.ts';
 import type {VerificationFinding} from '../src/music/verification';
+import {createWorkspaceState, workspaceReducer} from '../src/music/workspace/workspace-state.ts';
 
 const event = (id: string, onset: number, pitch: number, duration = 0.5) =>
   ({id, onset, duration, pitch, velocity: 0.6, confidence: null, optional: false, string: null, fret: null});
@@ -291,4 +292,32 @@ test('A3 an unrelated edit before acceptance does not block the transaction', ()
     assert.equal(prepared.document.performance.find(note => note.id === 'c')?.pitch, 69);
     assert.equal(prepared.document.performance.find(note => note.id === 'a')?.pitch, 62);
   }
+});
+test('R4 before-entry discriminant and unknown keys are refused', () => {
+  const base = doc();
+  const f = finding('shape-1', [{op: 'set_pitch', event_ids: ['a'], before: {pitch: 60}, after: {pitch: 62}}]);
+  const applied = accepted(base, f);
+  const beforeFalse = {...applied.baseline, before: {...applied.baseline.before,
+    a: {...applied.baseline.before.a, present: false}}};
+  assert.equal(validateBaseline(f, beforeFalse).ok, false);
+  const extra = {...applied.baseline, entries: {...applied.baseline.entries, extra: null}};
+  assert.equal(validateBaseline(f, extra).ok, false);
+  const inverse = invertFinding(applied.document, f, null, extra);
+  assert.ok('reason' in inverse);
+});
+
+test('candidate fast path never replaces an intervening document state', () => {
+  const base = doc();
+  const f = finding('base-1', [{op: 'set_pitch', event_ids: ['a'], before: {pitch: 60}, after: {pitch: 62}}]);
+  const prepared = prepareFinding(base, f, null);
+  assert.equal(prepared.status, 'applied');
+  if (prepared.status !== 'applied') return;
+  let state = createWorkspaceState(base);
+  const intervening = workspaceReducer(state, {type: 'command',
+    command: {type: 'set-occurrence-pitch', occurrenceId: 'b', pitch: 66}});
+  state = intervening;
+  const after = workspaceReducer(state, {type: 'commands', commands: prepared.commands,
+    candidate: prepared.document, base});
+  assert.equal(after.document.performance.find(note => note.id === 'b')?.pitch, 66);
+  assert.equal(after.document.performance.find(note => note.id === 'a')?.pitch, 62);
 });

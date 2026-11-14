@@ -772,7 +772,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           return;
         }
         acceptedBaselines.current[finding.id] = prepared.baseline;
-        dispatch({type: 'commands', commands: prepared.commands, candidate: prepared.document,
+        dispatch({type: 'commands', commands: prepared.commands, candidate: prepared.document, base: latest,
           label: `Verification: ${finding.kind}`});
         setConfirmReviewed(false);
       } else if (wasAccepted) {
@@ -781,7 +781,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           setNotice(`${result.reason} The local document was kept.`);
           return;
         }
-        dispatch({type: 'commands', commands: result.commands, candidate: result.document,
+        dispatch({type: 'commands', commands: result.commands, candidate: result.document, base: latest,
           label: 'Verification: reverted suggestion'});
         setConfirmReviewed(false);
       }

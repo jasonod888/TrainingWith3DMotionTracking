@@ -1,10 +1,10 @@
-﻿# Phase 7 matrix completion
-# web suite: 488 passed
+﻿# Phase 7 R4/async regression
+# web suite: 490 passed
 # tsc: clean
-# transaction matrix: 17 tests
+# transaction matrix: 19 tests
+# baseline shape: 2/2
 # contract audit: 5/5
-# structural round trips: 2/2
-# verification/recovery/transitions/settings/clock: pass
-# performance real: preview 14.0 ms median, commit 115.5 ms median (target unmet)
-# performance 20k: commit 2.88 s (unusable)
+# async A2/A3/A4: 3/3
+# A7: not demonstrated
+# performance: unmet (preview p95 177.9 ms, commit 115.5 ms, 20k ~2.9 s)
 # hardware: BLOCKED

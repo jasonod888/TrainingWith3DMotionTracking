@@ -1,0 +1,15 @@
+[
+  {
+    "id": "R4",
+    "name": "before-state-discriminant",
+    "passed": true,
+    "validator_accepted": false
+  },
+  {
+    "id": "R4",
+    "name": "malformed-extra-entry",
+    "passed": true,
+    "validator_accepted": false,
+    "invert_threw": false
+  }
+]

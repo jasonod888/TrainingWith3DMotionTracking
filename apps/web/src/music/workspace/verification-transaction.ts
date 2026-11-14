@@ -154,9 +154,14 @@ export function validateBaseline(finding: VerificationFinding, value: unknown): 
   }
   const required = affectedIds(finding);
   if (!required.length) return {ok: false, reason: 'finding touches no occurrences'};
+  const PRESENT_KEYS = new Set(['present', 'pitch', 'onset', 'duration', 'velocity', 'spelling', 'staff',
+    'voice', 'eventStart', 'eventDuration', 'notationDuration', 'confidence', 'optional', 'string', 'fret']);
+  const ABSENT_KEYS = new Set(['present', 'occurrenceId']);
   const presentEntry = (entry: unknown): entry is Extract<AuthoredOccurrence, {present: true}> => {
-    if (!entry || typeof entry !== 'object') return false;
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
     const item = entry as Record<string, unknown>;
+    if (item.present !== true) return false;
+    if (Object.keys(item).some(key => !PRESENT_KEYS.has(key))) return false;
     if (!(typeof item.pitch === 'number' && Number.isInteger(item.pitch) && item.pitch >= 0 && item.pitch <= 127)) return false;
     if (!(typeof item.onset === 'number' && Number.isFinite(item.onset) && item.onset >= 0)) return false;
     if (!(item.duration === null || (typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration > 0))) return false;
@@ -182,6 +187,13 @@ export function validateBaseline(finding: VerificationFinding, value: unknown): 
       && item.fret >= 0 && item.fret <= 24))) return false;
     return true;
   };
+  const requiredIds = new Set(required.map(item => item.id));
+  for (const key of Object.keys(baseline.entries as Record<string, unknown>)) {
+    if (!requiredIds.has(key)) return {ok: false, reason: `unexpected baseline entry ${key}`};
+  }
+  for (const key of Object.keys(baseline.before as Record<string, unknown>)) {
+    if (!requiredIds.has(key)) return {ok: false, reason: `unexpected before-state entry ${key}`};
+  }
   for (const {id, present} of required) {
     const entry = (baseline.entries as Record<string, unknown>)[id];
     if (!entry || typeof entry !== 'object') return {ok: false, reason: `missing baseline entry for ${id}`};
@@ -190,7 +202,8 @@ export function validateBaseline(finding: VerificationFinding, value: unknown): 
       if ((entry as {present?: boolean}).present !== true) return {ok: false, reason: `expected ${id} to be present`};
     } else {
       const absent = entry as {present?: boolean; occurrenceId?: unknown};
-      if (absent.present !== false || absent.occurrenceId !== id) {
+      if (absent.present !== false || absent.occurrenceId !== id
+        || Object.keys(entry).some(key => !ABSENT_KEYS.has(key))) {
         return {ok: false, reason: `expected explicit absence for ${id}`};
       }
     }
@@ -207,7 +220,9 @@ export function validateBaseline(finding: VerificationFinding, value: unknown): 
 
 export function matchesBaseline(document: NotationDocument, finding: VerificationFinding,
   baseline: AcceptedBaseline): boolean {
+  if (!baseline || !baseline.entries || typeof baseline.entries !== 'object') return false;
   for (const [id, expected] of Object.entries(baseline.entries)) {
+    if (!expected || typeof expected !== 'object') return false;
     if (!matchesState(captureOccurrence(document, id), expected)) return false;
   }
   for (const {id, present} of affectedIds(finding)) {

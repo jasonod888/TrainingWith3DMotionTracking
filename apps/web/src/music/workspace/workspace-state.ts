@@ -55,7 +55,8 @@ export type WorkspaceState = {
 export type WorkspaceAction =
   | { type: 'select'; occurrenceId: string | null }
   | { type: 'command'; command: CorrectionCommand }
-  | { type: 'commands'; commands: CorrectionCommand[]; label?: string; candidate?: NotationDocument }
+  | { type: 'commands'; commands: CorrectionCommand[]; label?: string;
+      candidate?: NotationDocument; base?: NotationDocument }
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'reset'; document: NotationDocument };
@@ -136,9 +137,12 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     }
 
     case 'commands': {
-      let candidate = action.candidate ?? state.document;
+      // A pre-staged candidate is only valid against the document it was prepared
+      // from; otherwise restage the commands against the current document.
+      const useCandidate = Boolean(action.candidate && action.base === state.document);
+      let candidate = useCandidate ? action.candidate! : state.document;
       let selection = state.selection;
-      for (const command of action.candidate ? [] : action.commands) {
+      for (const command of useCandidate ? [] : action.commands) {
         const outcome = applyCommand(candidate, command);
         if (outcome.status === 'rejected') {
           return {...state, lastReport: {status: 'rejected', label: 'Not applied',

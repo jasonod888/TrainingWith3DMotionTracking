@@ -553,6 +553,17 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
   }
   if (command.restore) {
     const restore = command.restore;
+    if (restore.optional !== undefined && typeof restore.optional !== 'boolean') {
+      return rejection('invalid-scope', 'A restored optional flag is invalid.');
+    }
+    if (restore.string !== undefined && restore.string !== null
+      && (!Number.isInteger(restore.string) || restore.string < 1 || restore.string > 6)) {
+      return rejection('invalid-scope', 'A restored string is invalid.');
+    }
+    if (restore.fret !== undefined && restore.fret !== null
+      && (!Number.isInteger(restore.fret) || restore.fret < 0 || restore.fret > 24)) {
+      return rejection('invalid-scope', 'A restored fret is invalid.');
+    }
     if (restore.notation_duration !== undefined && restore.notation_duration !== null
       && (!Number.isFinite(restore.notation_duration) || restore.notation_duration <= 0)) {
       return rejection('invalid-duration', 'A restored written duration is invalid.');
