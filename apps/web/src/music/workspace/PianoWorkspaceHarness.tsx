@@ -32,6 +32,7 @@ import {
 } from './workspace-state';
 import {useElementWidth} from './useElementWidth';
 import {createClock, useClockTime, type ClockStore} from './clock';
+import type {GestureEdit} from './gestures';
 import {
   buildSaveBody, canonicalAnchors, performanceChanged, restoreFromReference, serializeAlignment, type SavedSpan,
 } from './save-payload';
@@ -160,6 +161,11 @@ export function PianoWorkspaceHarness() {
   const [reopenMessage, setReopenMessage] = useState('');
   const [recoveryOffer, setRecoveryOffer] = useState<RecoveryCheckpoint | null>(null);
   const [staleCheckpoint, setStaleCheckpoint] = useState<RecoveryCheckpoint | null>(null);
+  const [replaceMode, setReplaceMode] = useState<{occurrenceId: string; pitch: number} | null>(null);
+  const [addMode, setAddMode] = useState<{seconds: number; pitch: number; ticks: number} | null>(null);
+  const [duplicateId, setDuplicateId] = useState<string | null>(null);
+  const [overlap, setOverlap] = useState<{pitch: number; ids: string[]} | null>(null);
+  const lastWrittenTicks = useRef(480);
   const [recoveryNotice, setRecoveryNotice] = useState('');
 
   const dispatch = useCallback((action: WorkspaceAction) => {
@@ -295,6 +301,67 @@ export function PianoWorkspaceHarness() {
     requestReveal(occurrenceId);
   }, [dispatch, offsetSeconds, requestReveal, seek, state?.document]);
 
+  const applyGestureEdit = useCallback((edit: GestureEdit) => {
+    if (!document) return;
+    if (edit.kind === 'pitch') {
+      dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: edit.occurrenceId,
+        pitch: edit.pitch, ...(edit.spelling ? {spelling: edit.spelling} : {})}});
+    } else if (edit.kind === 'time') {
+      dispatch({type: 'command', command: {type: 'set-occurrence-onset', occurrenceId: edit.occurrenceId,
+        seconds: edit.seconds}});
+    } else {
+      dispatch({type: 'command', command: {type: 'set-occurrence-duration', occurrenceId: edit.occurrenceId,
+        seconds: edit.durationSeconds}});
+    }
+  }, [dispatch, document]);
+
+  const auditionPitch = useCallback((pitch: number) => { audition([pitch], 0.25); }, [audition]);
+
+  // Replace-pitch mode changes exactly its target and exits.
+  const replacementPitch = useCallback((pitch: number) => {
+    if (!replaceMode) return;
+    dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: replaceMode.occurrenceId, pitch}});
+    setReplaceMode(null);
+    setNotice(pitch === replaceMode.pitch ? 'Replacement cancelled: same pitch, no change.' : `Pitch replaced with ${pitchName(pitch)}.`);
+  }, [dispatch, replaceMode]);
+
+  useEffect(() => {
+    if (!replaceMode) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setReplaceMode(null); setNotice('Replacement cancelled.'); }
+    };
+    globalThis.window.addEventListener('keydown', onKey);
+    return () => globalThis.window.removeEventListener('keydown', onKey);
+  }, [replaceMode]);
+
+  const ghostDuplicate = Boolean(addMode && document?.performance.some(note =>
+    note.pitch === addMode.pitch && Math.abs(note.onset - addMode.seconds) < 0.01));
+  const ghostDuplicateId = ghostDuplicate && document
+    ? document.performance.find(note => note.pitch === addMode!.pitch && Math.abs(note.onset - addMode!.seconds) < 0.01)?.id ?? null
+    : null;
+
+  const commitAdd = useCallback(() => {
+    if (!addMode || !document || !state) return;
+    if (ghostDuplicateId) { setDuplicateId(ghostDuplicateId); return; }
+    lastWrittenTicks.current = addMode.ticks;
+    dispatch({type: 'command', command: {type: 'insert-note', pitch: addMode.pitch, onsetSeconds: addMode.seconds,
+      durationSeconds: Math.max(0.02, addMode.ticks * (60 / (document.tempo.bpm * document.ppq)))}});
+    setAddMode(null);
+    setDuplicateId(null);
+  }, [addMode, document, state, ghostDuplicateId, dispatch]);
+
+  useEffect(() => {
+    if (!addMode) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (event.key === 'Enter') { event.preventDefault(); commitAdd(); }
+      else if (event.key === 'Escape') { setAddMode(null); setDuplicateId(null); setNotice('Add note cancelled.'); }
+    };
+    globalThis.window.addEventListener('keydown', onKey);
+    return () => globalThis.window.removeEventListener('keydown', onKey);
+  }, [addMode, commitAdd]);
+
   const selection = state?.selection ?? null;
   const selected = selection && document ? noteFacts(document, selection) : null;
   const secondsPerTick = document ? 60 / (document.tempo.bpm * document.ppq) : 0.0625;
@@ -323,7 +390,7 @@ export function PianoWorkspaceHarness() {
     const sounding = intervals.filter(interval => interval.pitch === pitch
       && playhead >= interval.start && playhead < interval.end);
     if (sounding.length === 1) { select(sounding[0].id); return; }
-    if (sounding.length > 1) { setNotice(`${sounding.length} ${pitchName(pitch)} notes overlap here; use the roll to choose one.`); return; }
+    if (sounding.length > 1) { setOverlap({pitch, ids: sounding.map(interval => interval.id)}); setNotice(''); return; }
     setNotice(`No ${pitchName(pitch)} is sounding here. Audition only — select a note in the roll or score.`);
   }, [document, intervals, playhead, select]);
 
@@ -953,11 +1020,16 @@ export function PianoWorkspaceHarness() {
           <div ref={keyboardRef}>
             <LiveKeyboard document={document} clock={clockRef.current} intervals={intervals}
               selectedPitch={selected?.pitch ?? null}
-              onKey={pitch => audition([pitch], 0.4)} onSelectKey={selectKey}
+              onKey={pitch => audition([pitch], 0.4)}
+              onSelectKey={pitch => { if (replaceMode) { replacementPitch(pitch); return; } selectKey(pitch); }}
               width={compactKeyboard ? 640 : 1040} semitones={compactKeyboard ? 36 : 60}
               toolbarHint="Tap to audition. With a note selected, tap a key to select that pitch at the playhead; it never edits a note."
               hint="Selection and audition only; use “Add note at playhead” in the inspector to insert."/>
           </div>
+          {replaceMode && <div className="ws-replace-banner" data-replace="active">
+            Replacing {pitchName(replaceMode.pitch)} — click a key to commit.
+            <button type="button" onClick={() => { setReplaceMode(null); setNotice('Replacement cancelled.'); }}>Cancel</button>
+          </div>}
         </section>
 
         <section className="ws-panel ws-surface" aria-label="Piano roll">
@@ -967,6 +1039,11 @@ export function PianoWorkspaceHarness() {
             clock={clockRef.current} intervals={intervals}
             selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={rollReveal}
+            onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
+            snapSeconds={snapTicks ? snapTicks * secondsPerTick : null}
+            addMode={Boolean(addMode)}
+            ghost={addMode ? {seconds: addMode.seconds, pitch: addMode.pitch} : null}
+            onGhostPlace={(seconds, pitch) => setAddMode(mode => ({seconds, pitch, ticks: mode?.ticks ?? lastWrittenTicks.current}))}
             playhead={playhead} onSelect={select} onSeek={seek}/>
           <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Scrolling never seeks. Dragging notes is Phase 6.</p>
         </section>
@@ -977,11 +1054,25 @@ export function PianoWorkspaceHarness() {
             playheadTick={playheadTick} activeOccurrenceIds={activeIds}
             clock={clockRef.current} alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals}
             scrollTarget={scoreTarget} onSeekTick={seekToTick} onUserScroll={onScoreScroll}
+            onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
             onAmbiguous={(logicalNoteId, occurrenceIds) => setNotice(
               `This written note maps ${occurrenceIds.length} occurrences; choose one in the roll (logical ${logicalNoteId}).`)}/>
           <p className="ws-hint">One continuous grand staff; the cursor is the mapped musical position. Click the ruler to seek, a notehead to select.</p>
         </section>
 
+        {overlap && <section className="ws-panel" aria-label="Overlap picker" data-overlap="true">
+          <h2>Overlapping {pitchName(overlap.pitch)} notes</h2>
+          <div className="ws-row">
+            {overlap.ids.map(id => {
+              const note = document.performance.find(item => item.id === id);
+              return note ? <button key={id} type="button" data-overlap-id={id}
+                onClick={() => { select(id); setOverlap(null); }}>
+                at {note.onset.toFixed(3)} s · {note.duration?.toFixed(2) ?? '?'} s
+              </button> : null;
+            })}
+            <button type="button" onClick={() => setOverlap(null)}>Cancel</button>
+          </div>
+        </section>}
         <section className="ws-panel ws-surface" aria-label="Overview">
           <ClipOverview document={document} window={window} playhead={playhead}
             onWindowChange={next => changeWindow(next, 'user')}/>
@@ -1022,12 +1113,14 @@ export function PianoWorkspaceHarness() {
           <h2>Selected note</h2>
           {!selection || !selected
             ? <p className="ws-hint">Select a note in the roll, the score or the keyboard to edit it.</p>
-            : <>
+            : <fieldset className="ws-inspector-fieldset" disabled={Boolean(replaceMode)}>
               <p className="ws-facts">
                 <strong>{selected.spelling}</strong> · {selection.occurrenceId} · {pitchName(selected.pitch)} (MIDI {selected.pitch})<br/>
                 {selected.onset.toFixed(3)} s · recorded {selected.duration === null ? 'unknown' : `${selected.duration.toFixed(3)} s`}<br/>
                 {selection.staff} voice {selection.voice} · measure {selection.measureIndex + 1} · written {selected.writtenTicks} ticks
-                {selected.linkedOccurrences > 1 && <> · <em>linked to {selected.linkedOccurrences} occurrences</em></>}
+              {selected.linkedOccurrences > 1 && <>
+                <br/><strong data-tie-scope="logical">Entire tied note: {selected.linkedOccurrences} linked segments. Pitch replacement and delete apply to all of them.</strong>
+              </>}
               </p>
 
               <div className="ws-row" role="group" aria-label="Pitch">
@@ -1036,6 +1129,8 @@ export function PianoWorkspaceHarness() {
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'sharp'}})}>♯</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'flat'}})}>♭</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'natural'}})}>♮</button>
+                <button type="button" data-replace="start"
+                  onClick={() => { setReplaceMode({occurrenceId: selection.occurrenceId, pitch: selected.pitch}); setNotice(''); }}>Replace pitch</button>
               </div>
 
               <div className="ws-row" role="group" aria-label="Respell">
@@ -1089,7 +1184,7 @@ export function PianoWorkspaceHarness() {
               <p className="ws-hint">
                 Written value and recorded length are independent. Start uses exact seconds unless a Snap value is chosen.
               </p>
-            </>}
+            </fieldset>}
         </section>
 
         <section className="ws-panel" aria-label="Insert">
@@ -1102,6 +1197,25 @@ export function PianoWorkspaceHarness() {
               type: 'insert-note', pitch: selected?.pitch ?? 60, onsetSeconds: playhead, durationSeconds: 0.4, addToChord: true,
             }})}>Add to chord</button>
           </div>
+          <div className="ws-row">
+            <button type="button" data-add="toggle" aria-pressed={Boolean(addMode)}
+              onClick={() => {
+                setDuplicateId(null);
+                setAddMode(addMode ? null : {seconds: playhead, pitch: selected?.pitch ?? 60, ticks: lastWrittenTicks.current});
+              }}>{addMode ? 'Cancel add note' : 'Add note (place)'}</button>
+          </div>
+          {addMode && <div className="ws-add-panel" data-add="active">
+            <p>New {pitchName(addMode.pitch)} at {addMode.seconds.toFixed(3)} s · written {addMode.ticks} ticks · click the roll to place it.</p>
+            <div className="ws-row">
+              <button type="button" data-add="commit" onClick={commitAdd}>Insert</button>
+              <button type="button" data-add="cancel"
+                onClick={() => { setAddMode(null); setDuplicateId(null); setNotice('Add note cancelled.'); }}>Cancel</button>
+            </div>
+            {ghostDuplicate && <p className="ws-report is-bad" data-add="duplicate">
+              A {pitchName(addMode.pitch)} already starts here.
+              <button type="button" onClick={() => { if (ghostDuplicateId) select(ghostDuplicateId); setAddMode(null); }}>Select existing</button>
+            </p>}
+          </div>}
           <p className="ws-hint">Insertion is rejected when it would overwrite or collide. “Add to chord” only joins an identical written position.</p>
         </section>
 

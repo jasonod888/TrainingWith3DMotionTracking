@@ -1,0 +1,35 @@
+{
+  "pitch_drag": {
+    "from": 60,
+    "to": 62
+  },
+  "escape_cancel": {
+    "pitch": 60
+  },
+  "time_drag": {
+    "from": 2.0,
+    "to": 2.6
+  },
+  "resize": {
+    "length": "1.0964"
+  },
+  "sheet_drag": {
+    "from": "C4, quarter",
+    "to": "D4, quarter, selected"
+  },
+  "replace_pitch": {
+    "from": 60,
+    "to": 62
+  },
+  "add_note": {
+    "before": 4,
+    "after": 5
+  },
+  "duplicate_warning": true,
+  "saved_round_trip": {
+    "before": 60,
+    "saved": 63,
+    "reopened": 63
+  },
+  "failures": []
+}

@@ -16,6 +16,7 @@ import {
 } from './viewport';
 import {useElementWidth} from './useElementWidth';
 import {useClockTime, type ClockStore} from './clock';
+import {durationFromDrag, onsetFromDrag, pitchFromDrag, resolveAxis, type GestureAxis, type GestureEdit} from './gestures';
 
 const RULER_HEIGHT = 24;
 const PLOT_HEIGHT = 168;
@@ -45,11 +46,22 @@ type Props = {
   intervals?: { id: string; start: number; end: number }[];
   /** Distinguishes a user scroll from a reveal or playback pan. */
   onWindowChangeOrigin?: (window: TimeWindow, origin: 'user' | 'reveal' | 'playback') => void;
+  /** Commits one completed drag as a single edit. */
+  onGestureCommit?: (edit: GestureEdit) => void;
+  /** Bounded pitch audition while dragging. */
+  onAuditionPitch?: (pitch: number) => void;
+  /** Explicit snap in seconds; null keeps the exact recorded value. */
+  snapSeconds?: number | null;
+  /** Add-note mode places a ghost instead of selecting. */
+  addMode?: boolean;
+  ghost?: {seconds: number; pitch: number} | null;
+  onGhostPlace?: (seconds: number, pitch: number) => void;
 };
 
 export function TimeRoll({
   document, window, onWindowChange, selectedOccurrenceId, reveal, playhead, offsetSeconds = 0,
   activeOccurrenceIds = [], onSelect, onSeek, onWindowChangeOrigin, clock = null, intervals,
+  onGestureCommit, onAuditionPitch, snapSeconds = null, addMode = false, ghost = null, onGhostPlace,
 }: Props) {
   const livePlayhead = useClockTime(clock, playhead);
   const liveActive = intervals
@@ -130,6 +142,106 @@ export function TimeRoll({
     // Deliberately keyed on the token only: panning must not re-run this.
   }, [reveal?.token]);
 
+  type DragState = {
+    note: NotationDocument['performance'][number];
+    startX: number; startY: number; forced: GestureAxis | null;
+    axis: GestureAxis | null; pitch: number; onset: number; duration: number;
+  };
+  const dragRef = useRef<DragState | null>(null);
+  const dragCleanup = useRef<(() => void) | null>(null);
+  const auditionAt = useRef(0);
+  const [dragPreview, setDragPreview] = useState<{id: string; pitch: number; onset: number; duration: number; axis: GestureAxis} | null>(null);
+
+  const beginDrag = (note: NotationDocument['performance'][number], event: React.PointerEvent, forced: GestureAxis | null) => {
+    if (addMode) { onGhostPlace?.(note.onset, note.pitch); return; }
+    if (event.button !== 0) return;
+    event.preventDefault();
+    try { (event.currentTarget as Element).setPointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    dragRef.current = {
+      note, startX: event.clientX, startY: event.clientY, forced, axis: null,
+      pitch: note.pitch, onset: note.onset, duration: note.duration ?? 0.25,
+    };
+    onSelect(note.id);
+    dragCleanup.current?.();
+    const onMove = (moveEvent: PointerEvent) => moveDrag(moveEvent as unknown as React.PointerEvent);
+    const onEnd = (endEvent: PointerEvent) => { cancelCleanup(); endDrag(endEvent as unknown as React.PointerEvent); };
+    const cancelCleanup = () => {
+      dragCleanup.current?.();
+      dragCleanup.current = null;
+    };
+    globalThis.window.addEventListener('pointermove', onMove);
+    globalThis.window.addEventListener('pointerup', onEnd);
+    globalThis.window.addEventListener('pointercancel', onEnd);
+    dragCleanup.current = () => {
+      globalThis.window.removeEventListener('pointermove', onMove);
+      globalThis.window.removeEventListener('pointerup', onEnd);
+      globalThis.window.removeEventListener('pointercancel', onEnd);
+    };
+  };
+
+  const moveDrag = (event: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    const axis = drag.axis ?? resolveAxis(dx, dy, 5, drag.forced);
+    if (!axis) return;
+    drag.axis = axis;
+    if (axis === 'pitch') {
+      const pitch = pitchFromDrag(drag.note.pitch, dy, rowHeight);
+      if (pitch !== drag.pitch) {
+        drag.pitch = pitch;
+        const now = Date.now();
+        if (now - auditionAt.current > 120) { auditionAt.current = now; onAuditionPitch?.(pitch); }
+      }
+    } else if (axis === 'time') {
+      drag.onset = onsetFromDrag(drag.note.onset, dx, pps, snapSeconds, document.duration);
+    } else {
+      drag.duration = durationFromDrag(drag.note.duration ?? 0.25, dx, pps, snapSeconds);
+    }
+    setDragPreview({id: drag.note.id, pitch: drag.pitch, onset: drag.onset, duration: drag.duration, axis});
+  };
+
+  const endDrag = (event: React.PointerEvent) => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    try { (event.currentTarget as Element).releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    setDragPreview(null);
+    if (!drag || !drag.axis) return;
+    if (drag.axis === 'pitch' && drag.pitch !== drag.note.pitch) {
+      onGestureCommit?.({kind: 'pitch', occurrenceId: drag.note.id, pitch: drag.pitch});
+    } else if (drag.axis === 'time' && Math.abs(drag.onset - drag.note.onset) > 1e-9) {
+      onGestureCommit?.({kind: 'time', occurrenceId: drag.note.id, seconds: drag.onset});
+    } else if (drag.axis === 'resize' && Math.abs(drag.duration - (drag.note.duration ?? 0.25)) > 1e-9) {
+      onGestureCommit?.({kind: 'resize', occurrenceId: drag.note.id, durationSeconds: drag.duration});
+    }
+  };
+
+  const cancelDrag = (event?: React.PointerEvent) => {
+    dragRef.current = null;
+    dragCleanup.current?.();
+    dragCleanup.current = null;
+    setDragPreview(null);
+    if (event) { try { (event.currentTarget as Element).releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ } }
+  };
+
+  useEffect(() => {
+    if (!dragPreview) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') cancelDrag(); };
+    globalThis.window.addEventListener('keydown', onKey);
+    return () => globalThis.window.removeEventListener('keydown', onKey);
+  }, [dragPreview]);
+
+  const placeGhost = (event: React.PointerEvent<Element>) => {
+    if (!addMode) return;
+    const rect = (event.currentTarget as Element).getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const py = event.clientY - rect.top;
+    const seconds = Math.max(0, Math.min(document.duration, x / pps));
+    const pitch = Math.max(0, Math.min(127, high - Math.floor(py / rowHeight)));
+    onGhostPlace?.(Math.round(seconds * 1e3) / 1e3, pitch);
+  };
+
   const handleScroll = () => {
     const node = element;
     if (!node || syncing.current) return;
@@ -171,23 +283,56 @@ export function TimeRoll({
           aria-label={`Piano roll, ${visibleNotes.length} notes visible`}
           data-culled-notes={visibleNotes.length} data-total-notes={document.performance.length}
           data-pitch-height={Math.round(pitchHeight)} data-plot-height={PLOT_HEIGHT}>
+          {addMode ? <rect className="ws-roll-add-layer" x={0} y={0} width={totalWidth} height={pitchHeight}
+            onPointerDown={placeGhost} aria-label="Add note position"/> : null}
           {ticks.map(tick => <line key={tick} className="ws-roll-grid" x1={tick * pps} y1={0} x2={tick * pps} y2={pitchHeight}/>)}
           {Array.from({length: rows}, (_, index) => high - index).filter(pitch => pitch % 12 === 0).map(pitch =>
             <line key={`row-${pitch}`} className="ws-roll-octave" x1={0} y1={y(pitch)} x2={totalWidth} y2={y(pitch)}/>)}
           {visibleNotes.map(note => {
-            const left = (note.onset + effectiveOffset) * pps;
-            const noteWidth = Math.max(2, (note.duration ?? 0.25) * pps - 1);
+            const preview = dragPreview?.id === note.id ? dragPreview : null;
+            const pitch = preview?.pitch ?? note.pitch;
+            const onset = preview?.onset ?? note.onset;
+            const seconds = preview?.duration ?? (note.duration ?? 0.25);
+            const left = (onset + effectiveOffset) * pps;
+            const noteWidth = Math.max(2, seconds * pps - 1);
             const selected = selectedOccurrenceId === note.id;
             const active = liveActive.includes(note.id);
-            return <rect key={note.id} className={`ws-roll-note${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
-              x={left} y={y(note.pitch) - rowHeight / 2} width={noteWidth} height={Math.max(3, rowHeight - 1)} rx={2}
-              data-occurrence={note.id} data-pitch={note.pitch} role="button" tabIndex={0}
-              aria-label={`${pitchName(note.pitch)} at ${note.onset.toFixed(2)} seconds${selected ? ', selected' : ''}`}
-              onPointerDown={() => onSelect(note.id)}
-              onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(note.id); } }}>
-              <title>{`${pitchName(note.pitch)} · ${note.onset.toFixed(2)} s · ${(note.duration ?? 0).toFixed(2)} s`}</title>
-            </rect>;
+            const dragging = preview !== null;
+            const invalid = dragging && (preview!.axis === 'resize' && seconds < 0.02 || pitch < 0 || pitch > 127);
+            return <g key={note.id}>
+              <rect className={`ws-roll-note${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}${dragging ? ' is-dragging' : ''}${invalid ? ' is-invalid' : ''}`}
+                x={left} y={y(pitch) - rowHeight / 2} width={noteWidth} height={Math.max(3, rowHeight - 1)} rx={2}
+                data-occurrence={note.id} data-pitch={pitch} data-drag-axis={preview?.axis ?? undefined} role="button" tabIndex={0}
+                aria-label={`${pitchName(pitch)} at ${onset.toFixed(2)} seconds${selected ? ', selected' : ''}`}
+                onPointerDown={event => beginDrag(note, event, null)}
+                onPointerMove={moveDrag}
+                onPointerUp={endDrag}
+                onPointerCancel={cancelDrag}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(note.id); } }}>
+                <title>{`${pitchName(pitch)} · ${onset.toFixed(2)} s · ${seconds.toFixed(2)} s`}</title>
+              </rect>
+              {selected ? <>
+                <rect className="ws-roll-handle" data-handle="time" x={left - 3} y={y(pitch) - rowHeight / 2} width={6}
+                  height={Math.max(3, rowHeight - 1)} rx={1}
+                  aria-label="Move start"
+                  onPointerDown={event => { event.stopPropagation(); beginDrag(note, event, 'time'); }}
+                  onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={cancelDrag}/>
+                <rect className="ws-roll-handle" data-handle="resize" x={left + noteWidth - 3} y={y(pitch) - rowHeight / 2} width={6}
+                  height={Math.max(3, rowHeight - 1)} rx={1}
+                  aria-label="Resize recorded length"
+                  onPointerDown={event => { event.stopPropagation(); beginDrag(note, event, 'resize'); }}
+                  onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={cancelDrag}/>
+              </> : null}
+            </g>;
           })}
+          {ghost ? (() => {
+            const ghostLeft = (ghost.seconds + effectiveOffset) * pps;
+            const clash = document.performance.some(note => note.pitch === ghost.pitch && Math.abs(note.onset - ghost.seconds) < 0.001);
+            return <rect className={`ws-roll-ghost${clash ? ' is-invalid' : ''}`} data-ghost="true"
+              data-ghost-invalid={clash ? 'true' : 'false'}
+              x={ghostLeft} y={y(ghost.pitch) - rowHeight / 2} width={Math.max(4, 0.25 * pps)} height={Math.max(3, rowHeight - 1)} rx={2}
+              aria-label={`New note ${pitchName(ghost.pitch)} at ${ghost.seconds.toFixed(2)} seconds`}/>;
+          })() : null}
           {livePlayhead >= window.start && livePlayhead <= window.start + window.span
             ? <line className="ws-roll-playhead" x1={livePlayhead * pps} y1={0} x2={livePlayhead * pps} y2={pitchHeight}/>
             : null}

@@ -1,0 +1,5 @@
+﻿# npm test (apps/web) — Phase 6
+# Command: cd apps/web; npm test
+# tests 462
+# pass 462
+# fail 0

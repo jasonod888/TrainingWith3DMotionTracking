@@ -16,6 +16,7 @@ import {
 import {useElementWidth} from './useElementWidth';
 import {useClockTime, type ClockStore} from './clock';
 import {effectiveSecondsToTick, type Alignment} from '../../../../../packages/music-notation/index.ts';
+import {diatonicStep, type GestureEdit} from './gestures';
 
 const RULER_HEIGHT = 22;
 const LINE = 10;
@@ -77,12 +78,16 @@ type Props = {
   onSeekTick?: (tick: number) => void;
   /** Reports the tick at the left edge when the user scrolls the strip. */
   onUserScroll?: (tickAtLeft: number) => void;
+  /** One committed drag becomes one edit. */
+  onGestureCommit?: (edit: GestureEdit) => void;
+  onAuditionPitch?: (pitch: number) => void;
 };
 
 export function ContinuousScore({
   document, boxes, selectedOccurrenceId, reveal, playheadTick = null, activeOccurrenceIds = [],
   scrollTarget = null, onSelect, onAmbiguous, onSeekTick, onUserScroll,
   clock = null, alignment = null, offsetSeconds = 0, intervals,
+  onGestureCommit, onAuditionPitch,
 }: Props) {
   const liveSeconds = useClockTime(clock, Number.NaN);
   const liveTick = clock && alignment ? effectiveSecondsToTick(alignment, liveSeconds, offsetSeconds) : playheadTick;
@@ -137,6 +142,76 @@ export function ContinuousScore({
     requestAnimationFrame(() => { programmatic.current = false; });
     // Keyed on the token only.
   }, [scrollTarget?.token]);
+
+  const sheetDrag = useRef<{occurrence: string; startY: number; spelling: string; pitch: number; steps: number} | null>(null);
+  const sheetCleanup = useRef<(() => void) | null>(null);
+  const sheetAudition = useRef(0);
+  const [sheetPreview, setSheetPreview] = useState<{occurrence: string; spelling: string; pitch: number; steps: number} | null>(null);
+
+  const beginSheetDrag = (note: {logical_note_id: string; performance_ids: string[]; spelling: string}, event: React.PointerEvent) => {
+    if (event.button !== 0) return;
+    const occurrence = occurrenceFor(note);
+    if (!occurrence) { choose(note); return; }
+    event.preventDefault();
+    try { (event.currentTarget as Element).setPointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    const pitch = document.performance.find(item => item.id === occurrence)?.pitch ?? 60;
+    sheetDrag.current = {occurrence, startY: event.clientY, spelling: note.spelling, pitch, steps: 0};
+    choose(note);
+    sheetCleanup.current?.();
+    const onMove = (moveEvent: PointerEvent) => moveSheetDrag(moveEvent as unknown as React.PointerEvent);
+    const onEnd = (endEvent: PointerEvent) => { cancelSheetCleanup(); endSheetDrag(endEvent as unknown as React.PointerEvent); };
+    const cancelSheetCleanup = () => {
+      sheetCleanup.current?.();
+      sheetCleanup.current = null;
+    };
+    globalThis.window.addEventListener('pointermove', onMove);
+    globalThis.window.addEventListener('pointerup', onEnd);
+    globalThis.window.addEventListener('pointercancel', onEnd);
+    sheetCleanup.current = () => {
+      globalThis.window.removeEventListener('pointermove', onMove);
+      globalThis.window.removeEventListener('pointerup', onEnd);
+      globalThis.window.removeEventListener('pointercancel', onEnd);
+    };
+  };
+
+  const moveSheetDrag = (event: React.PointerEvent) => {
+    const drag = sheetDrag.current;
+    if (!drag) return;
+    const dy = event.clientY - drag.startY;
+    if (Math.abs(dy) < 5) return;
+    const steps = -Math.round(dy / 12);
+    if (steps === drag.steps) return;
+    drag.steps = steps;
+    const next = diatonicStep(drag.spelling, steps, document.key_signature);
+    const now = Date.now();
+    if (now - sheetAudition.current > 120) { sheetAudition.current = now; onAuditionPitch?.(next.pitch); }
+    setSheetPreview({occurrence: drag.occurrence, spelling: next.spelling, pitch: next.pitch, steps});
+  };
+
+  const endSheetDrag = (event: React.PointerEvent) => {
+    const drag = sheetDrag.current;
+    sheetDrag.current = null;
+    try { (event.currentTarget as Element).releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    setSheetPreview(null);
+    if (!drag || drag.steps === 0) return;
+    const next = diatonicStep(drag.spelling, drag.steps, document.key_signature);
+    onGestureCommit?.({kind: 'pitch', occurrenceId: drag.occurrence, pitch: next.pitch, spelling: next.spelling});
+  };
+
+  const cancelSheetDrag = (event?: React.PointerEvent) => {
+    sheetDrag.current = null;
+    sheetCleanup.current?.();
+    sheetCleanup.current = null;
+    setSheetPreview(null);
+    if (event) { try { (event.currentTarget as Element).releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ } }
+  };
+
+  useEffect(() => {
+    if (!sheetPreview) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') cancelSheetDrag(); };
+    globalThis.window.addEventListener('keydown', onKey);
+    return () => globalThis.window.removeEventListener('keydown', onKey);
+  }, [sheetPreview]);
 
   const visibleSegments = useMemo(() => {
     if (last < first) return [] as NotationSegment[];
@@ -238,13 +313,20 @@ export function ContinuousScore({
                   data-occurrence={occurrence ?? ''} data-occurrences={note.performance_ids.join(',')} data-ambiguous={ambiguous ? 'true' : 'false'}
                   role="button" tabIndex={0}
                   aria-label={`${note.spelling}, ${segment.value}${segment.dotted ? ' dotted' : ''}${selected ? ', selected' : ''}`}
-                  onPointerDown={() => choose(note)}
+                  data-sheet-preview={sheetPreview?.occurrence === occurrence ? sheetPreview.steps : undefined}
+                  onPointerDown={event => beginSheetDrag(note, event)}
+                  onPointerMove={moveSheetDrag}
+                  onPointerUp={endSheetDrag}
+                  onPointerCancel={cancelSheetDrag}
                   onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(note); } }}/>
                 {note.display_accidental && note.accidental
                   ? <text className="ws-score-accidental" x={x - 13} y={cy + 4}>
                       {note.accidental === 'sharp' ? '♯' : note.accidental === 'flat' ? '♭' : '♮'}
                     </text>
                   : null}
+                {sheetPreview?.occurrence === occurrence ? <text className="ws-score-drag-label"
+                  data-sheet-drag-label={sheetPreview.spelling}
+                  x={x + 10} y={cy - 10 + sheetPreview.steps * 6}>{sheetPreview.spelling}</text> : null}
                 {segment.dotted ? <circle className="ws-score-dot" cx={x + 8} cy={cy - 1} r={1.8}/> : null}
               </g>;
             })}
