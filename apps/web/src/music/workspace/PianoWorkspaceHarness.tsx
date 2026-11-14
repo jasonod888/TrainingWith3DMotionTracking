@@ -12,7 +12,7 @@ import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
   buildNotation, parseNotationDocument, selectionForOccurrence,
   activeOccurrenceIds, alignmentFromSpans, effectiveSecondsToTick, occurrenceIntervals,
-  applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, type AnchorPoint,
+  addAnchor, applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, type AnchorPoint,
   type Alignment, type CorrectionSelection, type NotationDocument,
 } from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
@@ -115,8 +115,8 @@ export function PianoWorkspaceHarness() {
   const [rate, setRate] = useState(1);
   const [scoreTarget, setScoreTarget] = useState<{ tick: number; token: number } | null>(null);
   const [anchors, setAnchors] = useState<AnchorPoint[]>([]);
-  const [anchorPast, setAnchorPast] = useState<AnchorPoint[][]>([]);
-  const [anchorFuture, setAnchorFuture] = useState<AnchorPoint[][]>([]);
+  const [anchorPast, setAnchorPast] = useState<{anchors: AnchorPoint[]; map: Alignment | null}[]>([]);
+  const [anchorFuture, setAnchorFuture] = useState<{anchors: AnchorPoint[]; map: Alignment | null}[]>([]);
   const [anchorTick, setAnchorTick] = useState('');
   const [anchorPreview, setAnchorPreview] = useState('');
   const linkToken = useRef(0);
@@ -143,11 +143,12 @@ export function PianoWorkspaceHarness() {
   const [savedSections, setSavedSections] = useState<{id: string; label: string; start: number; end: number}[] | null>(null);
   const [savedAssessment, setSavedAssessment] = useState<unknown>(null);
   const [serverSignature, setServerSignature] = useState<string | null>(null);
-  const [storedAlignment, setStoredAlignment] = useState<Alignment | null>(null);
+  const [mapState, setMapState] = useState<Alignment | null>(null);
   const [previewBaseline, setPreviewBaseline] = useState<NotationDocument | null>(null);
   const pendingSavedSignature = useRef(false);
   const workspaceSignatureRef = useRef('');
   const referenceLoadedRef = useRef(false);
+  const loadGeneration = useRef(0);
   const [savedRevisionId, setSavedRevisionId] = useState<string | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [confirmReviewed, setConfirmReviewed] = useState(false);
@@ -225,49 +226,6 @@ export function PianoWorkspaceHarness() {
       setLoading(false);
       return () => { stopped = true; };
     }
-    if (!lessonId) { setError('Add ?id=<lesson id> to the harness URL.'); setLoading(false); return; }
-    request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft`)
-      .then(async value => {
-        // A saved revision may have no proposal left; give the reference a moment
-        // to open before treating the missing draft as an error.
-        if (value === null) {
-          await new Promise(resolve => setTimeout(resolve, 800));
-          if (referenceLoadedRef.current) return;
-        }
-        const parsed = parseMusicDraftView(value);
-        if (!parsed.ok) throw new Error(parsed.message);
-        if (stopped) return;
-        const draft = parsed.value;
-        const draftSpans = draft.spans.map(span => ({start: span.start, end: span.end, kind: span.kind}));
-        const clock = scoreClock(draftSpans, draft.duration);
-        const document = buildNotation(draft.events.map(event => ({
-          id: event.id, onset: event.onset, duration: event.duration, pitch: event.pitch,
-          velocity: event.velocity, confidence: event.confidence, optional: event.optional,
-          string: event.string, fret: event.fret, notation_duration: event.notation_duration ?? null,
-        })), {
-          duration: draft.duration,
-          scoreSeconds: note => clock.toScore(note.onset),
-          scoreDuration: clock.scoreDuration,
-        });
-        setBaseline(document);
-        setState(createWorkspaceState(document));
-        setTitle(draft.title);
-        setSpans(draft.spans.map(span => ({start: span.start, end: span.end, kind: span.kind})));
-        setOffsetSeconds(draft.playback?.sync_offset_seconds ?? 0);
-        setVideoUrl(draft.source_video ? assetUrl(draft.source_video.key) : null);
-        setDraftId(draft.draft_id);
-        setSourceSha256(draft.reference?.sha256 ?? '');
-        setVerificationToken(draft.verification_state_token ?? '');
-        setPreviewAsset((draft.piano_preview as Asset | null) ?? null);
-        setPreviewIdentity(draft.preview_identity ?? '');
-      })
-      .catch(cause => {
-        if (!stopped && !referenceLoadedRef.current) {
-          setError(cause instanceof Error ? cause.message : 'The draft could not be opened.');
-        }
-      })
-      .finally(() => { if (!stopped) setLoading(false); });
-    return () => { stopped = true; };
   }, [lessonId]);
 
   useEffect(() => {
@@ -348,7 +306,7 @@ export function PianoWorkspaceHarness() {
   const anchored = useMemo(
     () => (document && baseAlignment ? applyAnchors(baseAlignment, document, anchors) : null),
     [document, baseAlignment, anchors]);
-  const alignment = storedAlignment ?? anchored?.alignment ?? baseAlignment;
+  const alignment = mapState ?? anchored?.alignment ?? baseAlignment;
   const intervals = useMemo(() => (document ? occurrenceIntervals(document, offsetSeconds) : []), [document, offsetSeconds]);
   const activeIds = useMemo(() => activeOccurrenceIds(intervals, playhead), [intervals, playhead]);
   const playheadTick = alignment ? effectiveSecondsToTick(alignment, playhead, offsetSeconds) : null;
@@ -388,22 +346,27 @@ export function PianoWorkspaceHarness() {
     : workspaceSignature !== (serverSignature ?? '') || Boolean(state?.dirty);
   const previewStale = Boolean(previewBaseline && document && performanceChanged(previewBaseline, document));
   const recoveryIdentity = useMemo<RecoveryIdentity>(
-    () => ({accountId, lessonId: lessonId ?? '', draftId, sourceSha256}),
-    [accountId, lessonId, draftId, sourceSha256],
+    () => ({accountId, lessonId: lessonId ?? '', draftId, sourceSha256,
+      baseRevisionId: savedRevisionId}),
+    [accountId, lessonId, draftId, sourceSha256, savedRevisionId],
   );
 
   const applyRestoredReference = useCallback((restored: Extract<ReturnType<typeof restoreFromReference>, {ok: true}>['value'],
-    revisionId: string, manifest: {section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
+    revisionId: string, manifest: {draft_id?: string | null; source_video?: Asset | null;
+      reference?: {key: string; sha256?: string} | null;
+      preview_identity?: string | null; sha256?: string;
+      section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
       assessment?: unknown; piano_preview?: Asset | null} | null) => {
     setBaseline(restored.document);
     setState(createWorkspaceState(restored.document));
     setSpans(restored.spans);
     setOffsetSeconds(restored.offsetSeconds);
-    setAnchors(restored.alignment?.anchors ?? []);
-    setStoredAlignment(restored.alignment?.passages?.length ? {
+    // One authoritative editable map: the stored map is the base for later anchors.
+    setMapState(restored.alignment?.passages?.length ? {
       alignment_version: 1, mode: restored.alignment.mode, basis: restored.alignment.basis,
       passages: restored.alignment.passages,
     } : null);
+    setAnchors(restored.alignment?.anchors ?? []);
     setAnchorPast([]); setAnchorFuture([]);
     referenceLoadedRef.current = true;
     setError('');
@@ -412,34 +375,117 @@ export function PianoWorkspaceHarness() {
     setSavedSections(manifest?.section_set?.sections ?? null);
     setSavedAssessment(manifest?.assessment ?? null);
     setPreviewAsset((manifest?.piano_preview as Asset | null) ?? null);
+    setPreviewIdentity(manifest?.preview_identity ?? '');
+    setVideoUrl(manifest?.source_video ? assetUrl(manifest.source_video.key) : null);
+    // A saved-only lesson keeps identity without inventing a draft id.
+    setDraftId(manifest?.draft_id ?? '');
+    setSourceSha256(manifest?.source_video?.sha256 ?? manifest?.reference?.sha256 ?? manifest?.sha256 ?? '');
     // The preview is valid only for the performance it was rendered from.
     setPreviewBaseline(manifest?.piano_preview ? restored.document : null);
     if (restored.title) setTitle(restored.title);
     pendingSavedSignature.current = true;
   }, []);
 
-  // A saved lesson opens from its stored reference, not from a regenerated draft.
+  // One coordinator chooses the workspace: a saved reference wins over a proposal,
+  // and a late response can never replace what the user is editing.
   useEffect(() => {
-    let stopped = false;
-    if (!lessonId) return () => { stopped = true; };
+    // Demo fixtures own their workspace; the API coordinator must not run for them.
+    if (params.get('demo')) { setLoading(false); return; }
+    if (!lessonId) { setError('Add ?id=<lesson id> to the harness URL.'); setLoading(false); return; }
+    const generation = ++loadGeneration.current;
+    let cancelled = false;
+    const alive = () => !cancelled && generation === loadGeneration.current;
+
     (async () => {
+      setLoading(true);
+      setError('');
+      // Both requests start together; a slow draft must not delay a saved reference.
+      const draftPromise = request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft`)
+        .catch(() => null);
+      let manifest: {revision_id: string; reference: {key: string; sha256?: string};
+        source_video?: Asset | null; piano_preview?: Asset | null; preview_identity?: string | null;
+        draft_id?: string | null;
+        section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
+        assessment?: unknown} | null = null;
       try {
-        const manifest = await request<{revision_id: string; reference: {key: string};
-          section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
-          assessment?: unknown; piano_preview?: Asset | null} | null>(`/lessons/${encodeURIComponent(lessonId)}`);
-        if (stopped || !manifest?.revision_id || !manifest.reference?.key) return;
-        const response = await fetch(assetUrl(manifest.reference.key), {credentials: 'same-origin'});
-        if (!response.ok) return;
-        const restored = restoreFromReference(await response.json());
-        if (stopped || !restored.ok) return;
-        applyRestoredReference(restored.value, manifest.revision_id, manifest);
-        setReopenMessage(`Opened saved revision ${manifest.revision_id.slice(0, 8)} from ${
-          restored.value.source === 'notation' ? 'the authored notation' : 'performance only (legacy reference)'}.`);
+        manifest = await request(`/lessons/${encodeURIComponent(lessonId)}`);
       } catch {
-        // No saved reference: the draft path below opens the proposal.
+        manifest = null;
+      }
+      if (!alive()) return;
+
+      let restored = false;
+      if (manifest?.revision_id && manifest.reference?.key) {
+        try {
+          const response = await fetch(assetUrl(manifest.reference.key), {credentials: 'same-origin'});
+          if (!alive()) return;
+          if (!response.ok) {
+            setReopenMessage('The saved revision could not be read; showing the current proposal instead.');
+          } else {
+            const result = restoreFromReference(await response.json());
+            if (!alive()) return;
+            if (result.ok) {
+              applyRestoredReference(result.value, manifest.revision_id, manifest);
+              setReopenMessage(`Opened saved revision ${manifest.revision_id.slice(0, 8)} from ${
+                result.value.source === 'notation' ? 'the authored notation' : 'performance only (legacy reference)'}.`);
+              restored = true;
+            } else {
+              setReopenMessage(`The saved revision could not be opened (${result.message}); showing the proposal instead.`);
+            }
+          }
+        } catch {
+          if (!alive()) return;
+          setReopenMessage('The saved revision could not be read; showing the current proposal instead.');
+        }
+      }
+      if (!alive()) return;
+      if (restored) { setLoading(false); return; }
+
+      // Fallback to the proposal only when no saved reference could be opened.
+      setError('');
+      const value = await draftPromise;
+      if (!alive()) return;
+      if (value === null) {
+        setError('No draft or saved revision is available for this lesson.');
+        setLoading(false);
+        return;
+      }
+      try {
+        const parsed = parseMusicDraftView(value);
+        if (!parsed.ok) throw new Error(parsed.message);
+        const draft = parsed.value;
+        const draftSpans = draft.spans.map(span => ({start: span.start, end: span.end, kind: span.kind}));
+        const clock = scoreClock(draftSpans, draft.duration);
+        const document = buildNotation(draft.events.map(event => ({
+          id: event.id, onset: event.onset, duration: event.duration, pitch: event.pitch,
+          velocity: event.velocity, confidence: event.confidence, optional: event.optional,
+          string: event.string, fret: event.fret, notation_duration: event.notation_duration ?? null,
+        })), {
+          duration: draft.duration,
+          scoreSeconds: note => clock.toScore(note.onset),
+          scoreDuration: clock.scoreDuration,
+        });
+        if (!alive()) return;
+        setBaseline(document);
+        setState(createWorkspaceState(document));
+        setTitle(draft.title);
+        setSpans(draftSpans);
+        setOffsetSeconds(draft.playback?.sync_offset_seconds ?? 0);
+        setDraftId(draft.draft_id);
+        setSourceSha256(draft.reference?.sha256 ?? '');
+        setVerificationToken(draft.verification_state_token ?? '');
+        setPreviewAsset((draft.piano_preview as Asset | null) ?? null);
+        setPreviewIdentity(draft.preview_identity ?? '');
+        setPreviewBaseline(draft.piano_preview ? document : null);
+        setVideoUrl(draft.source_video ? assetUrl(draft.source_video.key) : null);
+      } catch (cause) {
+        if (alive()) setError(cause instanceof Error ? cause.message : 'The draft could not be opened.');
+      } finally {
+        if (alive()) setLoading(false);
       }
     })();
-    return () => { stopped = true; };
+
+    return () => { cancelled = true; };
   }, [lessonId, applyRestoredReference]);
 
   useEffect(() => {
@@ -461,7 +507,7 @@ export function PianoWorkspaceHarness() {
 
   // A local checkpoint is offered only when its account, draft and source match.
   useEffect(() => {
-    if (!accountId || !lessonId || !draftId || !sourceSha256 || !document) return;
+    if (!accountId || !lessonId || !sourceSha256 || !document) return;
     const outcome = readRecovery(recoveryIdentity);
     if (outcome.status === 'restored') setRecoveryOffer(outcome.checkpoint);
     else if (outcome.status === 'rejected') setRecoveryNotice(outcome.reason);
@@ -470,7 +516,7 @@ export function PianoWorkspaceHarness() {
 
   // Autosave a local checkpoint while edits are unsaved; it is never called Saved.
   useEffect(() => {
-    if (!document || !dirty || !accountId || !draftId || !sourceSha256) return;
+    if (!document || !dirty || !accountId || !sourceSha256) return;
     const timer = setTimeout(() => {
       writeRecovery({
         identity: recoveryIdentity, title,
@@ -678,7 +724,7 @@ export function PianoWorkspaceHarness() {
       if (recoveryOffer.baseRevisionId) setSavedRevisionId(recoveryOffer.baseRevisionId);
       if (recoveryOffer.verificationToken) setVerificationToken(recoveryOffer.verificationToken);
       if (recoveryOffer.alignment?.passages?.length) {
-        setStoredAlignment({alignment_version: 1, mode: recoveryOffer.alignment.mode,
+        setMapState({alignment_version: 1, mode: recoveryOffer.alignment.mode,
           basis: recoveryOffer.alignment.basis, passages: recoveryOffer.alignment.passages});
       }
       setConfirmReviewed(false);
@@ -695,15 +741,15 @@ export function PianoWorkspaceHarness() {
 
   const storedPlayhead = Math.max(0, playhead - offsetSeconds);
 
-  const commitAnchors = useCallback((next: AnchorPoint[]) => {
-    if (!document || !baseAlignment) return;
-    const check = applyAnchors(baseAlignment, document, next);
-    if (check.problem) { setAnchorPreview(`Not applied: ${check.problem}`); return; }
-    setAnchorPast(history => [...history.slice(-19), anchors]);
+  const snapshot = useCallback(() => ({anchors, map: mapState}), [anchors, mapState]);
+
+  const commitAnchors = useCallback((next: AnchorPoint[], nextMap: Alignment | null) => {
+    setAnchorPast(history => [...history.slice(-19), snapshot()]);
     setAnchorFuture([]);
     setAnchors(next);
+    setMapState(nextMap);
     setAnchorPreview(next.length ? `Anchored at ${next.length} point(s).` : 'Reset to the estimated map.');
-  }, [document, baseAlignment, anchors]);
+  }, [snapshot]);
 
   const useCurrentTick = useCallback(() => {
     if (!alignment) return;
@@ -719,28 +765,43 @@ export function PianoWorkspaceHarness() {
   }, [alignment, anchorTick]);
 
   const applyAnchorPoint = useCallback(() => {
+    if (!document || !alignment) return;
     const tick = Number(anchorTick);
     if (!Number.isInteger(tick) || tick < 0) { setAnchorPreview('Enter a whole tick number.'); return; }
-    commitAnchors([...anchors, {seconds: storedPlayhead, tick}]);
-  }, [anchorTick, anchors, commitAnchors, storedPlayhead]);
+    // The anchor is applied to the map in use, so a reopened stored map stays editable.
+    const result = addAnchor(alignment, document, storedPlayhead, tick);
+    if (!result.ok) { setAnchorPreview(`Not applied: ${result.message}`); return; }
+    commitAnchors([...anchors, {seconds: storedPlayhead, tick}], result.alignment);
+  }, [document, alignment, anchorTick, anchors, commitAnchors, storedPlayhead]);
+
+  const removeAnchor = useCallback((index: number) => {
+    if (!document) return;
+    const next = anchors.filter((_, position) => position !== index);
+    const base = alignmentFromSpans(document, spans);
+    const result = next.length ? applyAnchors(base, document, next) : {alignment: base, problem: null};
+    if (result.problem) { setAnchorPreview(`Not applied: ${result.problem}`); return; }
+    commitAnchors(next, next.length ? result.alignment : null);
+  }, [document, anchors, spans, commitAnchors]);
 
   const undoAnchors = useCallback(() => {
     if (!anchorPast.length) return;
     const previous = anchorPast[anchorPast.length - 1];
     setAnchorPast(anchorPast.slice(0, -1));
-    setAnchorFuture([anchors, ...anchorFuture].slice(0, 20));
-    setAnchors(previous);
-    setAnchorPreview('Anchor removed (undo).');
-  }, [anchorPast, anchorFuture, anchors]);
+    setAnchorFuture([snapshot(), ...anchorFuture].slice(0, 20));
+    setAnchors(previous.anchors);
+    setMapState(previous.map);
+    setAnchorPreview('Anchor change undone.');
+  }, [anchorPast, anchorFuture, snapshot]);
 
   const redoAnchors = useCallback(() => {
     if (!anchorFuture.length) return;
     const [next, ...rest] = anchorFuture;
-    setAnchorPast([...anchorPast.slice(-19), anchors]);
+    setAnchorPast([...anchorPast.slice(-19), snapshot()]);
     setAnchorFuture(rest);
-    setAnchors(next);
-    setAnchorPreview('Anchor restored (redo).');
-  }, [anchorPast, anchorFuture, anchors]);
+    setAnchors(next.anchors);
+    setMapState(next.map);
+    setAnchorPreview('Anchor change restored.');
+  }, [anchorPast, anchorFuture, snapshot]);
 
   if (loading) return <main className="ws-shell"><p role="status">Opening the draft…</p></main>;
   if (error) return <main className="ws-shell"><p role="alert" className="ws-error">{error}</p></main>;
@@ -810,12 +871,16 @@ export function PianoWorkspaceHarness() {
         <button type="button" onClick={() => zoom(0.8)} aria-label="Zoom in">+</button>
       </div>
       <span className="ws-time">{playhead.toFixed(2)} s / {document.duration.toFixed(2)} s</span>
-      {!videoUrl && <label className="ws-field ws-inline">
+      <label className="ws-field ws-inline">
         <span>Fixture clock</span>
         <input type="range" min={0} max={document.duration} step={0.01} value={playhead}
           aria-label="Fixture clock"
-          onChange={event => { const value = Number(event.target.value); setPlayhead(value); clockRef.current.set(value); setPlaying(false); }}/>
-      </label>}
+          onChange={event => {
+            const value = Number(event.target.value);
+            if (videoUrl && videoRef.current) { seek(value); return; }
+            setPlayhead(value); clockRef.current.set(value); setPlaying(false);
+          }}/>
+      </label>
       <span className="ws-alignment" data-alignment-mode={alignment?.mode ?? 'none'} data-playhead-tick={playheadTick ?? ''}
         data-ticks-per-second={alignment ? Math.round((1 / secondsPerTick) * 1000) / 1000 : ''}>
         {alignment?.mode === 'anchored' ? 'Score alignment anchored' : 'Score alignment estimated'}
@@ -1023,11 +1088,11 @@ export function PianoWorkspaceHarness() {
           <div className="ws-row">
             <button type="button" onClick={undoAnchors} disabled={!anchorPast.length}>Undo point</button>
             <button type="button" onClick={redoAnchors} disabled={!anchorFuture.length}>Redo point</button>
-            <button type="button" onClick={() => commitAnchors([])} disabled={!anchors.length}>Reset</button>
+            <button type="button" onClick={() => commitAnchors([], null)} disabled={!anchors.length}>Reset</button>
           </div>
           {anchors.map((anchor, index) => <p className="ws-hint" key={`${anchor.seconds}-${anchor.tick}-${index}`}>
             {anchor.seconds.toFixed(3)} s → tick {anchor.tick}{' '}
-            <button type="button" onClick={() => commitAnchors(anchors.filter((_, position) => position !== index))}>Remove</button>
+            <button type="button" onClick={() => removeAnchor(index)}>Remove</button>
           </p>)}
           {anchorPreview && <p className="ws-report">{anchorPreview}</p>}
           <p className="ws-hint">Anchors are local and unsaved until Phase 5. One or more applied points make the map “anchored”.</p>

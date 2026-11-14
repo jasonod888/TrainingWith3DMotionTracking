@@ -151,9 +151,13 @@ def run():
         expect(saved is not None, 'edit B has no local checkpoint after a delayed success')
         if saved:
             expect(saved['offsetSeconds'] == 0.5, f"checkpoint offset {saved.get('offsetSeconds')} != 0.5")
-            expect(saved['identity'] == {'accountId': 'account-1', 'lessonId': LESSON,
-                                         'draftId': 'draft-1', 'sourceSha256': 'b' * 64},
-                   'the checkpoint lost its draft identity')
+            identity = saved['identity']
+        expect({key: identity.get(key) for key in ('accountId', 'lessonId', 'draftId', 'sourceSha256')} ==
+               {'accountId': 'account-1', 'lessonId': LESSON, 'draftId': 'draft-1',
+                'sourceSha256': 'b' * 64},
+               'the checkpoint lost its draft identity')
+        expect(identity.get('baseRevisionId') in (None, 'rev-saved-1'),
+               f"unexpected base revision in the checkpoint: {identity.get('baseRevisionId')}")
         confirm(page)
         expect(save_button(page).is_enabled(), 'edit B should still be saveable')
         RESULT['delayed_success'] = {'checkpoint_offset': saved['offsetSeconds'] if saved else None,

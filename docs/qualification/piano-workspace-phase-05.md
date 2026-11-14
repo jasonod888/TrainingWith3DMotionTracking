@@ -141,3 +141,22 @@ Evidence: [`phase5-browser.json`](piano-workspace-phase-05/phase5-browser.json),
 Remaining known gap: no authenticated capture against the real backend; the cross-language
 API test and this browser run cover the contract and workspace behaviour without a live
 session.
+
+---
+
+## 9. Follow-up lifecycle corrections (this commit)
+
+| Review item | Resolution |
+| --- | --- |
+| R1 load race | One coordinator owns loading: both requests start together, a saved reference wins, the draft is consulted only as a fallback, and a generation check makes a late response incapable of touching the workspace. A saved reference that cannot be read now falls back to the proposal with an explicit message instead of an error screen. |
+| R2 saved-only identity | A saved-only lesson now restores its source video, preview identity, revision id, spans, sections and assessment. Recovery works without inventing a draft id: the checkpoint identity is account + lesson + source hash + **base revision**, and a saved-only edit writes and restores it. |
+| R3 stored-map shadowing | The map in use is one editable state (`mapState`); an anchor applied after reopening is added to that map, so the cursor and the serialized passages change with it. Undo/redo restore map+anchor snapshots; Remove/Reset rebuild from the clip with the remaining anchors; anchor history resets when a different reference opens. |
+
+Verified with the reviewer's own lifecycle diagnostic: **4/4 passed** (`docs/qualification/piano-workspace-phase-05-followup-repro.ts`), covering source video on saved-only load, an anchor applied after reopen moving the cursor, an identity-scoped checkpoint for a saved-only edit, and a late draft response leaving a newer offset edit intact.
+
+The controlled-route Chromium script still passes all checks (delayed success/failure, reload recovery, preview validity, invalidated reopen).
+
+**Known gaps after this commit**
+
+- Removal/reset/undo/redo on a reopened stored map is implemented and exercised only through the map-state code path; the two component tests I wrote for it and for the saved-only revision save hung under jsdom and were removed, so they are not automated.
+- The saved-only revision-save round trip (edit → save as revision) is covered by the cross-language API test and the browser script, not by a component test.

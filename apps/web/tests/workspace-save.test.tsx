@@ -39,6 +39,7 @@ const draft = {...fixture,
 let posts: {url: string; body: any}[] = [];
 let saveStatus = 200;
 let conflictMessage = '';
+let lessonManifest: any = null;
 let deferredSave: {promise: Promise<void>; resolve: () => void} | null = null;
 let latestReference: any = null;
 let lessonGets = 0;
@@ -134,6 +135,7 @@ test('a failed save keeps the edits and the local checkpoint, and never claims S
   assert.equal(checkpoint.version, 1);
   assert.deepEqual(checkpoint.identity, {
     accountId: 'account-1', lessonId: 'lesson-1', draftId: 'draft-1', sourceSha256: draft.reference.sha256,
+    baseRevisionId: null,
   });
   assert.ok(checkpoint.notation);
 });
@@ -333,4 +335,5 @@ test('R5: opening a saved lesson uses its stored reference, not a regenerated dr
   assert.equal((view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement).disabled, true,
     'an opened saved revision is clean');
 });
+
 
