@@ -1,0 +1,15 @@
+[
+  {
+    "name": "reject-keeps-added-note-with-later-recorded-length-edit",
+    "passed": true,
+    "recorded_length_before_reject": "0.9",
+    "retained_after_reject": true
+  },
+  {
+    "name": "recovered-reject-restores-authored-spelling-or-refuses-safely",
+    "passed": true,
+    "actual_spelling": "B#3",
+    "actual_pitch": 60,
+    "expected": "B#3 restored, or accepted D4 retained with explicit missing-baseline reconciliation"
+  }
+]

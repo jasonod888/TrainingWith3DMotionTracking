@@ -874,8 +874,13 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       const noteOf = (id: string) => doc.performance.find(note => note.id === id);
       const same = (id: string, data: Record<string, unknown>) => {
         const note = noteOf(id);
-        return Boolean(note) && note!.pitch === Number(data.pitch)
-          && Math.abs(note!.onset - Number(data.onset)) < 1e-6;
+        if (!note || note.pitch !== Number(data.pitch)
+          || Math.abs(note.onset - Number(data.onset)) > 1e-6) return false;
+        if (data.duration !== undefined && data.duration !== null
+          && Math.abs((note.duration ?? 0) - Number(data.duration)) > 1e-6) return false;
+        if (data.velocity !== undefined && data.velocity !== null
+          && note.velocity !== null && Math.abs(note.velocity - Number(data.velocity)) > 1e-6) return false;
+        return true;
       };
       return finding.proposed_edits.every(edit => {
         const after = (edit.after ?? {}) as Record<string, unknown>;
@@ -887,6 +892,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         if (edit.op === 'split_note') return Array.isArray(edit.after)
           && (edit.after as Record<string, unknown>[]).every((piece, index) =>
             same(`vf-${finding.id}-${index + 1}`, piece));
+        if (edit.op === 'delete_note') return edit.event_ids.every(id => !noteOf(id));
         return true;
       });
     }
@@ -948,6 +954,14 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         dispatch({type: 'commands', commands, label: `Verification: ${finding.kind}`});
         setConfirmReviewed(false);
       } else if (wasAccepted && findingMatches(latest, finding, true)) {
+        const needsSpelling = finding.proposed_edits.some(edit =>
+          edit.op === 'set_pitch' || edit.op === 'delete_note' || edit.op === 'merge' || edit.op === 'split_note');
+        const baseline = authoredSpellings.current[finding.id];
+        if (needsSpelling && !baseline) {
+          setNotice('The decision was rejected on the server, but this recovery has no authored spelling/section baseline. '
+            + 'The local document was kept rather than restoring a key-derived spelling.');
+          return;
+        }
         const {commands, problem} = commandsFor(latest, finding, true);
         if (problem) { setNotice(problem); return; }
         const preflight = commands.reduce<{doc: NotationDocument; ok: boolean}>((acc, command) => {
@@ -1027,6 +1041,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         sections: sectionsDraft.length ? sectionsDraft : undefined,
         assessment: {policy: assessmentPolicy},
         durationSeconds: document.duration,
+        authoredSpellings: authoredSpellings.current,
       });
     }, 600);
     return () => clearTimeout(timer);
@@ -1231,6 +1246,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       setAnchors(canonicalAnchors(staleCheckpoint.alignment?.anchors ?? []));
       if (staleCheckpoint.sections?.length) setSectionsDraft(staleCheckpoint.sections);
       if (staleCheckpoint.assessment) setAssessmentPolicy(staleCheckpoint.assessment.policy);
+      authoredSpellings.current = staleCheckpoint.authoredSpellings ?? {};
       if (staleCheckpoint.alignment?.passages?.length) {
         setMapState({alignment_version: 1, mode: staleCheckpoint.alignment.mode,
           basis: staleCheckpoint.alignment.basis, passages: staleCheckpoint.alignment.passages});
@@ -1257,6 +1273,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       setAnchors(canonicalAnchors(recoveryOffer.alignment?.anchors ?? []));
       if (recoveryOffer.sections?.length) setSectionsDraft(recoveryOffer.sections);
       if (recoveryOffer.assessment) setAssessmentPolicy(recoveryOffer.assessment.policy);
+      authoredSpellings.current = recoveryOffer.authoredSpellings ?? {};
       // Recovered work keeps its server base so a retry is not a first review.
       if (recoveryOffer.baseRevisionId) setSavedRevisionId(recoveryOffer.baseRevisionId);
       if (recoveryOffer.verificationToken) setVerificationToken(recoveryOffer.verificationToken);

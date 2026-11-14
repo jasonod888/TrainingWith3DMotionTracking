@@ -1,0 +1,17 @@
+{
+  "before": {
+    "duration": 3,
+    "seekable": [
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  "after": {
+    "time": 0,
+    "seeking": false,
+    "readyState": 4,
+    "error": null
+  }
+}

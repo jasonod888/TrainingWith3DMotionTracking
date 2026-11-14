@@ -35,6 +35,8 @@ export type RecoveryCheckpoint = {
   assessment?: {policy: 'none' | 'notes'};
   /** Clip duration the sections were written against, for strict validation. */
   durationSeconds?: number;
+  /** finding id → occurrence id → authored spelling, for faithful reversals. */
+  authoredSpellings?: Record<string, Record<string, string>>;
 };
 
 export type RecoveryRead =
@@ -102,6 +104,14 @@ export function readRecovery(identity: RecoveryIdentity): RecoveryRead {
         ? 'A local checkpoint predates base-revision tracking; confirm before restoring it.'
         : 'A local checkpoint was written against an older saved revision of this clip; it is stale.',
     };
+  }
+  if (checkpoint.authoredSpellings !== undefined) {
+    const value = checkpoint.authoredSpellings;
+    const valid = value && typeof value === 'object' && !Array.isArray(value)
+      && Object.values(value).every(entry => entry && typeof entry === 'object' && !Array.isArray(entry)
+        && Object.entries(entry).every(([id, spelling]) => id.length <= 120
+          && typeof spelling === 'string' && spelling.length > 0 && spelling.length <= 12));
+    if (!valid) return {status: 'rejected', reason: 'The local checkpoint has invalid authored spellings and was ignored.'};
   }
   if (!checkpoint.notation || typeof checkpoint.notation !== 'object') {
     return {status: 'rejected', reason: 'The local checkpoint has no notation and was ignored.'};

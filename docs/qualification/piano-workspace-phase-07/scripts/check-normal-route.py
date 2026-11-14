@@ -76,7 +76,20 @@ class World:
                 return self.json(route, {}, status=404)
             return self.json(route, self.manifest)
         if path.endswith('/assets/clip.mp4') and self.video_bytes is not None:
-            return route.fulfill(status=200, content_type='video/mp4', body=self.video_bytes)
+            data = self.video_bytes
+            range_header = request.headers.get('range') or request.headers.get('Range')
+            if range_header and range_header.startswith('bytes='):
+                start_text, _, end_text = range_header[6:].partition('-')
+                start = int(start_text or 0)
+                end = int(end_text) if end_text else len(data) - 1
+                end = min(end, len(data) - 1)
+                chunk = data[start:end + 1]
+                return route.fulfill(status=206, content_type='video/mp4', body=chunk,
+                                     headers={'Accept-Ranges': 'bytes',
+                                              'Content-Range': f'bytes {start}-{end}/{len(data)}',
+                                              'Content-Length': str(len(chunk))})
+            return route.fulfill(status=200, content_type='video/mp4', body=data,
+                                 headers={'Accept-Ranges': 'bytes', 'Content-Length': str(len(data))})
         if path.endswith('/assets/ref.json') and self.reference_text is not None:
             return route.fulfill(status=200, content_type='application/json', body=self.reference_text)
         if '/music-draft/review' in path or '/music-revision' in path:
@@ -387,21 +400,50 @@ def video_qualification(browser, world):
     page.get_by_role('button', name='Pause', exact=True).click()
     page.wait_for_timeout(200)
     expect(page.evaluate('() => document.querySelector("video").paused'), 'pause did not stop video')
-    ruler = page.locator('.ws-score-ruler').first
-    ruler.scroll_into_view_if_needed()
-    box = ruler.bounding_box()
-    page.mouse.click(box['x'] + box['width'] * (1.5 / meta['duration']), box['y'] + box['height'] / 2)
+    page.wait_for_function('() => { const v = document.querySelector("video");'
+                           ' return v && v.seekable.length > 0 && v.seekable.end(0) > 1; }', timeout=15000)
+    seekable = page.evaluate('() => { const v = document.querySelector("video");'
+                             ' return v.seekable.length ? [v.seekable.start(0), v.seekable.end(0)] : []; }')
+    expect(seekable and seekable[1] >= 2.5, f'video is not seekable: {seekable}')
+    clock = page.get_by_label('Source clock position', exact=True)
+    clock.evaluate("e => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, '1.5');"
+                   " e.dispatchEvent(new Event('input', {bubbles: true})); }")
     page.wait_for_timeout(300)
     seek = page.evaluate('() => document.querySelector("video").currentTime')
-    expect(seek > 0.3, f'seek did not move the video: {seek}')
-    cursors = page.evaluate("""() => {
-      const score = document.querySelector('.ws-score-playhead');
-      return {scoreTick: score && score.getAttribute('data-playhead-tick'),
-              video: document.querySelector('video').currentTime};
-    }""")
-    expect(cursors['scoreTick'] not in (None, ''), 'score cursor is not drawn')
-    RESULT['loaded_video'] = {**meta, 'rate': rate, 'seek': seek, 'cursors': cursors,
-                              'played': played, 'header_clear': True}
+    expect(abs(seek - 1.5) < 0.05, f'seek went to {seek}')
+    tick = float(page.locator('.ws-alignment').get_attribute('data-playhead-tick'))
+    score_tick = float(page.locator('.ws-score-playhead').get_attribute('data-playhead-tick'))
+    tps = float(page.locator('[data-ticks-per-second]').get_attribute('data-ticks-per-second'))
+    span = float(page.locator('[data-window-span]').get_attribute('data-window-span'))
+    width = page.locator('.ws-roll-viewport').evaluate('(e) => e.clientWidth')
+    roll_second = float(page.locator('.ws-roll-playhead').get_attribute('x1')) / (width / span)
+    expect(abs(roll_second - seek) < 0.05, f'roll cursor {roll_second} does not match {seek}')
+    expect(abs(score_tick - tick) < 3, f'score cursor {score_tick} does not match mapped {tick}')
+    page.locator('video').evaluate('(v) => { v.currentTime = 2.9; v.playbackRate = 1; }')
+    page.get_by_role('button', name='Play', exact=True).click()
+    page.wait_for_timeout(450)
+    ended = page.evaluate('() => { const v = document.querySelector("video");'
+                          ' return {ended: v.ended, paused: v.paused, time: v.currentTime}; }')
+    expect(ended['ended'] and ended['paused'] and abs(ended['time'] - 3) < 0.05, f'video did not end: {ended}')
+    cursors = {'scoreTick': score_tick, 'mappedTick': tick, 'roll_seconds': roll_second}
+    RESULT['loaded_video'] = {**meta, 'rate': rate, 'seek': seek, 'seekable': seekable,
+                              'cursors': cursors, 'played': played, 'ended': ended, 'header_clear': True}
+    page.mouse.wheel(0, 320)
+    page.wait_for_timeout(250)
+    scrolled_header = (page.locator('header').first.bounding_box()
+                       if page.locator('header').count() else None)
+    scrolled_video = page.locator('video').first.bounding_box()
+    expect(scrolled_header is not None and scrolled_video is not None, 'header or video missing while scrolling')
+    if scrolled_header and scrolled_video:
+        top = max(scrolled_header['y'], scrolled_video['y'])
+        bottom = min(scrolled_header['y'] + scrolled_header['height'],
+                     scrolled_video['y'] + scrolled_video['height'])
+        if bottom > top:
+            hit = page.evaluate("([x, y]) => { const el = document.elementFromPoint(x, y);"
+                                " return el ? Boolean(el.closest('header')) : false; }",
+                                [scrolled_header['x'] + scrolled_header['width'] / 2, (top + bottom) / 2])
+            expect(hit, 'the video paints over the app header while scrolling')
+    RESULT['loaded_video']['header_scroll_clear'] = True
     page.screenshot(path=str(OUT / 'loaded-video.png'))
     context.close()
 

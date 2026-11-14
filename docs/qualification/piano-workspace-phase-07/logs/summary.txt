@@ -1,9 +1,11 @@
-﻿# Phase 7 T1-T2 and journey regression
+﻿# Phase 7 U1-U3 regression
 # web suite: 471 passed
 # tsc: clean
-# transition checks: 2/2
+# recovery checks: 2/2
+# transitions: 2/2
 # verification: 3/3
 # settings: 2/2
-# library revision journey: pass (base rev-normal-1, reopened)
-# loaded video: pass (3s fixture)
+# loaded clock: 4/4
+# clip seek: pass
+# library revision: pass
 # physical touch: BLOCKED

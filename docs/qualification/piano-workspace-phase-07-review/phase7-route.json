@@ -1,0 +1,60 @@
+{
+  "workspace_styles": {
+    "grid": "grid",
+    "fill": "rgb(127, 174, 143)",
+    "sheetFill": "rgb(31, 45, 38)",
+    "settings": true
+  },
+  "route_integration": {
+    "workspace": true,
+    "legacy_form_absent": true
+  },
+  "app_navigation_guard": "Leave without saving your changes or take?",
+  "app_dirty": true,
+  "focus_ownership": {
+    "raised": 71,
+    "after_outside_undo": 71,
+    "after_inside_undo": 70
+  },
+  "route_save_reopen": {
+    "before": 70,
+    "corrected": 73,
+    "reopened": 73
+  },
+  "saved_only_entry": true,
+  "unsaved_guard": "Leave without saving your changes?",
+  "guitar_regression": true,
+  "performance_1338": {
+    "dom": 124,
+    "load": 126,
+    "notes": 35,
+    "score": 33,
+    "heap": 29,
+    "data_notes": 1338
+  },
+  "loaded_video": {
+    "duration": 3,
+    "muted": false,
+    "rate": 0.75,
+    "seek": 1.03013,
+    "cursors": {
+      "scoreTick": "1195",
+      "video": 1.03013
+    },
+    "played": 0.659323,
+    "header_clear": true
+  },
+  "revision_journey": {
+    "before": 73,
+    "corrected": 74,
+    "base": "rev-normal-1"
+  },
+  "revision_reopen": true,
+  "touch_emulation": {
+    "tap_selected_only": true,
+    "edited": 72,
+    "overflow": 0,
+    "inspector_position": "sticky"
+  },
+  "failures": []
+}

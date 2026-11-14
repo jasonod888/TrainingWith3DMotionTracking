@@ -165,3 +165,31 @@ Phase 8 has not started. No deployment or release action was taken.
 
 - **Physical touch qualification remains BLOCKED.** No hardware is available; emulated touch is not a substitute.
 - The loaded-video performance figures are still a controlled dev-server run; interactive upper-bound timing has not been profiled beyond the long-example load/render numbers.
+
+---
+
+## 9. Reversal and seek corrections (U1–U3)
+
+| Item | Resolution |
+| --- | --- |
+| U1 later note edits | Destructive inverses now compare the full accepted after-state: pitch, onset, recorded duration, velocity and the presence of the inserted `vf-*` identity. An added note whose recorded length was changed to 0.9 s is no longer deleted on reject; the reversal is skipped with an explicit reconciliation message. Deleted-not-reinserted state is also checked. |
+| U2 baseline after reload | The authored-spelling baseline is part of the versioned recovery checkpoint (validated on read), restored on both recovery paths. If an older checkpoint has no baseline, a reversal that would need authored spelling is refused and the local document kept, rather than restoring a key-derived spelling. |
+| U3 seekable video | The fixture is re-encoded with `+faststart`, and the asset route now serves byte ranges (`206` + `Content-Range`/`Accept-Ranges`). Evidence: seekable `[0,3]`, slider seek to 1.5 s gives video 1.5 s, roll cursor 1.5 s and score tick 1740 under the current map, then a playback-to-end check (`ended`, paused, 3 s). Header overlap is checked at rest and while scrolling using the paint/hit result, not just box geometry. |
+
+### Verification (U1–U3)
+
+| Check | Result |
+| --- | --- |
+| Reviewer recovery cases | **2/2** (0.9 s note retained; B#3 restored after reload/recover) |
+| Reviewer verification / transitions / settings | 3/3, 2/2, 2/2 |
+| Reviewer loaded-clock | 4/4 (play/pause, rate, exact seek with both cursors, ended) |
+| Reviewer bare clip seek | pass (seekable range with byte serving) |
+| Library revision journey | pass (base `rev-normal-1`, reopened 74) |
+| Normal-route E2E | 0 failures (loaded video now includes seek/ended/scroll checks) |
+| Web suite / `tsc` | 471 / clean |
+
+### Outstanding
+
+- **Physical touch qualification remains BLOCKED** — no hardware; emulated touch is not a substitute.
+- The video pass uses the 209 s long draft with a 3 s fixture at source second 1.5; it validates the transport/cursors against the current map, not a short-document domain. That limitation is explicit.
+- Performance figures remain controlled dev-server measurements; interactive upper-bound profiling is still separate.

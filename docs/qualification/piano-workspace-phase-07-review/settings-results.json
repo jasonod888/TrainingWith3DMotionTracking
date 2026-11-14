@@ -13,6 +13,7 @@
     "checkpoint_fields": [
       "alignment",
       "assessment",
+      "authoredSpellings",
       "baseRevisionId",
       "durationSeconds",
       "identity",
