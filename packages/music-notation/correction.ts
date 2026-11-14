@@ -80,6 +80,8 @@ export type CorrectionCommand =
       /** Verification decisions carry deterministic occurrence ids. */
       id?: string;
       velocity?: number;
+      /** Restoring equal-pitch attacks maps them onto the existing written note. */
+      allowDuplicate?: boolean;
     }
   | { type: 'delete-occurrence'; occurrenceId: string }
   | { type: 'delete-logical-note'; logicalNoteId: string };
@@ -566,7 +568,9 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
 
   const duplicate = document.performance.find(item => item.pitch === pitch
     && Math.abs(item.onset - onsetSeconds) < 1e-6);
-  if (duplicate) return rejection('duplicate-occurrence', 'A note of that pitch already starts at this time.');
+  if (duplicate && !command.allowDuplicate) {
+    return rejection('duplicate-occurrence', 'A note of that pitch already starts at this time.');
+  }
 
   const next = clone(document);
   const occurrenceId = command.id ?? newId('authored');
@@ -575,7 +579,18 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
     && event.start === start && event.duration === duration);
 
   if (same) {
-    if (same.notes.some(note => note.pitch === pitch)) {
+    const existing = same.notes.find(note => note.pitch === pitch);
+    if (existing) {
+      if (command.allowDuplicate) {
+        existing.performance_ids.push(occurrenceId);
+        next.performance.push({
+          id: occurrenceId, onset: onsetSeconds, duration: durationSeconds, notation_duration: null,
+          pitch, velocity: command.velocity ?? 0.7, confidence: null, optional: false, string: null, fret: null,
+        });
+        const mergedOutcome = finalise(next, `Restored ${spelling.spelling}`);
+        if (mergedOutcome.status !== 'applied') return mergedOutcome;
+        return applied(mergedOutcome.document, mergedOutcome.label, selectionForOccurrence(mergedOutcome.document, occurrenceId));
+      }
       return rejection('duplicate-chord-pitch', 'That chord already has a note at this pitch.');
     }
     if (!command.addToChord) {

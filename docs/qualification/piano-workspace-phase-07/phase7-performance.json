@@ -1,0 +1,82 @@
+{
+  "scope": "controlled dev server, mocked API, local video fixture",
+  "runs": 5,
+  "real_1338": {
+    "domMs": 136,
+    "loadMs": 137,
+    "notes": 35,
+    "heapMb": 29,
+    "recoveryBytes": 0,
+    "pointer": {
+      "preview": {
+        "median": 20.8,
+        "p95": 183.9
+      },
+      "commit": {
+        "median": 133.5,
+        "p95": 235.1
+      }
+    },
+    "pointer_samples": [
+      {
+        "preview": 183.8999999910593,
+        "commit": 235.1000000089407
+      },
+      {
+        "preview": 48.79999999701977,
+        "commit": 152.40000000596046
+      },
+      {
+        "preview": 20.80000001192093,
+        "commit": 133.5
+      },
+      {
+        "preview": 10.799999997019768,
+        "commit": 118.5
+      },
+      {
+        "preview": 7.4000000059604645,
+        "commit": 115.69999998807907
+      }
+    ]
+  },
+  "limit_20000": {
+    "domMs": 132,
+    "loadMs": 133,
+    "notes": 1565,
+    "heapMb": 46,
+    "recoveryBytes": 0,
+    "pointer": {
+      "preview": {
+        "median": 140.7,
+        "p95": 161.5
+      },
+      "commit": {
+        "median": 2900.5,
+        "p95": 3040.6
+      }
+    },
+    "pointer_samples": [
+      {
+        "preview": 89.70000000298023,
+        "commit": 3040.5999999940395
+      },
+      {
+        "preview": 38.099999994039536,
+        "commit": 2938.4000000059605
+      },
+      {
+        "preview": 140.70000000298023,
+        "commit": 2883.2999999970198
+      },
+      {
+        "preview": 161.5,
+        "commit": 2900.5
+      },
+      {
+        "preview": 143,
+        "commit": 2855.1000000089407
+      }
+    ]
+  }
+}

@@ -24,6 +24,9 @@ import {
   decideVerification, findingDecision, loadVerification, parseVerificationState,
   type VerificationFinding, type VerificationState,
 } from '../verification';
+import {
+  invertFinding, prepareFinding, type AcceptedBaseline,
+} from './verification-transaction';
 import type {Asset} from '../../../../../packages/lesson-schema/index';
 import {ClipOverview} from './ClipOverview';
 import {ContinuousScore} from './ContinuousScore';
@@ -210,21 +213,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const documentRef = useRef<NotationDocument | null>(null);
   const verificationRef = useRef<VerificationState | null>(null);
   const authoredSpellings = useRef<Record<string, Record<string, string>>>({});
-  const acceptedBaselines = useRef<Record<string, Record<string, {
-    pitch: number; onset: number; duration: number | null; velocity: number | null;
-    spelling: string | null; staff: string | null; voice: number | null;
-    eventStart: number | null; eventDuration: number | null;
-  }>>>({});
-  const authoredState = (doc: NotationDocument, id: string) => {
-    const note = doc.performance.find(item => item.id === id);
-    if (!note) return null;
-    const event = doc.events.find(item => item.notes.some(n => n.performance_ids.includes(id)));
-    const written = event?.notes.find(n => n.performance_ids.includes(id));
-    return {pitch: note.pitch, onset: note.onset, duration: note.duration,
-      velocity: note.velocity, spelling: written?.spelling ?? null,
-      staff: event?.staff ?? null, voice: event?.voice ?? null,
-      eventStart: event?.start ?? null, eventDuration: event?.duration ?? null};
-  };
+  const acceptedBaselines = useRef<Record<string, AcceptedBaseline>>({});
   documentRef.current = document;
   verificationRef.current = verification;
 
@@ -751,233 +740,16 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     return () => { stopped = true; };
   }, [lessonId, draftId]);
 
-  /** Compare one edit's before snapshot with the live document. */
-  const editMatches = useCallback((doc: NotationDocument, edit: {op: string; event_ids: string[];
-    before: unknown}): boolean => {
-    const find = (id: string) => doc.performance.find(note => note.id === id);
-    const matchEvent = (event: {pitch: number; onset: number; duration: number | null} | undefined,
-                        before: unknown): boolean => {
-      if (!before || typeof before !== 'object' || Array.isArray(before)) return Boolean(event);
-      const fields = before as Record<string, unknown>;
-      if (fields.id !== undefined && event === undefined) return false;
-      if (!event) return false;
-      return Object.entries(fields).every(([key, value]) => {
-        if (key === 'id') return true;
-        const actual = (event as unknown as Record<string, unknown>)[key];
-        if (['onset', 'duration', 'velocity'].includes(key)) {
-          if (value === null || actual === null || actual === undefined) return value === actual;
-          return Math.abs(Number(actual) - Number(value)) < 1e-6;
-        }
-        if (value === null && actual === undefined) return true;
-        return actual === value;
-      });
-    };
-    if (edit.op === 'merge' || edit.op === 'split_note') {
-      const snapshots = Array.isArray(edit.before) ? edit.before : [];
-      return edit.event_ids.every((id, index) => matchEvent(find(id), snapshots[index] ?? snapshots[0]));
-    }
-    if (edit.op === 'delete_note') {
-      return edit.event_ids.every(id => matchEvent(find(id), edit.before));
-    }
-    if (edit.op === 'add_note') return true;
-    return edit.event_ids.every(id => {
-      const note = find(id);
-      if (!note) return false;
-      const before = edit.before;
-      if (!before || typeof before !== 'object' || Array.isArray(before)) return true;
-      return Object.entries(before as Record<string, unknown>).every(([key, value]) => {
-        if (key === 'id') return true;
-        const actual = (note as unknown as Record<string, unknown>)[key];
-        if (['onset', 'duration', 'velocity'].includes(key)) {
-          if (value === null || actual === null || actual === undefined) return value === actual;
-          return Math.abs(Number(actual) - Number(value)) < 1e-6;
-        }
-        if (value === null && actual === undefined) return true;
-        return actual === value;
-      });
-    });
-  }, []);
-
-  /** Translate a decision's edits into occurrence commands for the atomic reducer. */
-  const commandsFor = useCallback((doc: NotationDocument, finding: VerificationFinding,
-    invert: boolean): {commands: Parameters<typeof applyCommand>[1][]; problem?: string} => {
-    const commands: Parameters<typeof applyCommand>[1][] = [];
-    const tickFor = (seconds: number) => alignment
-      ? Math.max(0, Math.round(secondsToTick(alignment, seconds) / 120) * 120) : undefined;
-    const insert = (id: string, data: Record<string, unknown>, velocity?: number | null) => {
-      const onset = Number(data.onset), duration = Math.max(0.02, Number(data.duration) || 0.25);
-      commands.push({type: 'insert-note', pitch: Number(data.pitch), onsetSeconds: onset,
-        durationSeconds: duration, startTicks: tickFor(onset), id, addToChord: true,
-        velocity: velocity === null || velocity === undefined ? 0.7 : Number(velocity)});
-    };
-    const remove = (id: string) => commands.push({type: 'delete-occurrence', occurrenceId: id});
-    for (const edit of finding.proposed_edits) {
-      const after = (edit.after ?? {}) as Record<string, unknown>;
-      const before = edit.before;
-      const beforeEvents = (Array.isArray(before) ? before : before && typeof before === 'object'
-        ? [before] : []) as Record<string, unknown>[];
-      if (invert) {
-        const spellingOf = (id: string) => authoredSpellings.current[finding.id]?.[id];
-        if (edit.op === 'set_pitch' || edit.op === 'set_onset') {
-          for (const id of edit.event_ids) {
-            if (edit.op === 'set_pitch' && beforeEvents[0]?.pitch !== undefined) {
-              commands.push({type: 'set-occurrence-pitch', occurrenceId: id, pitch: Number(beforeEvents[0].pitch),
-                spelling: spellingOf(id)});
-            } else if (edit.op === 'set_onset' && beforeEvents[0]?.onset !== undefined) {
-              commands.push({type: 'set-occurrence-onset', occurrenceId: id, seconds: Number(beforeEvents[0].onset)});
-            }
-          }
-        } else if (edit.op === 'delete_note') {
-          for (const event of beforeEvents) {
-            insert(String(event.id), event, event.velocity as number | null);
-            commands.push({type: 'set-occurrence-pitch', occurrenceId: String(event.id),
-              pitch: Number(event.pitch), spelling: spellingOf(String(event.id))});
-          }
-        } else if (edit.op === 'add_note') {
-          remove(`vf-${finding.id}-a`);
-        } else if (edit.op === 'merge') {
-          remove(`vf-${finding.id}-m`);
-          for (const event of beforeEvents) {
-            insert(String(event.id), event, event.velocity as number | null);
-            commands.push({type: 'set-occurrence-pitch', occurrenceId: String(event.id),
-              pitch: Number(event.pitch), spelling: spellingOf(String(event.id))});
-          }
-        } else if (edit.op === 'split_note') {
-          const pieces = Array.isArray(edit.after) ? edit.after as Record<string, unknown>[] : [];
-          pieces.forEach((_, index) => remove(`vf-${finding.id}-${index + 1}`));
-          for (const event of beforeEvents) {
-            insert(String(event.id), event, event.velocity as number | null);
-            commands.push({type: 'set-occurrence-pitch', occurrenceId: String(event.id),
-              pitch: Number(event.pitch), spelling: spellingOf(String(event.id))});
-          }
-        } else {
-          return {commands: [], problem: `The ${edit.op} suggestion cannot be reverted safely.`};
-        }
-        continue;
-      }
-      if (edit.op === 'set_pitch') {
-        for (const id of edit.event_ids) commands.push({type: 'set-occurrence-pitch', occurrenceId: id, pitch: Number(after.pitch)});
-      } else if (edit.op === 'set_onset') {
-        for (const id of edit.event_ids) commands.push({type: 'set-occurrence-onset', occurrenceId: id, seconds: Number(after.onset)});
-      } else if (edit.op === 'delete_note') {
-        for (const id of edit.event_ids) remove(id);
-      } else if (edit.op === 'add_note') {
-        insert(`vf-${finding.id}-a`, after, after.velocity as number | null);
-      } else if (edit.op === 'merge') {
-        for (const id of edit.event_ids) remove(id);
-        const velocity = Math.max(0, ...beforeEvents.map(event => Number(event.velocity ?? 0)));
-        insert(`vf-${finding.id}-m`, after, velocity || 0.7);
-      } else if (edit.op === 'split_note') {
-        const original = beforeEvents[0];
-        for (const id of edit.event_ids) remove(id);
-        const pieces = Array.isArray(edit.after) ? edit.after as Record<string, unknown>[] : [];
-        pieces.forEach((piece, index) => insert(`vf-${finding.id}-${index + 1}`, piece,
-          original?.velocity as number | null));
-      } else {
-        return {commands: [], problem: `The ${edit.op} suggestion is not supported.`};
-      }
-    }
-    return {commands};
-  }, [alignment]);
-
-  /** Preflight every before snapshot against the candidate document. */
-  const findingMatches = useCallback((doc: NotationDocument, finding: VerificationFinding,
-    invert: boolean): boolean => {
-    if (invert) {
-      // The accepted state must still be exactly present before a revert is safe;
-      // a later manual edit is preserved rather than overwritten. Without a full
-      // accepted-state baseline (e.g. an older checkpoint) a destructive inverse
-      // cannot be proven safe, so it is refused rather than guessed from performance.
-      const baseline = acceptedBaselines.current[finding.id];
-      // A baseline must exist, cover every occurrence the finding touches, and
-      // contain complete entries; empty/partial/malformed baselines are refused.
-      const requiredIds = new Set<string>();
-      for (const edit of finding.proposed_edits) {
-        edit.event_ids.forEach(id => requiredIds.add(String(id)));
-        if (edit.op === 'add_note') requiredIds.add(`vf-${finding.id}-a`);
-        if (edit.op === 'merge') requiredIds.add(`vf-${finding.id}-m`);
-        if (edit.op === 'split_note' && Array.isArray(edit.after)) {
-          (edit.after as unknown[]).forEach((_, index) => requiredIds.add(`vf-${finding.id}-${index + 1}`));
-        }
-      }
-      if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)
-        || Object.keys(baseline).length === 0) return false;
-      const validEntry = (entry: unknown): boolean => {
-        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
-        const value = entry as Record<string, unknown>;
-        return typeof value.pitch === 'number' && Number.isFinite(value.pitch)
-          && typeof value.onset === 'number' && Number.isFinite(value.onset)
-          && (value.duration === null || typeof value.duration === 'number')
-          && (value.velocity === null || typeof value.velocity === 'number')
-          && typeof value.spelling === 'string'
-          && typeof value.staff === 'string'
-          && typeof value.voice === 'number'
-          && typeof value.eventStart === 'number'
-          && typeof value.eventDuration === 'number';
-      };
-      for (const id of requiredIds) if (!validEntry((baseline as Record<string, unknown>)[id])) return false;
-      if (baseline) {
-        for (const [id, expected] of Object.entries(baseline)) {
-          const actual = authoredState(doc, id);
-          if (!actual) return false;
-          if (actual.pitch !== expected.pitch
-            || Math.abs(actual.onset - expected.onset) > 1e-6
-            || (actual.duration ?? 0) !== (expected.duration ?? 0)
-            || (actual.velocity ?? 0) !== (expected.velocity ?? 0)
-            || actual.spelling !== expected.spelling
-            || actual.staff !== expected.staff
-            || actual.voice !== expected.voice
-            || actual.eventStart !== expected.eventStart
-            || actual.eventDuration !== expected.eventDuration) return false;
-        }
-        return true;
-      }
-      const noteOf = (id: string) => doc.performance.find(note => note.id === id);
-      const same = (id: string, data: Record<string, unknown>) => {
-        const note = noteOf(id);
-        if (!note || note.pitch !== Number(data.pitch)
-          || Math.abs(note.onset - Number(data.onset)) > 1e-6) return false;
-        if (data.duration !== undefined && data.duration !== null
-          && Math.abs((note.duration ?? 0) - Number(data.duration)) > 1e-6) return false;
-        if (data.velocity !== undefined && data.velocity !== null
-          && note.velocity !== null && Math.abs(note.velocity - Number(data.velocity)) > 1e-6) return false;
-        return true;
-      };
-      return finding.proposed_edits.every(edit => {
-        const after = (edit.after ?? {}) as Record<string, unknown>;
-        if (edit.op === 'set_pitch') return edit.event_ids.every(id => noteOf(id)?.pitch === Number(after.pitch));
-        if (edit.op === 'set_onset') return edit.event_ids.every(id => noteOf(id)
-          && Math.abs(noteOf(id)!.onset - Number(after.onset)) < 1e-6);
-        if (edit.op === 'add_note') return same(`vf-${finding.id}-a`, after);
-        if (edit.op === 'merge') return same(`vf-${finding.id}-m`, after);
-        if (edit.op === 'split_note') return Array.isArray(edit.after)
-          && (edit.after as Record<string, unknown>[]).every((piece, index) =>
-            same(`vf-${finding.id}-${index + 1}`, piece));
-        if (edit.op === 'delete_note') return edit.event_ids.every(id => !noteOf(id));
-        return true;
-      });
-    }
-    return finding.proposed_edits.every(edit => editMatches(doc, {
-      op: edit.op, event_ids: edit.event_ids.map(String), before: edit.before,
-    }));
-  }, [editMatches]);
-
   const decideFinding = useCallback(async (finding: VerificationFinding, decision: 'accepted' | 'rejected') => {
     const current = verificationRef.current;
     const live = documentRef.current;
     if (!lessonId || !draftId || !current || !live || verificationBusy) return;
+    if (decision === 'accepted') {
+      const prepared = prepareFinding(live, finding, alignment);
+      if (prepared.status !== 'applied') { setNotice(prepared.reason); return; }
+    }
     const previous = findingDecision(current, finding.id);
-    // V2: never accept over a manual change the proposal's before snapshot does not match.
-    if (decision === 'accepted' && !findingMatches(live, finding, false)) {
-      setNotice('This suggestion conflicts with your local edits and was not applied. '
-        + 'Review or undo your change before accepting it.');
-      return;
-    }
     const wasAccepted = previous?.decision === 'accepted';
-    if (decision === 'rejected' && wasAccepted && !findingMatches(live, finding, true)) {
-      setNotice('The suggestion was accepted earlier, but the notes have since changed. '
-        + 'It was rejected on the server and your manual edits were kept.');
-    }
     setVerificationBusy(true);
     try {
       const value = await decideVerification(lessonId, draftId, current.proposal_sha256,
@@ -986,76 +758,26 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       if (!parsed.ok) throw new Error(parsed.message);
       setVerification(parsed.value);
       setVerificationToken(parsed.value.state_token);
-      // Revalidate against the document as it is now, not at click time.
       const latest = documentRef.current;
       if (!latest) return;
       if (decision === 'accepted') {
-        if (!findingMatches(latest, finding, false)) {
-          setNotice('The server accepted this suggestion, but your notes changed while the request was pending. '
-            + 'The local document was not overwritten; save will report a conflict until you reconcile it.');
+        // Revalidate against the live document after the async response.
+        const prepared = prepareFinding(latest, finding, alignment);
+        if (prepared.status !== 'applied') {
+          setNotice('The server accepted this suggestion, but the local notes changed while the request was pending. '
+            + 'The document was not overwritten; save will report a conflict until you reconcile it.');
           return;
         }
-        const spellings: Record<string, string> = {};
-        for (const note of latest.events.flatMap(event => event.notes)) {
-          for (const id of note.performance_ids) spellings[id] = note.spelling;
-        }
-        authoredSpellings.current[finding.id] = spellings;
-        const {commands, problem} = commandsFor(latest, finding, false);
-        if (problem) { setNotice(problem); return; }
-        const preflight = commands.reduce<{doc: NotationDocument; ok: boolean}>((acc, command) => {
-          if (!acc.ok) return acc;
-          const outcome = applyCommand(acc.doc, command);
-          if (outcome.status === 'rejected') return {doc: acc.doc, ok: false};
-          return {doc: outcome.status === 'applied' ? outcome.document : acc.doc, ok: true};
-        }, {doc: latest, ok: true});
-        if (!preflight.ok) {
-          setNotice('This suggestion cannot be represented on the current score; nothing was changed.');
-          return;
-        }
-        // Snapshot the accepted performance and authored notation so a later written
-        // rhythm/spelling/mapping edit blocks destructive reversal (W1).
-        const touched = new Set<string>();
-        for (const edit of finding.proposed_edits) {
-          edit.event_ids.forEach(id => touched.add(String(id)));
-        }
-        if (finding.proposed_edits.some(edit => edit.op === 'add_note')) touched.add(`vf-${finding.id}-a`);
-        if (finding.proposed_edits.some(edit => edit.op === 'merge')) touched.add(`vf-${finding.id}-m`);
-        for (const edit of finding.proposed_edits) {
-          if (edit.op === 'split_note' && Array.isArray(edit.after)) {
-            (edit.after as unknown[]).forEach((_, index) => touched.add(`vf-${finding.id}-${index + 1}`));
-          }
-        }
-        const baseline: Record<string, NonNullable<ReturnType<typeof authoredState>>> = {};
-        for (const id of touched) {
-          const state = authoredState(preflight.doc, id);
-          if (state) baseline[id] = state;
-        }
-        acceptedBaselines.current[finding.id] = baseline;
-        dispatch({type: 'commands', commands, label: `Verification: ${finding.kind}`});
+        acceptedBaselines.current[finding.id] = prepared.baseline;
+        dispatch({type: 'commands', commands: prepared.commands, label: `Verification: ${finding.kind}`});
         setConfirmReviewed(false);
-      } else if (wasAccepted && findingMatches(latest, finding, true)) {
-        const needsSpelling = finding.proposed_edits.some(edit =>
-          edit.op === 'set_pitch' || edit.op === 'delete_note' || edit.op === 'merge' || edit.op === 'split_note');
-        const baseline = authoredSpellings.current[finding.id];
-        if (needsSpelling && !baseline) {
-          setNotice('The decision was rejected on the server, but this recovery has no authored spelling/section baseline. '
-            + 'The local document was kept rather than restoring a key-derived spelling.');
+      } else if (wasAccepted) {
+        const result = invertFinding(latest, finding, alignment, acceptedBaselines.current[finding.id]);
+        if ('reason' in result) {
+          setNotice(`${result.reason} The local document was kept.`);
           return;
         }
-        const {commands, problem} = commandsFor(latest, finding, true);
-        if (problem) { setNotice(problem); return; }
-        const preflight = commands.reduce<{doc: NotationDocument; ok: boolean}>((acc, command) => {
-          if (!acc.ok) return acc;
-          const outcome = applyCommand(acc.doc, command);
-          if (outcome.status === 'rejected') return {doc: acc.doc, ok: false};
-          return {doc: outcome.status === 'applied' ? outcome.document : acc.doc, ok: true};
-        }, {doc: latest, ok: true});
-        if (!preflight.ok) {
-          setNotice('The decision was rejected on the server, but the accepted edit could not be reverted safely. '
-            + 'The local document was kept.');
-          return;
-        }
-        dispatch({type: 'commands', commands, label: 'Verification: reverted suggestion'});
+        dispatch({type: 'commands', commands: result.commands, label: 'Verification: reverted suggestion'});
         setConfirmReviewed(false);
       }
     } catch (cause) {
@@ -1066,8 +788,6 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         const parsed = parseVerificationState(value);
         if (!parsed.ok) return;
         setVerification(parsed.value);
-        // Advance the save token only when the server's working performance equals
-        // the live local document; otherwise keep it and surface the conflict.
         const liveDoc = documentRef.current;
         const same = liveDoc && parsed.value.events.length === liveDoc.performance.length
           && parsed.value.events.every((event, index) => {
@@ -1082,7 +802,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     } finally {
       setVerificationBusy(false);
     }
-  }, [lessonId, draftId, verificationBusy, findingMatches, commandsFor, dispatch]);
+  }, [lessonId, draftId, verificationBusy, alignment, dispatch]);
 
   useEffect(() => {
     if (pendingSavedSignature.current && workspaceSignature) {

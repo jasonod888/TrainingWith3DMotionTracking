@@ -109,18 +109,17 @@ export function readRecovery(identity: RecoveryIdentity): RecoveryRead {
   }
   if (checkpoint.acceptedBaselines !== undefined) {
     const value = checkpoint.acceptedBaselines;
-    const validEntry = (entry: unknown) => {
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
-      const item = entry as Record<string, unknown>;
-      return typeof item.pitch === 'number' && Number.isFinite(item.pitch)
-        && typeof item.onset === 'number' && Number.isFinite(item.onset)
-        && typeof item.spelling === 'string' && typeof item.staff === 'string'
-        && typeof item.voice === 'number' && typeof item.eventStart === 'number'
-        && typeof item.eventDuration === 'number';
-    };
+    // Detailed semantic validation happens in verification-transaction on use;
+    // here only the versioned container shape is checked so older/partial data
+    // still restores the notation and simply refuses reversal.
     const valid = value && typeof value === 'object' && !Array.isArray(value)
-      && Object.values(value).every(group => group && typeof group === 'object' && !Array.isArray(group)
-        && Object.values(group).every(validEntry));
+      && Object.values(value).every(group => {
+        if (!group || typeof group !== 'object' || Array.isArray(group)) return false;
+        const item = group as Record<string, unknown>;
+        return item.version === 1 && typeof item.findingId === 'string'
+          && item.entries && typeof item.entries === 'object' && !Array.isArray(item.entries)
+          && item.before && typeof item.before === 'object' && !Array.isArray(item.before);
+      });
     // Drop an unusable baseline but keep the recovered work; reversal will refuse.
     if (!valid) delete checkpoint.acceptedBaselines;
   }

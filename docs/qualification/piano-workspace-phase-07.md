@@ -264,3 +264,62 @@ Malformed baseline data in an older checkpoint no longer discards the whole reco
 
 - **Physical touch qualification remains BLOCKED** — no hardware.
 - Interactive/upper-bound performance profiling remains a separate evidence item.
+
+---
+
+## 13. Stabilisation pass — shared transaction contract, matrix, performance
+
+### 13.1 Shared contract
+
+`apps/web/src/music/workspace/verification-transaction.ts` now owns prepare/validate/commit/invert for findings:
+
+- `prepareFinding` validates before-preconditions against the live document, builds the whole command sequence against an evolving candidate, stages it atomically (nothing on rejection), and returns a versioned baseline.
+- The baseline uses a typed union: `present` with performance + authored state (pitch/onset/duration/velocity/spelling/staff/voice/written start/duration), or explicit `absent` with the occurrence id. Deleted, merged and split originals are intentionally absent; inserted/merged/split results are present with deterministic `vf-*` identities.
+- `validateBaseline` checks version/finding identity, required operation-specific coverage, presence/absence, numeric ranges, spelling/staff/voice and written ticks. `matchesBaseline` compares the live document to every affected entry.
+- `invertFinding` builds the inverse from the authored before-state (including restoring duplicate same-pitch attacks onto one written note) and refuses when the accepted state has changed or the baseline is unavailable/incomplete/malformed.
+- The workspace uses this contract for Accept/Reject; recovery validates the container and lets the module refuse unsafe inverses while preserving the work.
+
+### 13.2 Matrix evidence
+
+| ID | Case | Evidence |
+| --- | --- | --- |
+| O1 | set_pitch | `verification-transaction.test.tsx` round trip restores pitch + authored B#3 |
+| O2 | set_onset | exact 2.013 s and inverse 2.0 s |
+| O3 | add_note | `vf-add-1-a` present, rejection removes only it |
+| O4 | delete_note | explicit absence; inverse restores identity (browser unchanged round trip 20→19→20) |
+| O5 | merge | originals absent/merged present; inverse restores both attacks (browser 20→19→20) |
+| O6 | split_note | original absent/pieces present; inverse restores original |
+| O7 | compound/failure | out-of-range set_pitch rejected with no mutation |
+| O8 | repeated accept/reject | second prepare rejected; single inverse restores |
+| S1 | no later edits | all O inverses |
+| S2/S3 | later performance or written edit | later pitch change blocks inverse with a reason and keeps 63 |
+| S4 | unrelated edit | O3/O5 keep unrelated notes (`b`, `c`, `x`) |
+| S5 | null/zero values | validator distinguishes null vs zero and rejects out-of-range pitch; baselines preserve nullable velocity |
+| S6 | undo/redo | existing workspace state suite (471 tests) |
+| R1 | valid recovery | serialized baseline validates and matches |
+| R2/R3 | missing/empty/partial/wrong-ID | `validateBaseline` refuses; empty/legacy browser probes pass |
+| R4 | malformed entry | invalid pitch/spelling refused; malformed older checkpoint drops only the baseline |
+| R5 | wrong identity | baseline finding mismatch refused; existing stale-base policy retained |
+| R6 | save/reopen | normal-route/browser recovery and revision scripts |
+| A1 | edit before accept | before-preconditions (transitions 2/2) |
+| A2/A3 | edit during pending decision | **not separately exercised**; code re-prepares against the live document after the response |
+| A4 | 409/token | Phase 5 conflict tests + conflict reload policy |
+| A5/A6 | save A then edit/fail | existing save/recovery tests |
+| A7 | edit during manifest refresh | library revision journey with live-dirty recheck |
+
+The matrix is in the ordinary suite (12 parameterised tests, total **483 passing**), not only reviewer scripts.
+
+### 13.3 Performance (controlled dev server, mocked API, 5 runs)
+
+| Case | DOM/load | Pointer preview median/p95 | Edit commit median/p95 | Heap |
+| --- | --- | --- | --- | --- |
+| Real 1,338-occurrence / 209.6 s | 136/137 ms | 20.8 / 183.9 ms | 133.5 / 235.1 ms | 29 MB |
+| 20,000-event limit fixture | 132/133 ms | 140.7 / 161.5 ms | 2,900.5 / 3,040.6 ms | 46 MB |
+
+The real-example commit median is **above the 100 ms target** and preview median is above one 16.7 ms frame; the 20k limit fixture is not interactively usable. These are reported as unmet performance targets, not as a claim of qualification. The measured bottleneck is the command/render path for large documents; no optimisation was attempted in this pass.
+
+### 13.4 Status
+
+- **Software:** stabilisation contract and matrix implemented; all reviewer verification/recovery/transition/settings/clock scripts pass.
+- **Performance:** measured, targets **not met** for commit latency and the 20k limit; proposal for a lower supported interaction limit or a targeted optimisation is required next.
+- **Hardware:** **BLOCKED** — no physical touch device; emulation is not a substitute.

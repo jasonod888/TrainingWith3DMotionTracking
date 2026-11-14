@@ -1,12 +1,15 @@
-﻿# Phase 7 W2 closure regression
-# web suite: 471 passed
+﻿# Phase 7 stabilisation regression
+# web suite: 483 passed
 # tsc: clean
-# empty baseline: 1/1
-# legacy reversal: 1/1
-# written reversal: 1/1
-# recovery: 2/2
-# transitions: 2/2
+# O/S/R matrix: 12 pure tests
+# unchanged delete/merge round trips: 2/2
 # verification: 3/3
+# transitions: 2/2
+# recovery: 2/2
+# legacy: 1/1
+# empty baseline: 1/1
+# written reversal: 1/1
 # settings: 2/2
 # loaded clock: 4/4
-# physical touch: BLOCKED
+# performance: targets NOT met (commit 133.5 ms real, 20k unusable)
+# hardware: BLOCKED
