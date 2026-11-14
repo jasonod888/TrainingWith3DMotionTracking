@@ -42,6 +42,13 @@ def drag(page, locator, dx, dy, steps=6):
     page.mouse.up()
 
 
+def ensure_add_mode(page):
+    toggle = page.locator('[data-add="toggle"]')
+    if toggle.get_attribute('aria-pressed') != 'true':
+        toggle.click()
+    page.wait_for_selector('.ws-roll-add-layer', timeout=10000)
+
+
 def demo_gestures(page):
     page.goto(f'{BASE}/workspace-harness.html?demo=frames', wait_until='domcontentloaded')
     page.wait_for_selector('.ws-roll-svg')
@@ -127,11 +134,10 @@ def demo_gestures(page):
     page.wait_for_selector('.ws-roll-note')
     total = lambda: int(page.locator('.ws-roll-svg').get_attribute('data-total-notes'))
     start = total()
-    page.locator('[data-add="toggle"]').click()
-    page.wait_for_selector('.ws-roll-add-layer')
+    ensure_add_mode(page)
     layer = page.locator('.ws-roll-add-layer')
     box = layer.bounding_box()
-    page.mouse.click(box['x'] + 700, box['y'] + 40)
+    page.mouse.click(box['x'] + 300, box['y'] + 40)
     page.wait_for_selector('[data-ghost="true"]')
     page.screenshot(path=str(OUT / 'add-ghost.png'))
     page.get_by_role('button', name='Insert').click()
@@ -139,8 +145,7 @@ def demo_gestures(page):
     expect(total() == start + 1, f'Insert should add one note, total {total()} from {start}')
     RESULT['add_note'] = {'before': start, 'after': total()}
 
-    page.locator('[data-add="toggle"]').click()
-    page.wait_for_selector('.ws-roll-add-layer')
+    ensure_add_mode(page)
     # Clicking an existing note in add mode proposes its exact position.
     page.locator('.ws-roll-note').first.click()
     page.wait_for_selector('[data-ghost="true"]')
@@ -148,6 +153,116 @@ def demo_gestures(page):
     page.wait_for_selector('[data-add="duplicate"]', timeout=10000)
     RESULT['duplicate_warning'] = True
     page.screenshot(path=str(OUT / 'duplicate-warning.png'))
+
+
+def surface_checks(page):
+    page.goto(f'{BASE}/workspace-harness.html?demo=frames', wait_until='domcontentloaded')
+    page.wait_for_selector('.ws-roll-note')
+    page.locator('.ws-roll-note').first.click()
+    facts = lambda: page.locator('.ws-facts').inner_text()
+    pitch_before = pitch_of(page)
+    page.get_by_role('button', name='♯').click()
+    page.wait_for_timeout(150)
+    sharp = facts()
+    page.get_by_role('button', name='♭').click()
+    page.wait_for_timeout(150)
+    flat = facts()
+    page.get_by_role('button', name='♮').click()
+    page.wait_for_timeout(150)
+    natural = facts()
+    expect(pitch_of(page) == pitch_before, 'accidentals must not change the sounding pitch')
+    expect(len({sharp, flat, natural}) == 3, f'sharp/flat/natural must differ: {sharp} | {flat} | {natural}')
+    page.locator('.ws-row[aria-label="Respell"] input').fill('B#3')
+    page.get_by_role('button', name='Apply spelling').click()
+    page.wait_for_timeout(150)
+    expect('B#3' in facts(), f'respell did not change the spelling: {facts()}')
+    expect(pitch_of(page) == pitch_before, 'enharmonic respelling must not change the pitch')
+    RESULT['accidentals'] = {'sharp': sharp, 'flat': flat, 'natural': natural, 'respell': facts()}
+    page.screenshot(path=str(OUT / 'accidentals-respell.png'))
+
+    # Chord member isolation: two recorded attacks engraved as one written chord.
+    page.goto(f'{BASE}/workspace-harness.html?demo=explanation', wait_until='domcontentloaded')
+    page.wait_for_selector('.ws-roll-note')
+    member = page.locator('.ws-roll-note[data-pitch="62"]').first
+    member.click()
+    page.wait_for_selector('.ws-facts')
+    page.get_by_role('button', name='+ semitone').click()
+    page.wait_for_timeout(200)
+    expect(page.locator('.ws-roll-note[data-pitch="63"]').count() == 1, 'the edited member must change')
+    expect(page.locator('.ws-roll-note[data-pitch="66"]').count() == 1, 'the sibling chord member must not change')
+    RESULT['chord_isolation'] = True
+    page.screenshot(path=str(OUT / 'chord-isolation.png'))
+
+    # Overlap picker for repeated attacks of the same pitch.
+    page.goto(f'{BASE}/workspace-harness.html?demo=double', wait_until='domcontentloaded')
+    page.wait_for_selector('.ws-roll-note')
+    page.locator('input[aria-label="Fixture clock"]').evaluate(
+        "(node) => { const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;"
+        " setter.call(node, '2.05'); node.dispatchEvent(new Event('input', {bubbles: true})); }")
+    page.wait_for_timeout(200)
+    key = page.locator('.keyboard-white[data-pitch="60"], .keyboard-black[data-pitch="60"]').first
+    key.click()
+    page.wait_for_selector('[data-overlap="true"]')
+    choices = page.locator('[data-overlap-id]')
+    expect(choices.count() == 2, f'overlap picker should list two attacks, got {choices.count()}')
+    choices.first.click()
+    page.wait_for_selector('[data-tie-scope], [data-recorded-attacks="true"]')
+    RESULT['overlap_picker'] = 2
+    page.screenshot(path=str(OUT / 'overlap-picker.png'))
+
+
+def long_round_trip(page, world):
+    long_draft = json.loads((ROOT / 'docs/qualification/piano-workspace-phase-06/long-draft.json').read_text(encoding='utf-8'))
+    world['long'] = long_draft
+    lesson = long_draft['lesson_id']
+    page.goto(f'{BASE}/workspace-harness.html?id={lesson}', wait_until='domcontentloaded')
+    page.wait_for_selector('.ws-roll-note', timeout=30000)
+    total = int(page.locator('.ws-roll-svg').get_attribute('data-total-notes'))
+    target = page.locator('.ws-roll-note').first
+    target_id = target.get_attribute('data-occurrence')
+    target_pitch = int(target.get_attribute('data-pitch'))
+    target_onset = onset_of(page)
+    original = {event['id']: event for event in long_draft['events']}
+    unrelated = page.locator('.ws-roll-note').nth(10)
+    unrelated_id = unrelated.get_attribute('data-occurrence')
+    unrelated_pitch = int(unrelated.get_attribute('data-pitch'))
+    drag(page, target, 0, -20)
+    page.wait_for_timeout(200)
+    page.get_by_label('Confirm reviewed').check()
+    page.get_by_role('button', name='Save privately').click()
+    page.wait_for_selector('text=Saved privately', timeout=20000)
+    captured = world['long_capture']
+    expect(captured is not None, 'the long draft was not saved')
+    events = captured['events']
+    expect(len(events) == total, f'saved events {len(events)} != loaded {total}')
+    saved_target = next(event for event in events if event['id'] == target_id)
+    saved_unrelated = next(event for event in events if event['id'] == unrelated_id)
+    delta = saved_target['pitch'] - target_pitch
+    expect(delta > 0, f'the gesture correction was not saved (delta {delta})')
+    expect(abs(saved_target['onset'] - original[target_id]['onset']) < 1e-9, 'the correction moved its onset')
+    expect(saved_unrelated['pitch'] == original[unrelated_id]['pitch'], 'an unrelated note changed')
+    expect(abs(saved_unrelated['onset'] - original[unrelated_id]['onset']) < 1e-9, 'an unrelated onset changed')
+
+    # Reopen the stored reference and confirm the correction and integrity survive.
+    world['long_manifest'] = {'revision_id': 'rev-long-1',
+                              'reference': {'key': f'lessons/{lesson}/ref.json', 'sha256': 'd' * 64},
+                              'source_video': None, 'piano_preview': None, 'preview_identity': None,
+                              'section_set': {'sections': []}, 'assessment': None}
+    world['long_reference'] = {'reference_version': 1, 'duration': captured['notation']['duration'],
+                               'title': 'Long edited', 'events': captured['events'],
+                               'spans': captured['spans'], 'notation': captured['notation'],
+                               'alignment': captured['alignment']}
+    world['long_draft_available'] = False
+    page.reload(wait_until='domcontentloaded')
+    page.wait_for_selector('text=Opened saved revision rev-long', timeout=30000)
+    page.wait_for_selector('.ws-roll-note', timeout=30000)
+    reopened_total = int(page.locator('.ws-roll-svg').get_attribute('data-total-notes'))
+    reopened = page.locator(f'.ws-roll-note[data-occurrence="{target_id}"]')
+    expect(reopened_total == total, f'reopened notes {reopened_total} != {total}')
+    expect(int(reopened.first.get_attribute('data-pitch')) == target_pitch + delta, 'the reopened pitch lost the correction')
+    RESULT['long_round_trip'] = {'notes': total, 'target': [target_id, target_pitch, target_pitch + delta],
+                                 'unrelated_preserved': unrelated_pitch}
+    page.screenshot(path=str(OUT / 'long-saved-reopened.png'))
 
 
 def saved_round_trip(page, world):
@@ -193,6 +308,16 @@ def run():
                 return route.fulfill(status=200, content_type='application/json', body=json.dumps({
                     'account': {'id': 'account-1', 'email': 'owner@test', 'platform_role': 'member',
                                 'status': 'active', 'mfa_enrolled': False}, 'csrf': 'x'}))
+            if world.get('long') and path == f"/lessons/{world['long']['lesson_id']}/music-draft":
+                if world.get('long_draft_available') is False:
+                    return route.fulfill(status=404, content_type='application/json', body='{}')
+                return route.fulfill(status=200, content_type='application/json', body=json.dumps(world['long']))
+            if world.get('long') and path == f"/lessons/{world['long']['lesson_id']}":
+                if not world.get('long_manifest'):
+                    return route.fulfill(status=404, content_type='application/json', body='{}')
+                return route.fulfill(status=200, content_type='application/json', body=json.dumps(world['long_manifest']))
+            if world.get('long') and path.endswith('/assets/ref.json') and world.get('long_reference'):
+                return route.fulfill(status=200, content_type='application/json', body=json.dumps(world['long_reference']))
             if path == '/lessons/lesson-1/music-draft':
                 if not world['draft_available']:
                     return route.fulfill(status=404, content_type='application/json', body='{}')
@@ -208,6 +333,8 @@ def run():
                 return route.fulfill(status=200, content_type='application/json', body=json.dumps(world['reference']))
             if '/music-draft/review' in path or '/music-revision' in path:
                 world['capture'] = json.loads(request.post_data or '{}')
+                if world.get('long') and request.url.split('/api', 1)[-1].startswith('/lessons/' + world['long']['lesson_id']):
+                    world['long_capture'] = world['capture']
                 return route.fulfill(status=200, content_type='application/json',
                                      body=json.dumps({'revision_id': 'rev-edited-1'}))
             return route.fulfill(status=404, content_type='application/json', body='{}')
@@ -215,7 +342,9 @@ def run():
         context.route('**/api/**', handler)
         page = context.new_page()
         demo_gestures(page)
+        surface_checks(page)
         saved_round_trip(page, world)
+        long_round_trip(page, world)
         context.close()
         browser.close()
 

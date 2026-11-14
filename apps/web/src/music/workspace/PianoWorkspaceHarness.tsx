@@ -10,7 +10,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ApiError, assetUrl, getSession, request} from '../../api';
 import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
-  buildNotation, parseNotationDocument, selectionForOccurrence,
+  applyCommand, buildNotation, parseNotationDocument, selectionForOccurrence,
   activeOccurrenceIds, alignmentFromSpans, effectiveSecondsToTick, occurrenceIntervals,
   addAnchor, applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, type AnchorPoint,
   type Alignment, type CorrectionSelection, type NotationDocument,
@@ -34,7 +34,8 @@ import {useElementWidth} from './useElementWidth';
 import {createClock, useClockTime, type ClockStore} from './clock';
 import type {GestureEdit} from './gestures';
 import {
-  buildSaveBody, canonicalAnchors, performanceChanged, restoreFromReference, serializeAlignment, type SavedSpan,
+  buildSaveBody, canonicalAnchors, insertionPlacement, performanceChanged, restoreFromReference, serializeAlignment,
+  type SavedSpan,
 } from './save-payload';
 import {
   clearRecovery, peekRecovery, readRecovery, writeRecovery, type RecoveryCheckpoint, type RecoveryIdentity,
@@ -107,6 +108,7 @@ export function PianoWorkspaceHarness() {
   const [snapTicks, setSnapTicks] = useState(0);
   const [writtenScope, setWrittenScope] = useState<'note' | 'event'>('note');
   const [respellDraft, setRespellDraft] = useState('');
+  const [writtenStartDraft, setWrittenStartDraft] = useState('');
   const [notice, setNotice] = useState('');
   const [window, setWindow] = useState<TimeWindow>({start: 0, span: DEFAULT_SPAN_SECONDS});
   const [spans, setSpans] = useState<{ start: number; end: number; kind: 'playing' | 'explanation' }[]>([]);
@@ -162,10 +164,14 @@ export function PianoWorkspaceHarness() {
   const [recoveryOffer, setRecoveryOffer] = useState<RecoveryCheckpoint | null>(null);
   const [staleCheckpoint, setStaleCheckpoint] = useState<RecoveryCheckpoint | null>(null);
   const [replaceMode, setReplaceMode] = useState<{occurrenceId: string; pitch: number} | null>(null);
-  const [addMode, setAddMode] = useState<{seconds: number; pitch: number; ticks: number} | null>(null);
+  const [addMode, setAddMode] = useState<{seconds: number; pitch: number; ticks: number; durationSeconds: number} | null>(null);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [overlap, setOverlap] = useState<{pitch: number; ids: string[]} | null>(null);
   const lastWrittenTicks = useRef(480);
+  const alignmentRef = useRef<Alignment | null>(null);
+  const selectedRef = useRef<{ pitch: number } | null>(null);
+  const selectionOccurrenceRef = useRef<string | null>(null);
+  const lastRecordedSeconds = useRef(0.5);
   const [recoveryNotice, setRecoveryNotice] = useState('');
 
   const dispatch = useCallback((action: WorkspaceAction) => {
@@ -190,10 +196,16 @@ export function PianoWorkspaceHarness() {
     setLoading(true);
     setError('');
     const demo = params.get('demo');
-    if (demo === 'explanation' || demo === 'arpeggio' || demo === 'frames') {
+    if (demo === 'explanation' || demo === 'arpeggio' || demo === 'frames' || demo === 'double') {
       // A local fixture for cases the real recording does not contain: an arpeggiated
       // chord, a spoken explanation passage and a held score cursor.
-      const events = demo === 'frames'
+      const events = demo === 'double'
+        ? [
+            {id: 'x-1', onset: 2.0, duration: 0.5, pitch: 60},
+            {id: 'x-2', onset: 2.012, duration: 0.5, pitch: 60},
+            {id: 'x-3', onset: 5.0, duration: 0.5, pitch: 64},
+          ]
+        : demo === 'frames'
         ? [
             {id: 'f-1', onset: 2.0, duration: 0.5, pitch: 60},
             {id: 'f-2', onset: 2.012, duration: 0.5, pitch: 64},
@@ -227,7 +239,10 @@ export function PianoWorkspaceHarness() {
       });
       setBaseline(document);
       setState(createWorkspaceState(document));
-      setTitle(demo === 'explanation' ? 'Fixture: explanation passage' : demo === 'frames' ? 'Fixture: 12 ms attacks' : 'Fixture: arpeggiated chord');
+      setTitle(demo === 'explanation' ? 'Fixture: explanation passage'
+        : demo === 'frames' ? 'Fixture: 12 ms attacks'
+        : demo === 'double' ? 'Fixture: two attacks on one written note'
+        : 'Fixture: arpeggiated chord');
       setSpans(demoSpans);
       setVideoUrl(null);
       setLoading(false);
@@ -319,11 +334,26 @@ export function PianoWorkspaceHarness() {
 
   // Replace-pitch mode changes exactly its target and exits.
   const replacementPitch = useCallback((pitch: number) => {
-    if (!replaceMode) return;
-    dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: replaceMode.occurrenceId, pitch}});
+    if (!replaceMode || !state) return;
+    const command = {type: 'set-occurrence-pitch' as const, occurrenceId: replaceMode.occurrenceId, pitch};
+    const outcome = applyCommand(state.document, command);
+    if (outcome.status === 'rejected') { setNotice(outcome.message); return; }
+    if (outcome.status === 'unchanged') {
+      setReplaceMode(null);
+      setNotice(pitch === replaceMode.pitch ? 'Replacement cancelled: same pitch, no change.' : outcome.label);
+      return;
+    }
+    dispatch({type: 'command', command});
     setReplaceMode(null);
-    setNotice(pitch === replaceMode.pitch ? 'Replacement cancelled: same pitch, no change.' : `Pitch replaced with ${pitchName(pitch)}.`);
-  }, [dispatch, replaceMode]);
+    setNotice(`Pitch replaced with ${pitchName(pitch)}.`);
+  }, [dispatch, replaceMode, state]);
+
+  useEffect(() => {
+    if (replaceMode && document && !document.performance.some(note => note.id === replaceMode.occurrenceId)) {
+      setReplaceMode(null);
+      setNotice('The replacement target no longer exists; replacement cancelled.');
+    }
+  }, [replaceMode, document]);
 
   useEffect(() => {
     if (!replaceMode) return;
@@ -334,21 +364,55 @@ export function PianoWorkspaceHarness() {
     return () => globalThis.window.removeEventListener('keydown', onKey);
   }, [replaceMode]);
 
+  const placementFor = useCallback((sourceSeconds: number): {performed: number; tick: number} | {problem: string} => {
+    if (!document) return {problem: 'The score is not ready for insertion.'};
+    const placement = insertionPlacement(alignmentRef.current, document, sourceSeconds, offsetSeconds);
+    return placement.ok ? {performed: placement.performed, tick: placement.tick} : {problem: placement.problem};
+  }, [document, offsetSeconds]);
+
   const ghostDuplicate = Boolean(addMode && document?.performance.some(note =>
-    note.pitch === addMode.pitch && Math.abs(note.onset - addMode.seconds) < 0.01));
+    note.pitch === addMode.pitch && Math.abs(note.onset - addMode.seconds) < 0.001));
   const ghostDuplicateId = ghostDuplicate && document
-    ? document.performance.find(note => note.pitch === addMode!.pitch && Math.abs(note.onset - addMode!.seconds) < 0.01)?.id ?? null
+    ? document.performance.find(note => note.pitch === addMode!.pitch && Math.abs(note.onset - addMode!.seconds) < 0.001)?.id ?? null
     : null;
+
+  const insertAtPlayhead = useCallback((addToChord: boolean) => {
+    if (!document || !state) return;
+    const placement = placementFor(playhead);
+    if ('problem' in placement) { setNotice(placement.problem); return; }
+    const command = {type: 'insert-note' as const, pitch: selectedRef.current?.pitch ?? 60,
+      onsetSeconds: placement.performed, durationSeconds: lastRecordedSeconds.current,
+      startTicks: placement.tick, addToChord};
+    const outcome = applyCommand(state.document, command);
+    if (outcome.status === 'applied') {
+      dispatch({type: 'command', command});
+      setNotice('');
+    } else {
+      setNotice(outcome.status === 'rejected' ? outcome.message : outcome.label);
+    }
+  }, [document, state, placementFor, playhead, dispatch]);
 
   const commitAdd = useCallback(() => {
     if (!addMode || !document || !state) return;
     if (ghostDuplicateId) { setDuplicateId(ghostDuplicateId); return; }
+    const placement = placementFor(addMode.seconds + offsetSeconds);
+    if ('problem' in placement) { setNotice(placement.problem); return; }
+    const command = {type: 'insert-note' as const, pitch: addMode.pitch, onsetSeconds: placement.performed,
+      durationSeconds: Math.max(0.02, addMode.durationSeconds), startTicks: placement.tick};
+    const outcome = applyCommand(state.document, command);
+    if (outcome.status === 'rejected') { setNotice(outcome.message); return; }
+    if (outcome.status === 'unchanged') {
+      setNotice(outcome.label || 'That note already exists.');
+      if (ghostDuplicateId) setDuplicateId(ghostDuplicateId);
+      return;
+    }
     lastWrittenTicks.current = addMode.ticks;
-    dispatch({type: 'command', command: {type: 'insert-note', pitch: addMode.pitch, onsetSeconds: addMode.seconds,
-      durationSeconds: Math.max(0.02, addMode.ticks * (60 / (document.tempo.bpm * document.ppq)))}});
+    lastRecordedSeconds.current = addMode.durationSeconds;
+    dispatch({type: 'command', command});
     setAddMode(null);
     setDuplicateId(null);
-  }, [addMode, document, state, ghostDuplicateId, dispatch]);
+    setNotice('');
+  }, [addMode, document, state, ghostDuplicateId, dispatch, placementFor, offsetSeconds]);
 
   useEffect(() => {
     if (!addMode) return;
@@ -364,6 +428,33 @@ export function PianoWorkspaceHarness() {
 
   const selection = state?.selection ?? null;
   const selected = selection && document ? noteFacts(document, selection) : null;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
+      const modifier = event.metaKey || event.ctrlKey;
+      if (modifier && !event.shiftKey && event.key.toLowerCase() === 'z') {
+        event.preventDefault(); dispatch({type: 'undo'}); return;
+      }
+      if (modifier && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) {
+        event.preventDefault(); dispatch({type: 'redo'}); return;
+      }
+      const occurrence = selectionOccurrenceRef.current;
+      if ((event.key === 'Delete' || event.key === 'Backspace') && occurrence && !replaceMode && !addMode) {
+        event.preventDefault();
+        dispatch({type: 'command', command: {type: 'delete-occurrence', occurrenceId: occurrence}});
+      }
+    };
+    globalThis.window.addEventListener('keydown', onKey);
+    return () => globalThis.window.removeEventListener('keydown', onKey);
+  }, [dispatch, replaceMode, addMode]);
+
+  const tiedSegmentCount = useMemo(() => {
+    if (!document || !selection) return 0;
+    return document.segments
+      .flatMap(segment => segment.notes)
+      .filter(note => note.logical_note_id === selection.logicalNoteId).length;
+  }, [document, selection]);
   const secondsPerTick = document ? 60 / (document.tempo.bpm * document.ppq) : 0.0625;
   const diff = useMemo(() => (baseline && document ? diffAgainst(baseline, document) : null), [baseline, document]);
 
@@ -376,8 +467,6 @@ export function PianoWorkspaceHarness() {
     [document, baseAlignment, anchors]);
   const alignment = mapState ?? anchored?.alignment ?? baseAlignment;
   const intervals = useMemo(() => (document ? occurrenceIntervals(document, offsetSeconds) : []), [document, offsetSeconds]);
-  const activeIds = useMemo(() => activeOccurrenceIds(intervals, playhead), [intervals, playhead]);
-  const playheadTick = alignment ? effectiveSecondsToTick(alignment, playhead, offsetSeconds) : null;
 
   // Active highlighting and key selection use the same offset-aware intervals as
   // the roll and score, so the keyboard cannot light or select an unsounding note.
@@ -394,8 +483,14 @@ export function PianoWorkspaceHarness() {
     setNotice(`No ${pitchName(pitch)} is sounding here. Audition only — select a note in the roll or score.`);
   }, [document, intervals, playhead, select]);
 
+  const activeIds = useMemo(() => activeOccurrenceIds(intervals, playhead), [intervals, playhead]);
+  alignmentRef.current = alignment;
+  const playheadTick = alignment ? effectiveSecondsToTick(alignment, playhead, offsetSeconds) : null;
+
   // A selection that changes for any reason (click, undo, insert) requests one reveal.
   const selectionOccurrence = state?.selection?.occurrenceId ?? null;
+  selectedRef.current = selected;
+  selectionOccurrenceRef.current = selectionOccurrence;
   useEffect(() => {
     if (!selectionOccurrence) return;
     if (rollReveal?.occurrenceId === selectionOccurrence) return;
@@ -627,7 +722,7 @@ export function PianoWorkspaceHarness() {
         setScoreTarget({tick: effectiveSecondsToTick(alignment, clamped.start, offsetSeconds), token: linkToken.current});
       }
     }
-  }, [document, alignment, offsetSeconds]);
+  }, [document, offsetSeconds]);
 
   const onScoreScroll = useCallback((tick: number) => {
     if (!document || !alignment) return;
@@ -942,10 +1037,10 @@ export function PianoWorkspaceHarness() {
       </label>
       <button type="button" onClick={() => save()} disabled={!confirmReviewed || saving || !(dirty || savedRevisionId === null)}
         data-save-button="true">{saving ? 'Saving…' : 'Save privately'}</button>
-      <button type="button" onClick={reopen}>Reopen saved</button>
+      <button type="button" onClick={reopen} disabled={Boolean(replaceMode)}>Reopen saved</button>
 
-      <button type="button" onClick={() => dispatch({type: 'undo'})} disabled={!state.past.length}>Undo</button>
-      <button type="button" onClick={() => dispatch({type: 'redo'})} disabled={!state.future.length}>Redo</button>
+      <button type="button" onClick={() => dispatch({type: 'undo'})} disabled={!state.past.length || Boolean(replaceMode)}>Undo</button>
+      <button type="button" onClick={() => dispatch({type: 'redo'})} disabled={!state.future.length || Boolean(replaceMode)}>Redo</button>
       <label className="ws-field ws-inline">
         <span>Snap</span>
         <select value={snapTicks} onChange={event => setSnapTicks(Number(event.target.value))}>
@@ -1021,7 +1116,11 @@ export function PianoWorkspaceHarness() {
             <LiveKeyboard document={document} clock={clockRef.current} intervals={intervals}
               selectedPitch={selected?.pitch ?? null}
               onKey={pitch => audition([pitch], 0.4)}
-              onSelectKey={pitch => { if (replaceMode) { replacementPitch(pitch); return; } selectKey(pitch); }}
+              onSelectKey={pitch => {
+                if (replaceMode) { replacementPitch(pitch); return; }
+                if (addMode) { setAddMode(mode => mode ? {...mode, pitch} : mode); return; }
+                selectKey(pitch);
+              }}
               width={compactKeyboard ? 640 : 1040} semitones={compactKeyboard ? 36 : 60}
               toolbarHint="Tap to audition. With a note selected, tap a key to select that pitch at the playhead; it never edits a note."
               hint="Selection and audition only; use “Add note at playhead” in the inspector to insert."/>
@@ -1040,10 +1139,15 @@ export function PianoWorkspaceHarness() {
             selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={rollReveal}
             onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
+            editingEnabled={!replaceMode && !addMode}
             snapSeconds={snapTicks ? snapTicks * secondsPerTick : null}
             addMode={Boolean(addMode)}
-            ghost={addMode ? {seconds: addMode.seconds, pitch: addMode.pitch} : null}
-            onGhostPlace={(seconds, pitch) => setAddMode(mode => ({seconds, pitch, ticks: mode?.ticks ?? lastWrittenTicks.current}))}
+            ghost={addMode ? {seconds: addMode.seconds, pitch: addMode.pitch,
+              durationSeconds: addMode.durationSeconds} : null}
+            onGhostPlace={(seconds, pitch) => setAddMode(mode => ({
+              seconds: Math.max(0, Math.min(document.duration, seconds - offsetSeconds)), pitch,
+              ticks: mode?.ticks ?? lastWrittenTicks.current,
+              durationSeconds: mode?.durationSeconds ?? lastRecordedSeconds.current}))}
             playhead={playhead} onSelect={select} onSeek={seek}/>
           <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Scrolling never seeks. Dragging notes is Phase 6.</p>
         </section>
@@ -1055,6 +1159,7 @@ export function PianoWorkspaceHarness() {
             clock={clockRef.current} alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals}
             scrollTarget={scoreTarget} onSeekTick={seekToTick} onUserScroll={onScoreScroll}
             onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
+            editingEnabled={!replaceMode && !addMode}
             onAmbiguous={(logicalNoteId, occurrenceIds) => setNotice(
               `This written note maps ${occurrenceIds.length} occurrences; choose one in the roll (logical ${logicalNoteId}).`)}/>
           <p className="ws-hint">One continuous grand staff; the cursor is the mapped musical position. Click the ruler to seek, a notehead to select.</p>
@@ -1113,13 +1218,18 @@ export function PianoWorkspaceHarness() {
           <h2>Selected note</h2>
           {!selection || !selected
             ? <p className="ws-hint">Select a note in the roll, the score or the keyboard to edit it.</p>
-            : <fieldset className="ws-inspector-fieldset" disabled={Boolean(replaceMode)}>
+            : <fieldset className="ws-inspector-fieldset" disabled={Boolean(replaceMode) || Boolean(addMode)}>
               <p className="ws-facts">
                 <strong>{selected.spelling}</strong> · {selection.occurrenceId} · {pitchName(selected.pitch)} (MIDI {selected.pitch})<br/>
                 {selected.onset.toFixed(3)} s · recorded {selected.duration === null ? 'unknown' : `${selected.duration.toFixed(3)} s`}<br/>
                 {selection.staff} voice {selection.voice} · measure {selection.measureIndex + 1} · written {selected.writtenTicks} ticks
+              <br/><span data-written-segments="true">Written segments: {tiedSegmentCount} ({(selected.writtenTicks / 480).toFixed(2)} beats written)</span>
+              <br/><span data-recorded-attacks="true">Recorded attacks mapped to this written note: {selected.linkedOccurrences}</span>
+              {tiedSegmentCount > 1 && <>
+                <br/><strong data-tie-scope="segments">This written note is tied across {tiedSegmentCount} segments; pitch replacement edits only the selected attack and splits the written note if several attacks share it.</strong>
+              </>}
               {selected.linkedOccurrences > 1 && <>
-                <br/><strong data-tie-scope="logical">Entire tied note: {selected.linkedOccurrences} linked segments. Pitch replacement and delete apply to all of them.</strong>
+                <br/><strong data-occurrence-scope="multiple">This written note owns {selected.linkedOccurrences} recorded attacks. “Delete note” removes the selected attack; “Delete logical note” removes the written note and every attack mapped to it.</strong>
               </>}
               </p>
 
@@ -1129,8 +1239,8 @@ export function PianoWorkspaceHarness() {
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'sharp'}})}>♯</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'flat'}})}>♭</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'natural'}})}>♮</button>
-                <button type="button" data-replace="start"
-                  onClick={() => { setReplaceMode({occurrenceId: selection.occurrenceId, pitch: selected.pitch}); setNotice(''); }}>Replace pitch</button>
+                <button type="button" data-replace="start" disabled={Boolean(addMode)}
+                  onClick={() => { setAddMode(null); setReplaceMode({occurrenceId: selection.occurrenceId, pitch: selected.pitch}); setNotice(''); }}>Replace pitch</button>
               </div>
 
               <div className="ws-row" role="group" aria-label="Respell">
@@ -1145,6 +1255,25 @@ export function PianoWorkspaceHarness() {
                 </button>
               </div>
 
+              <div className="ws-row" role="group" aria-label="Written beat position">
+                <label className="ws-field ws-inline"><span>Written beat position (ticks)</span>
+                  <input type="number" min={0} step={120} data-written-start
+                    defaultValue={selected.writtenStartTicks}
+                    key={`${selection.eventId}-${selected.writtenStartTicks}`}
+                    onChange={event => setWrittenStartDraft(event.target.value)}/>
+                </label>
+                <button type="button" data-written-start-apply disabled={!writtenStartDraft.trim()}
+                  onClick={() => {
+                    const ticks = Number(writtenStartDraft);
+                    if (!Number.isInteger(ticks) || ticks < 0) { setNotice('Enter a whole, non-negative tick value.'); return; }
+                    const command = {type: 'move-written-start' as const, eventId: selection.eventId, ticks};
+                    const outcome = applyCommand(state.document, command);
+                    if (outcome.status === 'rejected') { setNotice(outcome.message); return; }
+                    dispatch({type: 'command', command});
+                    setNotice(outcome.status === 'unchanged' ? 'The written position is unchanged.' : 'Written position moved; recorded onset unchanged.');
+                    setWrittenStartDraft('');
+                  }}>Apply written position</button>
+              </div>
               <div className="ws-row" role="group" aria-label="Written value scope">
                 <span className="ws-hint">Written value for</span>
                 <button type="button" aria-pressed={writtenScope === 'note'} className={writtenScope === 'note' ? 'is-active' : ''}
@@ -1190,23 +1319,36 @@ export function PianoWorkspaceHarness() {
         <section className="ws-panel" aria-label="Insert">
           <h2>Insert</h2>
           <div className="ws-row">
-            <button type="button" onClick={() => dispatch({type: 'command', command: {
-              type: 'insert-note', pitch: selected?.pitch ?? 60, onsetSeconds: playhead, durationSeconds: 0.4,
-            }})}>Add note at playhead</button>
-            <button type="button" onClick={() => dispatch({type: 'command', command: {
-              type: 'insert-note', pitch: selected?.pitch ?? 60, onsetSeconds: playhead, durationSeconds: 0.4, addToChord: true,
-            }})}>Add to chord</button>
+            <button type="button" disabled={Boolean(replaceMode) || Boolean(addMode)}
+              onClick={() => insertAtPlayhead(false)}>Add note at playhead</button>
+            <button type="button" disabled={Boolean(replaceMode) || Boolean(addMode)}
+              onClick={() => insertAtPlayhead(true)}>Add to chord</button>
           </div>
           <div className="ws-row">
-            <button type="button" data-add="toggle" aria-pressed={Boolean(addMode)}
+            <button type="button" data-add="toggle" aria-pressed={Boolean(addMode)} disabled={Boolean(replaceMode)}
               onClick={() => {
                 setDuplicateId(null);
-                setAddMode(addMode ? null : {seconds: playhead, pitch: selected?.pitch ?? 60, ticks: lastWrittenTicks.current});
+                setReplaceMode(null);
+                setAddMode(addMode ? null : {seconds: playhead - offsetSeconds, pitch: selected?.pitch ?? 60,
+                  ticks: lastWrittenTicks.current, durationSeconds: lastRecordedSeconds.current});
               }}>{addMode ? 'Cancel add note' : 'Add note (place)'}</button>
           </div>
           {addMode && <div className="ws-add-panel" data-add="active">
-            <p>New {pitchName(addMode.pitch)} at {addMode.seconds.toFixed(3)} s · written {addMode.ticks} ticks · click the roll to place it.</p>
+            <p>New {pitchName(addMode.pitch)} at {addMode.seconds.toFixed(3)} s (recorded) · written {addMode.ticks} ticks ·
+              click the roll to place it.</p>
             <div className="ws-row">
+              <label className="ws-field ws-inline"><span>Recorded length (s)</span>
+                <input type="number" step={0.01} min={0.02} max={document.duration} data-add="length"
+                  value={addMode.durationSeconds}
+                  onChange={event => setAddMode(mode => mode ? {...mode,
+                    durationSeconds: Math.max(0.02, Number(event.target.value) || 0.02)} : mode)}/>
+              </label>
+              <label className="ws-field ws-inline"><span>Written value</span>
+                <select data-add="written" value={addMode.ticks}
+                  onChange={event => setAddMode(mode => mode ? {...mode, ticks: Number(event.target.value)} : mode)}>
+                  {DURATION_CHOICES.map(choice => <option key={choice.ticks} value={choice.ticks}>{choice.label}</option>)}
+                </select>
+              </label>
               <button type="button" data-add="commit" onClick={commitAdd}>Insert</button>
               <button type="button" data-add="cancel"
                 onClick={() => { setAddMode(null); setDuplicateId(null); setNotice('Add note cancelled.'); }}>Cancel</button>
@@ -1276,6 +1418,7 @@ function noteFacts(document: NotationDocument, selection: CorrectionSelection) {
     velocity: occurrence.velocity,
     spelling,
     writtenTicks: event?.duration ?? 0,
+    writtenStartTicks: event?.start ?? 0,
     notesInEvent: event?.notes.length ?? 1,
     linkedOccurrences: note?.performance_ids.length ?? 1,
   };

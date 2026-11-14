@@ -15,7 +15,7 @@
   },
   "sheet_drag": {
     "from": "C4, quarter",
-    "to": "D4, quarter, selected"
+    "to": "C4, quarter, selected"
   },
   "replace_pitch": {
     "from": 60,
@@ -26,10 +26,27 @@
     "after": 5
   },
   "duplicate_warning": true,
+  "accidentals": {
+    "sharp": "C#4 \u00b7 f-1 \u00b7 C#4 (MIDI 61)\n2.000 s \u00b7 recorded 0.500 s\ntreble voice 1 \u00b7 measure 2 \u00b7 written 480 ticks\nWritten segments: 1 (1.00 beats written)\nRecorded attacks mapped to this written note: 1",
+    "flat": "Cb4 \u00b7 f-1 \u00b7 B3 (MIDI 59)\n2.000 s \u00b7 recorded 0.500 s\ntreble voice 1 \u00b7 measure 2 \u00b7 written 480 ticks\nWritten segments: 1 (1.00 beats written)\nRecorded attacks mapped to this written note: 1",
+    "natural": "C4 \u00b7 f-1 \u00b7 C4 (MIDI 60)\n2.000 s \u00b7 recorded 0.500 s\ntreble voice 1 \u00b7 measure 2 \u00b7 written 480 ticks\nWritten segments: 1 (1.00 beats written)\nRecorded attacks mapped to this written note: 1",
+    "respell": "B#3 \u00b7 f-1 \u00b7 C4 (MIDI 60)\n2.000 s \u00b7 recorded 0.500 s\ntreble voice 1 \u00b7 measure 2 \u00b7 written 480 ticks\nWritten segments: 1 (1.00 beats written)\nRecorded attacks mapped to this written note: 1"
+  },
+  "chord_isolation": true,
+  "overlap_picker": 2,
   "saved_round_trip": {
     "before": 60,
     "saved": 63,
     "reopened": 63
+  },
+  "long_round_trip": {
+    "notes": 1338,
+    "target": [
+      "bp-1",
+      69,
+      72
+    ],
+    "unrelated_preserved": 57
   },
   "failures": []
 }

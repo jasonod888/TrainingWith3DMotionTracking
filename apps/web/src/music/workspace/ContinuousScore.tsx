@@ -81,13 +81,15 @@ type Props = {
   /** One committed drag becomes one edit. */
   onGestureCommit?: (edit: GestureEdit) => void;
   onAuditionPitch?: (pitch: number) => void;
+  /** Replace/Add modes disable direct manipulation in this surface. */
+  editingEnabled?: boolean;
 };
 
 export function ContinuousScore({
   document, boxes, selectedOccurrenceId, reveal, playheadTick = null, activeOccurrenceIds = [],
   scrollTarget = null, onSelect, onAmbiguous, onSeekTick, onUserScroll,
   clock = null, alignment = null, offsetSeconds = 0, intervals,
-  onGestureCommit, onAuditionPitch,
+  onGestureCommit, onAuditionPitch, editingEnabled = true,
 }: Props) {
   const liveSeconds = useClockTime(clock, Number.NaN);
   const liveTick = clock && alignment ? effectiveSecondsToTick(alignment, liveSeconds, offsetSeconds) : playheadTick;
@@ -143,7 +145,8 @@ export function ContinuousScore({
     // Keyed on the token only.
   }, [scrollTarget?.token]);
 
-  const sheetDrag = useRef<{occurrence: string; startY: number; spelling: string; pitch: number; steps: number} | null>(null);
+  const sheetDrag = useRef<{occurrence: string; startY: number; spelling: string; pitch: number; steps: number;
+    pointerId: number; capture: Element | null} | null>(null);
   const sheetCleanup = useRef<(() => void) | null>(null);
   const sheetAudition = useRef(0);
   const [sheetPreview, setSheetPreview] = useState<{occurrence: string; spelling: string; pitch: number; steps: number} | null>(null);
@@ -153,33 +156,45 @@ export function ContinuousScore({
     const occurrence = occurrenceFor(note);
     if (!occurrence) { choose(note); return; }
     event.preventDefault();
-    try { (event.currentTarget as Element).setPointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    if (!editingEnabled) { choose(note); return; }
+    const capture = event.currentTarget as Element;
+    try { capture.setPointerCapture?.(event.pointerId); } catch { /* jsdom */ }
     const pitch = document.performance.find(item => item.id === occurrence)?.pitch ?? 60;
-    sheetDrag.current = {occurrence, startY: event.clientY, spelling: note.spelling, pitch, steps: 0};
+    sheetDrag.current = {occurrence, startY: event.clientY, spelling: note.spelling, pitch, steps: 0,
+      pointerId: event.pointerId, capture};
     choose(note);
     sheetCleanup.current?.();
-    const onMove = (moveEvent: PointerEvent) => moveSheetDrag(moveEvent as unknown as React.PointerEvent);
-    const onEnd = (endEvent: PointerEvent) => { cancelSheetCleanup(); endSheetDrag(endEvent as unknown as React.PointerEvent); };
-    const cancelSheetCleanup = () => {
-      sheetCleanup.current?.();
-      sheetCleanup.current = null;
-    };
+    const owns = (incoming: PointerEvent) => sheetDrag.current?.pointerId === incoming.pointerId;
+    const onMove = (moveEvent: PointerEvent) => { if (owns(moveEvent)) moveSheetDrag(moveEvent as unknown as React.PointerEvent); };
+    const onUp = (upEvent: PointerEvent) => { if (owns(upEvent)) commitSheetDrag(upEvent as unknown as React.PointerEvent); };
+    const onCancel = (cancelEvent: PointerEvent) => { if (owns(cancelEvent)) cancelSheetDrag(); };
+    const onLost = (lostEvent: PointerEvent) => { if (owns(lostEvent) || !lostEvent.pointerId) cancelSheetDrag(); };
     globalThis.window.addEventListener('pointermove', onMove);
-    globalThis.window.addEventListener('pointerup', onEnd);
-    globalThis.window.addEventListener('pointercancel', onEnd);
+    globalThis.window.addEventListener('pointerup', onUp);
+    globalThis.window.addEventListener('pointercancel', onCancel);
+    capture.addEventListener('lostpointercapture', onLost as EventListener);
     sheetCleanup.current = () => {
       globalThis.window.removeEventListener('pointermove', onMove);
-      globalThis.window.removeEventListener('pointerup', onEnd);
-      globalThis.window.removeEventListener('pointercancel', onEnd);
+      globalThis.window.removeEventListener('pointerup', onUp);
+      globalThis.window.removeEventListener('pointercancel', onCancel);
+      capture.removeEventListener('lostpointercapture', onLost as EventListener);
     };
   };
 
   const moveSheetDrag = (event: React.PointerEvent) => {
     const drag = sheetDrag.current;
-    if (!drag) return;
-    const dy = event.clientY - drag.startY;
-    if (Math.abs(dy) < 5) return;
-    const steps = -Math.round(dy / 12);
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    // Pointer pixels → SVG units, then one diatonic step per line or space.
+    const svg = (drag.capture as SVGElement | null)?.ownerSVGElement;
+    const rect = svg?.getBoundingClientRect();
+    const scale = rect && rect.height > 0 ? HEIGHT / rect.height : 1;
+    const dy = (event.clientY - drag.startY) * scale;
+    const steps = -Math.round(dy / (LINE / 2));
+    if (steps === 0) {
+      drag.steps = 0;
+      setSheetPreview(null);
+      return;
+    }
     if (steps === drag.steps) return;
     drag.steps = steps;
     const next = diatonicStep(drag.spelling, steps, document.key_signature);
@@ -188,23 +203,27 @@ export function ContinuousScore({
     setSheetPreview({occurrence: drag.occurrence, spelling: next.spelling, pitch: next.pitch, steps});
   };
 
-  const endSheetDrag = (event: React.PointerEvent) => {
+  const commitSheetDrag = (event: React.PointerEvent) => {
     const drag = sheetDrag.current;
     sheetDrag.current = null;
-    try { (event.currentTarget as Element).releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    sheetCleanup.current?.();
+    sheetCleanup.current = null;
     setSheetPreview(null);
+    try { drag?.capture?.releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ }
     if (!drag || drag.steps === 0) return;
     const next = diatonicStep(drag.spelling, drag.steps, document.key_signature);
     onGestureCommit?.({kind: 'pitch', occurrenceId: drag.occurrence, pitch: next.pitch, spelling: next.spelling});
   };
 
-  const cancelSheetDrag = (event?: React.PointerEvent) => {
+  const cancelSheetDrag = () => {
     sheetDrag.current = null;
     sheetCleanup.current?.();
     sheetCleanup.current = null;
     setSheetPreview(null);
-    if (event) { try { (event.currentTarget as Element).releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ } }
   };
+
+  // Unmounting disposes the transaction; nothing can commit afterwards.
+  useEffect(() => () => { cancelSheetDrag(); }, []);
 
   useEffect(() => {
     if (!sheetPreview) return;
@@ -316,7 +335,7 @@ export function ContinuousScore({
                   data-sheet-preview={sheetPreview?.occurrence === occurrence ? sheetPreview.steps : undefined}
                   onPointerDown={event => beginSheetDrag(note, event)}
                   onPointerMove={moveSheetDrag}
-                  onPointerUp={endSheetDrag}
+                  onPointerUp={commitSheetDrag}
                   onPointerCancel={cancelSheetDrag}
                   onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(note); } }}/>
                 {note.display_accidental && note.accidental

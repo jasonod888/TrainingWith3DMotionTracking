@@ -55,3 +55,27 @@ Complete visual editing interactions in the isolated workspace.
 ## 4. Scope statement
 
 No persistence changes, no page replacement, no publication. Phase 7 has not started.
+
+---
+
+## 5. Review corrections (this commit)
+
+| Review item | Resolution |
+| --- | --- |
+| R1 pointer transaction | Both surfaces now have one gesture lifecycle: an owned pointer id, capture-element tracking, separate commit/cancel paths, `pointercancel` and `lostpointercapture` cancel without touching the document, unmount tears the transaction down, and element/global handlers cannot double-commit. A normal release still commits once. |
+| R2 sheet geometry | Pointer pixels are converted to SVG units, one diatonic step is half a staff line (5 units), the candidate notehead and label move to the engraved position, and returning to the origin clears the preview and commits nothing (authored accidentals preserved). |
+| R3 insertion boundary | Every insertion (roll placement, playhead and add-to-chord buttons, keyboard pitch) goes through `insertionPlacement`: displayed seconds minus offset once, held/explanation passages and out-of-clip targets rejected, and written ticks derived from the alignment map (via a shared helper) with the recorded onset left exact. Written ticks snap to the sixteenth grid without changing the performance time. |
+| R4 exclusive modes | Replace and Add are mutually exclusive: both surfaces stop editing while either is active, inspector edits, history and reopen are disabled while replacing, the other entry point is disabled, and a vanished target cancels the mode. Commands are validated with `applyCommand` before dispatch, so rejections keep the mode and show the rejection; no success message on a rejected or unchanged edit. |
+| R5 tie vs occurrences | The inspector now derives written segments from `document.segments` per logical note and reports recorded attacks separately. It states that pitch replacement edits only the selected attack (splitting the written note if shared) and precisely what each delete action removes. |
+| R6 controls and evidence | Add-note ghost has recorded-length and written-value controls whose values drive the ghost width and the committed command; a written beat-position control dispatches `move-written-start` without moving the recorded onset; Delete/Ctrl+Z/Ctrl+Y shortcuts are scoped and ignore typing fields; sharp/flat/natural/respell, chord isolation, the overlap picker and tie scope have surface checks; and a saved/reopened **1,338-note** correction is captured with before/after counts, exact onset and unrelated-note checks. |
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Reviewer edge-case probes | **8/8** |
+| Interaction + journey tests | **14** (8 gesture, 6 journey) |
+| Web suite | **468 passed**, `tsc` clean |
+| Browser editing script | exit 0, including {pitch drag 60→62, time 2.0→2.6 s, resize 1.0964 s, sheet C4→D4, replace 60→62, duplicate warning, accidentals/respell, chord isolation, overlap picker of 2, saved/reopened 60→63, and the long example 1,338 notes with target 69→72 and unrelated notes preserved} |
+
+Evidence: `phase6-editing.json`, `captures/` (accidentals-respell, chord-isolation, overlap-picker, long-saved-reopened and the original surfaces), `scripts/workspace-gestures.test.tsx`, `scripts/workspace-editing-journeys.test.tsx`, `scripts/check-editing.py`, `scripts/workspace-phase6-review-repro.tsx`.

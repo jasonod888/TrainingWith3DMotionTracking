@@ -54,7 +54,9 @@ type Props = {
   snapSeconds?: number | null;
   /** Add-note mode places a ghost instead of selecting. */
   addMode?: boolean;
-  ghost?: {seconds: number; pitch: number} | null;
+  ghost?: {seconds: number; pitch: number; durationSeconds?: number} | null;
+  /** Replace/Add modes disable direct manipulation in this surface. */
+  editingEnabled?: boolean;
   onGhostPlace?: (seconds: number, pitch: number) => void;
 };
 
@@ -62,6 +64,7 @@ export function TimeRoll({
   document, window, onWindowChange, selectedOccurrenceId, reveal, playhead, offsetSeconds = 0,
   activeOccurrenceIds = [], onSelect, onSeek, onWindowChangeOrigin, clock = null, intervals,
   onGestureCommit, onAuditionPitch, snapSeconds = null, addMode = false, ghost = null, onGhostPlace,
+  editingEnabled = true,
 }: Props) {
   const livePlayhead = useClockTime(clock, playhead);
   const liveActive = intervals
@@ -144,44 +147,63 @@ export function TimeRoll({
 
   type DragState = {
     note: NotationDocument['performance'][number];
-    startX: number; startY: number; forced: GestureAxis | null;
-    axis: GestureAxis | null; pitch: number; onset: number; duration: number;
+    startX: number; startY: number; forced: GestureAxis | null; pointerId: number;
+    capture: Element | null; axis: GestureAxis | null; pitch: number; onset: number; duration: number;
   };
   const dragRef = useRef<DragState | null>(null);
   const dragCleanup = useRef<(() => void) | null>(null);
   const auditionAt = useRef(0);
   const [dragPreview, setDragPreview] = useState<{id: string; pitch: number; onset: number; duration: number; axis: GestureAxis} | null>(null);
 
+  const teardownDrag = () => {
+    dragCleanup.current?.();
+    dragCleanup.current = null;
+  };
+
+  const cancelDrag = () => {
+    // Distinct from commit: nothing reaches the document or history.
+    dragRef.current = null;
+    teardownDrag();
+    setDragPreview(null);
+  };
+
+  // An unmount during a drag must dispose the transaction, never commit later.
+  useEffect(() => () => { cancelDrag(); }, []);
+
   const beginDrag = (note: NotationDocument['performance'][number], event: React.PointerEvent, forced: GestureAxis | null) => {
-    if (addMode) { onGhostPlace?.(note.onset, note.pitch); return; }
+    if (addMode) { onGhostPlace?.(note.onset + effectiveOffset, note.pitch); return; }
     if (event.button !== 0) return;
+    if (!editingEnabled) { onSelect(note.id); return; }
     event.preventDefault();
-    try { (event.currentTarget as Element).setPointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    teardownDrag();
+    const capture = event.currentTarget as Element;
+    try { capture.setPointerCapture?.(event.pointerId); } catch { /* jsdom */ }
     dragRef.current = {
-      note, startX: event.clientX, startY: event.clientY, forced, axis: null,
-      pitch: note.pitch, onset: note.onset, duration: note.duration ?? 0.25,
+      note, startX: event.clientX, startY: event.clientY, forced, pointerId: event.pointerId,
+      capture, axis: null, pitch: note.pitch, onset: note.onset, duration: note.duration ?? 0.25,
     };
     onSelect(note.id);
-    dragCleanup.current?.();
-    const onMove = (moveEvent: PointerEvent) => moveDrag(moveEvent as unknown as React.PointerEvent);
-    const onEnd = (endEvent: PointerEvent) => { cancelCleanup(); endDrag(endEvent as unknown as React.PointerEvent); };
-    const cancelCleanup = () => {
-      dragCleanup.current?.();
-      dragCleanup.current = null;
-    };
+
+    const owns = (incoming: PointerEvent) => dragRef.current?.pointerId === incoming.pointerId;
+    const onMove = (moveEvent: PointerEvent) => { if (owns(moveEvent)) moveDrag(moveEvent as unknown as React.PointerEvent); };
+    const onUp = (upEvent: PointerEvent) => { if (owns(upEvent)) commitDrag(upEvent as unknown as React.PointerEvent); };
+    const onCancel = (cancelEvent: PointerEvent) => { if (owns(cancelEvent)) cancelDrag(); };
+    const onLost = (lostEvent: PointerEvent) => { if (owns(lostEvent) || !lostEvent.pointerId) cancelDrag(); };
     globalThis.window.addEventListener('pointermove', onMove);
-    globalThis.window.addEventListener('pointerup', onEnd);
-    globalThis.window.addEventListener('pointercancel', onEnd);
+    globalThis.window.addEventListener('pointerup', onUp);
+    globalThis.window.addEventListener('pointercancel', onCancel);
+    capture.addEventListener('lostpointercapture', onLost as EventListener);
     dragCleanup.current = () => {
       globalThis.window.removeEventListener('pointermove', onMove);
-      globalThis.window.removeEventListener('pointerup', onEnd);
-      globalThis.window.removeEventListener('pointercancel', onEnd);
+      globalThis.window.removeEventListener('pointerup', onUp);
+      globalThis.window.removeEventListener('pointercancel', onCancel);
+      capture.removeEventListener('lostpointercapture', onLost as EventListener);
     };
   };
 
   const moveDrag = (event: React.PointerEvent) => {
     const drag = dragRef.current;
-    if (!drag) return;
+    if (!drag || event.pointerId !== drag.pointerId) return;
     const dx = event.clientX - drag.startX;
     const dy = event.clientY - drag.startY;
     const axis = drag.axis ?? resolveAxis(dx, dy, 5, drag.forced);
@@ -202,11 +224,12 @@ export function TimeRoll({
     setDragPreview({id: drag.note.id, pitch: drag.pitch, onset: drag.onset, duration: drag.duration, axis});
   };
 
-  const endDrag = (event: React.PointerEvent) => {
+  const commitDrag = (event: React.PointerEvent) => {
     const drag = dragRef.current;
     dragRef.current = null;
-    try { (event.currentTarget as Element).releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    teardownDrag();
     setDragPreview(null);
+    try { drag?.capture?.releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ }
     if (!drag || !drag.axis) return;
     if (drag.axis === 'pitch' && drag.pitch !== drag.note.pitch) {
       onGestureCommit?.({kind: 'pitch', occurrenceId: drag.note.id, pitch: drag.pitch});
@@ -215,14 +238,6 @@ export function TimeRoll({
     } else if (drag.axis === 'resize' && Math.abs(drag.duration - (drag.note.duration ?? 0.25)) > 1e-9) {
       onGestureCommit?.({kind: 'resize', occurrenceId: drag.note.id, durationSeconds: drag.duration});
     }
-  };
-
-  const cancelDrag = (event?: React.PointerEvent) => {
-    dragRef.current = null;
-    dragCleanup.current?.();
-    dragCleanup.current = null;
-    setDragPreview(null);
-    if (event) { try { (event.currentTarget as Element).releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ } }
   };
 
   useEffect(() => {
@@ -306,7 +321,7 @@ export function TimeRoll({
                 aria-label={`${pitchName(pitch)} at ${onset.toFixed(2)} seconds${selected ? ', selected' : ''}`}
                 onPointerDown={event => beginDrag(note, event, null)}
                 onPointerMove={moveDrag}
-                onPointerUp={endDrag}
+                onPointerUp={commitDrag}
                 onPointerCancel={cancelDrag}
                 onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(note.id); } }}>
                 <title>{`${pitchName(pitch)} · ${onset.toFixed(2)} s · ${seconds.toFixed(2)} s`}</title>
@@ -316,12 +331,12 @@ export function TimeRoll({
                   height={Math.max(3, rowHeight - 1)} rx={1}
                   aria-label="Move start"
                   onPointerDown={event => { event.stopPropagation(); beginDrag(note, event, 'time'); }}
-                  onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={cancelDrag}/>
+                  onPointerMove={moveDrag} onPointerUp={commitDrag} onPointerCancel={cancelDrag}/>
                 <rect className="ws-roll-handle" data-handle="resize" x={left + noteWidth - 3} y={y(pitch) - rowHeight / 2} width={6}
                   height={Math.max(3, rowHeight - 1)} rx={1}
                   aria-label="Resize recorded length"
                   onPointerDown={event => { event.stopPropagation(); beginDrag(note, event, 'resize'); }}
-                  onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={cancelDrag}/>
+                  onPointerMove={moveDrag} onPointerUp={commitDrag} onPointerCancel={cancelDrag}/>
               </> : null}
             </g>;
           })}
@@ -330,7 +345,7 @@ export function TimeRoll({
             const clash = document.performance.some(note => note.pitch === ghost.pitch && Math.abs(note.onset - ghost.seconds) < 0.001);
             return <rect className={`ws-roll-ghost${clash ? ' is-invalid' : ''}`} data-ghost="true"
               data-ghost-invalid={clash ? 'true' : 'false'}
-              x={ghostLeft} y={y(ghost.pitch) - rowHeight / 2} width={Math.max(4, 0.25 * pps)} height={Math.max(3, rowHeight - 1)} rx={2}
+              x={ghostLeft} y={y(ghost.pitch) - rowHeight / 2} width={Math.max(4, (ghost.durationSeconds ?? 0.25) * pps)} height={Math.max(3, rowHeight - 1)} rx={2}
               aria-label={`New note ${pitchName(ghost.pitch)} at ${ghost.seconds.toFixed(2)} seconds`}/>;
           })() : null}
           {livePlayhead >= window.start && livePlayhead <= window.start + window.span

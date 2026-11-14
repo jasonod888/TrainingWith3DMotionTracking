@@ -241,3 +241,33 @@ export function restoreFromReference(value: unknown): RestoreResult {
     return {ok: false, message: `The saved performance could not be read: ${cause instanceof Error ? cause.message : 'invalid events'}`};
   }
 }
+
+import {secondsToTick} from '../../../../../packages/music-notation/index.ts';
+
+export type InsertionPlacement =
+  | { ok: true; performed: number; tick: number }
+  | { ok: false; problem: string };
+
+/**
+ * Source (displayed) seconds → stored performance seconds → written tick through the
+ * map in use. Explanation holds have no score time and are rejected rather than
+ * inventing beats.
+ */
+export function insertionPlacement(
+  alignment: Alignment | null, document: NotationDocument, sourceSeconds: number, offsetSeconds: number,
+): InsertionPlacement {
+  if (!alignment) return {ok: false, problem: 'The score is not ready for insertion.'};
+  const performed = sourceSeconds - offsetSeconds;
+  if (performed < -1e-9) return {ok: false, problem: 'A note cannot start before the video.'};
+  if (performed > document.duration + 1e-9) return {ok: false, problem: 'A note cannot start after the clip ends.'};
+  const passage = alignment.passages.find(item =>
+    performed >= item.source_seconds[0] - 1e-9 && performed <= item.source_seconds[1] + 1e-9);
+  if (passage && passage.kind === 'held') {
+    return {ok: false, problem: 'This moment is a spoken explanation with no score time. Choose a playing passage.'};
+  }
+  // Written positions are sixteenth-note grid ticks; the recorded onset keeps its
+  // exact seconds, so snapping the score position never moves the performance.
+  const rawTick = secondsToTick(alignment, performed);
+  const tick = Math.max(0, Math.round(rawTick / 120) * 120);
+  return {ok: true, performed: Math.max(0, Math.min(document.duration, performed)), tick};
+}
