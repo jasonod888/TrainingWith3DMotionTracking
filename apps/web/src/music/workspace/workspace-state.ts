@@ -194,7 +194,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
 /** Truthful status text; Phase 2 has no persistence, so it must not claim “Saved”. */
 export function workspaceStatus(state: WorkspaceState): string {
   if (state.lastReport?.status === 'rejected') return 'Not applied';
-  if (state.dirty) return 'Unsaved changes (not saved — this harness has no save)';
+  if (state.dirty) return 'Unsaved changes';
   return 'No changes';
 }
 

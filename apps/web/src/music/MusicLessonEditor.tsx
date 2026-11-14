@@ -24,8 +24,9 @@ function editNotesFrom(events: {id: string; onset: number; duration: number | nu
 }
 
 /** Explicit owner editing of a reviewed lesson; saving creates a new revision but does not release it. */
-export function MusicLessonEditor({lessonId, onBack, onSaved}: {
+export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
   lessonId: string; onBack: () => void; onSaved: (lesson: MusicLessonManifest) => void;
+  onDirty?: (dirty: boolean) => void;
 }) {
   const [manifest, setManifest] = useState<MusicLessonManifest | null>(null);
   const [notes, setNotes] = useState<EditNote[]>([]);
@@ -148,8 +149,8 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
   })();
 
   if (manifest?.subject === 'piano' && notation) {
-    return <PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack}
-      onSaved={() => { void refreshReviewed(); }}/>;
+    return <PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack} onDirty={onDirty}
+      onSaved={(_revisionId, current) => { if (current) { onDirty?.(false); void refreshReviewed(); } }}/>;
   }
   return <section className="music-home music-review" aria-label="Edit reviewed music lesson">
     <button className="back-link" disabled={busy} onClick={onBack}><ArrowLeft size={16}/>Back</button>

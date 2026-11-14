@@ -1,4 +1,6 @@
 import React from 'react';
+import './music/notation/notation.css';
+import './music/workspace/workspace.css';
 import {createRoot} from 'react-dom/client';
 import {App} from './LibraryApp';
 import {loadSetupPolicy} from './camera-setup-policy';

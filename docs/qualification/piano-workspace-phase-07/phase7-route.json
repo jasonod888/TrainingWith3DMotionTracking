@@ -1,25 +1,34 @@
 {
+  "workspace_styles": {
+    "grid": "grid",
+    "fill": "rgb(127, 174, 143)",
+    "sheetFill": "rgb(31, 45, 38)",
+    "settings": true
+  },
   "route_integration": {
     "workspace": true,
     "legacy_form_absent": true
   },
+  "app_navigation_guard": "Leave without saving your changes or take?",
+  "app_dirty": true,
   "focus_ownership": {
-    "raised": 70,
-    "after_outside_undo": 70,
-    "after_inside_undo": 69
+    "raised": 71,
+    "after_outside_undo": 71,
+    "after_inside_undo": 70
   },
   "route_save_reopen": {
-    "before": 69,
-    "corrected": 72,
-    "reopened": 72
+    "before": 70,
+    "corrected": 73,
+    "reopened": 73
   },
+  "saved_only_entry": true,
   "unsaved_guard": "Leave without saving your changes?",
   "guitar_regression": true,
   "performance_1338": {
-    "dom": 132,
-    "load": 133,
+    "dom": 138,
+    "load": 141,
     "notes": 35,
-    "score": 43,
+    "score": 33,
     "heap": 22,
     "data_notes": 1338
   },

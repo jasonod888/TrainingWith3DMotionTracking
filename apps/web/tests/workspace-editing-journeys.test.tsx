@@ -131,7 +131,7 @@ test('Delete and undo/redo shortcuts work outside text fields only', async () =>
   fireEvent.keyDown(view.container.querySelector('.ws-roll-svg')!, {key: 'y', ctrlKey: true});
   await waitFor(() => assert.equal(total(view), start - 1));
 
-  const offset = view.getByLabelText('Sync offset in seconds (not saved)') as HTMLInputElement;
+  const offset = view.getByLabelText('Sync offset in seconds') as HTMLInputElement;
   offset.focus();
   const after = total(view);
   fireEvent.keyDown(offset, {key: 'Delete'});

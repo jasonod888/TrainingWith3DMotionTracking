@@ -2,8 +2,7 @@
    Keyboard above a ten-second time roll, continuous grand staff below, overview,
    and the reference video + inspector alongside. */
 
-body {
-  margin: 0;
+.ws-shell {
   background: #f5f4ef;
   color: #1f2a24;
   font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;

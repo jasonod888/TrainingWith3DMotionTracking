@@ -160,7 +160,7 @@ test('acceptance 2-4: Piano follows the source clock, Original restores, failure
   const piano = view.container.querySelector('audio')!;
 
   // Offset is applied once and reaches the Piano element.
-  fireEvent.change(view.getByLabelText('Sync offset in seconds (not saved)'), {target: {value: '0.5'}});
+  fireEvent.change(view.getByLabelText('Sync offset in seconds'), {target: {value: '0.5'}});
   fireEvent.click(view.getByRole('button', {name: 'Piano', exact: true}));
   await waitFor(() => assert.equal(
     view.getByRole('button', {name: 'Piano', exact: true}).getAttribute('aria-pressed'), 'true'));
@@ -192,7 +192,7 @@ test('acceptance 2-4: Piano follows the source clock, Original restores, failure
   assert.equal((piano as unknown as {playbackRate: number}).playbackRate, 0.5, 'rate did not reach Piano');
 
   // Offset change reconfigures the same controller.
-  fireEvent.change(view.getByLabelText('Sync offset in seconds (not saved)'), {target: {value: '1'}});
+  fireEvent.change(view.getByLabelText('Sync offset in seconds'), {target: {value: '1'}});
   await flush();
   assert.ok(Math.abs((piano as unknown as {currentTime: number}).currentTime - 9) < 0.001,
     'a new offset did not remap Piano');

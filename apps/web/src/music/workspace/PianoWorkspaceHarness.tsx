@@ -94,12 +94,15 @@ function NumberField({label, value, min, max, step, disabled, onCommit}: {
   </label>;
 }
 
-export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false, onBack, onSaved}: {
+export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false, onBack, onDirty, onSaved}: {
   lessonId?: string;
   /** Normal review route: hide harness-only labels and demo affordances. */
   embedded?: boolean;
   onBack?: () => void;
-  onSaved?: (revisionId: string) => void;
+  /** Mirrors workspace dirty state to the app router/navigation guards. */
+  onDirty?: (dirty: boolean) => void;
+  /** Receives the revision and whether it represents the current work. */
+  onSaved?: (revisionId: string, current: boolean) => void;
 } = {}) {
   const params = new URLSearchParams(location.search);
   const lessonId = lessonIdProp ?? params.get('id') ?? '';
@@ -151,6 +154,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [sourceSha256, setSourceSha256] = useState('');
   const [verificationToken, setVerificationToken] = useState('');
   const [savedSections, setSavedSections] = useState<{id: string; label: string; start: number; end: number}[] | null>(null);
+  const [sectionsDraft, setSectionsDraft] = useState<{id: string; label: string; start: number; end: number}[]>([]);
+  const [assessmentPolicy, setAssessmentPolicy] = useState<'none' | 'notes'>('none');
   const [savedAssessment, setSavedAssessment] = useState<unknown>(null);
   const [serverSignature, setServerSignature] = useState<string | null>(null);
   const [mapState, setMapState] = useState<Alignment | null>(null);
@@ -469,14 +474,15 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
       const modifier = event.metaKey || event.ctrlKey;
       if (modifier && !event.shiftKey && event.key.toLowerCase() === 'z') {
+        if (!workspaceActive.current || replaceMode || addMode) return;
         event.preventDefault();
-        // History is an editing transaction too: modes block it.
-        if (!replaceMode && !addMode && workspaceActive.current) dispatch({type: 'undo'});
+        dispatch({type: 'undo'});
         return;
       }
       if (modifier && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) {
+        if (!workspaceActive.current || replaceMode || addMode) return;
         event.preventDefault();
-        if (!replaceMode && !addMode && workspaceActive.current) dispatch({type: 'redo'});
+        dispatch({type: 'redo'});
         return;
       }
       const occurrence = selectionOccurrenceRef.current;
@@ -546,12 +552,13 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   // Every persisted edit participates in dirty state and confirmation, not just notes.
   const workspaceSignature = useMemo(() => (document ? JSON.stringify({
     document, alignment: serializeAlignment(alignment, anchors, offsetSeconds),
-    anchors, offsetSeconds, spans, title,
-  }) : ''), [documentSignature, alignment, anchors, offsetSeconds, spans, title]);
+    anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy,
+  }) : ''), [documentSignature, alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy]);
   workspaceSignatureRef.current = workspaceSignature;
   const dirty = savedSignature !== null
     ? workspaceSignature !== savedSignature
     : workspaceSignature !== (serverSignature ?? '') || Boolean(state?.dirty);
+  useEffect(() => { onDirty?.(dirty); }, [dirty, onDirty]);
   const previewStale = Boolean(previewBaseline && document && performanceChanged(previewBaseline, document));
   const recoveryIdentity = useMemo<RecoveryIdentity>(
     () => ({accountId, lessonId: lessonId ?? '', draftId, sourceSha256,
@@ -581,6 +588,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     setLoading(false);
     setSavedRevisionId(revisionId);
     setSavedSections(manifest?.section_set?.sections ?? null);
+    if (manifest?.section_set?.sections?.length) setSectionsDraft(manifest.section_set.sections);
+    setAssessmentPolicy(((manifest?.assessment as {assessment?: string} | null)?.assessment === 'notes') ? 'notes' : 'none');
     setSavedAssessment(manifest?.assessment ?? null);
     setPreviewAsset((manifest?.piano_preview as Asset | null) ?? null);
     setPreviewIdentity(manifest?.preview_identity ?? '');
@@ -599,7 +608,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   useEffect(() => {
     // Demo fixtures own their workspace; the API coordinator must not run for them.
     if (params.get('demo')) { setLoading(false); return; }
-    if (!lessonId) { setError('Add ?id=<lesson id> to the harness URL.'); setLoading(false); return; }
+    if (!lessonId) { setError('This review link is incomplete.'); setLoading(false); return; }
     const generation = ++loadGeneration.current;
     let cancelled = false;
     const alive = () => !cancelled && generation === loadGeneration.current;
@@ -616,7 +625,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
         assessment?: unknown} | null = null;
       try {
-        manifest = await request(`/lessons/${encodeURIComponent(lessonId)}`);
+        manifest = await request(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false,
+        {'X-Lesson-Formats': '1,2'});
       } catch {
         manifest = null;
       }
@@ -682,6 +692,9 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         setDraftId(draft.draft_id);
         setSourceSha256(draft.reference?.sha256 ?? '');
         setVerificationToken(draft.verification_state_token ?? '');
+        setSectionsDraft(current => current.length ? current
+          : [{id: 'whole', label: 'Whole lesson', start: 0, end: draft.duration}]);
+        setAssessmentPolicy(current => current === 'notes' ? 'notes' : 'none');
         setPreviewAsset((draft.piano_preview as Asset | null) ?? null);
         setPreviewIdentity(draft.preview_identity ?? '');
         setPreviewBaseline(draft.piano_preview ? document : null);
@@ -846,7 +859,10 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     const body = buildSaveBody({
       title, document, spans, alignment, anchors, offsetSeconds, baseRevisionId: base,
       draftId, referenceSha256: sourceSha256, verificationStateToken: verificationToken || null,
-      sections: savedSections ?? undefined, assessment: savedAssessment ?? undefined,
+      sections: sectionsDraft.length ? sectionsDraft : (savedSections ?? undefined),
+      assessment: assessmentPolicy === 'notes'
+        ? {assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch', 'timing'], rubric_version: 'piano-midi-v1'}
+        : {assessment: 'none', input_modes: ['none'], dimensions: [], rubric_version: 'music-watch-v1'},
     });
     try {
       const manifest = await request<{ revision_id: string }>(
@@ -854,7 +870,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         'POST', body);
       setSavedRevisionId(manifest.revision_id);
       setSavedSignature(snapshot);
-      onSaved?.(manifest.revision_id);
+      const current = snapshot === workspaceSignatureRef.current;
+      onSaved?.(manifest.revision_id, current);
       setSaveConflict(false);
       if (snapshot === workspaceSignatureRef.current) {
         // The acknowledged snapshot is still the current work.
@@ -894,7 +911,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const saveOnLatestRevision = useCallback(async () => {
     if (!lessonId) return;
     try {
-      const lesson = await request<{ revision_id: string }>(`/lessons/${encodeURIComponent(lessonId)}`);
+      const lesson = await request<{ revision_id: string }>(`/lessons/${encodeURIComponent(lessonId)}`,
+        'GET', undefined, false, {'X-Lesson-Formats': '1,2'});
       setSavedRevisionId(lesson.revision_id);
       setSaveConflict(false);
       await save(lesson.revision_id);
@@ -908,7 +926,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     setReopenMessage('');
     try {
       const lesson = await request<{ revision_id: string; reference: { key: string }; title?: string }>(
-        `/lessons/${encodeURIComponent(lessonId)}`);
+        `/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false, {'X-Lesson-Formats': '1,2'});
       const response = await fetch(assetUrl(lesson.reference.key), {credentials: 'same-origin'});
       if (!response.ok) throw new Error('The saved reference could not be read.');
       const restored = restoreFromReference(await response.json());
@@ -1105,9 +1123,9 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       <label className="ws-field ws-inline">
         <span>Offset</span>
         <input type="number" step={0.01} min={-10} max={10} value={offsetSeconds} style={{width: 72}}
-          aria-label="Sync offset in seconds (not saved)"
+          aria-label="Sync offset in seconds"
           onChange={event => setOffsetSeconds(Math.max(-10, Math.min(10, Number(event.target.value) || 0)))}/>
-        <span className="ws-hint">s · not saved</span>
+        <span className="ws-hint">s · preview alignment</span>
       </label>
       <div className="ws-zoom" role="group" aria-label="Zoom">
         <button type="button" onClick={() => zoom(1.25)} aria-label="Zoom out">−</button>
@@ -1164,6 +1182,87 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       </div>
     </section>}
 
+    <details className="ws-panel" data-lesson-settings="true">
+      <summary>Lesson settings, teaching sections and assessment</summary>
+      <h2>Teaching sections</h2>
+      <div className="ws-row">
+        <button type="button" data-section-add onClick={() => {
+          setSectionsDraft(current => {
+            const last = current[current.length - 1] ?? {id: 'whole', label: 'Whole lesson', start: 0, end: document.duration};
+            const sequence = current.length ? current : [last];
+            const middle = (last.start + last.end) / 2;
+            return [...sequence.slice(0, -1), {...last, end: middle},
+              {id: `section-${sequence.length + 1}`, label: `Section ${sequence.length + 1}`, start: middle, end: last.end}];
+          });
+          setConfirmReviewed(false);
+        }}>Add section</button>
+      </div>
+      {sectionsDraft.map((section, index) => <fieldset key={section.id} data-section={section.id}>
+        <legend>Section {index + 1}</legend>
+        <label className="ws-field"><span>Name</span>
+          <input value={section.label} maxLength={80} onChange={event => {
+            const label = event.target.value;
+            setSectionsDraft(current => current.map((item, position) => position === index ? {...item, label} : item));
+            setConfirmReviewed(false);
+          }}/></label>
+        <div className="ws-row">
+          <label className="ws-field ws-inline"><span>Start (s)</span>
+            <input type="number" step={0.01} min={0} max={section.end - 0.05} value={section.start}
+              onChange={event => {
+                const start = Math.max(0, Math.min(section.end - 0.05, Number(event.target.value)));
+                setSectionsDraft(current => current.map((item, position) => position === index ? {...item, start} : item));
+                setConfirmReviewed(false);
+              }}/></label>
+          <label className="ws-field ws-inline"><span>End (s)</span>
+            <input type="number" step={0.01} min={section.start + 0.05} max={document.duration} value={section.end}
+              onChange={event => {
+                const end = Math.max(section.start + 0.05, Math.min(document.duration, Number(event.target.value)));
+                setSectionsDraft(current => current.map((item, position) => position === index ? {...item, end} : item));
+                setConfirmReviewed(false);
+              }}/></label>
+          {sectionsDraft.length > 1 && <button type="button" onClick={() => {
+            setSectionsDraft(current => current.filter((_, position) => position !== index));
+            setConfirmReviewed(false);
+          }}>Remove</button>}
+        </div>
+      </fieldset>)}
+      <h2>Assessment</h2>
+      <label className="ws-field ws-inline"><span>Policy</span>
+        <select value={assessmentPolicy} data-assessment-policy
+          onChange={event => { setAssessmentPolicy(event.target.value === 'notes' ? 'notes' : 'none'); setConfirmReviewed(false); }}>
+          <option value="none">Watch only (no note scoring)</option>
+          <option value="notes">Pitch and timing from MIDI</option>
+        </select>
+      </label>
+      <h2>Passages</h2>
+      <p className="ws-hint">Playing passages carry score time; explanation passages are held and reject insertion.</p>
+      {spans.map((span, index) => <div className="ws-row" key={`${index}-${span.start}`} data-passage={index}>
+        <select aria-label={`Passage ${index + 1} kind`} value={span.kind}
+          onChange={event => { setSpans(current => current.map((item, position) => position === index
+            ? {...item, kind: event.target.value === 'explanation' ? 'explanation' : 'playing'} : item)); setConfirmReviewed(false); }}>
+          <option value="playing">Playing</option>
+          <option value="explanation">Explanation</option>
+        </select>
+        <label className="ws-field ws-inline"><span>Start</span>
+          <input type="number" step={0.01} value={span.start}
+            onChange={event => { const start = Number(event.target.value);
+              setSpans(current => current.map((item, position) => position === index ? {...item, start} : item));
+              setConfirmReviewed(false); }}/></label>
+        <label className="ws-field ws-inline"><span>End</span>
+          <input type="number" step={0.01} value={span.end}
+            onChange={event => { const end = Number(event.target.value);
+              setSpans(current => current.map((item, position) => position === index ? {...item, end} : item));
+              setConfirmReviewed(false); }}/></label>
+        {spans.length > 1 && <button type="button" onClick={() => { setSpans(current => current.filter((_, position) => position !== index)); setConfirmReviewed(false); }}>Remove</button>}
+      </div>)}
+      <div className="ws-row"><button type="button" onClick={() => {
+        const end = Math.min(document.duration, (spans[spans.length - 1]?.end ?? 0) + 1);
+        setSpans(current => [...current, {start: Math.max(0, end - 1), end, kind: 'playing'}]);
+        setConfirmReviewed(false);
+      }}>Add passage</button></div>
+      <p className="ws-hint">Verification decisions from the proposal remain server-authoritative; a changed verification state is reported as a conflict instead of being overwritten.</p>
+    </details>
+
     <div className="ws-grid">
       <div className="ws-edit">
         <section className="ws-panel ws-surface" aria-label="Keyboard">
@@ -1204,7 +1303,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
               ticks: mode?.ticks ?? lastWrittenTicks.current,
               durationSeconds: mode?.durationSeconds ?? lastRecordedSeconds.current}))}
             playhead={playhead} onSelect={select} onSeek={seek}/>
-          <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Scrolling never seeks. Dragging notes is Phase 6.</p>
+          <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Scrolling never seeks. Drag a note to edit pitch, time or recorded length.</p>
         </section>
 
         <section className="ws-panel ws-surface" aria-label="Score">
@@ -1456,7 +1555,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             <button type="button" onClick={() => removeAnchor(index)}>Remove</button>
           </p>)}
           {anchorPreview && <p className="ws-report">{anchorPreview}</p>}
-          <p className="ws-hint">Anchors are local and unsaved until Phase 5. One or more applied points make the map “anchored”.</p>
+          <p className="ws-hint">Applied anchors shape the score map and are saved with the review.</p>
         </section>
 
         <section className="ws-panel" aria-label="History">

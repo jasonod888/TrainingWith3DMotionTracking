@@ -51,3 +51,32 @@ Normal review workflow and device qualification.
 ## 4. Scope statement
 
 Phase 8 has not started. No deployment or release action was taken.
+
+---
+
+## 5. Correction round: R1–R5 (this commit)
+
+| Item | Resolution |
+| --- | --- |
+| R1 styling and copy | The shared stylesheet and notation styles load from the application entry (`main.tsx`), so the normal route uses the same grid, note fills, toolbar, focus and motion rules as the harness; harness-global `body` rules are scoped to `.ws-shell`. The normal-route test asserts computed `display:grid`, non-black roll/sheet fills, inspector/toolbar placement, 0 page overflow, and loaded-media-free header bounds. Stale copy is replaced: status says “Unsaved changes”, the offset is a preview-alignment control, anchor/roll hints no longer reference Phase 5/6, and the incomplete-link error is product language. |
+| R2 dirty and delayed saves | The workspace forwards dirty state through `onDirty` to `MusicReviewRoute` and `MusicLessonEditor`, so library navigation, browser history and Back all consult one value; the route test drives the real “Form home” link and receives the confirmation. `onSaved(revisionId, current)` marks whether the acknowledged snapshot is still current; wrappers only refresh/navigate for a current snapshot and never clear dirty state for an older save. The normal route no longer auto-navigates on save at all, so a delayed response cannot unmount newer edits. |
+| R3 loader, saved-only, format | A new `MusicReviewRoute` resolves the subject from the versioned music manifest first and renders the shared workspace for piano, or the guitar component for guitar; the legacy piano branch is removed from `MusicDraftReview`. A saved-only lesson (manifest + reference, draft 404) opens the workspace directly. Every manifest read in the workspace, reopen and refresh paths sends `X-Lesson-Formats: 1,2`, and the route mock now returns 406 without it, proving the contract. |
+| R4 capabilities | A compact, collapsed “Lesson settings” panel restores teaching sections (add/split/rename/boundaries), assessment policy, and playing/explanation passage editing; changes are dirty, reset confirmation and are written through `buildSaveBody`. Verification remains conflict-aware (`verification_state_token` and 409 handling) but the accepted/rejected decision UI is **not** yet rebuilt; this is disclosed below. |
+| R5 focus and evidence | Undo/redo now return before `preventDefault` unless the workspace owns the shortcut, and Escape handlers require workspace focus. The route test confirms an outside Ctrl+Z is neither applied nor consumed, then works after re-entry. |
+
+### Verification (correction)
+
+| Check | Result |
+| --- | --- |
+| Normal-route E2E | 0 failures: computed styling, settings panel, app-navigation guard, saved-only entry, focus ownership, save/reopen (70→73), guitar regression, 1,338-note performance, emulated touch |
+| Phase 6 correction checks | 6/6 |
+| Original eight probes | 8/8 |
+| Editing browser script | pass |
+| Web suite | 471 passed, `tsc` clean |
+
+### Still outstanding
+
+- **R6 physical touch qualification is BLOCKED.** No hardware is available in this environment; the touch pass remains Chromium emulation. Per the review, this gate cannot be marked met without a recorded device/OS/browser run.
+- The library-driven **new private revision** journey (edit from the library, revision POST with `base_revision_id`) is wired but not driven end-to-end; only the review and saved-reference paths are covered.
+- **Verification decisions** (accepted/rejected suggestions, concurrent decisions) are preserved server-side as a token with conflict handling, but no decision UI is rendered in the workspace. Explanation/playing passages have an editor; verification findings do not.
+- Performance numbers remain a controlled dev-server run with mocked requests and no playable video.

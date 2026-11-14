@@ -64,6 +64,8 @@ class World:
             return self.json(route, {**self.draft, 'draft_id': 'draft-1', 'status': 'draft',
                                      'reference': {**self.draft['reference'], 'sha256': 'b' * 64}})
         if path == f'/lessons/{LESSON}':
+            if '1,2' not in (request.headers.get('x-lesson-formats') or ''):
+                return self.json(route, {'detail': 'unsupported format'}, status=406)
             if not self.manifest:
                 return self.json(route, {}, status=404)
             return self.json(route, self.manifest)
@@ -77,6 +79,26 @@ class World:
     @staticmethod
     def json(route, body, status=200):
         return route.fulfill(status=status, content_type='application/json', body=json.dumps(body))
+
+
+def select_note(page, locator, pointer=91):
+    box = locator.bounding_box()
+    x = box['x'] + 4
+    y = box['y'] + box['height'] / 2
+    locator.dispatch_event('pointerdown', {'pointerId': pointer, 'pointerType': 'mouse',
+                                           'button': 0, 'clientX': x, 'clientY': y})
+    locator.dispatch_event('pointerup', {'pointerId': pointer, 'pointerType': 'mouse'})
+
+
+def drag_note(page, locator, dy, pointer=92):
+    box = locator.bounding_box()
+    x = box['x'] + 4
+    y = box['y'] + box['height'] / 2
+    locator.dispatch_event('pointerdown', {'pointerId': pointer, 'pointerType': 'mouse',
+                                           'button': 0, 'clientX': x, 'clientY': y})
+    locator.dispatch_event('pointermove', {'pointerId': pointer, 'pointerType': 'mouse',
+                                           'clientX': x, 'clientY': y + dy})
+    locator.dispatch_event('pointerup', {'pointerId': pointer, 'pointerType': 'mouse'})
 
 
 def open_route(page):
@@ -95,16 +117,52 @@ def normal_route(context, world):
     expect(page.locator('section[aria-label="Review music reference"]').count() == 0,
            'the legacy piano form list is still rendered')
     expect(page.locator('.ws-side').count() == 1, 'the shared workspace inspector is missing')
+    styles = page.evaluate("""() => {
+      const grid = document.querySelector('.ws-grid');
+      const note = document.querySelector('.ws-roll-note');
+      const sheet = document.querySelector('.ws-score-notehead');
+      return {grid: grid && getComputedStyle(grid).display,
+              fill: note && getComputedStyle(note).fill,
+              sheetFill: sheet && getComputedStyle(sheet).fill,
+              settings: Boolean(document.querySelector('[data-lesson-settings]'))};
+    }""")
+    expect(styles['grid'] == 'grid', f"workspace grid styling missing: {styles['grid']}")
+    expect(styles['fill'] not in ('rgb(0, 0, 0)', '#000000'), f"roll note fill is black: {styles['fill']}")
+    expect(styles['sheetFill'] not in ('rgb(0, 0, 0)', '#000000'), f"sheet notehead fill is black: {styles['sheetFill']}")
+    expect(styles['settings'], 'teaching sections/assessment/passages settings are missing')
+    RESULT['workspace_styles'] = styles
     RESULT['route_integration'] = {'workspace': True, 'legacy_form_absent': True}
 
+    # Application chrome navigation must honour the workspace dirty state.
+    select_note(page, page.locator('.ws-roll-note').first)
+    page.get_by_role('button', name='+ semitone').click()
+    page.wait_for_timeout(150)
+    chrome_dialogs = []
+    page.once('dialog', lambda dialog: (chrome_dialogs.append(dialog.message), dialog.dismiss()))
+    page.get_by_role('link', name='Form home').click()
+    page.wait_for_timeout(300)
+    expect(chrome_dialogs and 'Leave without saving' in chrome_dialogs[0],
+           'app navigation ignored the unsaved workspace changes')
+    expect(page.locator('.ws-shell').count() == 1, 'app navigation left the dirty workspace')
+    RESULT['app_navigation_guard'] = chrome_dialogs[0] if chrome_dialogs else None
+    page.keyboard.press('Control+z')
+    page.wait_for_timeout(120)
+    RESULT['app_dirty'] = True
+
     # Focus ownership: shortcuts must not act while focus is outside the workspace.
-    page.locator('.ws-roll-note').first.click()
+    select_note(page, page.locator('.ws-roll-note').first)
     before = pitch_of(page)
-    page.locator('.ws-roll-note').first.dispatch_event('pointerdown', {'clientX': 100, 'clientY': 100, 'pointerId': 3, 'button': 0})
-    page.locator('.ws-roll-note').first.dispatch_event('pointerup', {'pointerId': 3})
+    select_note(page, page.locator('.ws-roll-note').first, pointer=93)
     page.get_by_role('button', name='+ semitone').click()
     raised = pitch_of(page)
     page.evaluate("() => { document.body.tabIndex = -1; document.body.focus(); }")
+    outside_prevented = page.evaluate("""() => {
+      document.body.tabIndex = -1; document.body.focus();
+      const event = new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true, cancelable: true});
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    }""")
+    expect(outside_prevented is False, 'the workspace consumed Ctrl+Z owned by app chrome')
     page.keyboard.press('Control+z')
     page.wait_for_timeout(150)
     after_outside = pitch_of(page)
@@ -120,7 +178,7 @@ def normal_route(context, world):
     # Correct, confirm, save and reopen through the normal route.
     target = page.locator('.ws-roll-note').first
     before = pitch_of(page)
-    drag(page, target, 0, -20)
+    drag_note(page, target, -20)
     page.wait_for_timeout(200)
     corrected = pitch_of(page)
     expect(corrected != before, 'the normal-route correction did not change the pitch')
@@ -164,8 +222,24 @@ def normal_route(context, world):
     RESULT['route_save_reopen'] = {'before': before, 'corrected': corrected, 'reopened': pitch_of(page)}
     page.screenshot(path=str(OUT / 'normal-route-saved.png'))
 
+    # Saved-only entry: no proposal at all, only the reviewed reference.
+    saved_only_world = World(LONG)
+    saved_only_world.draft_available = False
+    saved_only_world.manifest = world.manifest
+    saved_only_world.reference = world.reference
+    saved_only_world.reference_text = world.reference_text
+    saved_context = page.context.browser.new_context(viewport={'width': 1440, 'height': 1000})
+    saved_context.route('**/api/**', saved_only_world.route)
+    saved_page = saved_context.new_page()
+    saved_page.goto(f'{BASE}/?page=music-review&id={LESSON}', wait_until='domcontentloaded')
+    saved_page.wait_for_selector('text=Opened saved revision rev-norm', timeout=30000)
+    saved_page.wait_for_selector('.ws-roll-note', timeout=30000)
+    expect(saved_page.locator('.ws-shell').count() == 1, 'saved-only entry did not open the workspace')
+    RESULT['saved_only_entry'] = True
+    saved_context.close()
+
     # Unsaved-navigation guard: Back asks before discarding.
-    page.locator('.ws-roll-note').first.click()
+    select_note(page, page.locator('.ws-roll-note').first)
     page.get_by_role('button', name='+ semitone').click()
     dialogs = []
     page.once('dialog', lambda dialog: (dialogs.append(dialog.message), dialog.dismiss()))

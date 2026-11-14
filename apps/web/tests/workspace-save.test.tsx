@@ -188,7 +188,7 @@ test('a matching local checkpoint is offered as local work, and restored without
   await waitFor(() => assert.ok(view.queryByText(/not saved to the server/i), 'no local checkpoint offer'));
   fireEvent.click(view.getByRole('button', {name: 'Restore local checkpoint'}));
   await waitFor(() => assert.ok(view.queryByText(/it is not saved to the server/i), 'no honest restore status'));
-  assert.equal((view.getByLabelText('Sync offset in seconds (not saved)') as HTMLInputElement).value, '0.5');
+  assert.equal((view.getByLabelText('Sync offset in seconds') as HTMLInputElement).value, '0.5');
   assert.match(view.getByText(/Score alignment anchored/i).textContent ?? '', /anchored/i);
   assert.equal(view.queryByText(/Saved privately/i), null, 'a local checkpoint must never claim Saved');
 });
@@ -212,7 +212,7 @@ test('R2: an offset-only change is dirty, requires confirmation and is saveable'
   const view = await open();
   const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
   assert.equal(save().disabled, true);
-  fireEvent.change(view.getByLabelText('Sync offset in seconds (not saved)'), {target: {value: '0.5'}});
+  fireEvent.change(view.getByLabelText('Sync offset in seconds'), {target: {value: '0.5'}});
   const confirm = () => view.getByLabelText('Confirm reviewed') as HTMLInputElement;
   fireEvent.click(confirm());
   await waitFor(() => assert.equal(save().disabled, false, 'an offset-only edit must be saveable'));
@@ -277,7 +277,7 @@ test('workspace reopen restores the stored map, anchors and offset (component)',
   await waitFor(() => assert.ok(
     view.container.querySelector('.ws-score-notehead[aria-label*="B#3"]'),
     'the authored spelling was regenerated instead of restored'));
-  const offset = view.getByLabelText('Sync offset in seconds (not saved)') as HTMLInputElement;
+  const offset = view.getByLabelText('Sync offset in seconds') as HTMLInputElement;
   assert.equal(offset.value, '0.25', 'the saved offset was not restored');
   assert.match(view.getByText(/Score alignment anchored/i).textContent ?? '', /anchored/i);
   assert.equal(save().disabled, true, 'a reopened revision is clean');
@@ -330,7 +330,7 @@ test('R5: opening a saved lesson uses its stored reference, not a regenerated dr
   await waitFor(() => assert.ok(view.queryByText(/Opened saved revision rev-late/i), 'no saved-reference open status'));
   await waitFor(() => assert.ok(view.container.querySelector('.ws-score-notehead[aria-label*="B#3"]'),
     'the stored spelling was not opened'));
-  assert.equal((view.getByLabelText('Sync offset in seconds (not saved)') as HTMLInputElement).value, '0.25');
+  assert.equal((view.getByLabelText('Sync offset in seconds') as HTMLInputElement).value, '0.25');
   assert.match(view.getByText(/Score alignment anchored/i).textContent ?? '', /anchored/i);
   assert.equal((view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement).disabled, true,
     'an opened saved revision is clean');

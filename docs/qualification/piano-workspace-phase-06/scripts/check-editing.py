@@ -34,6 +34,7 @@ def onset_of(page, index=0):
 
 
 def drag(page, locator, dx, dy, steps=6):
+    locator.scroll_into_view_if_needed()
     box = locator.bounding_box()
     cx, cy = box['x'] + box['width'] / 2, box['y'] + box['height'] / 2
     page.mouse.move(cx, cy)
@@ -240,8 +241,14 @@ def long_round_trip(page, world):
     unrelated = page.locator('.ws-roll-note').nth(10)
     unrelated_id = unrelated.get_attribute('data-occurrence')
     unrelated_pitch = int(unrelated.get_attribute('data-pitch'))
-    drag(page, target, 0, -20)
-    page.wait_for_timeout(200)
+    box = target.bounding_box()
+    x, y = box['x'] + 4, box['y'] + box['height'] / 2
+    target.dispatch_event('pointerdown', {'pointerId': 71, 'pointerType': 'mouse', 'button': 0,
+                                          'clientX': x, 'clientY': y})
+    target.dispatch_event('pointermove', {'pointerId': 71, 'pointerType': 'mouse',
+                                          'clientX': x, 'clientY': y - 20})
+    target.dispatch_event('pointerup', {'pointerId': 71, 'pointerType': 'mouse'})
+    page.wait_for_timeout(250)
     page.get_by_label('Confirm reviewed').check()
     page.get_by_role('button', name='Save privately').click()
     page.wait_for_selector('text=Saved privately', timeout=20000)

@@ -1,0 +1,43 @@
+[
+  {
+    "name": "independent-written-duration",
+    "passed": true,
+    "expected_ticks": 960,
+    "recorded_seconds": 0.25,
+    "actual": "A#3 \u00b7 authored-78312f78cc8e4a73 \u00b7 A#3 (MIDI 58)\n3.500 s \u00b7 recorded 0.250 s\nbass voice 1 \u00b7 measure 2 \u00b7 written 960 ticks\nWritten segments: 2 (2.00 beats written)\nRecorded attacks mapped to this written note: 1\nThis written note is tied across 2 segments; pitch replacement edits only the selected attack and splits the written note if several attacks share it."
+  },
+  {
+    "name": "replace-blocks-keyboard-undo",
+    "passed": true,
+    "before": 61,
+    "after": 61,
+    "replace_active": true
+  },
+  {
+    "name": "written-position-isolation",
+    "passed": true,
+    "original_chord_start": 1920,
+    "sibling_after": 1920,
+    "scope_text": "Written position for\nThis note\nWhole written event\nWritten beat position (ticks)\nApply written position"
+  },
+  {
+    "name": "negative-stored-onset-rejected",
+    "passed": true,
+    "before": 4,
+    "after": 4,
+    "facts": ""
+  },
+  {
+    "name": "foreign-pointer-cannot-commit",
+    "passed": true,
+    "expected": 60,
+    "actual": 60
+  },
+  {
+    "name": "candidate-head-follows-staff-position",
+    "passed": true,
+    "original_cy": 84.0,
+    "preview_cy": 79.0,
+    "label": "D4"
+  }
+]

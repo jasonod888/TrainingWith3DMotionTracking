@@ -52,7 +52,7 @@ test('R2 sheet drag follows actual staff line-space geometry',()=>{
   assert.equal(edits[0]?.pitch,64,'staff lines are 10 px apart, so C up one line must be E (two diatonic steps)');
 });
 test('R3 add placement subtracts the displayed sync offset',async()=>{
-  const v=await open();fireEvent.change(v.getByLabelText('Sync offset in seconds (not saved)'),{target:{value:'0.5'}});
+  const v=await open();fireEvent.change(v.getByLabelText('Sync offset in seconds'),{target:{value:'0.5'}});
   fireEvent.click(v.container.querySelector('[data-add="toggle"]')!);
   fireEvent.pointerDown(v.container.querySelector('.ws-roll-add-layer')!,{clientX:180,clientY:20});
   const ghost=v.container.querySelector('[data-ghost="true"]')!;

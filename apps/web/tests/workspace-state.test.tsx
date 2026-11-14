@@ -213,7 +213,7 @@ test('R6: partial undo still reports unsaved changes', () => {
 test('status text never claims a save', () => {
   assert.match(workspaceStatus(start()), /No changes/);
   const edited = workspaceReducer(start(), {type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 61}});
-  assert.match(workspaceStatus(edited), /not saved/i);
+  assert.match(workspaceStatus(edited), /Unsaved changes/i);
   assert.doesNotMatch(workspaceStatus(edited), /^Saved/);
 });
 
