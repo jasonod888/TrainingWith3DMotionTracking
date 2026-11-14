@@ -885,8 +885,11 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     invert: boolean): boolean => {
     if (invert) {
       // The accepted state must still be exactly present before a revert is safe;
-      // a later manual edit is preserved rather than overwritten.
+      // a later manual edit is preserved rather than overwritten. Without a full
+      // accepted-state baseline (e.g. an older checkpoint) a destructive inverse
+      // cannot be proven safe, so it is refused rather than guessed from performance.
       const baseline = acceptedBaselines.current[finding.id];
+      if (!baseline) return false;
       if (baseline) {
         for (const [id, expected] of Object.entries(baseline)) {
           const actual = authoredState(doc, id);

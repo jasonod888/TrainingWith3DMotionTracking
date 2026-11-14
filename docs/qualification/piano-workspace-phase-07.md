@@ -217,3 +217,26 @@ A destructive inverse runs only when every snapshotted field is still identical.
 
 - **Physical touch qualification remains BLOCKED** — no hardware.
 - Interactive/upper-bound performance profiling remains a separate evidence item.
+
+---
+
+## 11. Legacy-checkpoint reversal guard (W2)
+
+Destructive reversal now requires a complete validated accepted-state baseline. When an older checkpoint restores work without `acceptedBaselines`, the inverse cannot prove that authored notation is unchanged, so it is **refused** and the restored document is kept with an explicit reconciliation notice. It no longer falls back to performance-only comparisons, which could delete a manually re-written note.
+
+The refusal is limited to reversal application: the rejected decision is still recorded on the server, the local document, selection and history are untouched, and recovery remains editable and saveable.
+
+### Verification (W2)
+
+| Check | Result |
+| --- | --- |
+| Reviewer legacy-checkpoint reversal | **1/1** — 960-tick note retained after restore → Reject |
+| Reviewer written-reversal | 1/1 |
+| Reviewer recovery / transitions / verification / settings | 2/2, 2/2, 3/3, 2/2 |
+| Reviewer loaded clock | 4/4 |
+| Web suite / `tsc` | 471 / clean |
+
+### Outstanding
+
+- **Physical touch qualification remains BLOCKED** — no hardware.
+- Interactive/upper-bound performance profiling remains a separate evidence item.
