@@ -1,0 +1,53 @@
+# Piano correction workspace — Phase 7 submission
+
+Normal review workflow and device qualification.
+
+| | |
+| --- | --- |
+| Phase | 7 — Normal review workflow and device qualification |
+| Branch | `phase7/normal-route` |
+| Depends on | accepted Phase 6 `0dee2e0` |
+| Phase 8 | Not started |
+
+## 0. What changed
+
+| Area | Change |
+| --- | --- |
+| Initial review | `MusicDraftReview` renders the shared workspace for piano drafts (replacing the legacy piano form list) through `PianoWorkspaceHarness lessonId embedded`, with Back, dirty-navigation confirmation and a save callback. Guitar keeps its existing review. |
+| Reviewed revisions | `MusicLessonEditor` renders the same workspace for reviewed piano lessons (`embedded`, `onSaved`). The workspace coordinator loads the saved reference and saves a new private revision on that base. |
+| Keyboard focus ownership | Workspace shortcuts (Delete, Ctrl/Cmd+Z, redo) run only while focus or the last pointer is inside the workspace; focusing app chrome or any outside control disables them. The mode-specific Escape handlers stay scoped to their modes. |
+| Harness language | Visible “Developer harness · Phase 4 · writes nothing” was replaced with review language; the source clock is no longer labelled a fixture; fixture-only labels and titles remain only on the isolated demo harness (`?demo=`). |
+| Responsive / touch | Narrow layout stacks the grid, the inspector becomes a sticky bottom sheet (`data-inspector-sheet`, computed `sticky`, 44vh), the toolbar sticks, and the long score is contained in its own horizontal scroller (document overflow 0 at 390 px). Touch uses an explicit two-step rule: first tap selects, a drag on the already-selected note edits; the same rule applies to sheet noteheads. |
+| Accessibility | Visible focus rings, stronger report/hint contrast, and a reduced-motion media query. |
+| Performance | The 1,338-note lesson loads in ~133 ms DOMContentLoaded, ~135 ms load, renders 35 roll notes / 43 score noteheads in the current window (virtualised by span/measure), ~22 MB heap. No optimisation was required. |
+
+## 1. Acceptance-gate status
+
+| Criterion | Status |
+| --- | --- |
+| Enter from normal review route, correct, finalise, reopen | Verified with a controlled normal route on the real 1,338-note draft: pitch 69→72 saved, reopened reference shows 72; legacy form absent. |
+| Initial review and later private revision semantics | Initial review uses the existing `music-draft/review` contract with confirmation; the review route then shows the reviewed lesson. Revision creation is wired through `MusicLessonEditor` to the same workspace and `music-revision` path, but the library-driven revision journey was **not** exercised end-to-end in this submission (see limits). |
+| No duplicate state/video/transport | The workspace remains the single editing surface; guitar review is unchanged; no second video element is added by integration. |
+| Touch panning must not alter notes | Emulated Chromium touch at 390 px: first tap only selects; explicit second-gesture drag edits. Panning on the roll/score background scrolls (`touch-action: pan-x pan-y`). Not verified on hardware. |
+| No page horizontal overflow, stuck voices, header overlap | 0 px overflow at 390 px after score containment; header/toolbar are not fixed over content; audition voices are bounded by the existing 0.4 s release. |
+| Recovery, confirmation reset, save error, verification conflict usable | Existing Phase 5 flows retained; Back now asks before discarding unsaved work. |
+| Actual performance evidence | Measured above on the real 1,338-note draft. |
+| Physical touch device | **Not performed.** No physical device was available in this environment; the touch pass is Chromium emulation only. |
+
+## 2. Evidence
+
+- Route script: `scripts/check-normal-route.py`; results `phase7-route.json` (0 failures).
+- Captures: `captures/normal-route-saved.png`, `captures/touch-390.png`, `captures/normal-route-1338.png`.
+- Regression: Phase 6 reviewer correction script 6/6; original eight probes 8/8; editing browser script exit 0; web suite **471 passed**; `tsc` clean.
+- `scripts/workspace-phase6-review-repro.tsx` retained unchanged.
+
+## 3. Limits (explicit)
+
+- **Physical touch qualification is outstanding.** The GO requires a physical device; this submission only provides emulation on Chromium at 390×844 with `hasTouch`. A reviewer or device lab must run the tap/pan/edit checks on hardware before this criterion can be marked met.
+- The library-driven “create a new private revision” click path was not exercised end-to-end because the controlled route environment does not expose the studio/library action; the revision editor’s workspace mount and saved-reference load were verified via the reopen path. This should be demonstrated on the integrated environment.
+- Video playback integration is the Phase 4 controller already used by the harness; this phase does not add a second transport.
+- Compact settings for teaching sections/assessment/diagnostics were **not** moved into a settings flow; the workspace keeps its existing compact panels and the legacy review no longer renders the piano form list. This remains open scope if the reviewer requires it.
+
+## 4. Scope statement
+
+Phase 8 has not started. No deployment or release action was taken.

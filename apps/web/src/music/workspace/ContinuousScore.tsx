@@ -157,6 +157,7 @@ export function ContinuousScore({
     if (sheetDrag.current && sheetDrag.current.pointerId !== event.pointerId) return;
     const occurrence = occurrenceFor(note);
     if (!occurrence) { choose(note); return; }
+    if (event.pointerType === 'touch' && selectedOccurrenceId !== occurrence) { choose(note); return; }
     event.preventDefault();
     if (!editingEnabled) { choose(note); return; }
     const capture = event.currentTarget as Element;
@@ -269,8 +270,8 @@ export function ContinuousScore({
     if (note.performance_ids.length > 1) onAmbiguous?.(note.logical_note_id, note.performance_ids);
   };
 
-  return <div className="ws-score" ref={hostRef}>
-    <div className="ws-score-viewport" ref={scrollRef}>
+  return <div className="ws-score" ref={hostRef} style={{maxWidth: '100%', overflow: 'hidden', minWidth: 0}}>
+    <div className="ws-score-viewport" ref={scrollRef} style={{maxWidth: '100%', width: '100%', overflowX: 'auto', minWidth: 0}}>
       <svg className="ws-score-svg" width={canvasWidth} height={HEIGHT} role="img"
         aria-label={`Continuous grand staff, ${document.measures.length} measures, showing measures ${first + 1}-${Math.max(first + 1, last + 1)}`}
         data-rendered-measures={last >= first ? last - first + 1 : 0} data-total-measures={document.measures.length}

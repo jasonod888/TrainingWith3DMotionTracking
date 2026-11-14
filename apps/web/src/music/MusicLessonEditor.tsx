@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import {PianoWorkspaceHarness} from './workspace/PianoWorkspaceHarness';
 import {ArrowLeft, Plus, Trash2} from 'lucide-react';
 import type {MusicLessonManifest, Section} from '../../../../packages/lesson-schema/index';
 import {parseMusicLessonManifest} from '../../../../packages/lesson-schema/parse';
@@ -78,6 +79,17 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
     return () => { stopped = true; };
   }, [lessonId]);
 
+  const refreshReviewed = async () => {
+    try {
+      const value = await request<unknown>(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false,
+        {'X-Lesson-Formats': '1,2'});
+      const parsed = parseMusicLessonManifest(value);
+      if (parsed.ok) onSaved(parsed.value);
+    } catch {
+      // The workspace reported the save; the caller can refresh on its next visit.
+    }
+  };
+
   const update = (index: number, patch: Partial<EditNote>) => {
     changed();
     setNotes(previous => previous.map((note, position) => position === index ? {...note, ...patch} : note));
@@ -135,6 +147,10 @@ export function MusicLessonEditor({lessonId, onBack, onSaved}: {
     return null;
   })();
 
+  if (manifest?.subject === 'piano' && notation) {
+    return <PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack}
+      onSaved={() => { void refreshReviewed(); }}/>;
+  }
   return <section className="music-home music-review" aria-label="Edit reviewed music lesson">
     <button className="back-link" disabled={busy} onClick={onBack}><ArrowLeft size={16}/>Back</button>
     <h1>Edit this music lesson</h1>

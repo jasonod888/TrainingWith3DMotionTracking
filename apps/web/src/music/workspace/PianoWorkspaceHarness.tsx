@@ -94,9 +94,15 @@ function NumberField({label, value, min, max, step, disabled, onCommit}: {
   </label>;
 }
 
-export function PianoWorkspaceHarness() {
+export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false, onBack, onSaved}: {
+  lessonId?: string;
+  /** Normal review route: hide harness-only labels and demo affordances. */
+  embedded?: boolean;
+  onBack?: () => void;
+  onSaved?: (revisionId: string) => void;
+} = {}) {
   const params = new URLSearchParams(location.search);
-  const lessonId = params.get('id') ?? '';
+  const lessonId = lessonIdProp ?? params.get('id') ?? '';
 
   const [state, setState] = useState<WorkspaceState | null>(null);
   const [baseline, setBaseline] = useState<NotationDocument | null>(null);
@@ -176,6 +182,14 @@ export function PianoWorkspaceHarness() {
   const selectionOccurrenceRef = useRef<string | null>(null);
   const lastRecordedSeconds = useRef(0.5);
   const [recoveryNotice, setRecoveryNotice] = useState('');
+  const [narrowViewport, setNarrowViewport] = useState(() =>
+    globalThis.window.matchMedia('(max-width: 760px)').matches);
+  useEffect(() => {
+    const media = globalThis.window.matchMedia('(max-width: 760px)');
+    const update = () => setNarrowViewport(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   const dispatch = useCallback((action: WorkspaceAction) => {
     setState(previous => (previous ? workspaceReducer(previous, action) : previous));
@@ -435,13 +449,18 @@ export function PianoWorkspaceHarness() {
   const selection = state?.selection ?? null;
   const selected = selection && document ? noteFacts(document, selection) : null;
   useEffect(() => {
-    const onDown = (event: Event) => {
+    const inside = (target: EventTarget | null) => {
       const root = shellRef.current;
-      const target = event.target as Node | null;
-      if (root && target && root.contains(target)) workspaceActive.current = true;
+      return Boolean(root && target instanceof Object && root.contains(target as Node));
     };
+    const onDown = (event: Event) => { workspaceActive.current = inside(event.target); };
+    const onFocus = (event: Event) => { workspaceActive.current = inside(event.target); };
     globalThis.window.addEventListener('pointerdown', onDown, true);
-    return () => globalThis.window.removeEventListener('pointerdown', onDown, true);
+    globalThis.document.addEventListener('focusin', onFocus, true);
+    return () => {
+      globalThis.window.removeEventListener('pointerdown', onDown, true);
+      globalThis.document.removeEventListener('focusin', onFocus, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -835,6 +854,7 @@ export function PianoWorkspaceHarness() {
         'POST', body);
       setSavedRevisionId(manifest.revision_id);
       setSavedSignature(snapshot);
+      onSaved?.(manifest.revision_id);
       setSaveConflict(false);
       if (snapshot === workspaceSignatureRef.current) {
         // The acknowledged snapshot is still the current work.
@@ -869,7 +889,7 @@ export function PianoWorkspaceHarness() {
       setSaving(false);
     }
   }, [document, lessonId, confirmReviewed, saving, title, spans, alignment, anchors, offsetSeconds,
-      savedRevisionId, workspaceSignature, draftId, sourceSha256, verificationToken, savedSections, savedAssessment]);
+      savedRevisionId, workspaceSignature, draftId, sourceSha256, verificationToken, savedSections, savedAssessment, onSaved]);
 
   const saveOnLatestRevision = useCallback(async () => {
     if (!lessonId) return;
@@ -1029,11 +1049,19 @@ export function PianoWorkspaceHarness() {
   const summary = historySummary(state);
 
   return <main className="ws-shell" ref={shellRef}
+    style={{overflowX: 'clip', maxWidth: '100vw', contain: 'paint'}}
     onPointerDownCapture={() => { workspaceActive.current = true; }}>
     <header className="ws-head">
       <div>
-        <p className="ws-eyebrow">Developer harness · Phase 4 · writes nothing</p>
-        <h1>{title || 'Piano correction workspace'}</h1>
+        <p className="ws-eyebrow">{embedded ? 'Piano review · private until you save' : 'Correction workspace · local preview'}</p>
+        <div className="ws-title-row">
+          {onBack && <button type="button" className="ws-back" data-workspace-back="true"
+            onClick={() => {
+              if (dirty && !globalThis.window.confirm('Leave without saving your changes?')) return;
+              onBack();
+            }}>← Back</button>}
+          <h1>{title || 'Piano correction workspace'}</h1>
+        </div>
         <p className="ws-sub">
           {document.performance.length} notes · {document.events.length} events · {document.measures.length} measures ·{' '}
           {document.tempo.bpm} BPM (estimated). Select one note in the roll, the score or the keyboard.
@@ -1090,9 +1118,9 @@ export function PianoWorkspaceHarness() {
       </div>
       <span className="ws-time">{playhead.toFixed(2)} s / {document.duration.toFixed(2)} s</span>
       <label className="ws-field ws-inline">
-        <span>Fixture clock</span>
+        <span>{spans.length ? 'Source clock' : 'Position'}</span>
         <input type="range" min={0} max={document.duration} step={0.01} value={playhead}
-          aria-label="Fixture clock"
+          aria-label={embedded ? 'Source clock position' : 'Fixture clock'}
           onChange={event => {
             const value = Number(event.target.value);
             if (videoUrl && videoRef.current) { seek(value); return; }
@@ -1211,7 +1239,9 @@ export function PianoWorkspaceHarness() {
         </section>
       </div>
 
-      <aside className="ws-side">
+      <aside className="ws-side" data-inspector-sheet={narrowViewport ? 'true' : 'false'}
+        style={narrowViewport ? {position: 'sticky', bottom: 0, maxHeight: '44vh', overflow: 'auto', zIndex: 6,
+          background: '#fff', borderTop: '1px solid #d5dbe3'} : undefined}>
         <section className="ws-panel" aria-label="Reference video">
           {videoUrl
             ? <video ref={videoRef} src={videoUrl} controls playsInline preload="metadata" className="ws-video"/>

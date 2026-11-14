@@ -1,0 +1,7 @@
+﻿# Phase 7 regression summary
+# web suite: 471 passed
+# tsc: clean
+# reviewer correction checks: 6/6
+# original probes: 8/8
+# editing browser script: pass
+# normal-route script: pass (touch is emulation only)

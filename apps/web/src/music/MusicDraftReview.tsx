@@ -1,4 +1,5 @@
 ﻿import {useEffect,useMemo,useRef,useState} from 'react';
+import {PianoWorkspaceHarness} from './workspace/PianoWorkspaceHarness';
 import type {MusicDraftEvent,MusicDraftGuitarChord,MusicDraftView,MusicLessonManifest,Section} from '../../../../packages/lesson-schema/index';
 import {parseMusicDraftView,parseMusicLessonManifest} from '../../../../packages/lesson-schema/parse';
 import {assetUrl,request} from '../api';
@@ -126,6 +127,15 @@ export function MusicDraftReview({lessonId,onBack,onCompare,onReviewed,onDirty}:
  const changed=()=>{localDirty.current=true;setConfirmed(false);onDirty(true);};
  const edit=(index:number,patch:Partial<MusicDraftEvent>)=>{changed();setEvents(previous=>previous.map((event,i)=>i===index?{...event,...patch}:event));};
  const remove=(index:number)=>{changed();setEvents(previous=>previous.filter((_,i)=>i!==index));};
+  const refreshReviewedLesson = async () => {
+    try {
+      const value = await request<unknown>(`/lessons/${lessonId}`);
+      const parsed = parseMusicLessonManifest(value);
+      if (parsed.ok) onReviewed(parsed.value);
+    } catch {
+      // The workspace reported the save; the route can refresh on its next visit.
+    }
+  };
  const save=async()=>{if(!draft||!confirmed||busy||verificationBusy||verificationLoading||savingOffset)return;setBusy(true);setError('');
   try{const result=await request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft/review`,'POST',{
    draft_id:draft.draft_id,reference_sha256:draft.reference.sha256,title,events,spans:draft.spans,guitar_chords:chords,sections,confirm_reviewed:true,
@@ -209,6 +219,13 @@ export function MusicDraftReview({lessonId,onBack,onCompare,onReviewed,onDirty}:
   finally{if(alive.current)setRollingBack(false);}
  };
  const locked=busy||verificationBusy||verificationLoading||rollingBack||savingOffset;
+  const pianoWorkspace = Boolean(draft && draft.subject === 'piano');
+  if (pianoWorkspace) {
+    // The shared workspace replaces the legacy piano form list. Its Phase 5 save path
+    // performs the same review contract and required confirmation.
+    return <PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack}
+      onSaved={() => { onDirty(false); void refreshReviewedLesson(); }}/>;
+  }
  return <section className="music-home music-review" aria-label="Review music reference">
   <div className="review-toolbar">
    <button className="back-link" disabled={locked} onClick={onBack}>Back to lessons</button>

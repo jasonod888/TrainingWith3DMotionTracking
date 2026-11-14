@@ -1,0 +1,33 @@
+{
+  "route_integration": {
+    "workspace": true,
+    "legacy_form_absent": true
+  },
+  "focus_ownership": {
+    "raised": 70,
+    "after_outside_undo": 70,
+    "after_inside_undo": 69
+  },
+  "route_save_reopen": {
+    "before": 69,
+    "corrected": 72,
+    "reopened": 72
+  },
+  "unsaved_guard": "Leave without saving your changes?",
+  "guitar_regression": true,
+  "performance_1338": {
+    "dom": 132,
+    "load": 133,
+    "notes": 35,
+    "score": 43,
+    "heap": 22,
+    "data_notes": 1338
+  },
+  "touch_emulation": {
+    "tap_selected_only": true,
+    "edited": 72,
+    "overflow": 0,
+    "inspector_position": "sticky"
+  },
+  "failures": []
+}

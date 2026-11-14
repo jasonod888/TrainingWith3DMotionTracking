@@ -175,6 +175,9 @@ export function TimeRoll({
     if (addMode) { onGhostPlace?.(note.onset + effectiveOffset, note.pitch); return; }
     if (event.button !== 0) return;
     if (dragRef.current && dragRef.current.pointerId !== event.pointerId) return;
+    // On touch, the first contact selects; a drag starts only on the selected note,
+    // so a pan or an exploratory tap cannot alter a note.
+    if (event.pointerType === 'touch' && selectedOccurrenceId !== note.id) { onSelect(note.id); return; }
     if (!editingEnabled) { onSelect(note.id); return; }
     event.preventDefault();
     teardownDrag();
