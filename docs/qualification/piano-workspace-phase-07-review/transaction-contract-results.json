@@ -1,0 +1,58 @@
+[
+  {
+    "id": "S5-O4",
+    "name": "delete-inverse-preserves-nullable-performance-and-metadata",
+    "passed": true,
+    "original": {
+      "id": "a",
+      "onset": 2,
+      "duration": null,
+      "notation_duration": 0.3,
+      "pitch": 60,
+      "velocity": null,
+      "confidence": 0.8,
+      "optional": true,
+      "string": null,
+      "fret": null
+    },
+    "restored": {
+      "id": "a",
+      "onset": 2,
+      "duration": null,
+      "notation_duration": 0.3,
+      "pitch": 60,
+      "velocity": null,
+      "confidence": 0.8,
+      "optional": true,
+      "string": null,
+      "fret": null
+    },
+    "differences": []
+  },
+  {
+    "id": "S2-O4",
+    "name": "delete-before-snapshot-detects-later-velocity-edit",
+    "passed": true,
+    "actual_status": "rejected",
+    "original_velocity": null,
+    "manual_velocity": 0.9
+  },
+  {
+    "id": "R4",
+    "name": "invalid-spelling",
+    "passed": true,
+    "validator_accepted": false
+  },
+  {
+    "id": "R4",
+    "name": "off-grid-ticks",
+    "passed": true,
+    "validator_accepted": false
+  },
+  {
+    "id": "R4",
+    "name": "non-finite-duration",
+    "passed": true,
+    "validator_accepted": false
+  }
+]

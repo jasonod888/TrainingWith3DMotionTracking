@@ -139,12 +139,16 @@ test('O6 split_note restores the original and removes the pieces', () => {
   assert.ok(!restored.performance.some(note => note.id.startsWith('vf-split-1-')));
 });
 
-test('O7 unsupported/compound failure leaves the document untouched', () => {
+test('O7 compound failure after a valid first edit leaves the document untouched', () => {
   const base = doc();
-  const f = finding('bad-1', [{op: 'set_pitch', event_ids: ['a'], before: {pitch: 60}, after: {pitch: 200}}]);
+  const f = finding('bad-1', [
+    {op: 'set_pitch', event_ids: ['a'], before: {pitch: 60}, after: {pitch: 62}},
+    {op: 'set_pitch', event_ids: ['b'], before: {pitch: 64}, after: {pitch: 200}},
+  ]);
   const prepared = prepareFinding(base, f, null);
   assert.equal(prepared.status, 'rejected');
   assert.equal(base.performance[0].pitch, 60);
+  assert.equal(base.performance[1].pitch, 64);
 });
 
 test('O8 repeated accept is idempotent and a second rejection refuses', () => {
@@ -159,6 +163,9 @@ test('O8 repeated accept is idempotent and a second rejection refuses', () => {
     return outcome.status === 'applied' ? outcome.document : current;
   }, applied.document);
   assert.equal(restored.performance[0].pitch, 60);
+  // A second inverse no longer matches the accepted state and must refuse.
+  const again = invertFinding(restored, f, null, applied.baseline);
+  assert.ok('reason' in again);
 });
 
 test('S2/S3 later performance or written edits block reversal', () => {
@@ -203,4 +210,85 @@ test('R4 malformed entry values are refused', () => {
   const badSpelling = {...applied.baseline, entries: {...applied.baseline.entries,
     a: {...applied.baseline.entries.a, spelling: ''}}};
   assert.equal(validateBaseline(f, badSpelling).ok, false);
+});
+
+test('R3 a multi-target baseline missing one required entry is refused', () => {
+  const base = doc();
+  const f = finding('multi-1', [
+    {op: 'set_pitch', event_ids: ['a'], before: {pitch: 60}, after: {pitch: 62}},
+    {op: 'set_pitch', event_ids: ['b'], before: {pitch: 64}, after: {pitch: 66}},
+  ]);
+  const applied = accepted(base, f);
+  const partial = {...applied.baseline, entries: {a: applied.baseline.entries.a}};
+  assert.equal(validateBaseline(f, partial).ok, false);
+});
+
+test('R4 semantic malformed baselines are refused', () => {
+  const base = doc();
+  const f = finding('sem-1', [{op: 'set_pitch', event_ids: ['a'], before: {pitch: 60}, after: {pitch: 62}}]);
+  const applied = accepted(base, f);
+  const entry = applied.baseline.entries.a;
+  const cases: Array<Record<string, unknown>> = [
+    {spelling: 'not-a-note'},
+    {spelling: 'C4'}, // spelling disagrees with the accepted pitch 62
+    {eventStart: 1, eventDuration: 1},
+    {duration: Infinity},
+    {duration: -1},
+    {onset: Number.NaN},
+    {staff: 'alto'},
+    {voice: 3},
+    {velocity: 2},
+    {notationDuration: 0},
+    {confidence: -0.1},
+    {string: 9},
+    {fret: 30},
+    {optional: 'yes'},
+    {present: false},
+  ];
+  for (const patch of cases) {
+    const bad = {...applied.baseline, entries: {...applied.baseline.entries,
+      a: {...entry, ...patch}}};
+    assert.equal(validateBaseline(f, bad).ok, false, JSON.stringify(patch));
+  }
+});
+
+test('S5 unknown and zero values round-trip exactly for a structural delete', () => {
+  const base = buildNotation([
+    {id: 'noise', onset: 2, duration: null, pitch: 60, velocity: 0, confidence: 0.8,
+      optional: true, string: null, fret: null, notation_duration: 0.3},
+    event('other', 4, 64),
+  ], {bpm: 120, duration: 12});
+  const original = base.performance.find(note => note.id === 'noise')!;
+  const f = finding('null-1', [{op: 'delete_note', event_ids: ['noise'], before: {...original}, after: null}]);
+  const applied = accepted(base, f);
+  const inverse = invertFinding(applied.document, f, null, applied.baseline);
+  assert.ok('commands' in inverse);
+  const restored = inverse.commands.reduce<NotationDocument>((current, command) => {
+    const outcome = applyCommand(current, command);
+    return outcome.status === 'applied' ? outcome.document : current;
+  }, applied.document);
+  const after = restored.performance.find(note => note.id === 'noise')!;
+  assert.deepEqual(after, original);
+});
+test('A2 a related edit before acceptance invalidates the prepared transaction', () => {
+  const base = doc();
+  const f = finding('a2-1', [{op: 'set_pitch', event_ids: ['a'], before: {pitch: 60}, after: {pitch: 62}}]);
+  const changed = applyCommand(base, {type: 'set-occurrence-pitch', occurrenceId: 'a', pitch: 63});
+  assert.equal(changed.status, 'applied');
+  const prepared = prepareFinding(changed.status === 'applied' ? changed.document : base, f, null);
+  assert.equal(prepared.status, 'rejected');
+});
+
+test('A3 an unrelated edit before acceptance does not block the transaction', () => {
+  const base = doc();
+  const f = finding('a3-1', [{op: 'set_pitch', event_ids: ['a'], before: {pitch: 60}, after: {pitch: 62}}]);
+  const changed = applyCommand(base, {type: 'set-occurrence-pitch', occurrenceId: 'c', pitch: 69});
+  assert.equal(changed.status, 'applied');
+  const next = changed.status === 'applied' ? changed.document : base;
+  const prepared = prepareFinding(next, f, null);
+  assert.equal(prepared.status, 'applied');
+  if (prepared.status === 'applied') {
+    assert.equal(prepared.document.performance.find(note => note.id === 'c')?.pitch, 69);
+    assert.equal(prepared.document.performance.find(note => note.id === 'a')?.pitch, 62);
+  }
 });

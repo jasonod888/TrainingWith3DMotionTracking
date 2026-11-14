@@ -55,7 +55,7 @@ export type WorkspaceState = {
 export type WorkspaceAction =
   | { type: 'select'; occurrenceId: string | null }
   | { type: 'command'; command: CorrectionCommand }
-  | { type: 'commands'; commands: CorrectionCommand[]; label?: string }
+  | { type: 'commands'; commands: CorrectionCommand[]; label?: string; candidate?: NotationDocument }
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'reset'; document: NotationDocument };
@@ -136,9 +136,9 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     }
 
     case 'commands': {
-      let candidate = state.document;
+      let candidate = action.candidate ?? state.document;
       let selection = state.selection;
-      for (const command of action.commands) {
+      for (const command of action.candidate ? [] : action.commands) {
         const outcome = applyCommand(candidate, command);
         if (outcome.status === 'rejected') {
           return {...state, lastReport: {status: 'rejected', label: 'Not applied',

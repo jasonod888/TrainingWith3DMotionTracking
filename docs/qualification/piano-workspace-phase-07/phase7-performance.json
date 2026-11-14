@@ -2,81 +2,91 @@
   "scope": "controlled dev server, mocked API, local video fixture",
   "runs": 5,
   "real_1338": {
-    "domMs": 136,
-    "loadMs": 137,
+    "domMs": 137,
+    "loadMs": 140,
     "notes": 35,
     "heapMb": 29,
     "recoveryBytes": 0,
     "pointer": {
       "preview": {
-        "median": 20.8,
-        "p95": 183.9
+        "median": 14,
+        "p95": 177.9
       },
       "commit": {
-        "median": 133.5,
-        "p95": 235.1
+        "median": 115.5,
+        "p95": 217.7
       }
     },
     "pointer_samples": [
       {
-        "preview": 183.8999999910593,
-        "commit": 235.1000000089407
+        "preview": 177.8999999910593,
+        "commit": 217.70000000298023
       },
       {
-        "preview": 48.79999999701977,
-        "commit": 152.40000000596046
+        "preview": 49.8999999910593,
+        "commit": 153
       },
       {
-        "preview": 20.80000001192093,
-        "commit": 133.5
+        "preview": 14,
+        "commit": 115.5
       },
       {
-        "preview": 10.799999997019768,
-        "commit": 118.5
+        "preview": 11.900000005960464,
+        "commit": 113.09999999403954
       },
       {
-        "preview": 7.4000000059604645,
-        "commit": 115.69999998807907
+        "preview": 10.300000011920929,
+        "commit": 107.79999999701977
       }
+    ],
+    "gesture_applied": true,
+    "undo_enabled": true,
+    "history_label": [
+      "Pitch \u2192 D5"
     ]
   },
   "limit_20000": {
-    "domMs": 132,
-    "loadMs": 133,
+    "domMs": 124,
+    "loadMs": 126,
     "notes": 1565,
-    "heapMb": 46,
+    "heapMb": 64,
     "recoveryBytes": 0,
     "pointer": {
       "preview": {
-        "median": 140.7,
-        "p95": 161.5
+        "median": 143,
+        "p95": 203.4
       },
       "commit": {
-        "median": 2900.5,
-        "p95": 3040.6
+        "median": 2878.8,
+        "p95": 2986.7
       }
     },
     "pointer_samples": [
       {
-        "preview": 89.70000000298023,
-        "commit": 3040.5999999940395
+        "preview": 98.20000000298023,
+        "commit": 2986.699999988079
       },
       {
-        "preview": 38.099999994039536,
-        "commit": 2938.4000000059605
-      },
-      {
-        "preview": 140.70000000298023,
-        "commit": 2883.2999999970198
-      },
-      {
-        "preview": 161.5,
-        "commit": 2900.5
+        "preview": 40.70000000298023,
+        "commit": 2907.9000000059605
       },
       {
         "preview": 143,
-        "commit": 2855.1000000089407
+        "commit": 2795.7000000029802
+      },
+      {
+        "preview": 203.3999999910593,
+        "commit": 2878.7999999970198
+      },
+      {
+        "preview": 150.59999999403954,
+        "commit": 2840.300000011921
       }
+    ],
+    "gesture_applied": true,
+    "undo_enabled": true,
+    "history_label": [
+      "Pitch \u2192 F4"
     ]
   }
 }

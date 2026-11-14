@@ -564,11 +564,14 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   }, [selectionOccurrence, rollReveal?.occurrenceId, requestReveal]);
 
   const documentSignature = useMemo(() => (document ? JSON.stringify(document) : ''), [document]);
-  // Every persisted edit participates in dirty state and confirmation, not just notes.
-  const workspaceSignature = useMemo(() => (document ? JSON.stringify({
-    document, alignment: serializeAlignment(alignment, anchors, offsetSeconds),
+  // Only the small editable metadata is serialized here; the document is already
+  // canonicalised once in documentSignature, avoiding a second full serialization
+  // on every edit (a measured cost on long recordings).
+  const metaSignature = useMemo(() => JSON.stringify({
+    alignment: serializeAlignment(alignment, anchors, offsetSeconds),
     anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy,
-  }) : ''), [documentSignature, alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy]);
+  }), [alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy]);
+  const workspaceSignature = document ? `${documentSignature}#${metaSignature}` : '';
   workspaceSignatureRef.current = workspaceSignature;
   const dirty = savedSignature !== null
     ? workspaceSignature !== savedSignature
@@ -769,7 +772,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           return;
         }
         acceptedBaselines.current[finding.id] = prepared.baseline;
-        dispatch({type: 'commands', commands: prepared.commands, label: `Verification: ${finding.kind}`});
+        dispatch({type: 'commands', commands: prepared.commands, candidate: prepared.document,
+          label: `Verification: ${finding.kind}`});
         setConfirmReviewed(false);
       } else if (wasAccepted) {
         const result = invertFinding(latest, finding, alignment, acceptedBaselines.current[finding.id]);
@@ -777,7 +781,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           setNotice(`${result.reason} The local document was kept.`);
           return;
         }
-        dispatch({type: 'commands', commands: result.commands, label: 'Verification: reverted suggestion'});
+        dispatch({type: 'commands', commands: result.commands, candidate: result.document,
+          label: 'Verification: reverted suggestion'});
         setConfirmReviewed(false);
       }
     } catch (cause) {

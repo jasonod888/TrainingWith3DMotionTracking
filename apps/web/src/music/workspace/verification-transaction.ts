@@ -6,6 +6,7 @@
  */
 import {
   applyCommand,
+  parseSpelling,
   secondsToTick,
   type Alignment,
   type CorrectionCommand,
@@ -25,6 +26,11 @@ export type AuthoredOccurrence =
       voice: 1 | 2;
       eventStart: number;
       eventDuration: number;
+      notationDuration: number | null;
+      confidence: number | null;
+      optional: boolean;
+      string: number | null;
+      fret: number | null;
     }
   | {present: false; occurrenceId: string};
 
@@ -38,7 +44,7 @@ export type AcceptedBaseline = {
 };
 
 export type Prepared =
-  | {status: 'applied'; commands: CorrectionCommand[]; baseline: AcceptedBaseline}
+  | {status: 'applied'; commands: CorrectionCommand[]; baseline: AcceptedBaseline; document: NotationDocument}
   | {status: 'unchanged'; reason: string}
   | {status: 'rejected'; reason: string};
 
@@ -52,6 +58,9 @@ export function captureOccurrence(document: NotationDocument, id: string): Autho
     present: true, pitch: note.pitch, onset: note.onset, duration: note.duration,
     velocity: note.velocity, spelling: written.spelling, staff: event.staff, voice: event.voice,
     eventStart: event.start, eventDuration: event.duration,
+    notationDuration: note.notation_duration ?? null,
+    confidence: note.confidence, optional: note.optional,
+    string: note.string, fret: note.fret,
   };
 }
 
@@ -83,10 +92,12 @@ function insertCommand(id: string, state: AuthoredOccurrence, alignment: Alignme
   if (!state.present) return null;
   return {
     type: 'insert-note', id, pitch: state.pitch, onsetSeconds: state.onset,
-    durationSeconds: Math.max(0.02, state.duration ?? 0.25),
     startTicks: state.eventStart, durationTicks: state.eventDuration,
-    staff: state.staff, voice: state.voice, velocity: state.velocity ?? 0.7, addToChord: true,
+    staff: state.staff, voice: state.voice, velocity: state.velocity, addToChord: true,
     allowDuplicate: true,
+    durationSeconds: state.duration,
+    restore: {notation_duration: state.notationDuration, confidence: state.confidence,
+      optional: state.optional, string: state.string, fret: state.fret, velocity: state.velocity},
   };
 }
 
@@ -120,7 +131,12 @@ function matchesState(actual: AuthoredOccurrence, expected: AuthoredOccurrence):
     && actual.staff === expected.staff
     && actual.voice === expected.voice
     && actual.eventStart === expected.eventStart
-    && actual.eventDuration === expected.eventDuration;
+    && actual.eventDuration === expected.eventDuration
+    && actual.notationDuration === expected.notationDuration
+    && actual.confidence === expected.confidence
+    && actual.optional === expected.optional
+    && actual.string === expected.string
+    && actual.fret === expected.fret;
 }
 
 export function validateBaseline(finding: VerificationFinding, value: unknown): {ok: true; baseline: AcceptedBaseline}
@@ -141,15 +157,30 @@ export function validateBaseline(finding: VerificationFinding, value: unknown): 
   const presentEntry = (entry: unknown): entry is Extract<AuthoredOccurrence, {present: true}> => {
     if (!entry || typeof entry !== 'object') return false;
     const item = entry as Record<string, unknown>;
-    return typeof item.pitch === 'number' && Number.isInteger(item.pitch) && item.pitch >= 0 && item.pitch <= 127
-      && typeof item.onset === 'number' && Number.isFinite(item.onset) && item.onset >= 0
-      && (item.duration === null || (typeof item.duration === 'number' && item.duration > 0))
-      && (item.velocity === null || (typeof item.velocity === 'number' && item.velocity >= 0 && item.velocity <= 1))
-      && typeof item.spelling === 'string' && item.spelling.length > 0 && item.spelling.length <= 12
-      && (item.staff === 'treble' || item.staff === 'bass')
-      && (item.voice === 1 || item.voice === 2)
-      && typeof item.eventStart === 'number' && item.eventStart >= 0
-      && typeof item.eventDuration === 'number' && item.eventDuration > 0;
+    if (!(typeof item.pitch === 'number' && Number.isInteger(item.pitch) && item.pitch >= 0 && item.pitch <= 127)) return false;
+    if (!(typeof item.onset === 'number' && Number.isFinite(item.onset) && item.onset >= 0)) return false;
+    if (!(item.duration === null || (typeof item.duration === 'number' && Number.isFinite(item.duration) && item.duration > 0))) return false;
+    if (!(item.velocity === null || (typeof item.velocity === 'number' && Number.isFinite(item.velocity) && item.velocity >= 0 && item.velocity <= 1))) return false;
+    if (!(typeof item.spelling === 'string' && item.spelling.length > 0 && item.spelling.length <= 12)) return false;
+    let parsed: {pitch: number};
+    try { parsed = parseSpelling(item.spelling as string); } catch { return false; }
+    if (parsed.pitch !== item.pitch) return false;
+    if (item.staff !== 'treble' && item.staff !== 'bass') return false;
+    if (item.voice !== 1 && item.voice !== 2) return false;
+    if (!(typeof item.eventStart === 'number' && Number.isInteger(item.eventStart) && item.eventStart >= 0
+      && item.eventStart % 120 === 0)) return false;
+    if (!(typeof item.eventDuration === 'number' && Number.isInteger(item.eventDuration)
+      && item.eventDuration >= 120 && item.eventDuration % 120 === 0)) return false;
+    if (!(item.notationDuration === null || (typeof item.notationDuration === 'number'
+      && Number.isFinite(item.notationDuration) && item.notationDuration > 0))) return false;
+    if (!(item.confidence === null || (typeof item.confidence === 'number'
+      && Number.isFinite(item.confidence) && item.confidence >= 0 && item.confidence <= 1))) return false;
+    if (typeof item.optional !== 'boolean') return false;
+    if (!(item.string === null || (typeof item.string === 'number' && Number.isInteger(item.string)
+      && item.string >= 1 && item.string <= 6))) return false;
+    if (!(item.fret === null || (typeof item.fret === 'number' && Number.isInteger(item.fret)
+      && item.fret >= 0 && item.fret <= 24))) return false;
+    return true;
   };
   for (const {id, present} of required) {
     const entry = (baseline.entries as Record<string, unknown>)[id];
@@ -251,8 +282,25 @@ export function matchesBefore(document: NotationDocument, finding: VerificationF
       if (!before) continue;
       if (before.pitch !== undefined && actual.pitch !== Number(before.pitch)) return false;
       if (before.onset !== undefined && Math.abs(actual.onset - Number(before.onset)) > 1e-6) return false;
-      if (before.duration !== undefined && before.duration !== null
-        && Math.abs((actual.duration ?? 0) - Number(before.duration)) > 1e-6) return false;
+      if (before.duration !== undefined) {
+        if (before.duration === null ? actual.duration !== null
+          : actual.duration === null || Math.abs(actual.duration - Number(before.duration)) > 1e-6) return false;
+      }
+      if (before.velocity !== undefined) {
+        if (before.velocity === null ? actual.velocity !== null
+          : actual.velocity === null || Math.abs(actual.velocity - Number(before.velocity)) > 1e-6) return false;
+      }
+      if (before.notation_duration !== undefined) {
+        const expected = before.notation_duration === null ? null : Number(before.notation_duration);
+        if (expected !== actual.notationDuration) return false;
+      }
+      if (before.confidence !== undefined) {
+        if (before.confidence === null ? actual.confidence !== null
+          : actual.confidence === null || Math.abs(actual.confidence - Number(before.confidence)) > 1e-6) return false;
+      }
+      if (before.optional !== undefined && Boolean(before.optional) !== actual.optional) return false;
+      if (before.string !== undefined && (before.string ?? null) !== actual.string) return false;
+      if (before.fret !== undefined && (before.fret ?? null) !== actual.fret) return false;
     }
   }
   return true;
@@ -271,14 +319,15 @@ export function prepareFinding(document: NotationDocument, finding: Verification
   const before: Record<string, AuthoredOccurrence> = {};
   for (const {id} of affectedIds(finding)) before[id] = captureOccurrence(document, id);
   return {
-    status: 'applied', commands,
+    status: 'applied', commands, document: staged.document,
     baseline: {version: 1, findingId: finding.id, entries: captureAfter(staged.document, finding), before},
   };
 }
 
 /** Build the exact inverse for the accepted state, or refuse. */
 export function invertFinding(document: NotationDocument, finding: VerificationFinding,
-  alignment: Alignment | null, baselineUnknown: unknown): {commands: CorrectionCommand[]} | {reason: string} {
+  alignment: Alignment | null, baselineUnknown: unknown):
+  {commands: CorrectionCommand[]; document: NotationDocument} | {reason: string} {
   const checked = validateBaseline(finding, baselineUnknown);
   if (!checked.ok) return {reason: `Reversal unavailable: ${checked.reason}.`};
   if (!matchesBaseline(document, finding, checked.baseline)) {
@@ -311,5 +360,5 @@ export function invertFinding(document: NotationDocument, finding: VerificationF
   }
   const staged = stage(document, commands);
   if (!staged.ok) return {reason: `The reversal cannot be represented safely: ${staged.reason}`};
-  return {commands};
+  return {commands, document: staged.document};
 }

@@ -323,3 +323,37 @@ The real-example commit median is **above the 100 ms target** and preview median
 - **Software:** stabilisation contract and matrix implemented; all reviewer verification/recovery/transition/settings/clock scripts pass.
 - **Performance:** measured, targets **not met** for commit latency and the 20k limit; proposal for a lower supported interaction limit or a targeted optimisation is required next.
 - **Hardware:** **BLOCKED** — no physical touch device; emulation is not a substitute.
+
+---
+
+## 14. Matrix completion and metadata-preserving reversal
+
+| Finding | Resolution |
+| --- | --- |
+| S5 / O4 metadata | `AuthoredOccurrence` now carries the original nullable `notation_duration`, `confidence`, `optional`, `string`, `fret`, velocity and recorded duration. Reinsertion uses a guarded `restore` payload on `insert-note` (unknown duration/velocity stay `null`, zero stays zero); the audit's delete round trip now reports **zero field differences**. |
+| S2 / O4 stale delete | `matchesBefore` compares every relevant snapshot field (pitch, onset, nullable duration, nullable velocity, written metadata, confidence, optional, string, fret), so a later velocity change rejects the stale deletion. |
+| R4 validator | Present entries now require finite numbers, MIDI integers, real spelling parsing with pitch agreement, treble/bass and 1/2 enums, 120-tick written grid, positive nullable notation duration, 0–1 confidence/velocity, and valid string/fret ranges. Runtime and recovery share the validator; invalid reversal data restores the work but refuses the inverse. |
+| O7/O8/R3 | New pure tests: a valid first edit plus rejecting second edit leaves both notes unchanged; a second inverse refuses after a successful reverse; a two-target baseline missing one required entry is refused. |
+| S5 null/zero | Round-trip equality test for unknown duration/velocity, zero velocity, `notation_duration`, confidence and optional. |
+| R4 variants | 15 malformed-field cases (spelling/pitch mismatch, off-grid ticks, Infinity, negative/NaN numbers, staff/voice, velocity, notation duration, confidence, string/fret, optional, discriminant). |
+| A2/A3 | Pure revalidation tests: a related edit invalidates the prepared transaction; an unrelated edit preserves its change while applying the finding. The delayed-network UI wiring is still exercised only by the transition scripts, not a deferred browser case. |
+| Performance | One full-document serialization removed from every edit signature; already-staged candidates dispatch without re-running the command sequence. Benchmark now asserts the gesture applied and history exists. |
+
+### Matrix evidence (ordinary suite: **488 passed**, 17 transaction tests)
+
+O1–O8, S2/S3, S5, R1–R4, A2/A3 are covered by `tests/verification-transaction.test.tsx`; O4/O5 browser round trips and the reviewer contract audit also pass. A1/A4–A7 remain mapped to the existing transition/conflict/save/revision scripts; A2/A3 have pure coverage but no bounded deferred-response browser case.
+
+### Performance after optimisation (5 runs, controlled dev server)
+
+| Case | Preview median/p95 | Commit median/p95 | Applied / history |
+| --- | --- | --- | --- |
+| Real 1,338 / 209.6 s | **14.0 / 177.9 ms** | **115.5 / 217.7 ms** | true / true |
+| 20k limit fixture | 143.0 / 203.4 ms | 2,878.8 / 2,986.7 ms | true / true |
+
+Preview is now inside one frame at the median; real commit improved from 133.5 ms to 115.5 ms but remains above the 100 ms target. The 20k fixture is not interactively usable (render/diff dominates). No cap is enforced and no limit is claimed; this remains an unmet performance requirement requiring another optimisation pass or a reviewed limit proposal.
+
+### Status
+
+- Software: S2/S5/R4 corrected; matrix rows completed as above with the A2/A3 caveat.
+- Performance: improved but **not qualified** (commit target and 20k limit fail).
+- Hardware: **BLOCKED** — no physical touch device.

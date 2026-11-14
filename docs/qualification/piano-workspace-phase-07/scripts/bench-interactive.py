@@ -38,6 +38,7 @@ def measure(page):
     }""")
     node = page.locator('.ws-roll-note').first
     node.scroll_into_view_if_needed()
+    pitch_before = node.get_attribute('data-pitch')
     box = node.bounding_box()
     samples = []
     for _ in range(5):
@@ -60,6 +61,9 @@ def measure(page):
         return {'median': round(statistics.median(values), 2), 'p95': round(values[-1], 2)}
     metrics['pointer'] = {key: stat(key) for key in ('preview', 'commit')}
     metrics['pointer_samples'] = samples
+    metrics['gesture_applied'] = page.locator('.ws-roll-note').first.get_attribute('data-pitch') != pitch_before
+    metrics['undo_enabled'] = page.get_by_role('button', name='Undo', exact=True).is_enabled()
+    metrics['history_label'] = page.locator('.ws-report').all_inner_texts()[:2]
     return metrics
 
 

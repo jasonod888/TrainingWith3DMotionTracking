@@ -71,7 +71,7 @@ export type CorrectionCommand =
       type: 'insert-note';
       pitch: number;
       onsetSeconds: number;
-      durationSeconds: number;
+      durationSeconds: number | null;
       startTicks?: number;
       durationTicks?: number;
       staff?: NotationStaff;
@@ -79,9 +79,12 @@ export type CorrectionCommand =
       addToChord?: boolean;
       /** Verification decisions carry deterministic occurrence ids. */
       id?: string;
-      velocity?: number;
+      velocity?: number | null;
       /** Restoring equal-pitch attacks maps them onto the existing written note. */
       allowDuplicate?: boolean;
+      /** Guarded restorative insert: keep the original nullable metadata. */
+      restore?: {notation_duration?: number | null; confidence?: number | null;
+        optional?: boolean; string?: number | null; fret?: number | null; velocity?: number | null};
     }
   | { type: 'delete-occurrence'; occurrenceId: string }
   | { type: 'delete-logical-note'; logicalNoteId: string };
@@ -522,10 +525,13 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
   if (!Number.isFinite(onsetSeconds) || onsetSeconds < 0) {
     return rejection('invalid-onset', 'A start time must be a finite number of seconds at or after zero.');
   }
-  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+  if (durationSeconds !== null && (!Number.isFinite(durationSeconds) || durationSeconds <= 0)) {
     return rejection('invalid-duration', 'A recorded length must be greater than zero.');
   }
-  if (onsetSeconds + durationSeconds > document.duration + EPSILON) {
+  if (durationSeconds === null && !command.restore) {
+    return rejection('invalid-duration', 'Only a guarded restoration may use an unknown recorded length.');
+  }
+  if (durationSeconds !== null && onsetSeconds + durationSeconds > document.duration + EPSILON) {
     return rejection('out-of-bounds', 'That note would end past the clip.');
   }
   if (document.performance.length >= MAX_EVENTS) {
@@ -541,9 +547,24 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
     || command.id.length > 120 || document.performance.some(note => note.id === command.id))) {
     return rejection('invalid-scope', 'That verification note identity is not available.');
   }
-  if (command.velocity !== undefined && (!Number.isFinite(command.velocity)
+  if (command.velocity !== undefined && command.velocity !== null && (!Number.isFinite(command.velocity)
     || command.velocity < 0 || command.velocity > 1)) {
     return rejection('invalid-velocity', 'A velocity must be between zero and one.');
+  }
+  if (command.restore) {
+    const restore = command.restore;
+    if (restore.notation_duration !== undefined && restore.notation_duration !== null
+      && (!Number.isFinite(restore.notation_duration) || restore.notation_duration <= 0)) {
+      return rejection('invalid-duration', 'A restored written duration is invalid.');
+    }
+    if (restore.confidence !== undefined && restore.confidence !== null
+      && (!Number.isFinite(restore.confidence) || restore.confidence < 0 || restore.confidence > 1)) {
+      return rejection('invalid-velocity', 'A restored confidence is invalid.');
+    }
+    if (restore.velocity !== undefined && restore.velocity !== null
+      && (!Number.isFinite(restore.velocity) || restore.velocity < 0 || restore.velocity > 1)) {
+      return rejection('invalid-velocity', 'A restored velocity is invalid.');
+    }
   }
 
   const spb = secondsPerTick(document);
@@ -556,7 +577,7 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
     return rejection('invalid-ticks', 'A written duration must be a positive whole number of sixteenth notes.');
   }
   const start = startTicks ?? snapTick(onsetSeconds / spb);
-  const duration = durationTicks ?? Math.max(GRID, snapTick(durationSeconds / spb));
+  const duration = durationTicks ?? Math.max(GRID, snapTick((durationSeconds ?? 0.25) / spb));
   const staff = command.staff ?? (pitch >= document.staff_split_pitch ? 'treble' : 'bass');
   const voice = command.voice ?? 1;
   const lastMeasure = document.measures[document.measures.length - 1];
@@ -584,8 +605,12 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
       if (command.allowDuplicate) {
         existing.performance_ids.push(occurrenceId);
         next.performance.push({
-          id: occurrenceId, onset: onsetSeconds, duration: durationSeconds, notation_duration: null,
-          pitch, velocity: command.velocity ?? 0.7, confidence: null, optional: false, string: null, fret: null,
+          id: occurrenceId, onset: onsetSeconds, duration: durationSeconds,
+          notation_duration: command.restore?.notation_duration ?? null,
+          pitch, velocity: command.restore ? (command.restore.velocity ?? null) : (command.velocity ?? 0.7),
+          confidence: command.restore?.confidence ?? null,
+          optional: command.restore?.optional ?? false,
+          string: command.restore?.string ?? null, fret: command.restore?.fret ?? null,
         });
         const mergedOutcome = finalise(next, `Restored ${spelling.spelling}`);
         if (mergedOutcome.status !== 'applied') return mergedOutcome;
@@ -610,8 +635,12 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
     });
   }
   next.performance.push({
-    id: occurrenceId, onset: onsetSeconds, duration: durationSeconds, notation_duration: null,
-    pitch, velocity: command.velocity ?? 0.7, confidence: null, optional: false, string: null, fret: null,
+    id: occurrenceId, onset: onsetSeconds, duration: durationSeconds,
+    notation_duration: command.restore?.notation_duration ?? null,
+    pitch, velocity: command.restore ? (command.restore.velocity ?? null) : (command.velocity ?? 0.7),
+    confidence: command.restore?.confidence ?? null,
+    optional: command.restore?.optional ?? false,
+    string: command.restore?.string ?? null, fret: command.restore?.fret ?? null,
   });
   const outcome = finalise(next, `Inserted ${spelling.spelling}`);
   if (outcome.status !== 'applied') return outcome;
