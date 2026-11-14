@@ -1,10 +1,9 @@
-﻿# Phase 7 R4/async regression
+﻿# Phase 7 A7/async regression
 # web suite: 490 passed
 # tsc: clean
-# transaction matrix: 19 tests
+# A7 refresh race: 1/1
+# async A2/A3/A4: 3/3
 # baseline shape: 2/2
 # contract audit: 5/5
-# async A2/A3/A4: 3/3
-# A7: not demonstrated
-# performance: unmet (preview p95 177.9 ms, commit 115.5 ms, 20k ~2.9 s)
+# performance: unmet (preview p95 ~178 ms, commit ~115 ms, 20k ~2.9 s)
 # hardware: BLOCKED

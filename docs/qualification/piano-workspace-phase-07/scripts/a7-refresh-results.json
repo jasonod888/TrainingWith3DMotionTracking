@@ -1,0 +1,16 @@
+[
+  {
+    "name": "A7 newer edit during manifest refresh keeps the editor mounted",
+    "passed": true,
+    "before": 69,
+    "during": 71,
+    "after": 71,
+    "url": "http://127.0.0.1:5173/?page=music-edit",
+    "notice": true,
+    "reports": [
+      "Saved privately \u00b7 revision rev-a7-2",
+      "Opened saved revision rev-a7-1 from performance only (legacy reference).",
+      "Pitch \u2192 B4"
+    ]
+  }
+]

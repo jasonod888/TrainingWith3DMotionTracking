@@ -2,41 +2,41 @@
   "scope": "controlled dev server, mocked API, local video fixture",
   "runs": 5,
   "real_1338": {
-    "domMs": 137,
-    "loadMs": 140,
+    "domMs": 138,
+    "loadMs": 139,
     "notes": 35,
-    "heapMb": 29,
+    "heapMb": 25,
     "recoveryBytes": 0,
     "pointer": {
       "preview": {
-        "median": 14,
-        "p95": 177.9
+        "median": 15,
+        "p95": 213
       },
       "commit": {
-        "median": 115.5,
-        "p95": 217.7
+        "median": 130.3,
+        "p95": 223.5
       }
     },
     "pointer_samples": [
       {
-        "preview": 177.8999999910593,
-        "commit": 217.70000000298023
+        "preview": 213,
+        "commit": 223.5
       },
       {
-        "preview": 49.8999999910593,
-        "commit": 153
+        "preview": 45.29999999701977,
+        "commit": 149.1000000089407
       },
       {
-        "preview": 14,
-        "commit": 115.5
+        "preview": 15,
+        "commit": 130.30000001192093
       },
       {
-        "preview": 11.900000005960464,
-        "commit": 113.09999999403954
+        "preview": 10.299999997019768,
+        "commit": 122.20000000298023
       },
       {
-        "preview": 10.300000011920929,
-        "commit": 107.79999999701977
+        "preview": 7.799999997019768,
+        "commit": 111.6000000089407
       }
     ],
     "gesture_applied": true,
@@ -46,41 +46,41 @@
     ]
   },
   "limit_20000": {
-    "domMs": 124,
-    "loadMs": 126,
+    "domMs": 131,
+    "loadMs": 132,
     "notes": 1565,
-    "heapMb": 64,
+    "heapMb": 46,
     "recoveryBytes": 0,
     "pointer": {
       "preview": {
-        "median": 143,
-        "p95": 203.4
+        "median": 138.7,
+        "p95": 160.8
       },
       "commit": {
-        "median": 2878.8,
-        "p95": 2986.7
+        "median": 2852,
+        "p95": 2993.8
       }
     },
     "pointer_samples": [
       {
-        "preview": 98.20000000298023,
-        "commit": 2986.699999988079
+        "preview": 97.79999999701977,
+        "commit": 2993.7999999970198
       },
       {
-        "preview": 40.70000000298023,
-        "commit": 2907.9000000059605
+        "preview": 38.29999999701977,
+        "commit": 2858
       },
       {
-        "preview": 143,
-        "commit": 2795.7000000029802
+        "preview": 138.70000000298023,
+        "commit": 2828
       },
       {
-        "preview": 203.3999999910593,
-        "commit": 2878.7999999970198
+        "preview": 160.80000001192093,
+        "commit": 2852
       },
       {
-        "preview": 150.59999999403954,
-        "commit": 2840.300000011921
+        "preview": 140.1000000089407,
+        "commit": 2812.2999999970198
       }
     ],
     "gesture_applied": true,

@@ -154,7 +154,7 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
 
   if (manifest?.subject === 'piano') {
     const trackDirty = (dirty: boolean) => { liveDirty.current = dirty; onDirty?.(dirty); };
-    return <PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack} onDirty={trackDirty}
+    return <><PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack} onDirty={trackDirty}
       onSaved={(_revisionId, current) => {
         if (!current) return;
         // The saved snapshot is clean; only edits made during the refresh block exit.
@@ -169,7 +169,9 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
           onDirty?.(false);
           onSaved(lesson);
         })();
-      }}/>;
+      }}/>
+      {notice && <p className="inline-notice" role="status">{notice}</p>}
+    </>;
   }
   return <section className="music-home music-review" aria-label="Edit reviewed music lesson">
     <button className="back-link" disabled={busy} onClick={onBack}><ArrowLeft size={16}/>Back</button>

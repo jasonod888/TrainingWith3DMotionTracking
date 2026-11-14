@@ -357,3 +357,30 @@ Preview is now inside one frame at the median; real commit improved from 133.5 m
 - Software: S2/S5/R4 corrected; matrix rows completed as above with the A2/A3 caveat.
 - Performance: improved but **not qualified** (commit target and 20k limit fail).
 - Hardware: **BLOCKED** — no physical touch device.
+
+---
+
+## 16. A7 refresh race and script portability
+
+| Item | Result |
+| --- | --- |
+| A7 (edit during post-save manifest refresh) | **Pass** — async route holds the manifest GET for 3 s after the revision POST; a newer pitch edit is made after “Saved privately”, the editor stays on `page=music-edit`, the new pitch survives and the revision editor shows “Saved this revision; newer edits remain unsaved in the editor.” |
+| Revision-editor status | The piano early return now renders the editor's status notice alongside the workspace, so a stale-refresh warning is visible. |
+| Submitted async script | `scripts/check-async-races.py` now resolves the repository root from its own location and executes the review fixtures with the helper's `__file__`; it runs successfully from `docs/qualification/piano-workspace-phase-07/scripts` (A2/A3/A4 3/3). |
+| Performance | Unchanged and **unmet**: real preview median ~14 ms / p95 ~178 ms, commit median ~115 ms / p95 ~218 ms, 20k fixture ~2.9 s per commit. A fingerprint-based dirty-signature experiment made commits worse and was reverted. No cap is claimed. |
+| Hardware | **BLOCKED** — no physical touch device. |
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| A7 browser race | 1/1 |
+| Async A2/A3/A4 from the submitted script path | 3/3 |
+| Baseline shape / transaction contract | 2/2, 5/5 |
+| Web suite / `tsc` | 490 / clean |
+| Normal-route E2E | 0 failures |
+
+### Remaining
+
+- Performance targets (preview tail, 100 ms commit, 20k limit) remain unmet and need a trace-driven optimisation or a reviewed, enforced supported-limit proposal.
+- Physical touch remains HARDWARE BLOCKED.

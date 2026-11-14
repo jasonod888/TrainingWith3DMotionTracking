@@ -4,9 +4,14 @@ import json
 from pathlib import Path
 from playwright.async_api import async_playwright
 
-helper = Path(__file__).with_name('check-verification.py')
+ROOT = Path(__file__).resolve().parents[4]
+helper = ROOT / 'docs/qualification/piano-workspace-phase-07-review/check-verification.py'
 prefix = helper.read_text(encoding='utf-8').split('\nwith sync_playwright() as pw:')[0]
-exec(compile(prefix, str(helper), 'exec'))
+# Execute the shared fixtures with the helper's own __file__ so its ROOT resolves.
+namespace = {'__file__': str(helper)}
+exec(compile(prefix, str(helper), 'exec'), namespace)
+m = namespace['m']
+VerifyWorld = namespace['VerifyWorld']
 
 BASE = 'http://127.0.0.1:5173'
 results = []
