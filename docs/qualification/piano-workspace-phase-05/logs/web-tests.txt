@@ -1,5 +1,4 @@
 ﻿# npm test (apps/web) — Phase 5 corrections
-# Command: cd apps/web; npm test
 # tests 451
 # pass 451
 # fail 0

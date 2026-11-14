@@ -1,0 +1,18 @@
+{
+  "delayed_success": {
+    "checkpoint_offset": 0.5,
+    "captured_draft_id": "draft-1"
+  },
+  "delayed_failure_recovery": {
+    "checkpoint_restored": true
+  },
+  "preview_staleness": {
+    "pitch_disabled": true,
+    "spelling_kept": true
+  },
+  "preview_reopen": {
+    "piano_disabled": true,
+    "audio_removed": true
+  },
+  "failures": []
+}

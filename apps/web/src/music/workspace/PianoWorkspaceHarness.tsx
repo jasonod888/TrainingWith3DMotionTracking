@@ -146,6 +146,8 @@ export function PianoWorkspaceHarness() {
   const [storedAlignment, setStoredAlignment] = useState<Alignment | null>(null);
   const [previewBaseline, setPreviewBaseline] = useState<NotationDocument | null>(null);
   const pendingSavedSignature = useRef(false);
+  const workspaceSignatureRef = useRef('');
+  const referenceLoadedRef = useRef(false);
   const [savedRevisionId, setSavedRevisionId] = useState<string | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [confirmReviewed, setConfirmReviewed] = useState(false);
@@ -225,7 +227,13 @@ export function PianoWorkspaceHarness() {
     }
     if (!lessonId) { setError('Add ?id=<lesson id> to the harness URL.'); setLoading(false); return; }
     request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft`)
-      .then(value => {
+      .then(async value => {
+        // A saved revision may have no proposal left; give the reference a moment
+        // to open before treating the missing draft as an error.
+        if (value === null) {
+          await new Promise(resolve => setTimeout(resolve, 800));
+          if (referenceLoadedRef.current) return;
+        }
         const parsed = parseMusicDraftView(value);
         if (!parsed.ok) throw new Error(parsed.message);
         if (stopped) return;
@@ -253,7 +261,11 @@ export function PianoWorkspaceHarness() {
         setPreviewAsset((draft.piano_preview as Asset | null) ?? null);
         setPreviewIdentity(draft.preview_identity ?? '');
       })
-      .catch(cause => { if (!stopped) setError(cause instanceof Error ? cause.message : 'The draft could not be opened.'); })
+      .catch(cause => {
+        if (!stopped && !referenceLoadedRef.current) {
+          setError(cause instanceof Error ? cause.message : 'The draft could not be opened.');
+        }
+      })
       .finally(() => { if (!stopped) setLoading(false); });
     return () => { stopped = true; };
   }, [lessonId]);
@@ -370,6 +382,7 @@ export function PianoWorkspaceHarness() {
     document, alignment: serializeAlignment(alignment, anchors, offsetSeconds),
     anchors, offsetSeconds, spans, title,
   }) : ''), [documentSignature, alignment, anchors, offsetSeconds, spans, title]);
+  workspaceSignatureRef.current = workspaceSignature;
   const dirty = savedSignature !== null
     ? workspaceSignature !== savedSignature
     : workspaceSignature !== (serverSignature ?? '') || Boolean(state?.dirty);
@@ -392,6 +405,9 @@ export function PianoWorkspaceHarness() {
       passages: restored.alignment.passages,
     } : null);
     setAnchorPast([]); setAnchorFuture([]);
+    referenceLoadedRef.current = true;
+    setError('');
+    setLoading(false);
     setSavedRevisionId(revisionId);
     setSavedSections(manifest?.section_set?.sections ?? null);
     setSavedAssessment(manifest?.assessment ?? null);
@@ -582,7 +598,7 @@ export function PianoWorkspaceHarness() {
       setSavedRevisionId(manifest.revision_id);
       setSavedSignature(snapshot);
       setSaveConflict(false);
-      if (snapshot === workspaceSignature) {
+      if (snapshot === workspaceSignatureRef.current) {
         // The acknowledged snapshot is still the current work.
         clearRecovery();
         setRecoveryOffer(null);

@@ -115,6 +115,29 @@ revision endpoints are used exactly as they exist. Phase 6 has not started.
 
 **Remaining gaps (not claimed):**
 
-- The delayed-save/intervening-edit component test hung under jsdom (an unresolved deferred response kept the runner alive) and is not included; the snapshot-bound code path is implemented but unverified at component level.
-- Audio-bound preview staleness is implemented but has no component test.
-- No authenticated browser save/reopen capture; the round trip is proven by the cross-language API test and the JSON evidence.
+### Browser evidence for the two former gaps
+
+`scripts/browser-persistence.py` drives the isolated harness in Chromium with controlled
+route responses (no services) and a real local WAV preview. It runs all scenarios in one
+context, fulfils every held request, and closes normally.
+
+| Scenario | Result |
+| --- | --- |
+| Delayed success: A in flight, offset edit B, A resolves 200 | “Saved an earlier version”; B dirty; checkpoint holds B (`offsetSeconds = 0.5`) with the draft identity; B re-confirmed and saveable |
+| Delayed failure: A resolves 500 after B | Failure message; checkpoint holds B (`-0.5`); B stays saveable; after reload the banner says the checkpoint is **not saved to the server**, restoring it keeps B and remains saveable |
+| Preview, spelling edit | Verified Piano stays enabled and active |
+| Preview, pitch edit | Piano disabled, `data-preview-state="stale"`, Original restored |
+| Reopen an invalidated preview | Piano stays disabled, audio element removed, Original active |
+
+The harness also had a real defect behind the earlier failure: the save callback compared the
+submitted snapshot against a **stale closure** signature, so a delayed save could claim
+“Saved” for newer work and clear its checkpoint. It now compares against the live signature.
+A saved lesson with no proposal left (draft 404) opens from its reference instead of showing
+an error.
+
+Evidence: [`phase5-browser.json`](piano-workspace-phase-05/phase5-browser.json),
+`logs/browser-persistence.txt`.
+
+Remaining known gap: no authenticated capture against the real backend; the cross-language
+API test and this browser run cover the contract and workspace behaviour without a live
+session.
