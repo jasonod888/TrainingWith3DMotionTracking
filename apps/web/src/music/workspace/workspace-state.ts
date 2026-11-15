@@ -69,6 +69,12 @@ export type WorkspaceAction =
 export const HISTORY_BYTE_BUDGET = 4 * 1024 * 1024;
 export const HISTORY_LIMIT = 500;
 
+/** Stable identity of the current history path, used for saved-point dirty checks. */
+export function historyPath(state: WorkspaceState): string {
+  const top = state.past.length ? state.past[state.past.length - 1].id : 'origin';
+  return `${state.past.length}:${top}`;
+}
+
 export function createWorkspaceState(document: NotationDocument): WorkspaceState {
   return {
     document, origin: document, selection: null, past: [], future: [],

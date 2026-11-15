@@ -1,0 +1,24 @@
+[
+  {
+    "operation": "delete",
+    "passed": true,
+    "before": 20,
+    "accepted": 19,
+    "after_reject": 20,
+    "server_after_reject": 20,
+    "reports": [
+      "Verification: reverted suggestion"
+    ]
+  },
+  {
+    "operation": "merge",
+    "passed": true,
+    "before": 20,
+    "accepted": 19,
+    "after_reject": 20,
+    "server_after_reject": 20,
+    "reports": [
+      "Verification: reverted suggestion"
+    ]
+  }
+]

@@ -1,9 +1,4 @@
-﻿# Phase 7 dirty/performance correction
-# web suite: 491 passed
-# tsc: clean
-# dirty: clean-after-undo, dirty-after-redo, dirty-after-branch tested
-# real: preview 10.35/61.4/77.6 ms; commit 88.8/154.4/190.0 ms
-# 5k commit median 174.9 ms; 10k 235.5; 20k 400.0 (supported maximum unmet)
-# benchmark: 20/20 applied, undo restored, redo reapplied
-# contract/verification/structural/A7: pass
+﻿# Phase 7 final evidence
+# software: 492 tests, build clean, 16 regression scripts exit 0, savepoint check pass
+# performance: production build; real and 5k p95 pass; 10k/20k fail; decision required
 # hardware: BLOCKED

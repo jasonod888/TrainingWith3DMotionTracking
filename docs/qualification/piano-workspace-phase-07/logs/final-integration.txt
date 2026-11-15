@@ -1,0 +1,34 @@
+[
+  {
+    "name": "workspace-style-loaded",
+    "passed": true,
+    "measured": {
+      "workspaceCss": true,
+      "gridDisplay": "grid",
+      "shellFont": "14px",
+      "noteFill": "rgb(127, 174, 143)",
+      "videos": 1,
+      "staleCopy": false
+    }
+  },
+  {
+    "name": "app-chrome-unsaved-guard",
+    "passed": true,
+    "dialogs": [
+      "Leave without saving your changes or take?"
+    ],
+    "workspace_still_mounted": true,
+    "url": "http://127.0.0.1:5173/?page=music-review&id=0df28929d427406cb86d9bb5e2dcd35b"
+  },
+  {
+    "name": "draft-load-count",
+    "informational": true,
+    "draft_gets": 4,
+    "note": "Dev StrictMode may repeat mounts; parent and child both load/store the draft in code."
+  },
+  {
+    "name": "saved-only-review-entry",
+    "passed": true,
+    "body": "PIANO REVIEW \u00b7 PRIVATE UNTIL YOU SAVE\n\n\u2190 Back\nPiano correction workspace\n\n1338 notes \u00b7 1146 events \u00b7 127 measures \u00b7 145 BPM (estimated). Select one note in the roll, the score or the keyboard.\n\nNo changes\n0 changed \u00b7 0 added \u00b7 0 removed \u00b7 1338 total\nNothing selected\nPlay\nRate\n0.5\u00d7\n0.75\u00d7\n1\u00d7\n Follow\nReturn to playhead\n Reviewed\nSave privately\nReopen saved\nUndo\nRedo\nSnap\nOff\n1/4\n1/8\n1/16\nOffset\ns \u00b7 preview alignment\n\u2212\n10 s visible \u00b7 from 0.0 s\n+\n0.00 s / 209.59 s\nSource clock\nScore alignment estimated\nOpened saved revision rev-save from performance only (legacy reference).\nLesson settings, teaching sections and assessment\nPiano keyboard\n\u2212 oct\nC4\n+ oct\nTap to audition. With a note selected, tap a key to select that pitch at the playhead; it never edits a note.\nC3\nC4\nC5\nC6\nC7\nC8\nSelection and a"
+  }
+]

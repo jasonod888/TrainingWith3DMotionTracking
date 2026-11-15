@@ -1,6 +1,7 @@
 """Interactive performance evidence: real 1,338-note draft and a 20,000-note limit fixture."""
 import importlib.util
 import json
+import os
 import statistics
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -12,29 +13,43 @@ m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 OUT = ROOT / 'docs/qualification/piano-workspace-phase-07/phase7-performance.json'
 CAPTURES = ROOT / 'docs/qualification/piano-workspace-phase-07/captures'
-RESULT = {'scope': 'controlled dev server, mocked API, local video fixture', 'runs': 20}
+RESULT = {'scope': 'production build (vite preview), mocked API, local fixtures', 'runs': 3,
+          'samples_per_run': 20, 'base': os.environ.get('PERF_BASE', m.BASE)}
 
 
 def limit_draft(count=20_000):
+    # Dense chords and repeated pitch across the 512-measure (1024 s at 120 BPM)
+    # supported span; every 50th group uses long notes that cross bar lines.
     events = []
     pitches = [60, 64, 67, 71, 74]
-    for index in range(count):
-        events.append({'id': f'big-{index}', 'onset': 0.5 + (index % 4000) * 0.04,
-                       'duration': 0.04 * 5, 'pitch': pitches[index % 5],
-                       'velocity': 0.6, 'confidence': None, 'optional': False,
-                       'string': None, 'fret': None})
-    return {**m.LONG, 'title': f'{count} event fixture', 'duration': 200,
-            'events': events, 'spans': [{'start': 0, 'end': 200, 'kind': 'playing'}]}
+    groups = max(1, count // len(pitches))
+    for group in range(groups):
+        onset = 0.5 + group * 0.25
+        for index, pitch in enumerate(pitches):
+            event_id = f'big-{group * len(pitches) + index}'
+            events.append({'id': event_id, 'onset': onset,
+                           'duration': 3.0 if group % 50 == 0 and index == 0 else 0.2,
+                           'pitch': pitch, 'velocity': 0.6 if group % 7 else 0.0,
+                           'confidence': 0.8 if group % 11 == 0 else None,
+                           'optional': group % 13 == 0, 'string': None, 'fret': None})
+    return {**m.LONG, 'title': f'{count} event limit fixture', 'duration': 1024,
+            'events': events,
+            'spans': [{'start': 0, 'end': 300, 'kind': 'playing'},
+                      {'start': 300, 'end': 360, 'kind': 'explanation'},
+                      {'start': 360, 'end': 1024, 'kind': 'playing'}]}
 
 
 def measure(page):
     page.wait_for_selector('.ws-roll-note', timeout=60000)
+    heading = page.locator('.ws-sub').inner_text()
+    assert 'notes' in heading, heading
     metrics = page.evaluate("""() => {
       const nav = performance.getEntriesByType('navigation')[0];
       return {domMs: Math.round(nav.domContentLoadedEventEnd), loadMs: Math.round(nav.loadEventEnd),
               notes: document.querySelectorAll('.ws-roll-note').length,
               heapMb: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
-              recoveryBytes: (localStorage.getItem('piano-workspace-recovery-v1') || '').length};
+              recoveryBytes: (localStorage.getItem('piano-workspace-recovery-v1') || '').length,
+              heading: document.querySelector('.ws-sub')?.textContent ?? ''};
     }""")
     node = page.locator('.ws-roll-note').first
     node.scroll_into_view_if_needed()
@@ -112,7 +127,8 @@ def run_case(browser, world, label):
     context = browser.new_context(viewport={'width': 1440, 'height': 1000})
     context.route('**/api/**', world.route)
     page = context.new_page()
-    page.goto(f'{m.BASE}/?page=music-review&id={m.LESSON}', wait_until='domcontentloaded')
+    page.goto(f"{os.environ.get('PERF_BASE', m.BASE)}/?page=music-review&id={m.LESSON}",
+              wait_until='domcontentloaded')
     metrics = measure(page)
     page.screenshot(path=str(CAPTURES / f'performance-{label}.png'))
     context.close()
@@ -122,11 +138,11 @@ def run_case(browser, world, label):
 def main():
     with sync_playwright() as pw:
         browser = pw.chromium.launch(channel='chrome')
-        real = m.World(m.LONG)
-        RESULT['real_1338'] = run_case(browser, real, 'real')
-        for count in (5_000, 10_000, 20_000):
-            limit = m.World(limit_draft(count))
-            RESULT[f'limit_{count}'] = run_case(browser, limit, f'limit-{count}')
+        fixtures = [('real_1338', m.LONG)] + [(f'limit_{count}', limit_draft(count))
+                                              for count in (5_000, 10_000, 20_000)]
+        for name, draft in fixtures:
+            for run in range(1, 4):
+                RESULT[f'{name}_run{run}'] = run_case(browser, m.World(draft), f'{name}-{run}')
         browser.close()
     OUT.write_text(json.dumps(RESULT, indent=2), encoding='utf-8')
     print(json.dumps(RESULT, indent=2))

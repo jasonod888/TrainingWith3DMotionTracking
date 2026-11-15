@@ -34,7 +34,7 @@ import {TimeRoll} from './TimeRoll';
 import {
   clampTimeWindow, DEFAULT_SPAN_SECONDS, layoutMeasures, zoomAround, type TimeWindow,
 } from './viewport';import {
-  createWorkspaceState, historySummary, workspaceReducer, workspaceStatus,
+  createWorkspaceState, historyPath, historySummary, workspaceReducer, workspaceStatus,
   type WorkspaceAction, type WorkspaceState,
 } from './workspace-state';
 import {useElementWidth} from './useElementWidth';
@@ -574,9 +574,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     alignment: serializeAlignment(alignment, anchors, offsetSeconds),
     anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy,
   }), [alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy]);
-  const historyTop = state && state.past.length ? state.past[state.past.length - 1].id : 'origin';
-  const workspaceSignature = document
-    ? `${documentEpoch}:${state?.past.length ?? 0}:${historyTop}:${metaSignature}` : '';
+  const workspaceSignature = document && state
+    ? `${documentEpoch}:${historyPath(state)}:${metaSignature}` : '';
   workspaceSignatureRef.current = workspaceSignature;
   const dirty = savedSignature !== null
     ? workspaceSignature !== savedSignature

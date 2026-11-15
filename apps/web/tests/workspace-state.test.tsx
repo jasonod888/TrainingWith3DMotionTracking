@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {buildNotation, refreshNotation, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
 import {
-  createWorkspaceState, historySummary, workspaceReducer, workspaceStatus, HISTORY_BYTE_BUDGET,
+  createWorkspaceState, historyPath, historySummary, workspaceReducer, workspaceStatus, HISTORY_BYTE_BUDGET,
   type WorkspaceState,
 } from '../src/music/workspace/workspace-state';
 
@@ -258,4 +258,30 @@ test('R5: history keeps patches, not documents, on a real-size score', () => {
   assert.equal(state.document, document);
   assert.equal(state.dirty, false);
   console.log(`# history benchmark: 20 edits in ${elapsed} ms, ${retained} bytes of patches retained (document ${documentBytes} bytes)`);
+});
+
+test('B1 saved-point identity survives undo, redo and branching at the same depth', () => {
+  let state = start();
+  const origin = historyPath(state);
+  state = workspaceReducer(state, {type: 'command',
+    command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 62}});
+  const saved = historyPath(state);
+  assert.notEqual(saved, origin);
+  state = workspaceReducer(state, {type: 'command',
+    command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 64}});
+  const later = historyPath(state);
+  assert.notEqual(later, saved);
+  state = workspaceReducer(state, {type: 'undo'});
+  assert.equal(historyPath(state), saved, 'undo to saved point must match the saved path');
+  assert.equal(historyPath(state), saved);
+  const redone = workspaceReducer(state, {type: 'redo'});
+  assert.equal(historyPath(redone), later, 'redo returns to the later path');
+  const undoAgain = workspaceReducer(redone, {type: 'undo'});
+  const branch = workspaceReducer(undoAgain, {type: 'command',
+    command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 67}});
+  assert.equal(branch.past.length, undoAgain.past.length + 1);
+  assert.notEqual(historyPath(branch), saved, 'branching at the same depth must not collide');
+  const back = workspaceReducer(branch, {type: 'undo'});
+  assert.equal(historyPath(back), saved, 'undo back to the saved point is clean again');
+  assert.equal(historyPath(createWorkspaceState(score)), origin);
 });

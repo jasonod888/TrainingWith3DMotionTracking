@@ -1,0 +1,82 @@
+{
+  "normal-route": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07/scripts/check-normal-route.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-normal-route.txt"
+  },
+  "async-races": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07/scripts/check-async-races.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-async-races.txt"
+  },
+  "a7-refresh": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07/scripts/check-a7-refresh.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-a7-refresh.txt"
+  },
+  "transaction-contract": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-transaction-contract.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-transaction-contract.txt"
+  },
+  "baseline-shape": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-baseline-shape.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-baseline-shape.txt"
+  },
+  "verification": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-verification.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-verification.txt"
+  },
+  "verification-transitions": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-verification-transitions.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-verification-transitions.txt"
+  },
+  "verification-recovery": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-verification-recovery.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-verification-recovery.txt"
+  },
+  "structural-roundtrip": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-unchanged-structural-roundtrips.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-structural-roundtrip.txt"
+  },
+  "written-reversal": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-written-reversal.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-written-reversal.txt"
+  },
+  "legacy-reversal": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-legacy-reversal.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-legacy-reversal.txt"
+  },
+  "empty-baseline": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-empty-baseline.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-empty-baseline.txt"
+  },
+  "settings": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-settings.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-settings.txt"
+  },
+  "loaded-clock": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-loaded-clock.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-loaded-clock.txt"
+  },
+  "clip-seek": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-clip-seek.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-clip-seek.txt"
+  },
+  "integration": {
+    "command": ".venv-saas\\Scripts\\python.exe docs/qualification/piano-workspace-phase-07-review/check-integration.py",
+    "exit": 0,
+    "log": "docs\\qualification\\piano-workspace-phase-07\\logs\\final-integration.txt"
+  }
+}

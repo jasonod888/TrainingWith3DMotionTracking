@@ -1,0 +1,6 @@
+{
+  "name": "empty-accepted-baseline-refuses-destructive-reversal",
+  "passed": true,
+  "restored_before_reject": "C3 \u00b7 vf-add-1-a \u00b7 C3 (MIDI 48)\n3.500 s \u00b7 recorded 0.500 s\nbass voice 1 \u00b7 measure 1 \u00b7 written 960 ticks\nWritten segments: 2 (2.00 beats written)\nRecorded attacks mapped to this written note: 1\nThis written note is tied across 2 segments; pitch replacement edits only the selected attack and splits the written note if several attacks share it.",
+  "note_retained_after_reject": true
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "play-pause",
+    "passed": true,
+    "played": 0.297931,
+    "paused": 0.346921,
+    "later": 0.346921
+  },
+  {
+    "name": "rate",
+    "passed": true
+  },
+  {
+    "name": "slider-seek-and-both-cursors",
+    "passed": true,
+    "before": 0.346921,
+    "video": 1.5,
+    "roll_seconds": 1.5,
+    "score_tick": 1740.0,
+    "mapped_tick": 1740.0,
+    "ticks_per_second": 1160.0
+  },
+  {
+    "name": "video-ended",
+    "passed": true,
+    "ended": true,
+    "paused": true,
+    "time": 3
+  }
+]

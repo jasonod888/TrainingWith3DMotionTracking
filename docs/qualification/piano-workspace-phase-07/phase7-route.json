@@ -25,11 +25,11 @@
   "unsaved_guard": "Leave without saving your changes?",
   "guitar_regression": true,
   "performance_1338": {
-    "dom": 142,
-    "load": 143,
+    "dom": 137,
+    "load": 138,
     "notes": 35,
     "score": 33,
-    "heap": 29,
+    "heap": 26,
     "data_notes": 1338
   },
   "loaded_video": {
@@ -46,7 +46,7 @@
       "mappedTick": 1740.0,
       "roll_seconds": 1.5
     },
-    "played": 0.79063,
+    "played": 0.656523,
     "ended": {
       "ended": true,
       "paused": true,

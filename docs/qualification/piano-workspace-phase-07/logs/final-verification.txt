@@ -1,0 +1,25 @@
+[
+  {
+    "name": "finding-does-not-overwrite-manual-pitch",
+    "passed": true,
+    "local_before": 61,
+    "local_after": 61,
+    "proposal_before": 60,
+    "proposal_after": 62
+  },
+  {
+    "name": "reject-after-accept-reconciles-working-document",
+    "passed": true,
+    "accepted_pitch": 62,
+    "rejected_pitch": 60,
+    "server_pitch": 60
+  },
+  {
+    "name": "merge-is-atomic-and-retains-merged-note",
+    "passed": true,
+    "before": 20,
+    "after": 19,
+    "expected": 19,
+    "server_count": 19
+  }
+]
