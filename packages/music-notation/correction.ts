@@ -21,7 +21,7 @@ import {
 } from './types';
 import { refreshNotation } from './build';
 import { snapTick, measureTicks } from './rhythm';
-import { accidentalName, parseSpelling, spellPitch } from './spelling';
+import { accidentalName, displayAccidental, parseSpelling, spellPitch } from './spelling';
 
 export type CorrectionSelection = {
   occurrenceId: string;
@@ -216,6 +216,15 @@ export function documentProblem(document: NotationDocument): string | null {
 }
 
 /** Refresh derived geometry, then refuse to hand back an invalid document. */
+function finishWithoutRefresh(next: NotationDocument, label: string,
+  selection?: CorrectionSelection | null): CommandOutcome {
+  // Commands that only change a performance occurrence or a note's pitch/spelling
+  // do not alter event/segment structure; skip the full derived-notation rebuild.
+  const problem = documentProblem(next);
+  if (problem) return rejection('document-invalid', `${problem} Nothing was changed.`);
+  return applied(next, label, selection);
+}
+
 function finalise(next: NotationDocument, label: string, selection?: CorrectionSelection | null): CommandOutcome {
   let refreshed: NotationDocument;
   try {
@@ -329,7 +338,8 @@ function setPitch(document: NotationDocument, occurrenceId: string, pitch: numbe
   const { event, note } = target;
   const finalAccidental = accidentalName(parseSpelling(finalSpelling).alter);
 
-  if (note.performance_ids.length > 1) {
+  const needsDetach = note.performance_ids.length > 1;
+  if (needsDetach) {
     const detached = detachOccurrence(next, event, note, occurrenceId, pitch, finalSpelling, finalAccidental);
     if (!detached.ok) return detached.outcome;
   } else {
@@ -345,6 +355,20 @@ function setPitch(document: NotationDocument, occurrenceId: string, pitch: numbe
   if (!linked) return rejection('unknown-occurrence', 'That note is no longer in the document.');
   linked.pitch = pitch;
 
+  if (!needsDetach) {
+    const parsedSpelling = parseSpelling(finalSpelling);
+    const display = displayAccidental(parsedSpelling.letter, parsedSpelling.alter, next.key_signature);
+    for (const segment of next.segments) {
+      for (const segmentNote of segment.notes) {
+        if (segmentNote.logical_note_id !== note.id) continue;
+        segmentNote.pitch = pitch;
+        segmentNote.spelling = finalSpelling;
+        segmentNote.accidental = finalAccidental;
+        segmentNote.display_accidental = display;
+      }
+    }
+    return finishWithoutRefresh(next, `Pitch → ${finalSpelling}`);
+  }
   return finalise(next, `Pitch → ${finalSpelling}`);
 }
 
@@ -369,7 +393,7 @@ function setOnset(document: NotationDocument, occurrenceId: string, seconds: num
   if (Math.abs(occurrence.onset - onset) < 1e-9) return { status: 'unchanged', label: 'Start unchanged' };
   const next = clone(document);
   next.performance.find(item => item.id === occurrenceId)!.onset = onset;
-  return finalise(next, `Start → ${onset.toFixed(3)} s`);
+  return finishWithoutRefresh(next, `Start → ${onset.toFixed(3)} s`);
 }
 
 function setRecordedDuration(document: NotationDocument, occurrenceId: string, seconds: number): CommandOutcome {

@@ -12,18 +12,18 @@ m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 OUT = ROOT / 'docs/qualification/piano-workspace-phase-07/phase7-performance.json'
 CAPTURES = ROOT / 'docs/qualification/piano-workspace-phase-07/captures'
-RESULT = {'scope': 'controlled dev server, mocked API, local video fixture', 'runs': 5}
+RESULT = {'scope': 'controlled dev server, mocked API, local video fixture', 'runs': 20}
 
 
-def limit_draft():
+def limit_draft(count=20_000):
     events = []
     pitches = [60, 64, 67, 71, 74]
-    for index in range(20_000):
+    for index in range(count):
         events.append({'id': f'big-{index}', 'onset': 0.5 + (index % 4000) * 0.04,
                        'duration': 0.04 * 5, 'pitch': pitches[index % 5],
                        'velocity': 0.6, 'confidence': None, 'optional': False,
                        'string': None, 'fret': None})
-    return {**m.LONG, 'title': '20k limit fixture', 'duration': 200,
+    return {**m.LONG, 'title': f'{count} event fixture', 'duration': 200,
             'events': events, 'spans': [{'start': 0, 'end': 200, 'kind': 'playing'}]}
 
 
@@ -41,7 +41,7 @@ def measure(page):
     pitch_before = node.get_attribute('data-pitch')
     box = node.bounding_box()
     samples = []
-    for _ in range(5):
+    for _ in range(20):
         samples.append(page.evaluate("""async ([x, y]) => {
           const node = document.querySelector('.ws-roll-note');
           const fire = (kind, id, dy) => node.dispatchEvent(new PointerEvent(kind, {
@@ -83,8 +83,9 @@ def main():
         browser = pw.chromium.launch(channel='chrome')
         real = m.World(m.LONG)
         RESULT['real_1338'] = run_case(browser, real, 'real')
-        limit = m.World(limit_draft())
-        RESULT['limit_20000'] = run_case(browser, limit, 'limit')
+        for count in (5_000, 10_000, 20_000):
+            limit = m.World(limit_draft(count))
+            RESULT[f'limit_{count}'] = run_case(browser, limit, f'limit-{count}')
         browser.close()
     OUT.write_text(json.dumps(RESULT, indent=2), encoding='utf-8')
     print(json.dumps(RESULT, indent=2))

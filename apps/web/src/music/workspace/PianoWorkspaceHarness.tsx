@@ -563,15 +563,13 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     requestReveal(selectionOccurrence);
   }, [selectionOccurrence, rollReveal?.occurrenceId, requestReveal]);
 
-  const documentSignature = useMemo(() => (document ? JSON.stringify(document) : ''), [document]);
-  // Only the small editable metadata is serialized here; the document is already
-  // canonicalised once in documentSignature, avoiding a second full serialization
-  // on every edit (a measured cost on long recordings).
+  // Dirty identity uses the revision counter plus the small editable metadata; a
+  // full-document serialization per edit was a measured allocation/GC cost.
   const metaSignature = useMemo(() => JSON.stringify({
     alignment: serializeAlignment(alignment, anchors, offsetSeconds),
     anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy,
   }), [alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy]);
-  const workspaceSignature = document ? `${documentSignature}#${metaSignature}` : '';
+  const workspaceSignature = state ? `${state.revision}:${metaSignature}` : '';
   workspaceSignatureRef.current = workspaceSignature;
   const dirty = savedSignature !== null
     ? workspaceSignature !== savedSignature

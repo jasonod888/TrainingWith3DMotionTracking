@@ -1,9 +1,8 @@
-﻿# Phase 7 A7/async regression
+﻿# Phase 7 performance pass
 # web suite: 490 passed
 # tsc: clean
-# A7 refresh race: 1/1
-# async A2/A3/A4: 3/3
-# baseline shape: 2/2
-# contract audit: 5/5
-# performance: unmet (preview p95 ~178 ms, commit ~115 ms, 20k ~2.9 s)
+# real: preview median 6.95/p95 174.7 ms; commit 57.3/159.3 ms
+# 5k: commit 135 ms median; 10k: 233 ms; 20k: 409 ms (p95 3.9 s)
+# medians for the real example meet the targets; tails and supported maximum remain unmet
+# verification/recovery/transitions/structural/contract/A7: pass
 # hardware: BLOCKED

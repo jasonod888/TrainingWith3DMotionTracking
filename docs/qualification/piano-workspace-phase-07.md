@@ -384,3 +384,29 @@ Preview is now inside one frame at the median; real commit improved from 133.5 m
 
 - Performance targets (preview tail, 100 ms commit, 20k limit) remain unmet and need a trace-driven optimisation or a reviewed, enforced supported-limit proposal.
 - Physical touch remains HARDWARE BLOCKED.
+
+---
+
+## 17. Performance optimisation (real example now meets median targets)
+
+Profiling one manual command showed `refreshNotation` at ~26 ms dominating `applyCommand` (~25 ms total per command), with `structuredClone` ~8 ms and `documentProblem` ~0.4 ms for the 1,338-note recording. Two targeted changes were made:
+
+- Pitch, recorded onset, recorded length and velocity commands no longer rebuild all derived segments/ties. They validate the result and, for a single-occurrence pitch change, update the affected segment notes (pitch/spelling/accidental/display flag) in place. Structural/detach/merge/split paths still run the full refresh.
+- The dirty signature no longer serializes the whole document on every edit: it uses the workspace revision plus the small alignment/title/settings metadata. Undo/redo still produce distinct revisions.
+
+### Measured results (20 samples, controlled dev server, mocked API, local fixtures)
+
+| Case | Preview median / p95 | Commit median / p95 | Applied / undo |
+| --- | --- | --- | --- |
+| Real 1,338 / 209.6 s | **6.95 / 174.7 ms** | **57.3 / 159.3 ms** | true / true |
+| 5,000 events | 19.95 / 145.5 ms | 134.95 / 352.0 ms | true / true |
+| 10,000 events | 35.75 / 187.5 ms | 233.25 / 947.5 ms | true / true |
+| 20,000 events | 89.1 / 273.0 ms | 408.7 / 3,889.9 ms | true / true |
+
+The real example now meets the proposed medians (preview < 16.7 ms, commit < 100 ms). The tails remain high (p95 ~160–175 ms) and the 5k/10k/20k fixtures are not interactively acceptable; the supported maximum is **not qualified**. No supported-limit cap has been implemented and no cap is claimed.
+
+### Status
+
+- Performance: real median targets met; p95 tails and the supported maximum remain unmet.
+- Hardware: **BLOCKED** (no physical touch device).
+- Transaction/async behaviour, A7 and all reviewer scripts remain passing after the optimisation.
