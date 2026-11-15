@@ -17,6 +17,7 @@ bench_spec.loader.exec_module(bench)
 BASE = os.environ.get('PERF_BASE', 'http://localhost:4173')
 OUT = ROOT / 'docs/qualification/piano-workspace-phase-07/phase7-paths.json'
 RESULT = {'base': BASE, 'runs': 3, 'samples_per_path': 20, 'paths': {}}
+EXPECTED = {}
 
 
 def p95(values):
@@ -28,6 +29,29 @@ def p95(values):
 def stats(values):
     return {'median': round(statistics.median(values), 2), 'p95': p95(values),
             'max': round(max(values), 2), 'samples': [round(v, 2) for v in values]}
+
+
+def snapshot(page):
+    return page.evaluate('() => window.__pianoWorkspaceSnapshot()')
+
+
+def canonical(state):
+    return json.dumps(state['document'], sort_keys=True, separators=(',', ':'))
+
+
+def perf_note(document, occurrence):
+    for note in document['performance']:
+        if note['id'] == occurrence:
+            return note
+    return None
+
+
+def locate(document, occurrence):
+    for event in document['events']:
+        for note in event['notes']:
+            if occurrence in note['performance_ids']:
+                return event, note
+    return None, None
 
 
 def total(page):
@@ -76,6 +100,7 @@ def gesture(page, locator, dx, dy, pointer=90):
     box = locator.bounding_box()
     return page.evaluate("""async ([x, y, dx, dy, id]) => {
       const node = document.elementFromPoint(x, y);
+      if (!node) throw new Error('gesture target is not under the pointer');
       const fire = (kind, cx, cy) => node.dispatchEvent(new PointerEvent(kind, {
         pointerId: id, pointerType: 'mouse', button: 0, buttons: 1,
         clientX: cx, clientY: cy, bubbles: true, composed: true, cancelable: true}));
@@ -87,7 +112,7 @@ def gesture(page, locator, dx, dy, pointer=90):
       fire('pointerup', x + dx, y + dy);
       await new Promise(resolve => requestAnimationFrame(() => resolve()));
       return {preview, commit: performance.now() - commitStart};
-    }""", [box['x'] + 4, box['y'] + box['height'] / 2, dx, dy, pointer])
+    }""", [box['x'] + box['width'] / 2, box['y'] + box['height'] / 2, dx, dy, pointer])
 
 
 def click_measured(page, locator):
@@ -105,6 +130,16 @@ def click_locator(locator):
     return locator.evaluate("""async (node) => {
       const start = performance.now();
       if (typeof node.click === 'function') node.click(); else node.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+      await new Promise(resolve => requestAnimationFrame(() => resolve()));
+      await new Promise(resolve => requestAnimationFrame(() => resolve()));
+      return {commit: performance.now() - start};
+    }""")
+
+
+def click_button_timed(locator):
+    return locator.evaluate("""async (node) => {
+      const start = performance.now();
+      node.click();
       await new Promise(resolve => requestAnimationFrame(() => resolve()));
       await new Promise(resolve => requestAnimationFrame(() => resolve()));
       return {commit: performance.now() - start};
@@ -165,24 +200,54 @@ def make_paths(page, occurrence, duration):
     base_total = total(page)
 
     def pitch_drag():
+        EXPECTED['roll_pitch'] = {'occurrence': occurrence, 'pitch': base_pitch}
         timing = gesture(page, page.locator(f'.ws-roll-note[data-occurrence="{occurrence}"]'), 0, -8)
         return timing, pitch(page, occurrence) != base_pitch
 
     def time_drag():
+        EXPECTED['roll_time'] = {'occurrence': occurrence, 'onset': base_onset}
         timing = gesture(page, page.locator(f'.ws-roll-note[data-occurrence="{occurrence}"]'), 8, 0)
         return timing, abs(onset(page, occurrence) - base_onset) > 1e-4
 
     def resize():
-        select(page, occurrence)
+        target = page.locator('.ws-roll-note').first.get_attribute('data-occurrence')
+        EXPECTED['roll_resize'] = {'occurrence': target}
+        select(page, target)
         page.wait_for_timeout(10)
-        timing = gesture(page, page.locator('[data-handle="resize"]').first, 8, 0)
-        value = float(page.get_by_label('Recorded length (s)').input_value())
-        return timing, value > 0
+        before = snapshot(page)
+        timing = gesture(page, page.locator('[data-handle="resize"]').first, 30, 0)
+        after = snapshot(page)
+        old = perf_note(before['document'], target)
+        new = perf_note(after['document'], target)
+        if not old or not new:
+            return timing, False
+        event_before, _ = locate(before['document'], target)
+        event_after, _ = locate(after['document'], target)
+        applied = (new['duration'] is not None and old['duration'] is not None
+                   and abs(new['duration'] - old['duration']) > 1e-6
+                   and abs(new['onset'] - old['onset']) < 1e-9
+                   and event_before['duration'] == event_after['duration'])
+        return timing, applied
 
     def sheet_drag():
-        candidate = pick_safe(page, 1)
+        candidate = page.evaluate("""() => {
+          const notes = [...document.querySelectorAll('.ws-roll-note')];
+          const pitches = new Set(notes.map(node => Number(node.getAttribute('data-pitch'))));
+          for (const node of notes) {
+            const id = node.getAttribute('data-occurrence');
+            const pitch = Number(node.getAttribute('data-pitch'));
+            if (pitch + 2 > 127 || pitches.has(pitch + 2)) continue;
+            const heads = document.querySelectorAll('.ws-score-notehead[data-occurrence="' + id + '"]');
+            if (heads.length !== 1) continue;
+            const rect = heads[0].getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight
+                && rect.right > 0 && rect.left < innerWidth) return {id, pitch};
+          }
+          return null;
+        }""")
         if not candidate:
             return {'commit': 0.01}, False
+        EXPECTED['sheet_pitch'] = {'occurrence': candidate['id'], 'pitch': candidate['pitch']}
         target = candidate['id']
         head = page.locator(f'.ws-score-notehead[data-occurrence="{target}"]').first
         timing = gesture(page, head, 0, -5)
@@ -194,6 +259,7 @@ def make_paths(page, occurrence, duration):
             return {'commit': 0.01}, False
         target = candidate['id']
         before = candidate['pitch']
+        EXPECTED['keyboard_replace'] = {'occurrence': target, 'pitch': before}
         select(page, target)
         page.get_by_role('button', name='Replace pitch').click()
         page.wait_for_timeout(10)
@@ -214,8 +280,10 @@ def make_paths(page, occurrence, duration):
                 button = page.get_by_role('button', name=label, exact=True)
                 if not button.count() or not button.first.is_enabled():
                     continue
+                ticks = {'Half': 960, 'Whole': 1920, 'Quarter': 480, 'Eighth': 240}[label]
                 timing = click_locator(button.first)
                 if page.locator('.ws-shell').get_attribute('data-workspace-dirty') == 'true':
+                    EXPECTED['written_duration'] = {'occurrence': choice['id'], 'ticks': ticks}
                     return timing, True
         return {'commit': 0.01}, False
         return timing or {'commit': 0.01}, page.locator('.ws-shell').get_attribute('data-workspace-dirty') == 'true'
@@ -224,6 +292,7 @@ def make_paths(page, occurrence, duration):
         target = page.locator('.ws-roll-note[data-pitch="64"]').first
         occurrence = target.get_attribute('data-occurrence')
         before = pitch(page, occurrence)
+        EXPECTED['accidental'] = {'occurrence': occurrence, 'pitch': before}
         select(page, occurrence)
         page.wait_for_timeout(10)
         button = page.get_by_role('button', name='♯')
@@ -236,14 +305,18 @@ def make_paths(page, occurrence, duration):
             return {'commit': 0.01}, False
         select(page, candidate['id'])
         before = facts(page)
-        spelling = next(name + str(candidate['octave']) for name in candidate['options']
-                        if name not in before)
+        options = [name + str(candidate['octave']) for name in candidate['options']]
+        spelling = next((option for option in options if option not in before), options[0])
         field = page.locator('.ws-row[aria-label="Respell"] input')
         field.fill(spelling)
         timing = click_locator(page.get_by_role('button', name='Apply spelling'))
-        return timing, page.locator('.ws-shell').get_attribute('data-workspace-dirty') == 'true'
+        applied = page.locator('.ws-shell').get_attribute('data-workspace-dirty') == 'true'
+        if applied:
+            EXPECTED['respell'] = {'occurrence': candidate['id'], 'spelling': spelling}
+        return timing, applied
 
     def add():
+        EXPECTED['add_note'] = {'total': base_total}
         page.locator('[data-add="toggle"]').click()
         page.wait_for_selector('.ws-roll-add-layer')
         box = page.locator('.ws-roll-add-layer').bounding_box()
@@ -259,7 +332,9 @@ def make_paths(page, occurrence, duration):
         return {'commit': 0.01}, False
 
     def delete():
-        select(page, occurrence)
+        target = page.locator('.ws-roll-note').first.get_attribute('data-occurrence')
+        EXPECTED['delete_note'] = {'occurrence': target}
+        select(page, target)
         page.wait_for_timeout(10)
         timing = page.evaluate("""async () => {
           const start = performance.now();
@@ -282,6 +357,90 @@ def make_paths(page, occurrence, duration):
         'add_note': (add, False),
         'delete_note': (delete, False),
     }
+
+
+def performance_map_equal(left, right):
+    return left.get('performance_map') == right.get('performance_map')
+
+
+def verify_edit(path, before, after, expected):
+    """Canonical edit verifier: exact target result and one history entry."""
+    if after['past'] != before['past'] + 1:
+        return False
+    left, right = before['document'], after['document']
+    if canonical(before) == canonical(after):
+        return False
+    occurrence = expected.get('occurrence')
+    if path in ('roll_pitch', 'sheet_pitch', 'keyboard_replace', 'accidental'):
+        old = perf_note(left, occurrence)
+        new = perf_note(right, occurrence)
+        if not old or not new:
+            return False
+        if path == 'roll_pitch' and new['pitch'] != old['pitch'] + 1:
+            return False
+        if path == 'sheet_pitch' and new['pitch'] != old['pitch'] + 2:
+            return False
+        if path == 'keyboard_replace' and new['pitch'] != expected['pitch'] + 2:
+            return False
+        if path == 'accidental' and new['pitch'] != expected['pitch'] + 1:
+            return False
+        event, note = locate(right, occurrence)
+        if not event or not note or note['pitch'] != new['pitch']:
+            return False
+        others_before = {n['id']: n for n in left['performance'] if n['id'] != occurrence}
+        others_after = {n['id']: n for n in right['performance'] if n['id'] != occurrence}
+        return others_before == others_after
+    if path == 'roll_time':
+        old = perf_note(left, occurrence)
+        new = perf_note(right, occurrence)
+        return (old and new and abs(new['onset'] - old['onset']) > 1e-6
+                and new['duration'] == old['duration']
+                and {n['id']: n for n in left['performance'] if n['id'] != occurrence}
+                == {n['id']: n for n in right['performance'] if n['id'] != occurrence})
+    if path == 'roll_resize':
+        old = perf_note(left, occurrence)
+        new = perf_note(right, occurrence)
+        eb, _ = locate(left, occurrence)
+        ea, _ = locate(right, occurrence)
+        return (old and new and old['duration'] is not None and new['duration'] is not None
+                and abs(new['duration'] - old['duration']) > 1e-6
+                and abs(new['onset'] - old['onset']) < 1e-9
+                and eb['duration'] == ea['duration']
+                and {n['id']: n for n in left['performance'] if n['id'] != occurrence}
+                == {n['id']: n for n in right['performance'] if n['id'] != occurrence})
+    if path == 'written_duration':
+        event, _ = locate(left, expected['occurrence'])
+        new_event, _ = locate(right, expected['occurrence'])
+        return (event and new_event and new_event['duration'] == expected['ticks']
+                and left['performance'] == right['performance'])
+    if path == 'respell':
+        event, note = locate(left, expected['occurrence'])
+        new_event, new_note = locate(right, expected['occurrence'])
+        return (note and new_note and new_note['spelling'] == expected['spelling']
+                and new_note['pitch'] == note['pitch']
+                and left['performance'] == right['performance'])
+    if path == 'add_note':
+        before_ids = {n['id'] for n in left['performance']}
+        after_ids = {n['id'] for n in right['performance']}
+        if len(after_ids) != len(before_ids) + 1 or not before_ids < after_ids:
+            return False
+        added = (after_ids - before_ids).pop()
+        note = perf_note(right, added)
+        if not note or not note['id'] or added not in right['performance_map']:
+            return False
+        if any(n['id'] not in after_ids for n in left['performance']):
+            return False
+        return True
+    if path == 'delete_note':
+        target = expected['occurrence']
+        before_ids = {n['id'] for n in left['performance']}
+        after_ids = {n['id'] for n in right['performance']}
+        return (target in before_ids and target not in after_ids
+                and after_ids == before_ids - {target}
+                and target not in right['performance_map']
+                and {n['id']: n for n in left['performance'] if n['id'] != target}
+                == {n['id']: n for n in right['performance']})
+    return False
 
 
 def open_case(browser, draft):
@@ -321,18 +480,34 @@ def run_fixture(browser, draft, label):
         reset_modes(page)
         rows = []
         for _ in range(20):
-            before_total = total(page)
-            timing, applied = action()
-            undo_all(page)
-            dirty = page.locator('.ws-shell').get_attribute('data-workspace-dirty')
-            restored = total(page) == before_total and dirty == 'false'
+            before = snapshot(page)
+            timing, _closure_applied = action()
+            after = snapshot(page)
+            applied = verify_edit(path, before, after, EXPECTED.get(path, {}))
+            undo_button = page.get_by_role('button', name='Undo', exact=True)
+            redo_button = page.get_by_role('button', name='Redo', exact=True)
+            undo_timing = click_button_timed(undo_button) if undo_button.is_enabled() else {'commit': 0.0}
+            page.wait_for_timeout(80)
+            undone = snapshot(page)
+            restored = (canonical(undone) == canonical(before) and undone['past'] == before['past'])
+            redo_timing = click_button_timed(redo_button) if redo_button.is_enabled() else {'commit': 0.0}
+            page.wait_for_timeout(80)
+            redone = snapshot(page)
+            reapplied = (canonical(redone) == canonical(after) and redone['past'] == after['past'])
+            if undo_button.is_enabled():
+                undo_button.click()
+                page.wait_for_timeout(100)
             reset_modes(page)
             rows.append({'preview': timing.get('preview'), 'commit': timing['commit'],
-                         'applied': bool(applied), 'restored': bool(restored), 'has_preview': has_preview})
+                         'undo': undo_timing['commit'], 'redo': redo_timing['commit'],
+                         'applied': bool(applied), 'restored': bool(restored), 'reapplied': bool(reapplied),
+                         'has_preview': has_preview})
         samples[path] = {
             'preview': stats([r['preview'] for r in rows]) if has_preview else None,
             'commit': stats([r['commit'] for r in rows]),
+            'undo': stats([r['undo'] for r in rows]), 'redo': stats([r['redo'] for r in rows]),
             'applied': sum(1 for r in rows if r['applied']), 'restored': sum(1 for r in rows if r['restored']),
+            'reapplied': sum(1 for r in rows if r['reapplied']),
         }
         context.close()
     return samples
@@ -341,19 +516,24 @@ def run_fixture(browser, draft, label):
 def main():
     with sync_playwright() as pw:
         browser = pw.chromium.launch(channel='chrome')
-        for run in range(1, 4):
+        runs = int(os.environ.get('PERF_RUNS', '3'))
+        fixtures = [('real_1338', m.LONG), ('limit_5000', bench.limit_draft(5000))]
+        only = os.environ.get('PERF_FIXTURE')
+        if only:
+            fixtures = [item for item in fixtures if item[0] == only]
+        for run in range(1, runs + 1):
             run_results = {}
-            for label, draft in (('real_1338', m.LONG), ('limit_5000', bench.limit_draft(5000))):
+            for label, draft in fixtures:
                 run_results[label] = run_fixture(browser, draft, label)
             RESULT[f'run{run}'] = run_results
         browser.close()
 
     failures = []
-    for run in range(1, 4):
-        for label in ('real_1338', 'limit_5000'):
+    for run in range(1, runs + 1):
+        for label, _draft in fixtures:
             for path, data in RESULT[f'run{run}'][label].items():
-                if data['applied'] != 20 or data['restored'] != 20:
-                    failures.append(f'run{run} {path}/{label}: applied {data["applied"]} restored {data["restored"]}')
+                if data['applied'] != 20 or data['restored'] != 20 or data['reapplied'] != 20:
+                    failures.append(f'run{run} {path}/{label}: applied {data["applied"]} restored {data["restored"]} reapplied {data["reapplied"]}')
                 if data['commit']['p95'] > 100:
                     failures.append(f'run{run} {path}/{label}: commit p95 {data["commit"]["p95"]}')
                 if data['preview'] and data['preview']['p95'] > 16.7:

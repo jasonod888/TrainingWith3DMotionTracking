@@ -117,6 +117,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [state, setState] = useState<WorkspaceState | null>(null);
   /** Bumped when a document is replaced outside the undo history. */
   const [documentEpoch, setDocumentEpoch] = useState(0);
+  const snapshotRef = useRef<{document: NotationDocument | null; selection: unknown; dirty: boolean;
+    past: number; future: number} | null>(null);
   const [baseline, setBaseline] = useState<NotationDocument | null>(null);
   const [title, setTitle] = useState('');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -859,6 +861,27 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     return () => clearTimeout(timer);
   }, [workspaceSignature, dirty, accountId, draftId, sourceSha256, title, alignment, anchors, offsetSeconds,
       spans, recoveryIdentity, savedRevisionId, verificationToken, sectionsDraft, assessmentPolicy]);
+
+  snapshotRef.current = {
+    document, selection, dirty, past: state?.past.length ?? 0, future: state?.future.length ?? 0,
+  };
+  // Read-only qualification snapshot used by the evidence runner. It reads the
+  // render-current ref synchronously, so an immediate post-rAF read cannot observe
+  // a stale effect closure. No mutation API is exposed.
+  useEffect(() => {
+    (globalThis as unknown as {__pianoWorkspaceSnapshot?: () => unknown}).__pianoWorkspaceSnapshot = () => {
+      const current = snapshotRef.current;
+      if (!current) return null;
+      return {
+        document: current.document ? structuredClone(current.document) : null,
+        selection: current.selection ? {...(current.selection as Record<string, unknown>)} : null,
+        dirty: current.dirty, past: current.past, future: current.future,
+      };
+    };
+    return () => {
+      delete (globalThis as unknown as {__pianoWorkspaceSnapshot?: unknown}).__pianoWorkspaceSnapshot;
+    };
+  }, []);
 
   // Any document change requires a fresh confirmation before it can be saved.
   useEffect(() => { setConfirmReviewed(false); }, [workspaceSignature]);

@@ -358,6 +358,7 @@ function setPitch(document: NotationDocument, occurrenceId: string, pitch: numbe
   if (!needsDetach) {
     const parsedSpelling = parseSpelling(finalSpelling);
     const display = displayAccidental(parsedSpelling.letter, parsedSpelling.alter, next.key_signature);
+    const updatedSegmentNotes = new Set<string>();
     for (const segment of next.segments) {
       for (const segmentNote of segment.notes) {
         if (segmentNote.logical_note_id !== note.id) continue;
@@ -365,6 +366,14 @@ function setPitch(document: NotationDocument, occurrenceId: string, pitch: numbe
         segmentNote.spelling = finalSpelling;
         segmentNote.accidental = finalAccidental;
         segmentNote.display_accidental = display;
+        updatedSegmentNotes.add(segmentNote.id);
+      }
+    }
+    // Ties are derived from segment notes and carry the pitch too; leaving them
+    // stale made redo differ from the expected post-edit canonical document.
+    for (const tie of next.ties) {
+      if (updatedSegmentNotes.has(tie.from_segment_note_id) || updatedSegmentNotes.has(tie.to_segment_note_id)) {
+        tie.pitch = pitch;
       }
     }
     return finishWithoutRefresh(next, `Pitch → ${finalSpelling}`);
