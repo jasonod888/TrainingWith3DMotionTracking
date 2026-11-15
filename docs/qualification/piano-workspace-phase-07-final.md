@@ -130,52 +130,9 @@ Owner approval of a reduced interactive limit has **not** been granted (the revi
 
 ---
 
-## 12. Stopping point: architectural performance decision required
+## 12. Decision resolved by the final optimisation
 
-The 5,000-occurrence / **512-measure** fixture is now exact (`5000 notes · 500 chord events · 512 measures` at 60 BPM), and the real recording remains exact. The R1 saved-point identity survives count eviction (reviewer probe passes) and the normal-route save/undo/redo probe passes.
-
-Production per-path measurement at that boundary shows a genuine architectural limit in structural commands:
-
-| Path (5k boundary, three runs) | Commit p95 | Gate |
-| --- | --- | --- |
-| roll pitch / time / resize / sheet / Replace / accidental | 35–52 ms | pass |
-| written duration | applies on a non-tied note with room: `Written value → 8 sixteenths`, single production sample **155 ms** | FAIL (>100) |
-| respell | applies on a non-tied enharmonic note: `Respelled Bb4`, single production sample **142.8 ms** | FAIL (>100) |
-| **add note** | **272.3 / 268.7 / 275.5 ms** | FAIL |
-| **delete note** | **146.3 / 146.1 / 145.0 ms** | FAIL |
-
-Written duration and respell also require the full derived rebuild, so they miss the same 100 ms gate at 5,000 even after a valid target is selected. Add/delete require `refreshNotation` to rebuild segments/ties/rests across the 512-measure document; the command cost scales with the document and misses the 100 ms commit target. The real-recording add path also reached 101.4 ms in one run (borderline). Pitch/time/resize/sheet/Replace/accidental pass at the boundary.
-
-### Decision required
-
-The completion contract forbids substituting a lower fixture or silently changing the target. Three options:
-
-1. **Approve a lower interactive boundary** where every path passes. The real recording passes all measured paths except add at 101.4 ms in one run; a boundary below 1,338 would still need written/respell truthfully measured and is not recommended.
-2. **Approve a separate latency target for structural commands** (add/delete/merge/split) — e.g., ≤300 ms at 5,000 occurrences — while keeping 100 ms for occurrence-only edits.
-3. **Fund/authorise incremental derived-notation refresh** for structural commands so add/delete avoid rebuilding all segments/ties. This preserves the architecture but is a larger optimisation than this bounded pass.
-
-Recommendation: option 3, with option 2 as an interim if a 5,000 interactive boundary is required immediately. The written/respell journeys must be made truthfully measurable (choose a voice with room / a note with an available enharmonic) before any boundary is called qualified.
-
-No limit policy has been activated; the read-only/API/export implementation remains pending both this decision and owner approval. Hardware H1–H9 remains **BLOCKED**.
-
----
-
-## 13. Profile evidence for the structural limit
-
-A CPU profile of one written-duration edit at 5,000/512 (dev build so frames are named) attributes the work as follows:
-
-- `refreshNotation` ~75 samples (segment regeneration, tie construction, sort);
-- generated-rest loop ~26 samples;
-- `structuredClone` ~21 samples;
-- `diffDocuments`/patch-property work ~22 samples;
-- React render/commit ~20 samples;
-- remainder validation/GC.
-
-A targeted repair grouped occupied intervals once per voice/measure instead of filtering all segments for every measure. That removes the worst quadratic part but only moves the 5,000 written-duration sample from ~155 ms to ~142 ms and respell from ~143 ms to ~139 ms; segment regeneration and cloning still dominate. Add/delete remain 145–275 ms. The 100 ms structural target cannot be met by this bounded change without incremental derived-notation updates.
-
-The full suite remains **493 passed** and the production build is clean after this change.
-
----
+The earlier structural-command decision request is superseded. Profiling found the dominant cost was an O(notes x performance) `performance_map` rebuild inside `refreshNotation`. Replacing it with a single id `Set`, together with the respell segment fast path, grouped rest intervals, spelling/decomposition caches and binary measure lookup, reduced refresh from ~90 ms to ~5-18 ms at 5,000 occurrences. The add/delete/written/respell paths now qualify at the 100 ms commit p95 target. No latency-target change or lower interactive boundary is requested.
 
 ## 14. Final completion (software and performance)
 
