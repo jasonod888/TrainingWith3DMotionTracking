@@ -1,0 +1,7 @@
+﻿Path probes at 5,000 occurrences / 512 measures (production build):
+written_duration: applies "Written value -> 8 sixteenths", commit 155 ms
+respell: applies "Respelled Bb4", commit 142.8 ms
+add_note: applies only at an unoccupied written slot; previous valid runs 268-275 ms
+delete_note: 145-151 ms
+occurrence-only paths: 35-52 ms
+The full 3x20 path run aborts when structural add/delete changes the target occurrence; the path matrix is therefore a decision package, not a qualification.

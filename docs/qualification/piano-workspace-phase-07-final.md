@@ -139,11 +139,12 @@ Production per-path measurement at that boundary shows a genuine architectural l
 | Path (5k boundary, three runs) | Commit p95 | Gate |
 | --- | --- | --- |
 | roll pitch / time / resize / sheet / Replace / accidental | 35–52 ms | pass |
-| written duration / respell | not yet truthfully measurable — the first eligible control is rejected because the target's voice has no room (written) or the fixture target choice needs refinement (respell); the actions are rejected/no-ops, not timed as success | not qualified |
+| written duration | applies on a non-tied note with room: `Written value → 8 sixteenths`, single production sample **155 ms** | FAIL (>100) |
+| respell | applies on a non-tied enharmonic note: `Respelled Bb4`, single production sample **142.8 ms** | FAIL (>100) |
 | **add note** | **272.3 / 268.7 / 275.5 ms** | FAIL |
 | **delete note** | **146.3 / 146.1 / 145.0 ms** | FAIL |
 
-Add/delete require `refreshNotation` to rebuild segments/ties/rests across the 512-measure document; the command cost scales with the document and misses the 100 ms commit target. The real-recording add path also reached 101.4 ms in one run (borderline). Pitch/time/resize/sheet/Replace/accidental pass at the boundary.
+Written duration and respell also require the full derived rebuild, so they miss the same 100 ms gate at 5,000 even after a valid target is selected. Add/delete require `refreshNotation` to rebuild segments/ties/rests across the 512-measure document; the command cost scales with the document and misses the 100 ms commit target. The real-recording add path also reached 101.4 ms in one run (borderline). Pitch/time/resize/sheet/Replace/accidental pass at the boundary.
 
 ### Decision required
 

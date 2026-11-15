@@ -220,7 +220,7 @@ def make_paths(page, occurrence):
         page.wait_for_selector('.ws-roll-add-layer')
         box = page.locator('.ws-roll-add-layer').bounding_box()
         span = float(page.locator('[data-window-span]').get_attribute('data-window-span'))
-        for seconds in (0.2, 9.9, 5.13, 7.37):
+        for seconds in (0.75, 1.25, 1.75, 5.25, 9.75):
             for fraction in (0.05, 0.2, 0.4, 0.7, 0.9):
                 page.mouse.click(box['x'] + box['width'] * (seconds / span), box['y'] + box['height'] * fraction)
                 page.wait_for_timeout(20)
