@@ -1,8 +1,9 @@
-﻿# Phase 7 performance pass
-# web suite: 490 passed
+﻿# Phase 7 dirty/performance correction
+# web suite: 491 passed
 # tsc: clean
-# real: preview median 6.95/p95 174.7 ms; commit 57.3/159.3 ms
-# 5k: commit 135 ms median; 10k: 233 ms; 20k: 409 ms (p95 3.9 s)
-# medians for the real example meet the targets; tails and supported maximum remain unmet
-# verification/recovery/transitions/structural/contract/A7: pass
+# dirty: clean-after-undo, dirty-after-redo, dirty-after-branch tested
+# real: preview 10.35/61.4/77.6 ms; commit 88.8/154.4/190.0 ms
+# 5k commit median 174.9 ms; 10k 235.5; 20k 400.0 (supported maximum unmet)
+# benchmark: 20/20 applied, undo restored, redo reapplied
+# contract/verification/structural/A7: pass
 # hardware: BLOCKED

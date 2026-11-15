@@ -38,32 +38,73 @@ def measure(page):
     }""")
     node = page.locator('.ws-roll-note').first
     node.scroll_into_view_if_needed()
-    pitch_before = node.get_attribute('data-pitch')
     box = node.bounding_box()
-    samples = []
-    for _ in range(20):
-        samples.append(page.evaluate("""async ([x, y]) => {
+    target = [box['x'] + 4, box['y'] + box['height'] / 2]
+    # Warm-up: eight gestures discarded before measurement.
+    for index in range(8):
+        page.evaluate("""async ([x, y, id]) => {
           const node = document.querySelector('.ws-roll-note');
-          const fire = (kind, id, dy) => node.dispatchEvent(new PointerEvent(kind, {
+          const fire = (kind, dy) => node.dispatchEvent(new PointerEvent(kind, {
+            pointerId: id, pointerType: 'mouse', button: 0, buttons: 1,
+            clientX: x, clientY: y + dy, bubbles: true, composed: true, cancelable: true}));
+          fire('pointerdown', 0); fire('pointermove', -6);
+          await new Promise(resolve => requestAnimationFrame(() => resolve()));
+          fire('pointerup', -6);
+          await new Promise(resolve => requestAnimationFrame(() => resolve()));
+        }""", [target[0], target[1], 90 + index])
+    # Remove the warm-up gestures from history before taking the baseline so the
+    # later undo verification returns exactly to this state.
+    warmup_undo = page.get_by_role('button', name='Undo', exact=True)
+    for _ in range(60):
+        if not warmup_undo.is_enabled():
+            break
+        warmup_undo.click()
+    pitch_before = int(page.locator('.ws-roll-note').first.get_attribute('data-pitch'))
+    samples = []
+    for index in range(20):
+        samples.append(page.evaluate("""async ([x, y, id]) => {
+          const node = document.querySelector('.ws-roll-note');
+          const before = node.getAttribute('data-pitch');
+          const fire = (kind, dy) => node.dispatchEvent(new PointerEvent(kind, {
             pointerId: id, pointerType: 'mouse', button: 0, buttons: 1,
             clientX: x, clientY: y + dy, bubbles: true, composed: true, cancelable: true}));
           const start = performance.now();
-          fire('pointerdown', 41, 0); fire('pointermove', 41, -8);
+          fire('pointerdown', 0); fire('pointermove', -8);
           await new Promise(resolve => requestAnimationFrame(() => resolve()));
           const preview = performance.now() - start;
           const commitStart = performance.now();
-          fire('pointerup', 41, -8);
+          fire('pointerup', -8);
           await new Promise(resolve => requestAnimationFrame(() => resolve()));
-          return {preview, commit: performance.now() - commitStart};
-        }""", [box['x'] + 4, box['y'] + box['height'] / 2]))
+          const commit = performance.now() - commitStart;
+          return {preview, commit, before, after: node.getAttribute('data-pitch')};
+        }""", [target[0], target[1], 41 + index]))
+    applied = sum(1 for item in samples if item['before'] != item['after'])
+
     def stat(key):
         values = sorted(item[key] for item in samples)
-        return {'median': round(statistics.median(values), 2), 'p95': round(values[-1], 2)}
+        index = max(0, min(len(values) - 1, int(-(-0.95 * len(values) // 1)) - 1))
+        return {'median': round(statistics.median(values), 2), 'p95': round(values[index], 2),
+                'max': round(values[-1], 2), 'samples': [round(value, 2) for value in values]}
+
+    # Undo must actually restore the pre-gesture pitch, then redo must reapply.
+    undo = page.get_by_role('button', name='Undo', exact=True)
+    for _ in range(60):
+        if not undo.is_enabled():
+            break
+        undo.click()
+    pitch_after_undo = int(page.locator('.ws-roll-note').first.get_attribute('data-pitch'))
+    undo_disabled = not undo.is_enabled()
+    page.get_by_role('button', name='Redo', exact=True).click()
+    pitch_after_redo = int(page.locator('.ws-roll-note').first.get_attribute('data-pitch'))
     metrics['pointer'] = {key: stat(key) for key in ('preview', 'commit')}
     metrics['pointer_samples'] = samples
-    metrics['gesture_applied'] = page.locator('.ws-roll-note').first.get_attribute('data-pitch') != pitch_before
-    metrics['undo_enabled'] = page.get_by_role('button', name='Undo', exact=True).is_enabled()
-    metrics['history_label'] = page.locator('.ws-report').all_inner_texts()[:2]
+    metrics['applied_samples'] = applied
+    metrics['undo_restored'] = pitch_after_undo == pitch_before
+    metrics['undo_disabled'] = undo_disabled
+    metrics['redo_reapplied'] = pitch_after_redo != pitch_before
+    metrics['pitch_before'] = pitch_before
+    metrics['pitch_after_undo'] = pitch_after_undo
+    metrics['pitch_after_redo'] = pitch_after_redo
     return metrics
 
 

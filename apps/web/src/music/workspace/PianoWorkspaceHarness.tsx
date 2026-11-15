@@ -115,6 +115,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const lessonId = lessonIdProp ?? params.get('id') ?? '';
 
   const [state, setState] = useState<WorkspaceState | null>(null);
+  /** Bumped when a document is replaced outside the undo history. */
+  const [documentEpoch, setDocumentEpoch] = useState(0);
   const [baseline, setBaseline] = useState<NotationDocument | null>(null);
   const [title, setTitle] = useState('');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -275,6 +277,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         scoreDuration: demoClock.scoreDuration,
       });
       setBaseline(document);
+      setDocumentEpoch(value => value + 1);
       setState(createWorkspaceState(document));
       setTitle(demo === 'explanation' ? 'Fixture: explanation passage'
         : demo === 'frames' ? 'Fixture: 12 ms attacks'
@@ -563,13 +566,17 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     requestReveal(selectionOccurrence);
   }, [selectionOccurrence, rollReveal?.occurrenceId, requestReveal]);
 
-  // Dirty identity uses the revision counter plus the small editable metadata; a
-  // full-document serialization per edit was a measured allocation/GC cost.
+  // Dirty identity is the current history path (length + top entry identity) plus
+  // the small editable metadata and a document-replacement epoch. Undoing back to
+  // the saved path is clean; redo and branching produce a different path. This
+  // avoids serializing the whole document on every edit.
   const metaSignature = useMemo(() => JSON.stringify({
     alignment: serializeAlignment(alignment, anchors, offsetSeconds),
     anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy,
   }), [alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy]);
-  const workspaceSignature = state ? `${state.revision}:${metaSignature}` : '';
+  const historyTop = state && state.past.length ? state.past[state.past.length - 1].id : 'origin';
+  const workspaceSignature = document
+    ? `${documentEpoch}:${state?.past.length ?? 0}:${historyTop}:${metaSignature}` : '';
   workspaceSignatureRef.current = workspaceSignature;
   const dirty = savedSignature !== null
     ? workspaceSignature !== savedSignature
@@ -589,6 +596,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
       assessment?: unknown; piano_preview?: Asset | null} | null) => {
     setBaseline(restored.document);
+    setDocumentEpoch(value => value + 1);
     setState(createWorkspaceState(restored.document));
     setSpans(restored.spans);
     setOffsetSeconds(restored.offsetSeconds);
@@ -701,6 +709,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         });
         if (!alive()) return;
         setBaseline(document);
+        setDocumentEpoch(value => value + 1);
         setState(createWorkspaceState(document));
         setTitle(draft.title);
         setSpans(draftSpans);
@@ -1044,6 +1053,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     if (!staleCheckpoint) return;
     try {
       const restored = parseNotationDocument(staleCheckpoint.notation);
+      setDocumentEpoch(value => value + 1);
       setState(createWorkspaceState(restored));
       setSpans(staleCheckpoint.spans);
       setOffsetSeconds(staleCheckpoint.offsetSeconds);
@@ -1072,6 +1082,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     if (!recoveryOffer) return;
     try {
       const restored = parseNotationDocument(recoveryOffer.notation);
+      setDocumentEpoch(value => value + 1);
       setState(createWorkspaceState(restored));
       setSpans(recoveryOffer.spans);
       setOffsetSeconds(recoveryOffer.offsetSeconds);
@@ -1172,7 +1183,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const report = state.lastReport;
   const summary = historySummary(state);
 
-  return <main className="ws-shell" ref={shellRef}
+  return <main className="ws-shell" ref={shellRef} data-workspace-dirty={dirty ? 'true' : 'false'}
     style={{overflowX: 'clip', maxWidth: '100vw', contain: 'paint'}}
     onPointerDownCapture={() => { workspaceActive.current = true; }}>
     <header className="ws-head">

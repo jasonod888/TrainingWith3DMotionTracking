@@ -410,3 +410,42 @@ The real example now meets the proposed medians (preview < 16.7 ms, commit < 100
 - Performance: real median targets met; p95 tails and the supported maximum remain unmet.
 - Hardware: **BLOCKED** (no physical touch device).
 - Transaction/async behaviour, A7 and all reviewer scripts remain passing after the optimisation.
+
+---
+
+## 18. Accurate dirty comparison after undo
+
+The revision-counter signature was replaced by a history-path identity that does not serialize the document on every edit:
+
+`workspaceSignature = documentEpoch : past.length : topHistoryEntry.id : settingsMetadata`
+
+- Undo back to the saved path (same length, same top entry id, same settings) is clean.
+- Redo moves off that path and is dirty.
+- Undo followed by a new command creates a different history entry id at the same length, so branching is dirty.
+- Replacing the document outside history (restore/draft/reopen) bumps the epoch, so it cannot collide with the saved path.
+- History entries now carry a unique id (`history-N`), used only for this comparison.
+
+Three regression tests assert clean-after-undo, dirty-after-redo and dirty-after-branching; the suite is now **491 passed**.
+
+## 19. Corrected benchmark evidence
+
+The benchmark now:
+
+- runs eight warm-up gestures, then removes them from history before taking the baseline;
+- records 20 samples with a true p95 (nearest-rank), the maximum, and per-sample applied status (20/20 applied);
+- actually clicks Undo until disabled and verifies the pitch returns to the baseline, then Redo and verifies it is reapplied (all cases: `undo_restored=true`, `undo_disabled=true`, `redo_reapplied=true`).
+
+| Case | Preview median/p95/max | Commit median/p95/max |
+| --- | --- | --- |
+| Real 1,338 / 209.6 s | 10.35 / 61.4 / 77.6 ms | **88.8** / 154.4 / 190.0 ms |
+| 5,000 events | 34.85 / 121.7 / 149.0 ms | 174.85 / 304.5 / 461.2 ms |
+| 10,000 events | 39.5 / 156.9 / 192.8 ms | 235.45 / 392.5 / 1,514.5 ms |
+| 20,000 events | 76.45 / 191.7 / 215.5 ms | 400.0 / 487.2 / 2,280.0 ms |
+
+The real example meets the median targets (preview < one frame, commit < 100 ms) and the benchmark verifies applied edits plus real undo/redo restoration. Tails remain above one frame / 100 ms, and the 5k–20k fixtures remain outside interactive targets; the supported maximum is still unqualified. No cap is implemented or claimed.
+
+### Status
+
+- Dirty-after-undo regression: fixed and tested.
+- Performance: real medians met; tails and supported maximum unmet.
+- Hardware: **BLOCKED**.

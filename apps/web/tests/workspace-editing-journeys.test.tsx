@@ -208,3 +208,26 @@ test('exclusive modes block keyboard history as well as the toolbar', async () =
     'Ctrl+Z must not edit while adding'));
   assert.equal(view.getByRole('button', {name: 'Undo', exact: true}).hasAttribute('disabled'), true);
 });
+test('dirty state is clean after undo, dirty after redo and after branching', async () => {
+  const view = await open();
+  const dirty = () => view.container.querySelector('[data-workspace-dirty]')?.getAttribute('data-workspace-dirty');
+  assert.equal(dirty(), 'false');
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  fireEvent.pointerDown(note, {clientX: 100, clientY: 100, pointerId: 1, button: 0});
+  fireEvent.pointerUp(note, {pointerId: 1});
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-facts')));
+  view.getByRole('button', {name: '+ semitone'}).click();
+  await waitFor(() => assert.equal(dirty(), 'true'));
+  view.getByRole('button', {name: 'Undo', exact: true}).click();
+  await waitFor(() => assert.equal(dirty(), 'false', 'undo back to the saved content must be clean'));
+  view.getByRole('button', {name: 'Redo', exact: true}).click();
+  await waitFor(() => assert.equal(dirty(), 'true', 'redo must be dirty'));
+  view.getByRole('button', {name: 'Undo', exact: true}).click();
+  await waitFor(() => assert.equal(dirty(), 'false'));
+  const again = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  fireEvent.pointerDown(again, {clientX: 100, clientY: 100, pointerId: 2, button: 0});
+  fireEvent.pointerUp(again, {pointerId: 2});
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-facts')));
+  view.getByRole('button', {name: '+ semitone'}).click();
+  await waitFor(() => assert.equal(dirty(), 'true', 'branching after undo must be dirty'));
+});

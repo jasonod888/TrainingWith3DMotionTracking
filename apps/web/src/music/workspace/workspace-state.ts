@@ -19,7 +19,11 @@ import {
 
 export type Snapshot = { document: NotationDocument; selection: CorrectionSelection | null };
 
-export type HistoryEntry = {
+export let historySerial = 0;
+
+type HistoryEntry = {
+  /** Unique path entry identity, used for dirty comparison across undo/branching. */
+  id: string;
   patch: DocumentPatch;
   label: string;
   bytes: number;
@@ -110,6 +114,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       const requested = outcome.selection === undefined ? state.selection : outcome.selection;
       const selectionAfter = isValidSelection(outcome.document, requested);
       const entry: HistoryEntry = {
+        id: `history-${++historySerial}`,
         patch, label: outcome.label, bytes: patchBytes(patch),
         selectionBefore: state.selection, selectionAfter,
       };
@@ -157,7 +162,8 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       const patch = diffDocuments(state.document, candidate);
       if (isEmptyPatch(patch)) return {...state, lastReport: {status: 'unchanged', label: 'No change'}};
       const selectionAfter = isValidSelection(candidate, selection);
-      const entry: HistoryEntry = {patch, label: action.label ?? 'Applied verification suggestion',
+      const entry: HistoryEntry = {id: `history-${++historySerial}`, patch,
+        label: action.label ?? 'Applied verification suggestion',
         bytes: patchBytes(patch), selectionBefore: state.selection, selectionAfter};
       const past = [...state.past, entry];
       let total = entryBytes(past);
