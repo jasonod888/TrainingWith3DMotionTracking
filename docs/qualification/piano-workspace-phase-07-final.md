@@ -1,6 +1,6 @@
 # Phase 7 final submission — piano correction workspace
 
-Final commit: **to be filled after commit** (parent `242f376d29442c561a81f5b0aa678152421612ea`).
+Final commit: HEAD of `phase7/normal-route` containing this handoff (parent `242f376d29442c561a81f5b0aa678152421612ea`; exact SHA reported in the submission message).
 Branch: `phase7/normal-route`. Phase 8 remains stopped.
 
 ## 1. Status
