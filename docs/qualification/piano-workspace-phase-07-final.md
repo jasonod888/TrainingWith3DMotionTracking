@@ -175,7 +175,9 @@ The full path matrix now meets the gates without weakening validation, history, 
 - `buildWorkspaceExport`/`serializeWorkspaceExport` preserve the complete notation and recovery payload for lossless reference/recovery export above the limit.
 - `apps/web/tests/interactive-limit.test.tsx` covers the exact boundary, unapproved state, mutation guard, export round-trip and malformed input (4/4 pass).
 
-No workspace route imports the policy yet; nothing is restricted in production. Activation still requires the owner’s explicit approval. API behaviour for activation is specified as: keep the existing 20,000-occurrence storage/API validation for existing data, expose read-only capability for over-limit lessons, reject new over-limit review mutations with the same explicit code, and never truncate stored notation. Implementation remains gated on approval.
+The server-side counterpart `apps/api/interactive_limit.py` implements the same boundary, read-only capability list, mutation error and lossless reference/recovery export; `tests/test_interactive_limit.py` covers unapproved state, boundary/read-only guard and lossless export (3/3 pass).
+
+No workspace route or API route imports the policy yet; nothing is restricted in production. Activation still requires the owner’s explicit approval. API behaviour for activation is specified as: keep the existing 20,000-occurrence storage/API validation for existing data, expose read-only capability for over-limit lessons, reject new over-limit review mutations with the same explicit code, and never truncate stored notation. Implementation remains gated on approval.
 
 ### Regression and hardware
 
