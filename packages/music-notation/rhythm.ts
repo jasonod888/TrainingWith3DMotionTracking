@@ -43,9 +43,13 @@ export function durationName(spec: ValueSpec): string {
   return spec.dotted ? `dotted ${spec.value}` : spec.value;
 }
 
+const decomposeCache = new Map<number, ValueSpec[]>();
+
 /** Greedy decomposition into engraveable values; every result is tied to the next. */
 export function decomposeTicks(ticks: number): ValueSpec[] {
   if (!Number.isInteger(ticks) || ticks <= 0) throw new Error('A duration must be a positive whole number of ticks.');
+  const cached = decomposeCache.get(ticks);
+  if (cached) return cached;
   const result: ValueSpec[] = [];
   let remaining = ticks;
   for (const candidate of DECOMPOSE_TICKS) {
@@ -58,6 +62,7 @@ export function decomposeTicks(ticks: number): ValueSpec[] {
     // Sub-grid durations are rounded up to the smallest editable value rather than dropped.
     result.push(valueForTicks(GRID));
   }
+  decomposeCache.set(ticks, result);
   return result;
 }
 
@@ -85,7 +90,17 @@ export function splitAtMeasures(start: number, duration: number, measures: { sta
   const slices: SpanSlice[] = [];
   let cursor = start;
   const end = start + duration;
-  for (const measure of measures) {
+  // Binary-search the first measure that can contain the start instead of
+  // scanning every measure for every event (quadratic on long scores).
+  let low = 0;
+  let high = measures.length - 1;
+  while (low < high) {
+    const middle = (low + high + 1) >> 1;
+    if (measures[middle].start <= start) low = middle;
+    else high = middle - 1;
+  }
+  for (let measureIndex = low; measureIndex < measures.length; measureIndex += 1) {
+    const measure = measures[measureIndex];
     const measureEnd = measure.start + measure.duration;
     if (cursor >= end) break;
     if (cursor < measure.start || cursor >= measureEnd) continue;

@@ -529,7 +529,8 @@ function respellNote(document: NotationDocument, occurrenceId: string, spelling:
   const next = clone(document);
   const target = noteForOccurrence(next, occurrenceId)!;
   const finalAccidental = accidentalName(parsed.alter);
-  if (target.note.performance_ids.length > 1) {
+  const needsDetach = target.note.performance_ids.length > 1;
+  if (needsDetach) {
     const detached = detachOccurrence(next, target.event, target.note, occurrenceId, target.note.pitch, spelling, finalAccidental);
     if (!detached.ok) return detached.outcome;
   } else if (target.event.notes.some(item => item.id !== target.note.id && item.pitch === target.note.pitch)) {
@@ -537,6 +538,20 @@ function respellNote(document: NotationDocument, occurrenceId: string, spelling:
   } else {
     target.note.spelling = spelling;
     target.note.accidental = finalAccidental;
+  }
+  if (!needsDetach) {
+    // Spelling does not change segment structure; update the affected segment notes
+    // in place instead of rebuilding every segment and tie in the document.
+    const display = displayAccidental(parsed.letter, parsed.alter, next.key_signature);
+    for (const segment of next.segments) {
+      for (const segmentNote of segment.notes) {
+        if (segmentNote.logical_note_id !== target.note.id) continue;
+        segmentNote.spelling = spelling;
+        segmentNote.accidental = finalAccidental;
+        segmentNote.display_accidental = display;
+      }
+    }
+    return finishWithoutRefresh(next, `Respelled ${spelling}`);
   }
   return finalise(next, `Respelled ${spelling}`);
 }

@@ -15,6 +15,15 @@ import {
 import { decomposeTicks, measureCount, measureTicks, snapTick, splitAtMeasures } from './rhythm';
 import { accidentalName, displayAccidental, keySignature, parseSpelling, spellPitch } from './spelling';
 
+const spellingCache = new Map<string, ReturnType<typeof parseSpelling>>();
+function cachedParseSpelling(spelling: string): ReturnType<typeof parseSpelling> {
+  const cached = spellingCache.get(spelling);
+  if (cached) return cached;
+  const parsed = parseSpelling(spelling);
+  spellingCache.set(spelling, parsed);
+  return parsed;
+}
+
 const DEFAULT_TIME: TimeSignature = { numerator: 4, denominator: 4 };
 
 export function estimateTempo(performance: PerformanceNote[]): number {
@@ -254,7 +263,7 @@ export function refreshNotation(document: NotationDocument): NotationDocument {
     if (new Set(event.notes.map(note => note.pitch)).size !== event.notes.length) throw new Error('A chord repeats a pitch.');
     for (const note of event.notes) {
       if (!Number.isInteger(note.pitch) || note.pitch < 0 || note.pitch > 127) throw new Error('A notation note has an invalid pitch.');
-      const parsed = parseSpelling(note.spelling);
+      const parsed = cachedParseSpelling(note.spelling);
       if (parsed.pitch !== note.pitch) throw new Error('A notation spelling does not match its MIDI pitch.');
     }
   }
@@ -274,7 +283,7 @@ export function refreshNotation(document: NotationDocument): NotationDocument {
         const measure = document.measures[slice.measure_index];
         const id = `${event.id}:${owned.length}`.slice(0, 100);
         const notes: NotationSegmentNote[] = event.rest ? [] : event.notes.map(note => {
-          const parsed = parseSpelling(note.spelling);
+          const parsed = cachedParseSpelling(note.spelling);
           return {
             id: `${note.id}:${owned.length}`.slice(0, 100),
             logical_note_id: note.id,
@@ -385,14 +394,16 @@ export function refreshNotation(document: NotationDocument): NotationDocument {
     }
   }
 
+  // Build the id set once: checking every mapped id with performance.some was
+  // O(notes x performance notes) and dominated refreshes on long recordings.
+  const performanceIds = new Set(document.performance.map(note => note.id));
   const performanceMap: Record<string, string> = {};
   for (const event of document.events) {
     for (const note of event.notes) {
-      for (const id of note.performance_ids) performanceMap[id] = note.id;
+      for (const id of note.performance_ids) {
+        if (performanceIds.has(id)) performanceMap[id] = note.id;
+      }
     }
-  }
-  for (const id of Object.keys(performanceMap)) {
-    if (!document.performance.some(note => note.id === id)) delete performanceMap[id];
   }
 
   document.segments = segments;

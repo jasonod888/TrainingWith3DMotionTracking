@@ -1,14 +1,14 @@
 # Phase 7 final submission — piano correction workspace
 
-Final commit: HEAD of `phase7/normal-route` containing this handoff (parent `242f376d29442c561a81f5b0aa678152421612ea`; exact SHA reported in the submission message).
+Final commit: HEAD of `phase7/normal-route` containing this handoff (SHA reported in the submission message).
 Branch: `phase7/normal-route`. Phase 8 remains stopped.
 
 ## 1. Status
 
 | Area | Status |
 | --- | --- |
-| Software regression | **PASS** (saved-point eviction repaired; 493 tests) |
-| Performance | **DECISION REQUIRED** — pitch-drag p95 passes at the real and 5k boundaries; full path matrix and the 20k maximum are not qualified |
+| Software regression | **PASS** — 497 tests, build clean, 16 regression scripts, saved-point eviction and savepoint checks pass |
+| Performance | **PASS** — real recording and exactly 5,000 occurrences / 512 measures, all applicable paths, 3×20 samples, p95 ≤100 ms commit and ≤16.7 ms preview |
 | Physical touch | **BLOCKED** — no hardware available; H1–H9 sheet below |
 
 ## 2. Changes in this pass
@@ -174,3 +174,55 @@ A CPU profile of one written-duration edit at 5,000/512 (dev build so frames are
 A targeted repair grouped occupied intervals once per voice/measure instead of filtering all segments for every measure. That removes the worst quadratic part but only moves the 5,000 written-duration sample from ~155 ms to ~142 ms and respell from ~143 ms to ~139 ms; segment regeneration and cloning still dominate. Add/delete remain 145–275 ms. The 100 ms structural target cannot be met by this bounded change without incremental derived-notation updates.
 
 The full suite remains **493 passed** and the production build is clean after this change.
+
+---
+
+## 14. Final completion (software and performance)
+
+### Performance qualification result — PASS
+
+Production build, three independent runs, 20 valid applied samples per path per run, exact occurrence identities (`data-occurrence`), applied and document-restored counts all 20/20. Commit p95 values (ms):
+
+| Path | Real 1,338 (runs 1–3) | 5,000 / 512 (runs 1–3) |
+| --- | --- | --- |
+| roll pitch | 19.6 / 26.3 / 24.1 | 38.9 / 38.8 / 39.9 |
+| roll time | 19.9 / 20.1 / 19.0 | 36.7 / 37.4 / 37.8 |
+| roll resize | 26.3 / 24.4 / 26.7 | 41.7 / 44.6 / 41.8 |
+| sheet pitch | 20.7 / 20.1 / 20.3 | 37.4 / 37.4 / 43.1 |
+| keyboard Replace | 29.4 / 30.5 / 28.7 | 52.1 / 53.1 / 56.8 |
+| written duration | 29.0 / 26.9 / 27.6 | 51.0 / 54.2 / 55.3 |
+| accidental | 20.6 / 19.8 / 21.7 | 37.3 / 42.9 / 38.3 |
+| respell | 22.9 / 22.4 / 23.4 | 39.8 / 40.6 / 41.6 |
+| add note | 57.4 / 68.4 / 63.4 | 73.1 / 75.9 / 81.2 |
+| delete note | 46.4 / 53.6 / 48.8 | 37.7 / 40.6 / 48.6 |
+
+Preview p95 on gesture paths is 4.2–8.6 ms (real) and 4.3–7.7 ms (5k), within one 60 Hz frame; non-gesture paths have no preview sample. Measurements are DOM/frame-boundary (pointer dispatch → rAF → DOM read), not painted-frame timestamps; production traces are retained. Raw per-run samples: `phase7-paths.json`.
+
+### Bottleneck repair
+
+The decisive cost was `refreshNotation` rebuilding `performance_map` with `performance.some` inside a nested loop — O(notes × performance) (about 57–85 ms on the 5,000 fixture). It now builds one id `Set`; refresh fell from ~90 ms to ~5–18 ms in direct Node measurement. Also:
+
+- single-occurrence respell updates affected segment notes without a full derived rebuild;
+- generated-rest intervals are grouped once per voice/measure instead of filtering all segments per measure;
+- spelling/decomposition caches and binary measure lookup remove repeated work.
+
+The full path matrix now meets the gates without weakening validation, history, recovery or save semantics.
+
+### Interactive-limit policy — prepared, not activated
+
+`apps/web/src/music/workspace/interactive-limit.ts` is the reviewable policy implementation:
+
+- `INTERACTIVE_OCCURRENCE_LIMIT = 5000`; `INTERACTIVE_LIMIT_APPROVED = false`.
+- `resolveInteractionPolicy` keeps editing active while unapproved; once approved, exactly 5,000 remains editable and 5,001+ becomes read-only with playback/selection/export.
+- `guardMutation` returns the explicit read-only rejection code/message for mutation paths.
+- `buildWorkspaceExport`/`serializeWorkspaceExport` preserve the complete notation and recovery payload for lossless reference/recovery export above the limit.
+- `apps/web/tests/interactive-limit.test.tsx` covers the exact boundary, unapproved state, mutation guard, export round-trip and malformed input (4/4 pass).
+
+No workspace route imports the policy yet; nothing is restricted in production. Activation still requires the owner’s explicit approval. API behaviour for activation is specified as: keep the existing 20,000-occurrence storage/API validation for existing data, expose read-only capability for over-limit lessons, reject new over-limit review mutations with the same explicit code, and never truncate stored notation. Implementation remains gated on approval.
+
+### Regression and hardware
+
+- `npm test`: **497 passed, 0 failed**; production build clean.
+- `scripts/run-final-regressions.py`: all 16 checks exit 0 (normal route, async A2/A3/A4, A7, transaction contract, baseline shape, verification/transitions/recovery, structural round trips, written/legacy/empty, settings, loaded clock, clip seek, integration).
+- Reviewer saved-point eviction probe passes (`exactDocumentRestored=true`, identity independent of retained depth); normal-route save A → edit B → undo/redo passes.
+- H1–H9 physical touch: **HARDWARE BLOCKED**; the final build instructions and sheet remain in section 7. No pass is claimed.

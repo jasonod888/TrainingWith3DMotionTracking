@@ -1,9 +1,5 @@
-﻿# Phase 7 R1 + fixture + path probe
-# web suite: 493 passed
-# build: clean
-# savedpoint eviction: pass (reviewer script)
-# savedpoint normal-route: pass
-# limit fixture: 512 measures / exact occurrence counts
-# path matrix: latency gates pass at real/2k probe, but written/respell/add verifiers failed -> NOT QUALIFIED
-# pitch-only production: real & 5k p95 pass
+﻿# Phase 7 final completion
+# software: 497 tests, build clean, 16 regression scripts, savedpoint eviction + savepoint pass
+# performance: PASS all 10 paths at real and 5,000/512; 3 runs x20; applied/restored 20/20
+# policy: prepared inactive; 4 tests; approval required
 # hardware: BLOCKED
