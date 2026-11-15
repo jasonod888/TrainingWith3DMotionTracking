@@ -157,3 +157,20 @@ The completion contract forbids substituting a lower fixture or silently changin
 Recommendation: option 3, with option 2 as an interim if a 5,000 interactive boundary is required immediately. The written/respell journeys must be made truthfully measurable (choose a voice with room / a note with an available enharmonic) before any boundary is called qualified.
 
 No limit policy has been activated; the read-only/API/export implementation remains pending both this decision and owner approval. Hardware H1–H9 remains **BLOCKED**.
+
+---
+
+## 13. Profile evidence for the structural limit
+
+A CPU profile of one written-duration edit at 5,000/512 (dev build so frames are named) attributes the work as follows:
+
+- `refreshNotation` ~75 samples (segment regeneration, tie construction, sort);
+- generated-rest loop ~26 samples;
+- `structuredClone` ~21 samples;
+- `diffDocuments`/patch-property work ~22 samples;
+- React render/commit ~20 samples;
+- remainder validation/GC.
+
+A targeted repair grouped occupied intervals once per voice/measure instead of filtering all segments for every measure. That removes the worst quadratic part but only moves the 5,000 written-duration sample from ~155 ms to ~142 ms and respell from ~143 ms to ~139 ms; segment regeneration and cloning still dominate. Add/delete remain 145–275 ms. The 100 ms structural target cannot be met by this bounded change without incremental derived-notation updates.
+
+The full suite remains **493 passed** and the production build is clean after this change.

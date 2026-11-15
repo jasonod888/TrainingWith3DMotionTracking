@@ -314,15 +314,22 @@ export function refreshNotation(document: NotationDocument): NotationDocument {
     byEvent.set(event.id, owned);
   }
 
-  // Generated rests cover every gap in every voice that owns events.
+  // Generated rests cover every gap in every voice that owns events. Group the
+  // occupied intervals once: filtering every segment for every measure was
+  // O(measures x segments) and dominated full refreshes on long scores.
+  const occupiedByVoiceMeasure = new Map<string, { start: number; end: number }[]>();
+  for (const segment of segments) {
+    const key = `${segment.staff}:${segment.voice}:${segment.measure_index}`;
+    const list = occupiedByVoiceMeasure.get(key);
+    if (list) list.push({ start: segment.start, end: segment.start + segment.duration });
+    else occupiedByVoiceMeasure.set(key, [{ start: segment.start, end: segment.start + segment.duration }]);
+  }
   const voices = [...new Set(document.events.map(event => `${event.staff}:${event.voice}`))];
   for (const voiceKey of voices) {
     const [staff, voiceText] = voiceKey.split(':');
     const voice = Number(voiceText) as 1 | 2;
     for (const measure of document.measures) {
-      const occupied = segments
-        .filter(segment => segment.staff === staff && segment.voice === voice && segment.measure_index === measure.index)
-        .map(segment => ({ start: segment.start, end: segment.start + segment.duration }));
+      const occupied = occupiedByVoiceMeasure.get(`${staff}:${voice}:${measure.index}`) ?? [];
       const merged = mergeIntervals(occupied);
       let cursor = measure.start;
       const gaps: { start: number; end: number }[] = [];

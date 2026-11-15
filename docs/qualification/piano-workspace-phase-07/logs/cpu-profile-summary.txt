@@ -1,0 +1,5 @@
+﻿CPU profile: one written edit at 5,000/512 (dev build, named frames)
+refreshNotation ~75 samples; generated-rest loop ~26; structuredClone ~21; diffDocuments/patch ~22; React ~20.
+Optimization grouped occupied intervals per voice/measure (removed quadratic filter).
+Result: written 155 -> 142 ms, respell 143 -> 139 ms; add/delete unchanged 145-275 ms.
+Conclusion: 100 ms structural target requires incremental derived-notation updates.
