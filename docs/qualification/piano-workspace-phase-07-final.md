@@ -127,3 +127,32 @@ A per-path production benchmark (`bench-paths.py`) was added for roll pitch/time
 ## 11. Decision status
 
 Owner approval of a reduced interactive limit has **not** been granted (the review only recommends the direction). No read-only/API/export enforcement has been implemented, and no cap is claimed. Performance remains **DECISION REQUIRED**, with two blockers: completing trustworthy per-path measurements and obtaining the owner's explicit limit decision. Hardware remains **BLOCKED** under the H1–H9 sheet.
+
+---
+
+## 12. Stopping point: architectural performance decision required
+
+The 5,000-occurrence / **512-measure** fixture is now exact (`5000 notes · 500 chord events · 512 measures` at 60 BPM), and the real recording remains exact. The R1 saved-point identity survives count eviction (reviewer probe passes) and the normal-route save/undo/redo probe passes.
+
+Production per-path measurement at that boundary shows a genuine architectural limit in structural commands:
+
+| Path (5k boundary, three runs) | Commit p95 | Gate |
+| --- | --- | --- |
+| roll pitch / time / resize / sheet / Replace / accidental | 35–52 ms | pass |
+| written duration / respell | not yet truthfully measurable — the first eligible control is rejected because the target's voice has no room (written) or the fixture target choice needs refinement (respell); the actions are rejected/no-ops, not timed as success | not qualified |
+| **add note** | **272.3 / 268.7 / 275.5 ms** | FAIL |
+| **delete note** | **146.3 / 146.1 / 145.0 ms** | FAIL |
+
+Add/delete require `refreshNotation` to rebuild segments/ties/rests across the 512-measure document; the command cost scales with the document and misses the 100 ms commit target. The real-recording add path also reached 101.4 ms in one run (borderline). Pitch/time/resize/sheet/Replace/accidental pass at the boundary.
+
+### Decision required
+
+The completion contract forbids substituting a lower fixture or silently changing the target. Three options:
+
+1. **Approve a lower interactive boundary** where every path passes. The real recording passes all measured paths except add at 101.4 ms in one run; a boundary below 1,338 would still need written/respell truthfully measured and is not recommended.
+2. **Approve a separate latency target for structural commands** (add/delete/merge/split) — e.g., ≤300 ms at 5,000 occurrences — while keeping 100 ms for occurrence-only edits.
+3. **Fund/authorise incremental derived-notation refresh** for structural commands so add/delete avoid rebuilding all segments/ties. This preserves the architecture but is a larger optimisation than this bounded pass.
+
+Recommendation: option 3, with option 2 as an interim if a 5,000 interactive boundary is required immediately. The written/respell journeys must be made truthfully measurable (choose a voice with room / a note with an available enharmonic) before any boundary is called qualified.
+
+No limit policy has been activated; the read-only/API/export implementation remains pending both this decision and owner approval. Hardware H1–H9 remains **BLOCKED**.

@@ -127,6 +127,22 @@ def click_at(page, locator):
     }""", [box['x'] + box['width'] / 2, box['y'] + box['height'] / 2])
 
 
+def pick_non_tied(page, enharmonic=False):
+    return page.evaluate("""([enharmonic]) => {
+      const names = {1: ['C#', 'Db'], 3: ['D#', 'Eb'], 6: ['F#', 'Gb'], 8: ['G#', 'Ab'], 10: ['A#', 'Bb']};
+      const candidates = [];
+      for (const node of document.querySelectorAll('.ws-roll-note')) {
+        const id = node.getAttribute('data-occurrence');
+        const pitch = Number(node.getAttribute('data-pitch'));
+        const heads = document.querySelectorAll('.ws-score-notehead[data-occurrence="' + id + '"]');
+        if (heads.length !== 1) continue;
+        if (enharmonic && !names[pitch % 12]) continue;
+        candidates.push({id, pitch, octave: Math.floor(pitch / 12) - 1, options: names[pitch % 12] || []});
+      }
+      return candidates.length ? candidates[candidates.length - 1] : null;
+    }""", [enharmonic])
+
+
 def make_paths(page, occurrence):
     """Return {name: (action, applied, restored, preview_bool)} closures."""
     base_pitch = pitch(page, occurrence)
@@ -163,12 +179,21 @@ def make_paths(page, occurrence):
         return timing, pitch(page, occurrence) == base_pitch + 2
 
     def written():
-        select(page, occurrence)
+        candidate = pick_non_tied(page)
+        if not candidate:
+            return {'commit': 0.01}, False
+        select(page, candidate['id'])
         page.wait_for_timeout(10)
-        button = page.get_by_role('button', name='Half', exact=True)
-        box = button.bounding_box()
-        timing = click_locator(button)
-        return timing, 'written 960 ticks' in facts(page)
+        before = facts(page)
+        timing = None
+        for label in ['Half', 'Whole', 'Quarter', 'Eighth']:
+            button = page.get_by_role('button', name=label, exact=True)
+            if not button.count() or not button.first.is_enabled():
+                continue
+            timing = click_locator(button.first)
+            if page.locator('.ws-shell').get_attribute('data-workspace-dirty') == 'true':
+                break
+        return timing or {'commit': 0.01}, page.locator('.ws-shell').get_attribute('data-workspace-dirty') == 'true'
 
     def accidental():
         select(page, occurrence)
@@ -178,21 +203,7 @@ def make_paths(page, occurrence):
         return timing, pitch(page, occurrence) != base_pitch
 
     def respell():
-        candidate = page.evaluate("""() => {
-          const names = {1: ['C#', 'Db'], 3: ['D#', 'Eb'], 6: ['F#', 'Gb'], 8: ['G#', 'Ab'], 10: ['A#', 'Bb']};
-          for (const node of document.querySelectorAll('.ws-roll-note')) {
-            const pitch = Number(node.getAttribute('data-pitch'));
-            const options = names[pitch % 12];
-            if (!options) continue;
-            const id = node.getAttribute('data-occurrence');
-            node.dispatchEvent(new PointerEvent('pointerdown', {pointerId: 82, pointerType: 'mouse',
-              button: 0, bubbles: true, composed: true, cancelable: true}));
-            node.dispatchEvent(new PointerEvent('pointerup', {pointerId: 82, pointerType: 'mouse',
-              bubbles: true, composed: true, cancelable: true}));
-            return {id, options, octave: Math.floor(pitch / 12) - 1};
-          }
-          return null;
-        }""")
+        candidate = pick_non_tied(page, enharmonic=True)
         if not candidate:
             return {'commit': 0.01}, False
         select(page, candidate['id'])
@@ -207,15 +218,18 @@ def make_paths(page, occurrence):
     def add():
         page.locator('[data-add="toggle"]').click()
         page.wait_for_selector('.ws-roll-add-layer')
-        key = page.locator('.keyboard-white[data-pitch="100"], .keyboard-black[data-pitch="100"]').first
-        if key.count():
-            key.click()
         box = page.locator('.ws-roll-add-layer').bounding_box()
         span = float(page.locator('[data-window-span]').get_attribute('data-window-span'))
-        page.mouse.click(box['x'] + box['width'] * (0.2 / span), box['y'] + 5)
-        page.wait_for_selector('[data-ghost="true"]')
-        timing = click_locator(page.locator('[data-add="commit"]'))
-        return timing, total(page) == base_total + 1
+        for seconds in (0.2, 9.9, 5.13, 7.37):
+            for fraction in (0.05, 0.2, 0.4, 0.7, 0.9):
+                page.mouse.click(box['x'] + box['width'] * (seconds / span), box['y'] + box['height'] * fraction)
+                page.wait_for_timeout(20)
+                if page.locator('[data-ghost="true"]').count() and page.locator('[data-add="invalid"]').count() == 0:
+                    timing = click_locator(page.locator('[data-add="commit"]'))
+                    if total(page) == base_total + 1:
+                        return timing, True
+                    return timing, False
+        return {'commit': 0.01}, False
 
     def delete():
         select(page, occurrence)
@@ -300,14 +314,14 @@ def main():
         browser = pw.chromium.launch(channel='chrome')
         for run in range(1, 4):
             run_results = {}
-            for label, draft in (('real_1338', m.LONG), ('limit_2000', bench.limit_draft(2000))):
+            for label, draft in (('real_1338', m.LONG), ('limit_5000', bench.limit_draft(5000))):
                 run_results[label] = run_fixture(browser, draft, label)
             RESULT[f'run{run}'] = run_results
         browser.close()
 
     failures = []
     for run in range(1, 4):
-        for label in ('real_1338', 'limit_2000'):
+        for label in ('real_1338', 'limit_5000'):
             for path, data in RESULT[f'run{run}'][label].items():
                 if data['applied'] != 20 or data['restored'] != 20:
                     failures.append(f'run{run} {path}/{label}: applied {data["applied"]} restored {data["restored"]}')

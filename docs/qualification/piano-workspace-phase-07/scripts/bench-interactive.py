@@ -18,8 +18,27 @@ RESULT = {'scope': 'production build (vite preview), mocked API, local fixtures'
 
 
 def limit_draft(count=20_000):
-    # Dense chords and repeated pitch across the 512-measure (1024 s at 120 BPM)
-    # supported span; every 50th group uses long notes that cross bar lines.
+    # Supported-boundary fixture: 5,000 notes in ten-note chords every 2 s, so a
+    # written half note fits before the next attack in the same voice and several
+    # pitch classes have a single-accidental enharmonic spelling.
+    if count == 5000:
+        pitches = [60, 61, 63, 64, 66, 67, 68, 70, 71, 74]
+        groups = count // len(pitches)
+        events = []
+        for group in range(groups):
+            onset = 0.5 + group * 0.5
+            for index, pitch in enumerate(pitches):
+                events.append({'id': f'big-{group * len(pitches) + index}', 'onset': onset,
+                               'duration': 0.2, 'pitch': pitch,
+                               'velocity': 0.6 if group % 7 else 0.0,
+                               'confidence': 0.8 if group % 11 == 0 else None,
+                               'optional': group % 13 == 0, 'string': None, 'fret': None})
+        return {**m.LONG, 'title': f'{count} event limit fixture', 'duration': 2108,
+                'events': events,
+                'spans': [{'start': 0, 'end': 300, 'kind': 'playing'},
+                          {'start': 300, 'end': 360, 'kind': 'explanation'},
+                          {'start': 360, 'end': 2108, 'kind': 'playing'}]}
+    # Larger exploratory fixture (not a qualification boundary).
     events = []
     pitches = [60, 64, 67, 71, 74]
     groups = max(1, count // len(pitches))
@@ -32,13 +51,11 @@ def limit_draft(count=20_000):
                            'pitch': pitch, 'velocity': 0.6 if group % 7 else 0.0,
                            'confidence': 0.8 if group % 11 == 0 else None,
                            'optional': group % 13 == 0, 'string': None, 'fret': None})
-    # 1,084 source seconds with a 60 s explanation maps to 1,024 score seconds,
-    # i.e. exactly 512 two-second measures at 120 BPM.
-    return {**m.LONG, 'title': f'{count} event limit fixture', 'duration': 1084,
+    return {**m.LONG, 'title': f'{count} event limit fixture', 'duration': 2108,
             'events': events,
             'spans': [{'start': 0, 'end': 300, 'kind': 'playing'},
                       {'start': 300, 'end': 360, 'kind': 'explanation'},
-                      {'start': 360, 'end': 1084, 'kind': 'playing'}]}
+                      {'start': 360, 'end': 2108, 'kind': 'playing'}]}
 
 
 def measure(page):
