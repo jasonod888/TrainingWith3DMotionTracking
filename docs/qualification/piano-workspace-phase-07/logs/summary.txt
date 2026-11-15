@@ -1,5 +1,6 @@
-﻿# Phase 7 final completion
-# software: 497 tests, build clean, 16 regression scripts, savedpoint eviction + savepoint pass
-# performance: PASS all 10 paths at real and 5,000/512; 3 runs x20; applied/restored 20/20
-# policy: prepared inactive; 4 tests; approval required
-# hardware: BLOCKED
+﻿# Phase 7 final evidence
+# web suite: 497 passed; build and tsc clean
+# canonical performance: 3 independent runs, 20/20 applied/restored/reapplied each path, real + 5,000/512
+# read-only integration: 5001 banner/save-disabled/mutation rejected/download; 4999/5000 editable
+# regressions: 16 scripts, savedpoint eviction, verifier negative control, 6 Python policy/verifier tests
+# hardware: HARDWARE BLOCKED

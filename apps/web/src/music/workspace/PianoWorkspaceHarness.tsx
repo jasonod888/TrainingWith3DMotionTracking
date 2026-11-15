@@ -37,6 +37,9 @@ import {
   createWorkspaceState, historyIdentity, historySummary, workspaceReducer, workspaceStatus,
   type WorkspaceAction, type WorkspaceState,
 } from './workspace-state';
+import {
+  buildWorkspaceExport, interactiveLimitApproved, resolveInteractionPolicy, serializeWorkspaceExport,
+} from './interactive-limit';
 import {useElementWidth} from './useElementWidth';
 import {createClock, useClockTime, type ClockStore} from './clock';
 import type {GestureEdit} from './gestures';
@@ -1204,11 +1207,36 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const snapSeconds = snapTicks ? snapTicks * secondsPerTick : null;
   const report = state.lastReport;
   const summary = historySummary(state);
+  const interactionPolicy = resolveInteractionPolicy(document.performance.length, interactiveLimitApproved());
+  const readOnly = interactionPolicy.mode === 'read-only';
+  const downloadReference = () => {
+    const exported = buildWorkspaceExport({
+      document, title, occurrenceCount: document.performance.length, editingMode: interactionPolicy.mode,
+      authored: {
+        alignment: serializeAlignment(alignment, anchors, offsetSeconds),
+        offsetSeconds, spans, sections: sectionsDraft, assessment: assessmentPolicy,
+        identity: {accountId, lessonId: lessonId ?? '', draftId, sourceSha256},
+      },
+      recovery: peekRecovery(),
+    });
+    const blob = new Blob([serializeWorkspaceExport(exported)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const link = globalThis.document.createElement('a');
+    link.href = url;
+    link.download = `${title || 'piano-workspace'}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return <main className="ws-shell" ref={shellRef} data-workspace-dirty={dirty ? 'true' : 'false'}
+    data-interactive-mode={interactionPolicy.mode}
     style={{overflowX: 'clip', maxWidth: '100vw', contain: 'paint'}}
     onPointerDownCapture={() => { workspaceActive.current = true; }}>
     <header className="ws-head">
+      {readOnly ? <div className="inline-notice" role="status" data-read-only="true">
+        <strong>Read-only:</strong> {interactionPolicy.reason}
+        <button type="button" onClick={downloadReference}>Download reference</button>
+      </div> : null}
       <div>
         <p className="ws-eyebrow">{embedded ? 'Piano review · private until you save' : 'Correction workspace · local preview'}</p>
         <div className="ws-title-row">
@@ -1247,12 +1275,12 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         <span><input type="checkbox" aria-label="Confirm reviewed" checked={confirmReviewed}
           onChange={event => setConfirmReviewed(event.target.checked)}/> Reviewed</span>
       </label>
-      <button type="button" onClick={() => save()} disabled={!confirmReviewed || saving || !(dirty || savedRevisionId === null)}
+      <button type="button" onClick={() => save()} disabled={readOnly || !confirmReviewed || saving || !(dirty || savedRevisionId === null)}
         data-save-button="true">{saving ? 'Saving…' : 'Save privately'}</button>
       <button type="button" onClick={reopen} disabled={Boolean(replaceMode) || Boolean(addMode)}>Reopen saved</button>
 
-      <button type="button" onClick={() => dispatch({type: 'undo'})} disabled={!state.past.length || Boolean(replaceMode) || Boolean(addMode)}>Undo</button>
-      <button type="button" onClick={() => dispatch({type: 'redo'})} disabled={!state.future.length || Boolean(replaceMode) || Boolean(addMode)}>Redo</button>
+      <button type="button" onClick={() => dispatch({type: 'undo'})} disabled={readOnly || !state.past.length || Boolean(replaceMode) || Boolean(addMode)}>Undo</button>
+      <button type="button" onClick={() => dispatch({type: 'redo'})} disabled={readOnly || !state.future.length || Boolean(replaceMode) || Boolean(addMode)}>Redo</button>
       <label className="ws-field ws-inline">
         <span>Snap</span>
         <select value={snapTicks} onChange={event => setSnapTicks(Number(event.target.value))}>
@@ -1336,7 +1364,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           setConfirmReviewed(false);
         }}>Add section</button>
       </div>
-      {sectionsDraft.map((section, index) => <fieldset key={section.id} data-section={section.id}>
+      {sectionsDraft.map((section, index) => <fieldset key={section.id} data-section={section.id} disabled={readOnly}>
         <legend>Section {index + 1}</legend>
         <label className="ws-field"><span>Name</span>
           <input value={section.label} maxLength={80} onChange={event => {
@@ -1555,7 +1583,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           <h2>Selected note</h2>
           {!selection || !selected
             ? <p className="ws-hint">Select a note in the roll, the score or the keyboard to edit it.</p>
-            : <fieldset className="ws-inspector-fieldset" disabled={Boolean(replaceMode) || Boolean(addMode)}>
+            : <fieldset className="ws-inspector-fieldset" disabled={readOnly || Boolean(replaceMode) || Boolean(addMode)}>
               <p className="ws-facts">
                 <strong>{selected.spelling}</strong> · {selection.occurrenceId} · {pitchName(selected.pitch)} (MIDI {selected.pitch})<br/>
                 {selected.onset.toFixed(3)} s · recorded {selected.duration === null ? 'unknown' : `${selected.duration.toFixed(3)} s`}<br/>

@@ -8,6 +8,24 @@
 export const INTERACTIVE_OCCURRENCE_LIMIT = 5000;
 export const INTERACTIVE_LIMIT_APPROVED = false;
 
+// Controlled configuration: default inactive; qualification/integration tests can
+// enable the approved policy without changing the shipped default.
+let approvedForSession = INTERACTIVE_LIMIT_APPROVED;
+
+export function setInteractiveLimitApproved(value: boolean): void {
+  approvedForSession = value;
+}
+
+export function interactiveLimitApproved(): boolean {
+  if (approvedForSession) return true;
+  return (globalThis as unknown as {__PIANO_INTERACTIVE_LIMIT_APPROVED__?: boolean})
+    .__PIANO_INTERACTIVE_LIMIT_APPROVED__ === true;
+}
+
+export function interactiveLimitActive(): boolean {
+  return interactiveLimitApproved();
+}
+
 export type EditingMode = 'editing' | 'read-only';
 
 export type InteractionPolicy = {
@@ -63,6 +81,7 @@ export type WorkspaceExport = {
   occurrenceCount: number;
   document: unknown;
   editingMode: EditingMode;
+  authored: unknown;
   recovery: unknown | null;
 };
 
@@ -76,6 +95,7 @@ export function buildWorkspaceExport(input: {
   title: string;
   occurrenceCount: number;
   editingMode: EditingMode;
+  authored?: unknown;
   recovery?: unknown;
   exportedAt?: string;
 }): WorkspaceExport {
@@ -92,6 +112,7 @@ export function buildWorkspaceExport(input: {
     occurrenceCount: input.occurrenceCount,
     document: structuredClone(input.document),
     editingMode: input.editingMode,
+    authored: input.authored === undefined ? {} : structuredClone(input.authored),
     recovery: input.recovery === undefined ? null : structuredClone(input.recovery),
   };
 }

@@ -34,14 +34,17 @@ test('approved policy edits at the exact boundary and is read-only above it', ()
 
 test('lossless export keeps the complete document and recovery payload', () => {
   const recovery = {identity: {lessonId: 'lesson-1'}, notation: document};
+  const authored = {offsetSeconds: 0.25, alignment: {mode: 'manual'}, sections: [], assessment: {policy: 'strict'},
+    identity: {accountId: 'a', lessonId: 'lesson-1'}};
   const exported = buildWorkspaceExport({
     document, title: 'Boundary lesson', occurrenceCount: 2, editingMode: 'read-only',
-    recovery, exportedAt: '2026-11-15T00:00:00.000Z',
+    authored, recovery, exportedAt: '2026-11-15T00:00:00.000Z',
   });
   const parsedJson = JSON.parse(serializeWorkspaceExport(exported));
   assert.equal(parsedJson.kind, 'piano-workspace-export-v1');
   assert.equal(parsedJson.occurrenceCount, 2);
   assert.equal(parsedJson.editingMode, 'read-only');
+  assert.deepEqual(parsedJson.authored, authored);
   assert.deepEqual(parsedJson.recovery, recovery);
   const roundTripped = parseNotationDocument(parsedJson.document);
   assert.deepEqual(roundTripped, document);

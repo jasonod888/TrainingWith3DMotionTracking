@@ -1,5 +1,5 @@
 from apps.api.interactive_limit import (
-    INTERACTIVE_OCCURRENCE_LIMIT, export_reference, mutation_error, resolve_interaction,
+    INTERACTIVE_OCCURRENCE_LIMIT, export_reference, mutation_error, resolve_interaction, write_error,
 )
 
 
@@ -25,3 +25,11 @@ def test_lossless_export_preserves_document():
     assert exported['document'] is document
     assert exported['occurrence_count'] == 5001
     assert exported['recovery'] == {'identity': {'lessonId': 'x'}}
+
+
+def test_server_write_guard_only_when_approved():
+    assert write_error(INTERACTIVE_OCCURRENCE_LIMIT + 1, False) is None
+    assert write_error(INTERACTIVE_OCCURRENCE_LIMIT, True) is None
+    message = write_error(INTERACTIVE_OCCURRENCE_LIMIT + 1, True)
+    assert message and 'limited to' in message
+

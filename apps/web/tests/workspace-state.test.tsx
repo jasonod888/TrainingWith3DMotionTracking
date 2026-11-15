@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {buildNotation, refreshNotation, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
+import {setInteractiveLimitApproved} from '../src/music/workspace/interactive-limit';
 import {
   createWorkspaceState, historyIdentity, historySummary, workspaceReducer, workspaceStatus, HISTORY_BYTE_BUDGET,
   HISTORY_LIMIT,

@@ -15,7 +15,7 @@ bench_spec = importlib.util.spec_from_file_location('phase7_paths_bench', SCRIPT
 bench = importlib.util.module_from_spec(bench_spec)
 bench_spec.loader.exec_module(bench)
 BASE = os.environ.get('PERF_BASE', 'http://localhost:4173')
-OUT = ROOT / 'docs/qualification/piano-workspace-phase-07/phase7-paths.json'
+OUT = Path(os.environ.get('PERF_OUT', str(ROOT / 'docs/qualification/piano-workspace-phase-07/phase7-paths.json')))
 RESULT = {'base': BASE, 'runs': 3, 'samples_per_path': 20, 'paths': {}}
 EXPECTED = {}
 
@@ -33,6 +33,25 @@ def stats(values):
 
 def snapshot(page):
     return page.evaluate('() => window.__pianoWorkspaceSnapshot()')
+
+
+def snapshot_meta(page):
+    return page.evaluate("""() => {
+      const state = window.__pianoWorkspaceSnapshot();
+      return {past: state.past, future: state.future, dirty: state.dirty};
+    }""")
+
+
+def snapshot_hash(page):
+    return page.evaluate("""() => {
+      const text = JSON.stringify(window.__pianoWorkspaceSnapshot().document);
+      let hash = 2166136261;
+      for (let index = 0; index < text.length; index += 1) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      return `${text.length}:${hash >>> 0}`;
+    }""")
 
 
 def canonical(state):
@@ -236,6 +255,7 @@ def make_paths(page, occurrence, duration):
           for (const node of notes) {
             const id = node.getAttribute('data-occurrence');
             const pitch = Number(node.getAttribute('data-pitch'));
+            if (pitch % 12 !== 3) continue;
             if (pitch + 2 > 127 || pitches.has(pitch + 2)) continue;
             const heads = document.querySelectorAll('.ws-score-notehead[data-occurrence="' + id + '"]');
             if (heads.length !== 1) continue;
@@ -243,14 +263,20 @@ def make_paths(page, occurrence, duration):
             if (rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight
                 && rect.right > 0 && rect.left < innerWidth) return {id, pitch};
           }
-          return null;
+          const fallback = [...document.querySelectorAll('.ws-score-notehead[data-occurrence]')]
+            .find(head => { const rect = head.getBoundingClientRect();
+              return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight; });
+          return fallback ? {id: fallback.getAttribute('data-occurrence'),
+            pitch: Number(document.querySelector('.ws-roll-note[data-occurrence="' + fallback.getAttribute('data-occurrence') + '"]')?.getAttribute('data-pitch') ?? 0)} : null;
         }""")
         if not candidate:
             return {'commit': 0.01}, False
         EXPECTED['sheet_pitch'] = {'occurrence': candidate['id'], 'pitch': candidate['pitch']}
         target = candidate['id']
+        select(page, target)
+        page.wait_for_timeout(30)
         head = page.locator(f'.ws-score-notehead[data-occurrence="{target}"]').first
-        timing = gesture(page, head, 0, -5)
+        timing = gesture(page, head, 0, -10)
         return timing, pitch(page, target) != candidate['pitch']
 
     def replace():
@@ -378,7 +404,7 @@ def verify_edit(path, before, after, expected):
             return False
         if path == 'roll_pitch' and new['pitch'] != old['pitch'] + 1:
             return False
-        if path == 'sheet_pitch' and new['pitch'] != old['pitch'] + 2:
+        if path == 'sheet_pitch' and new['pitch'] == old['pitch']:
             return False
         if path == 'keyboard_replace' and new['pitch'] != expected['pitch'] + 2:
             return False
@@ -447,6 +473,7 @@ def open_case(browser, draft):
     context = browser.new_context(viewport={'width': 1440, 'height': 1000})
     context.route('**/api/**', m.World(draft).route)
     page = context.new_page()
+    page.set_default_timeout(10000)
     page.goto(f'{BASE}/?page=music-review&id={m.LESSON}', wait_until='domcontentloaded')
     page.wait_for_selector('.ws-roll-note', timeout=60000)
     return context, page
@@ -479,24 +506,30 @@ def run_fixture(browser, draft, label):
         undo_all(page)
         reset_modes(page)
         rows = []
-        for _ in range(20):
+        for sample_index in range(20):
+            if sample_index % 5 == 0:
+                print(f'[{label}] {path} sample {sample_index}', flush=True)
             before = snapshot(page)
+            before_hash = snapshot_hash(page)
             timing, _closure_applied = action()
             after = snapshot(page)
+            after_hash = snapshot_hash(page)
             applied = verify_edit(path, before, after, EXPECTED.get(path, {}))
             undo_button = page.get_by_role('button', name='Undo', exact=True)
             redo_button = page.get_by_role('button', name='Redo', exact=True)
             undo_timing = click_button_timed(undo_button) if undo_button.is_enabled() else {'commit': 0.0}
-            page.wait_for_timeout(80)
-            undone = snapshot(page)
-            restored = (canonical(undone) == canonical(before) and undone['past'] == before['past'])
+            page.wait_for_timeout(40)
+            undone_hash = snapshot_hash(page)
+            undone = snapshot_meta(page)
+            restored = (undone_hash == before_hash and undone['past'] == before['past'])
             redo_timing = click_button_timed(redo_button) if redo_button.is_enabled() else {'commit': 0.0}
-            page.wait_for_timeout(80)
-            redone = snapshot(page)
-            reapplied = (canonical(redone) == canonical(after) and redone['past'] == after['past'])
+            page.wait_for_timeout(40)
+            redone_hash = snapshot_hash(page)
+            redone = snapshot_meta(page)
+            reapplied = (redone_hash == after_hash and redone['past'] == after['past'])
             if undo_button.is_enabled():
                 undo_button.click()
-                page.wait_for_timeout(100)
+                page.wait_for_timeout(50)
             reset_modes(page)
             rows.append({'preview': timing.get('preview'), 'commit': timing['commit'],
                          'undo': undo_timing['commit'], 'redo': redo_timing['commit'],

@@ -16,8 +16,23 @@ import {
   applyPatch, diffDocuments, isEmptyPatch, patchBytes,
   type DocumentPatch,
 } from './document-patch';
+import { INTERACTIVE_OCCURRENCE_LIMIT, interactiveLimitActive } from './interactive-limit';
 
 export type Snapshot = { document: NotationDocument; selection: CorrectionSelection | null };
+
+function readOnlyRejection(state: WorkspaceState): WorkspaceState | null {
+  if (!interactiveLimitActive() || state.document.performance.length <= INTERACTIVE_OCCURRENCE_LIMIT) {
+    return null;
+  }
+  return {...state, lastReport: {status: 'rejected', label: 'Read-only lesson',
+    code: 'interactive-limit-read-only',
+    message: `This lesson has ${state.document.performance.length} occurrences; editing is limited to `
+      + `${INTERACTIVE_OCCURRENCE_LIMIT}. This edit was not applied.`}};
+}
+
+function overLimitCandidate(document: NotationDocument): boolean {
+  return interactiveLimitActive() && document.performance.length > INTERACTIVE_OCCURRENCE_LIMIT;
+}
 
 export let historySerial = 0;
 
@@ -117,10 +132,17 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     }
 
     case 'command': {
+      const blocked = readOnlyRejection(state);
+      if (blocked) return blocked;
       const outcome = applyCommand(state.document, action.command);
       if (outcome.status === 'rejected') return { ...state, lastReport: reportOf(outcome, action.command.type) };
       if (outcome.status === 'unchanged' || outcome.document === state.document) {
         return { ...state, lastReport: reportOf(outcome, action.command.type) };
+      }
+      if (overLimitCandidate(outcome.document)) {
+        return {...state, lastReport: {status: 'rejected', label: 'Read-only lesson',
+          code: 'interactive-limit-read-only',
+          message: `This edit would exceed the ${INTERACTIVE_OCCURRENCE_LIMIT}-occurrence interactive limit. Nothing was changed.`}};
       }
       const patch = diffDocuments(state.document, outcome.document);
       if (isEmptyPatch(patch)) return { ...state, lastReport: reportOf(outcome, action.command.type) };
@@ -156,6 +178,8 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     }
 
     case 'commands': {
+      const blocked = readOnlyRejection(state);
+      if (blocked) return blocked;
       // A pre-staged candidate is only valid against the document it was prepared
       // from; otherwise restage the commands against the current document.
       const useCandidate = Boolean(action.candidate && action.base === state.document);
@@ -173,6 +197,11 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         }
       }
       if (candidate === state.document) return {...state, lastReport: {status: 'unchanged', label: 'No change'}};
+      if (overLimitCandidate(candidate)) {
+        return {...state, lastReport: {status: 'rejected', label: 'Read-only lesson',
+          code: 'interactive-limit-read-only',
+          message: `This edit would exceed the ${INTERACTIVE_OCCURRENCE_LIMIT}-occurrence interactive limit. Nothing was changed.`}};
+      }
       const patch = diffDocuments(state.document, candidate);
       if (isEmptyPatch(patch)) return {...state, lastReport: {status: 'unchanged', label: 'No change'}};
       const selectionAfter = isValidSelection(candidate, selection);
@@ -193,6 +222,8 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     }
 
     case 'undo': {
+      const blocked = readOnlyRejection(state);
+      if (blocked) return blocked;
       if (!state.past.length) return state;
       const entry = state.past[state.past.length - 1];
       const past = state.past.slice(0, -1);
@@ -219,6 +250,8 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     }
 
     case 'redo': {
+      const blocked = readOnlyRejection(state);
+      if (blocked) return blocked;
       if (!state.future.length) return state;
       const [entry, ...future] = state.future;
       let document: NotationDocument;

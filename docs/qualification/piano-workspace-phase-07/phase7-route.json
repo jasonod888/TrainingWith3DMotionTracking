@@ -25,8 +25,8 @@
   "unsaved_guard": "Leave without saving your changes?",
   "guitar_regression": true,
   "performance_1338": {
-    "dom": 136,
-    "load": 138,
+    "dom": 125,
+    "load": 126,
     "notes": 35,
     "score": 33,
     "heap": 22,
@@ -46,7 +46,7 @@
       "mappedTick": 1740.0,
       "roll_seconds": 1.5
     },
-    "played": 0.789981,
+    "played": 0.791383,
     "ended": {
       "ended": true,
       "paused": true,

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import interactive_limit
+
 PPQ = 480
 GRID = 120
 MAX_MEASURES = 512
@@ -84,6 +86,13 @@ def validate_notation(value: Any, events: list[Any], duration: float) -> dict[st
         _fail('This notation version is unsupported.')
     if value.get('subject') != 'piano':
         _fail('Notation editing is only available for piano lessons.')
+    performance = value.get('performance')
+    occurrence_count = len(performance) if isinstance(performance, list) else -1
+    if occurrence_count >= 0:
+        limit_error = interactive_limit.write_error(
+            occurrence_count, interactive_limit.INTERACTIVE_LIMIT_APPROVED)
+        if limit_error:
+            _fail(limit_error)
     notated_duration = _number(value.get('duration'), 'duration')
     if notated_duration <= 0 or abs(notated_duration - duration) > 1e-6:
         _fail('The notation duration must match the reviewed clip.')

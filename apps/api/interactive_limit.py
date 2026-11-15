@@ -45,6 +45,14 @@ def mutation_error(policy: dict[str, Any]) -> dict[str, str] | None:
     }
 
 
+def write_error(occurrence_count: int, approved: bool | None = None) -> str | None:
+    """Server-side write guard; returns a message only when the policy is approved."""
+    policy = resolve_interaction(occurrence_count, approved)
+    error = mutation_error(policy)
+    return None if error is None else error['message']
+
+
+
 def export_reference(notation: Any, title: str, occurrence_count: int,
                      recovery: Any | None = None) -> dict[str, Any]:
     """Lossless export; the notation document is copied verbatim, never truncated."""
