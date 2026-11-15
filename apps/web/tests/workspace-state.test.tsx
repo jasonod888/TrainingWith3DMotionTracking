@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {buildNotation, refreshNotation, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
 import {
-  createWorkspaceState, historyPath, historySummary, workspaceReducer, workspaceStatus, HISTORY_BYTE_BUDGET,
+  createWorkspaceState, historyIdentity, historySummary, workspaceReducer, workspaceStatus, HISTORY_BYTE_BUDGET,
+  HISTORY_LIMIT,
   type WorkspaceState,
 } from '../src/music/workspace/workspace-state';
 
@@ -262,26 +263,54 @@ test('R5: history keeps patches, not documents, on a real-size score', () => {
 
 test('B1 saved-point identity survives undo, redo and branching at the same depth', () => {
   let state = start();
-  const origin = historyPath(state);
+  const origin = historyIdentity(state);
   state = workspaceReducer(state, {type: 'command',
     command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 62}});
-  const saved = historyPath(state);
+  const saved = historyIdentity(state);
   assert.notEqual(saved, origin);
   state = workspaceReducer(state, {type: 'command',
     command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 64}});
-  const later = historyPath(state);
+  const later = historyIdentity(state);
   assert.notEqual(later, saved);
   state = workspaceReducer(state, {type: 'undo'});
-  assert.equal(historyPath(state), saved, 'undo to saved point must match the saved path');
-  assert.equal(historyPath(state), saved);
+  assert.equal(historyIdentity(state), saved, 'undo to saved point must match the saved path');
+  assert.equal(historyIdentity(state), saved);
   const redone = workspaceReducer(state, {type: 'redo'});
-  assert.equal(historyPath(redone), later, 'redo returns to the later path');
+  assert.equal(historyIdentity(redone), later, 'redo returns to the later path');
   const undoAgain = workspaceReducer(redone, {type: 'undo'});
   const branch = workspaceReducer(undoAgain, {type: 'command',
     command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 67}});
   assert.equal(branch.past.length, undoAgain.past.length + 1);
-  assert.notEqual(historyPath(branch), saved, 'branching at the same depth must not collide');
+  assert.notEqual(historyIdentity(branch), saved, 'branching at the same depth must not collide');
   const back = workspaceReducer(branch, {type: 'undo'});
-  assert.equal(historyPath(back), saved, 'undo back to the saved point is clean again');
-  assert.equal(historyPath(createWorkspaceState(score)), origin);
+  assert.equal(historyIdentity(back), saved, 'undo back to the saved point is clean again');
+  assert.equal(historyIdentity(createWorkspaceState(score)), origin);
+});
+
+test('R1 saved savepoint survives count eviction and evicted-root identity', () => {
+  let state = start();
+  // Fill the retained history to its limit and save there.
+  for (let index = 0; index < HISTORY_LIMIT; index += 1) {
+    state = workspaceReducer(state, {type: 'command',
+      command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: index % 2 ? 60 : 62}});
+  }
+  assert.equal(state.past.length, HISTORY_LIMIT);
+  const savedIdentity = historyIdentity(state);
+  const savedDocument = JSON.stringify(state.document);
+  assert.equal(state.evicted, false);
+
+  // One more edit evicts the oldest patch; undo restores the saved document but
+  // the retained depth is now different.
+  state = workspaceReducer(state, {type: 'command',
+    command: {type: 'set-occurrence-pitch', occurrenceId: 'n-a', pitch: 64}});
+  assert.equal(state.evicted, true);
+  state = workspaceReducer(state, {type: 'undo'});
+  assert.equal(JSON.stringify(state.document), savedDocument);
+  assert.equal(historyIdentity(state), savedIdentity, 'evicted saved point must match');
+  assert.ok(state.past.length < HISTORY_LIMIT, 'retained depth is smaller than the saved depth');
+
+  // Undoing to the evicted root is not the clean original root.
+  while (state.past.length) state = workspaceReducer(state, {type: 'undo'});
+  assert.equal(historyIdentity(state), 'origin:evicted');
+  assert.notEqual(historyIdentity(state), historyIdentity(createWorkspaceState(score)));
 });

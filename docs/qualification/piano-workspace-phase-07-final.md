@@ -7,8 +7,8 @@ Branch: `phase7/normal-route`. Phase 8 remains stopped.
 
 | Area | Status |
 | --- | --- |
-| Software regression | **PASS** |
-| Performance | **DECISION REQUIRED** — real recording and 5,000-event boundary pass p95; 10,000 and the current 20,000 maximum do not |
+| Software regression | **PASS** (saved-point eviction repaired; 493 tests) |
+| Performance | **DECISION REQUIRED** — pitch-drag p95 passes at the real and 5k boundaries; full path matrix and the 20k maximum are not qualified |
 | Physical touch | **BLOCKED** — no hardware available; H1–H9 sheet below |
 
 ## 2. Changes in this pass
@@ -107,3 +107,23 @@ No physical device is available. All rows are **NOT RUN**; this is not a pass. E
 - Physical-touch qualification is hardware-blocked.
 - The benchmark measures pointer edits after warm-up; first-load/cold samples are reported separately in the raw JSON (`domMs`/`loadMs`), and replay of other journeys is regression-tested rather than individually timed.
 - Mocked API/local media; no backend timing or real media latency is claimed.
+
+---
+
+## 9. R1 eviction repair (this pass)
+
+`historyIdentity` no longer includes retained depth. It is the top history-entry id while history exists, and distinguishes the true root (`origin`) from an evicted root (`origin:evicted`). Branching still changes the top entry id, and document replacement still advances `documentEpoch`.
+
+- Reviewer `check-savedpoint-eviction.py`: **pass** — saved `entry:history-500`, post-eviction undo restores the exact document and the same identity with 499 retained entries.
+- Ordinary test: fill `HISTORY_LIMIT`, save the identity, perform one more command (evicting the oldest patch), undo, assert the exact document and identity; undo to the empty evicted history is `origin:evicted`, distinct from a clean root. Byte-budget eviction shares the same `evicted` flag and identity rule.
+- Normal-route save A → edit B → undo A → redo B still passes (`check-savepoint.py`).
+
+## 10. Fixture and path-measurement status
+
+The limit fixture now maps 1,084 source seconds with a 60 s held passage to exactly **1,024 score seconds = 512 measures**; the runner asserts the heading contains both the requested occurrence count and `512 measures` (5,000 notes / 512 measures; 2,000 probe also 512 measures).
+
+A per-path production benchmark (`bench-paths.py`) was added for roll pitch/time/resize, sheet drag, keyboard Replace, written duration, accidental, respell, add/delete and undo/redo, with fresh pages per path, warm-up, three runs of 20 samples, applied/undo-restored assertions and p95 gating. Its measured latency gates showed no commit p95 failures at the real or 2,000 boundary, but correctness verifiers for written duration (tied target), respell (tied/duplicate target) and add-note (placement collision) did not reliably apply, so the path matrix is **not qualified** and no supported-limit decision is claimed from it. The earlier pitch-only production results (real/5k p95 pass) remain the only qualified timing evidence.
+
+## 11. Decision status
+
+Owner approval of a reduced interactive limit has **not** been granted (the review only recommends the direction). No read-only/API/export enforcement has been implemented, and no cap is claimed. Performance remains **DECISION REQUIRED**, with two blockers: completing trustworthy per-path measurements and obtaining the owner's explicit limit decision. Hardware remains **BLOCKED** under the H1–H9 sheet.

@@ -69,11 +69,19 @@ export type WorkspaceAction =
 export const HISTORY_BYTE_BUDGET = 4 * 1024 * 1024;
 export const HISTORY_LIMIT = 500;
 
-/** Stable identity of the current history path, used for saved-point dirty checks. */
-export function historyPath(state: WorkspaceState): string {
-  const top = state.past.length ? state.past[state.past.length - 1].id : 'origin';
-  return `${state.past.length}:${top}`;
+/**
+ * Stable savepoint identity, independent of how many patches are retained. The top
+ * entry id identifies the exact path; an empty history distinguishes the true root
+ * from an evicted root (where older patches were dropped). Branching replaces the
+ * top entry id, and external document replacement is covered by the caller's epoch.
+ */
+export function historyIdentity(state: WorkspaceState): string {
+  if (!state.past.length) return state.evicted ? 'origin:evicted' : 'origin';
+  return `entry:${state.past[state.past.length - 1].id}`;
 }
+
+/** Backwards-compatible alias for the eviction-safe identity. */
+export const historyPath = historyIdentity;
 
 export function createWorkspaceState(document: NotationDocument): WorkspaceState {
   return {

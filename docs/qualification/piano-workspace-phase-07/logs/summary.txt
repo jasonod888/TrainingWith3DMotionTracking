@@ -1,4 +1,9 @@
-﻿# Phase 7 final evidence
-# software: 492 tests, build clean, 16 regression scripts exit 0, savepoint check pass
-# performance: production build; real and 5k p95 pass; 10k/20k fail; decision required
+﻿# Phase 7 R1 + fixture + path probe
+# web suite: 493 passed
+# build: clean
+# savedpoint eviction: pass (reviewer script)
+# savedpoint normal-route: pass
+# limit fixture: 512 measures / exact occurrence counts
+# path matrix: latency gates pass at real/2k probe, but written/respell/add verifiers failed -> NOT QUALIFIED
+# pitch-only production: real & 5k p95 pass
 # hardware: BLOCKED

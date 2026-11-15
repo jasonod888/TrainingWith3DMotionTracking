@@ -32,11 +32,13 @@ def limit_draft(count=20_000):
                            'pitch': pitch, 'velocity': 0.6 if group % 7 else 0.0,
                            'confidence': 0.8 if group % 11 == 0 else None,
                            'optional': group % 13 == 0, 'string': None, 'fret': None})
-    return {**m.LONG, 'title': f'{count} event limit fixture', 'duration': 1024,
+    # 1,084 source seconds with a 60 s explanation maps to 1,024 score seconds,
+    # i.e. exactly 512 two-second measures at 120 BPM.
+    return {**m.LONG, 'title': f'{count} event limit fixture', 'duration': 1084,
             'events': events,
             'spans': [{'start': 0, 'end': 300, 'kind': 'playing'},
                       {'start': 300, 'end': 360, 'kind': 'explanation'},
-                      {'start': 360, 'end': 1024, 'kind': 'playing'}]}
+                      {'start': 360, 'end': 1084, 'kind': 'playing'}]}
 
 
 def measure(page):

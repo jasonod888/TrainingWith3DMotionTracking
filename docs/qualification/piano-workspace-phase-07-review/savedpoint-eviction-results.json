@@ -1,0 +1,9 @@
+{
+  "savedDepth": 500,
+  "afterUndoDepth": 499,
+  "savedPath": "entry:history-500",
+  "afterUndoPath": "entry:history-500",
+  "evicted": true,
+  "exactDocumentRestored": true,
+  "passed": true
+}
