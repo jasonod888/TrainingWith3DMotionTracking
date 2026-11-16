@@ -301,6 +301,7 @@ export function TimeRoll({
           {ticks.map(tick => <span key={tick} className="ws-roll-tick-label" style={{left: tick * pps + 4}}>{formatSeconds(tick)}</span>)}
         </div>
         <svg className="ws-roll-svg" width={totalWidth} height={pitchHeight} role="img"
+          data-roll-window-start={window.start} data-roll-window-span={window.span}
           aria-label={`Piano roll, ${visibleNotes.length} notes visible`}
           data-culled-notes={visibleNotes.length} data-total-notes={document.performance.length}
           data-pitch-height={Math.round(pitchHeight)} data-plot-height={PLOT_HEIGHT}>

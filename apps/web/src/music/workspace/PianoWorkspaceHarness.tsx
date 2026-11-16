@@ -12,7 +12,7 @@ import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
   applyCommand, buildNotation, parseNotationDocument, selectionForOccurrence,
   activeOccurrenceIds, alignmentFromSpans, effectiveSecondsToTick, occurrenceIntervals,
-  addAnchor, applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, type AnchorPoint,
+  addAnchor, applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, toMusicXML, type AnchorPoint,
   type Alignment, type CorrectionSelection, type NotationDocument,
 } from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
@@ -41,6 +41,7 @@ import {
   buildWorkspaceExport, interactiveLimitApproved, resolveInteractionPolicy, serializeWorkspaceExport,
 } from './interactive-limit';
 import {useElementWidth} from './useElementWidth';
+import {FormattedScore} from './FormattedScore';
 import {createClock, useClockTime, type ClockStore} from './clock';
 import type {GestureEdit} from './gestures';
 import {
@@ -118,6 +119,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const lessonId = lessonIdProp ?? params.get('id') ?? '';
 
   const [state, setState] = useState<WorkspaceState | null>(null);
+  const [scoreMode, setScoreMode] = useState<'correction' | 'formatted'>('correction');
   /** Bumped when a document is replaced outside the undo history. */
   const [documentEpoch, setDocumentEpoch] = useState(0);
   const snapshotRef = useRef<{document: NotationDocument | null; selection: unknown; dirty: boolean;
@@ -1239,6 +1241,17 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     URL.revokeObjectURL(url);
   };
 
+  const downloadMusicXml = () => {
+    const xml = toMusicXML(document, {title});
+    const blob = new Blob([xml], {type: 'application/vnd.recordare.musicxml+xml'});
+    const url = URL.createObjectURL(blob);
+    const link = globalThis.document.createElement('a');
+    link.href = url;
+    link.download = `${(title || 'piano-lesson').replace(/[^a-z0-9._-]+/gi, '-').slice(0, 60)}.musicxml`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return <main className="ws-shell" ref={shellRef} data-workspace-dirty={dirty ? 'true' : 'false'}
     data-interactive-mode={interactionPolicy.mode}
     style={{overflowX: 'clip', maxWidth: '100vw', contain: 'paint'}}
@@ -1270,6 +1283,18 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       </div>
     </header>
 
+    <div className="ws-toolbar" data-score-mode={scoreMode}>
+      <button type="button" data-formatted-toggle="true"
+        aria-pressed={scoreMode === 'formatted'}
+        onClick={() => setScoreMode(mode => mode === 'formatted' ? 'correction' : 'formatted')}>
+        {scoreMode === 'formatted' ? 'Return to correction' : 'Formatted score'}
+      </button>
+      <button type="button" onClick={downloadMusicXml}>MusicXML</button>
+      {scoreMode === 'formatted' ? <span className="ws-hint">Read-only formatted preview · edits and selection are preserved.</span> : null}
+    </div>
+
+    {scoreMode === 'formatted' ? <FormattedScore document={document} title={title}
+      selectedOccurrenceId={selection?.occurrenceId ?? null}/> : <>
     <div className="ws-toolbar">
       <button type="button" onClick={toggleTransport}>{playing ? 'Pause' : 'Play'}</button>
       <label className="ws-field ws-inline">
@@ -1795,6 +1820,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         </section>
       </aside>
     </div>
+    </>}
   </main>;
 }
 
