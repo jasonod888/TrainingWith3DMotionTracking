@@ -207,6 +207,7 @@ export function ContinuousScore({
   };
 
   const commitSheetDrag = (event: React.PointerEvent) => {
+    if (!editingEnabled) { cancelSheetDrag(event); return; }
     const drag = sheetDrag.current;
     // A foreign pointer cannot finish (or cancel) someone else's drag.
     if (drag && event.pointerId !== drag.pointerId) return;
@@ -222,6 +223,8 @@ export function ContinuousScore({
 
   const cancelSheetDrag = (event?: React.PointerEvent) => {
     if (event && sheetDrag.current && event.pointerId !== sheetDrag.current.pointerId) return;
+    const drag = sheetDrag.current;
+    try { drag?.capture?.releasePointerCapture?.(drag.pointerId); } catch { /* jsdom */ }
     sheetDrag.current = null;
     sheetCleanup.current?.();
     sheetCleanup.current = null;
@@ -230,6 +233,7 @@ export function ContinuousScore({
 
   // Unmounting disposes the transaction; nothing can commit afterwards.
   useEffect(() => () => { cancelSheetDrag(); }, []);
+  useEffect(() => { if (!editingEnabled) cancelSheetDrag(); }, [editingEnabled]);
 
   useEffect(() => {
     if (!sheetPreview) return;

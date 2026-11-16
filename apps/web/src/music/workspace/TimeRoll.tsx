@@ -163,6 +163,8 @@ export function TimeRoll({
   const cancelDrag = (event?: React.PointerEvent) => {
     if (event && dragRef.current && event.pointerId !== dragRef.current.pointerId) return;
     // Distinct from commit: nothing reaches the document or history.
+    const drag = dragRef.current;
+    try { drag?.capture?.releasePointerCapture?.(drag.pointerId); } catch { /* jsdom */ }
     dragRef.current = null;
     teardownDrag();
     setDragPreview(null);
@@ -170,6 +172,7 @@ export function TimeRoll({
 
   // An unmount during a drag must dispose the transaction, never commit later.
   useEffect(() => () => { cancelDrag(); }, []);
+  useEffect(() => { if (!editingEnabled) cancelDrag(); }, [editingEnabled]);
 
   const beginDrag = (note: NotationDocument['performance'][number], event: React.PointerEvent, forced: GestureAxis | null) => {
     if (addMode) { onGhostPlace?.(note.onset + effectiveOffset, note.pitch); return; }
@@ -230,6 +233,7 @@ export function TimeRoll({
   };
 
   const commitDrag = (event: React.PointerEvent) => {
+    if (!editingEnabled) { cancelDrag(event); return; }
     const drag = dragRef.current;
     if (drag && event.pointerId !== drag.pointerId) return;
     dragRef.current = null;

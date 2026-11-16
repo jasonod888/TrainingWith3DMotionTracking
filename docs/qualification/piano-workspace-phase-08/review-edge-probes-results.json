@@ -1,0 +1,35 @@
+[
+  {
+    "name": "all-supported-key-signatures",
+    "passed": true,
+    "tested": 30,
+    "failures": []
+  },
+  {
+    "name": "full-piano-range-ledger-count",
+    "passed": true,
+    "notes": [
+      {
+        "note": "A0",
+        "expected": 6,
+        "actual": 6,
+        "passed": true
+      },
+      {
+        "note": "C8",
+        "expected": 9,
+        "actual": 9,
+        "passed": true
+      }
+    ]
+  },
+  {
+    "name": "preview-cancels-in-flight-pointer-transaction",
+    "passed": true,
+    "preview_pitch": "70",
+    "before_pitch": 69,
+    "after_pitch": 69,
+    "before_history": 0,
+    "after_history": 0
+  }
+]

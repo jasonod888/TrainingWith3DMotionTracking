@@ -6,14 +6,14 @@
  * API. Layout is pure so pagination/system packing can be tested.
  */
 import React, {useMemo} from 'react';
-import {measureTicks, parseSpelling, type NotationDocument, type NotationSegment, type NotationStaff} from '../../../../../packages/music-notation/index.ts';
+import {keySignature as sharedKeySignature, parseSpelling, type NotationDocument, type NotationSegment, type NotationStaff} from '../../../../../packages/music-notation/index.ts';
 
 const PAGE_WIDTH = 900;
-const PAGE_HEIGHT = 1160;
+const PAGE_HEIGHT = 1500;
 const MARGIN_X = 58;
 const MARGIN_TOP = 92;
 const MARGIN_BOTTOM = 64;
-const SYSTEM_HEIGHT = 176;
+const SYSTEM_HEIGHT = 280;
 const TREBLE_TOP = 38;
 const BASS_TOP = 112;
 const LINE = 8;
@@ -145,9 +145,9 @@ function ledgerLines(staff: NotationStaff, localY: number) {
   if (localY >= top && localY <= bottom) return [];
   const lines: number[] = [];
   if (localY < top) {
-    for (let line = top - LINE; line >= Math.max(localY - 0.1, top - 5 * LINE); line -= LINE) lines.push(line);
+    for (let line = top - LINE; line >= localY - 0.1; line -= LINE) lines.push(line);
   } else {
-    for (let line = bottom + LINE; line <= Math.min(localY + 0.1, bottom + 5 * LINE); line += LINE) lines.push(line);
+    for (let line = bottom + LINE; line <= localY + 0.1; line += LINE) lines.push(line);
   }
   return lines;
 }
@@ -189,13 +189,13 @@ const FLAT_ORDER: {letter: string; treble: number; bass: number}[] = [
   {letter: 'G', treble: 4, bass: 2}, {letter: 'C', treble: 5, bass: 3},
   {letter: 'F', treble: 4, bass: 2},
 ];
-const SHARP_KEYS: Record<string, number> = {G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7};
-const FLAT_KEYS: Record<string, number> = {F: 1, Bb: 2, Eb: 3, Ab: 4, Db: 5, Gb: 6, Cb: 7};
 
-function keySignature(key: string): {glyph: string; entries: {letter: string; treble: number; bass: number}[]} {
-  const name = (key || 'C').split(/[\s(]/)[0];
-  if (SHARP_KEYS[name]) return {glyph: '♯', entries: SHARP_ORDER.slice(0, SHARP_KEYS[name])};
-  if (FLAT_KEYS[name]) return {glyph: '♭', entries: FLAT_ORDER.slice(0, FLAT_KEYS[name])};
+/** Use the shared engine's fifths/mode definition, not a major-only lookup. */
+function renderedKeySignature(key: string): {glyph: string; entries: {letter: string; treble: number; bass: number}[]} {
+  const signature = sharedKeySignature(key || 'C');
+  const count = Math.abs(signature.fifths);
+  if (signature.fifths > 0) return {glyph: '♯', entries: SHARP_ORDER.slice(0, count)};
+  if (signature.fifths < 0) return {glyph: '♭', entries: FLAT_ORDER.slice(0, count)};
   return {glyph: '', entries: []};
 }
 
@@ -203,7 +203,7 @@ export function FormattedScore({document, title, selectedOccurrenceId}: {
   document: NotationDocument; title: string; selectedOccurrenceId?: string | null;
 }) {
   const layout = useMemo(() => layoutFormattedScore(document), [document]);
-  const signature = keySignature(document.key_signature);
+  const signature = renderedKeySignature(document.key_signature);
   return <section className="ws-formatted" aria-label="Formatted final score">
     <div className="ws-formatted-toolbar">
       <strong>Formatted score</strong>

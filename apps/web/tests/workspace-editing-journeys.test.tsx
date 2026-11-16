@@ -309,3 +309,30 @@ test('switching to formatted cancels active add/replace modes', async () => {
   await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
   assert.equal(view.container.querySelector('.ws-roll-add-layer'), null);
 });
+
+test('switching to formatted cancels an in-flight pointer drag and late release', async () => {
+  const view = await open();
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  const box = note.getBoundingClientRect();
+  const snapshot = () => (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  const before = snapshot();
+  fireEvent.pointerDown(note, {clientX: box.x + 4, clientY: box.y + box.height / 2, pointerId: 12, button: 0});
+  fireEvent.pointerMove(window, {clientX: box.x + 4, clientY: box.y + box.height / 2 - 8, pointerId: 12, buttons: 1});
+  view.getByRole('button', {name: 'Formatted score', exact: true}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('[data-formatted-page="1"]')));
+  fireEvent.pointerUp(window, {clientX: box.x + 4, clientY: box.y + box.height / 2 - 8, pointerId: 12});
+  await waitFor(() => {
+    const after = snapshot();
+    assert.deepEqual(after.document, before.document, 'late drag release must not commit');
+    assert.equal(after.past, before.past);
+    assert.equal(after.future, before.future);
+  });
+  view.getByRole('button', {name: 'Return to correction', exact: true}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
+  const again = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  const nextBox = again.getBoundingClientRect();
+  fireEvent.pointerDown(again, {clientX: nextBox.x + 4, clientY: nextBox.y + nextBox.height / 2, pointerId: 13, button: 0});
+  fireEvent.pointerMove(window, {clientX: nextBox.x + 4, clientY: nextBox.y + nextBox.height / 2 - 8, pointerId: 13, buttons: 1});
+  fireEvent.pointerUp(window, {clientX: nextBox.x + 4, clientY: nextBox.y + nextBox.height / 2 - 8, pointerId: 13});
+  await waitFor(() => assert.equal(snapshot().past, before.past + 1, 'normal editing resumes after return'));
+});

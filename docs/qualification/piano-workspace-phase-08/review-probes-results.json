@@ -71,9 +71,9 @@
     "name": "returned-source-clock-follows-playing-video",
     "passed": true,
     "native": {
-      "time": 1.686481,
+      "time": 1.701024,
       "paused": false
     },
-    "clock": "1.63 s / 209.59 s"
+    "clock": "1.64 s / 209.59 s"
   }
 ]

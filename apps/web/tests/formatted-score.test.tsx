@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
 import {render} from '@testing-library/react';
-import {buildNotation, refreshNotation, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
+import {buildNotation, keySignature as sharedKeySignature, refreshNotation, type NotationDocument, type PerformanceNote} from '../../../packages/music-notation/index.ts';
 import {FormattedScore, layoutFormattedScore} from '../src/music/workspace/FormattedScore';
 
 const dom = new JSDOM('<!doctype html><html><body></body></html>', {
@@ -101,4 +101,31 @@ test('formatted layout keeps every segment and measure exactly once', () => {
   assert.equal(new Set(placed).size, document.segments.length);
   const measures = layout.systems.flatMap(system => system.measures);
   assert.deepEqual(measures.sort((a, b) => a - b), document.measures.map(measure => measure.index));
+});
+
+test('all 30 supported major/minor keys render the shared fifths signature on both staves', () => {
+  const keys = ['Cb','Gb','Db','Ab','Eb','Bb','F','C','G','D','A','E','B','F#','C#',
+    'Abm','Ebm','Bbm','Fm','Cm','Gm','Dm','Am','Em','Bm','F#m','C#m','G#m','D#m','A#m'];
+  for (const key of keys) {
+    const document = score([note('key', 0, 0.5, 66)], 4, key);
+    const view = render(<FormattedScore document={document} title={key}/>);
+    const fifths = sharedKeySignature(key).fifths;
+    const glyphs = [...view.container.querySelectorAll('.formatted-key')];
+    assert.equal(glyphs.length, Math.abs(fifths) * 2, `${key} needs ${fifths} fifths on both staves`);
+    if (fifths > 0) assert.ok(glyphs.every(glyph => glyph.textContent?.charCodeAt(0) === 0x266f), key);
+    if (fifths < 0) assert.ok(glyphs.every(glyph => glyph.textContent?.charCodeAt(0) === 0x266d), key);
+    view.unmount();
+  }
+});
+
+test('A0 and C8 render every required ledger line without truncation', () => {
+  for (const [id, pitch, expected] of [['A0', 21, 6], ['C8', 108, 9]] as const) {
+    const document = score([note(id, 0, 0.5, pitch)], 4);
+    const view = render(<FormattedScore document={document} title={id}/>);
+    const group = view.container.querySelector(`[data-pitch="${pitch}"]`)!;
+    assert.equal(group.querySelectorAll('.formatted-ledger').length, expected, id);
+    const y = Number(group.querySelector('.formatted-notehead')?.getAttribute('cy'));
+    assert.ok(Number.isFinite(y), `${id} notehead has a position`);
+    view.unmount();
+  }
 });

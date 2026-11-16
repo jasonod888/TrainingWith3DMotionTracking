@@ -13,6 +13,31 @@ Branch `phase8/formatted-score`. Final commit identity reported with this submis
 | Phase 8 acceptance | Submitted for review |
 | Phase 7 carry-forward | Unchanged (limit inactive; H1–H9 hardware blocked) |
 
+## C1–C3 edge corrections (final)
+
+### C1 — unfinished pointer transactions
+
+- Passing `editingEnabled=false` on entering formatted mode now cancels an active roll or sheet drag: pointer capture is released, global pointer listeners are removed, the drag/candidate state is cleared, and late pointer-up commits are refused.
+- The gesture callback independently refuses edits while formatted mode is active.
+- Durable tests start a real pitch drag, switch via the formatted button, release the pointer, and prove document/history unchanged; return and prove a normal drag commits exactly once. Add/Replace cancellation remains covered.
+- `review-edge-probes.py` case `preview-cancels-in-flight-pointer-transaction` passes.
+
+### C2 — all supported keys
+
+- The formatted signature now derives from the shared engine `keySignature` fifths/mode; the separate major-key map is removed.
+- All **30 supported major/minor keys** render the correct sharp/flat count on both staves; zero-signature keys render none. The edge runner passes all 30, including Em/Dm/Bbm and 7-accidental extremes.
+- MusicXML continues to use the shared key helper. Fixture capture: `captures/fixture-bbm.png` (5 flats per staff).
+
+### C3 — complete ledger range
+
+- The five-ledger cap is removed; ledgers are drawn for the actual pitch and staff geometry.
+- A0 renders **6** ledger lines and C8 renders **9**, attached to the correct staff/system; system height was increased to 280 and page height to 1500 so extreme notes remain unclipped.
+- Fixture captures: `captures/fixture-a0.png`, `captures/fixture-c8.png`.
+- E4/F5/A3 anchors, segment/occurrence coverage and original review probes remain passing.
+- Durable tests in `formatted-score.test.tsx` cover all 30 keys and the A0/C8 ledger counts; `workspace-editing-journeys.test.tsx` covers drag cancellation and ordinary editing after return.
+- `review-edge-probes.py`: **3/3 pass**.
+
+
 ## P8-R1 — read-only formatted mode
 
 - The hidden correction subtree cannot receive edits: the main Delete/Backspace, Undo/Redo shortcuts, add-mode Enter and replace interactions all return early while formatted mode is active.
@@ -44,7 +69,7 @@ Raw results: `scripts/mode-lifecycle-results.json`. The independent review probe
 - Note values are visually distinct: hollow whole/half, stemmed quarter, and standard flags for eighth–sixty-fourth. Dotted values retain dots.
 - Clef, key-signature and meter context: treble/bass clefs, key signature glyphs on both staves for sharp/flat keys (G/F fixtures verified), and stacked 4/4 meter numbers.
 - Ties use correct endpoints: outgoing continuations start at the source's right edge; incoming continuations approach the target's left edge. 350 continuation paths on the real recording.
-- Measure widths expand up to 320 units (minimum 120) for dense chords/accidentals/rests.
+- Measure widths expand up to 320 units (minimum 120) for dense chords/accidentals/rests. The real recording now lays out as 16 pages / 62 systems; extreme-register systems use the enlarged 280-unit system height.
 
 Compact fixtures in `formatted-score.test.tsx` cover both-staff line/space anchors, ledger notes above/below, whole/half/quarter/eighth/sixteenth values and flags, dotted values, rests, sharp/flat keys, chords and ties within/across systems. Real pages re-captured and visually inspected after the repair: `captures/formatted-real-page1.png`, `captures/formatted-real-page2.png`.
 
@@ -63,7 +88,7 @@ Raw result: `phase8-formatted.json` (`saved_reopened=true`, `musicxml=true`, `br
 
 ## Verification
 
-- Web suite: **505 passed, 0 failed**; TypeScript and production build clean.
+- Web suite: **508 passed, 0 failed**; TypeScript and production build clean.
 - Phase 7 regression set: all **16 scripts** pass on this branch.
 - Independent review probes: **6/6 pass**.
 - Phase 8 focused: 5 formatted-score fixtures + 2 application-level mode tests, all pass.

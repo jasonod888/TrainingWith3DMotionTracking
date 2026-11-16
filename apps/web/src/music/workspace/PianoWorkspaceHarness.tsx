@@ -367,6 +367,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   }, [dispatch, offsetSeconds, requestReveal, seek, state?.document]);
 
   const applyGestureEdit = useCallback((edit: GestureEdit) => {
+    if (scoreModeRef.current === 'formatted') return;
     if (!document) return;
     if (edit.kind === 'pitch') {
       dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: edit.occurrenceId,
@@ -1558,7 +1559,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={rollReveal}
             onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
-            editingEnabled={!replaceMode && !addMode}
+            editingEnabled={scoreMode === 'correction' && !replaceMode && !addMode}
             snapSeconds={snapTicks ? snapTicks * secondsPerTick : null}
             addMode={Boolean(addMode)}
             ghost={addMode ? {seconds: addMode.seconds, pitch: addMode.pitch,
@@ -1578,7 +1579,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             clock={clockRef.current} alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals}
             scrollTarget={scoreTarget} onSeekTick={seekToTick} onUserScroll={onScoreScroll}
             onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
-            editingEnabled={!replaceMode && !addMode}
+            editingEnabled={scoreMode === 'correction' && !replaceMode && !addMode}
             onAmbiguous={(logicalNoteId, occurrenceIds) => setNotice(
               `This written note maps ${occurrenceIds.length} occurrences; choose one in the roll (logical ${logicalNoteId}).`)}/>
           <p className="ws-hint">One continuous grand staff; the cursor is the mapped musical position. Click the ruler to seek, a notehead to select.</p>
