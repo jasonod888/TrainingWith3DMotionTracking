@@ -29,6 +29,9 @@ with sync_playwright() as pw:
         page = context.new_page()
         page.set_default_timeout(20000)
         page.goto(f'{m.BASE}/?page=music-review&id={m.LESSON}', wait_until='domcontentloaded')
+        page.wait_for_selector('[data-roll-toggle]')
+        if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+            page.locator('[data-roll-toggle]').click()
         page.wait_for_selector('.ws-roll-note', timeout=60000)
         read_only = page.locator('[data-read-only="true"]').count() == 1
         assert read_only is (not editable), (count, read_only)

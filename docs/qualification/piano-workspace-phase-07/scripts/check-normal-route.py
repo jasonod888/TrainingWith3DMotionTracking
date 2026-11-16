@@ -137,6 +137,9 @@ def drag_note(page, locator, dy, pointer=92):
 
 def open_route(page):
     page.goto(f'{BASE}/?page=music-review&id={LESSON}', wait_until='domcontentloaded')
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     page.wait_for_selector('.ws-roll-note', timeout=45000)
 
 
@@ -252,6 +255,9 @@ def normal_route(context, world):
     except Exception:
         print('REOPEN-TEXT', repr(reopened.locator('body').inner_text()[:800]))
         raise
+    reopened.wait_for_selector('[data-roll-toggle]')
+    if reopened.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        reopened.locator('[data-roll-toggle]').click()
     reopened.wait_for_selector('.ws-roll-note', timeout=45000)
     expect(pitch_of(reopened) == corrected, 'the reopened revision lost the correction')
     page.close()
@@ -270,6 +276,9 @@ def normal_route(context, world):
     saved_page = saved_context.new_page()
     saved_page.goto(f'{BASE}/?page=music-review&id={LESSON}', wait_until='domcontentloaded')
     saved_page.wait_for_selector('text=Opened saved revision rev-norm', timeout=30000)
+    saved_page.wait_for_selector('[data-roll-toggle]')
+    if saved_page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        saved_page.locator('[data-roll-toggle]').click()
     saved_page.wait_for_selector('.ws-roll-note', timeout=30000)
     expect(saved_page.locator('.ws-shell').count() == 1, 'saved-only entry did not open the workspace')
     RESULT['saved_only_entry'] = True
@@ -347,6 +356,9 @@ def performance(context):
     context.route('**/api/**', world.route)
     page = context.new_page()
     page.goto(f'{BASE}/?page=music-review&id={LESSON}', wait_until='domcontentloaded')
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     page.wait_for_selector('.ws-roll-note', timeout=45000)
     measured = page.evaluate("""() => {
       const t = performance.getEntriesByType('navigation')[0];
@@ -467,6 +479,9 @@ def revision_journey(browser, world):
     page.locator('.feed-card-menu summary').first.click()
     page.get_by_role('button', name='Edit lesson').click()
     page.wait_for_selector('.ws-shell', timeout=45000)
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     page.wait_for_selector('.ws-roll-note', timeout=45000)
     expect(page.locator('section[aria-label="Edit reviewed music lesson"]').count() == 0,
            'the legacy revision editor is still rendered for piano')
@@ -491,6 +506,9 @@ def revision_journey(browser, world):
     reopened = context.new_page()
     reopened.goto(f'{BASE}/?page=music-review&id={LESSON}', wait_until='domcontentloaded')
     reopened.wait_for_selector('text=Opened saved revision rev-rev', timeout=45000)
+    reopened.wait_for_selector('[data-roll-toggle]')
+    if reopened.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        reopened.locator('[data-roll-toggle]').click()
     reopened.wait_for_selector('.ws-roll-note', timeout=45000)
     expect(int(reopened.locator('.ws-roll-note').first.get_attribute('data-pitch')) == corrected,
            'the reopened private revision lost the correction')

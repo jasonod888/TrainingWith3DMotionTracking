@@ -12,7 +12,7 @@ import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
   applyCommand, buildNotation, parseNotationDocument, selectionForOccurrence,
   activeOccurrenceIds, alignmentFromSpans, effectiveSecondsToTick, occurrenceIntervals,
-  addAnchor, applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, toMusicXML, type AnchorPoint,
+  addAnchor, applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, toMusicXML, keyLabel, type AnchorPoint,
   type Alignment, type CorrectionSelection, type NotationDocument,
 } from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
@@ -120,6 +120,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   const [state, setState] = useState<WorkspaceState | null>(null);
   const [scoreMode, setScoreMode] = useState<'correction' | 'formatted'>('correction');
+  const [rollOpen, setRollOpen] = useState(false);
   const scoreModeRef = useRef<'correction' | 'formatted'>('correction');
   scoreModeRef.current = scoreMode;
   /** Bumped when a document is replaced outside the undo history. */
@@ -1552,6 +1553,12 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         </section>
 
         <section className="ws-panel ws-surface" aria-label="Piano roll">
+          <button type="button" className="ws-accordion" data-roll-toggle="true"
+            aria-expanded={rollOpen} aria-controls="piano-roll-body"
+            onClick={() => setRollOpen(open => !open)}>
+            <span>Piano roll</span><span className="ws-hint">{rollOpen ? 'Hide' : 'Show'}</span>
+          </button>
+          <div id="piano-roll-body" hidden={!rollOpen}>
           <TimeRoll document={document} window={window} onWindowChange={next => changeWindow(next, 'reveal')}
             onWindowChangeOrigin={changeWindow}
             offsetSeconds={offsetSeconds} activeOccurrenceIds={activeIds}
@@ -1570,9 +1577,11 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
               durationSeconds: mode?.durationSeconds ?? lastRecordedSeconds.current}))}
             playhead={playhead} onSelect={select} onSeek={seek}/>
           <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Scrolling never seeks. Drag a note to edit pitch, time or recorded length.</p>
+          </div>
         </section>
 
         <section className="ws-panel ws-surface" aria-label="Score">
+          <p className="ws-hint" data-score-key>Key: {keyLabel(document.key_signature || 'C')} · {document.time_signature.numerator}/{document.time_signature.denominator}</p>
           <ContinuousScore document={document} boxes={boxes} selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={scoreReveal} onSelect={select}
             playheadTick={playheadTick} activeOccurrenceIds={activeIds}

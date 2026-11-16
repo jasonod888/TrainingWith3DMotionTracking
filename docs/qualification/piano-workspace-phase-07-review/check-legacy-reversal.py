@@ -9,6 +9,9 @@ with sync_playwright() as pw:
     page=context.new_page();m.open_route(page)
     page.locator('[data-lesson-settings] summary').click();page.wait_for_selector('[data-finding]')
     page.locator('[data-verification-accept]').click()
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     note=page.locator('.ws-roll-note[data-occurrence="vf-add-1-a"]');note.wait_for();note.click()
     page.get_by_role('button',name='Half',exact=True).click()
     page.wait_for_function("document.querySelector('.ws-facts')?.textContent.includes('written 960 ticks')")
@@ -17,6 +20,9 @@ with sync_playwright() as pw:
     page.evaluate("() => { const k='piano-workspace-recovery-v1';const c=JSON.parse(localStorage.getItem(k));delete c.acceptedBaselines;localStorage.setItem(k,JSON.stringify(c)); }")
     page.reload(wait_until='domcontentloaded');page.wait_for_selector('[data-recovery="offer"]')
     page.get_by_role('button',name='Restore local checkpoint',exact=True).click()
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     note=page.locator('.ws-roll-note[data-occurrence="vf-add-1-a"]');note.wait_for();note.click()
     before=page.locator('.ws-facts').inner_text()
     page.locator('[data-lesson-settings] summary').click();page.wait_for_selector('[data-verification-reject]')

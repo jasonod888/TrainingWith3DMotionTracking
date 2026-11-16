@@ -35,20 +35,20 @@
   },
   "returned_transport": {
     "native": {
-      "time": 1.765569,
+      "time": 1.777266,
       "paused": false
     },
-    "clock": 1.66,
+    "clock": 1.64,
     "passed": true
   },
   "playing_entry_policy": {
     "on_entry": {
       "paused": true,
-      "time": 0.343079
+      "time": 0.390369
     },
     "on_return": {
       "paused": true,
-      "time": 0.343079,
+      "time": 0.390369,
       "rate": 0.75
     },
     "passed": true

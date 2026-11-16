@@ -6,7 +6,7 @@
  * API. Layout is pure so pagination/system packing can be tested.
  */
 import React, {useMemo} from 'react';
-import {keySignature as sharedKeySignature, parseSpelling, type NotationDocument, type NotationSegment, type NotationStaff} from '../../../../../packages/music-notation/index.ts';
+import {keyLabel, keySignature as sharedKeySignature, parseSpelling, type NotationDocument, type NotationSegment, type NotationStaff} from '../../../../../packages/music-notation/index.ts';
 
 const PAGE_WIDTH = 900;
 const PAGE_HEIGHT = 1500;
@@ -208,6 +208,7 @@ export function FormattedScore({document, title, selectedOccurrenceId}: {
     <div className="ws-formatted-toolbar">
       <strong>Formatted score</strong>
       <span className="ws-hint">Read-only · {document.measures.length} measures · {document.performance.length} occurrences</span>
+      <span className="ws-hint" data-formatted-key-label>Key: {keyLabel(document.key_signature || 'C')} · {document.time_signature.numerator}/{document.time_signature.denominator}</span>
       <span className="ws-hint" data-formatted-pages={layout.pages.length}>
         {layout.pages.length} page{layout.pages.length === 1 ? '' : 's'} · {layout.systems.length} systems
       </span>
@@ -225,7 +226,7 @@ export function FormattedScore({document, title, selectedOccurrenceId}: {
           const offset = system.x;
           const width = Math.min(STAFF_WIDTH, system.width);
           return <g key={`system-${system.index}`} data-formatted-system={system.index}>
-            <text className="formatted-brace" x={offset - 22} y={system.y + (TREBLE_TOP + BASS_TOP) / 2 + 26}
+            <text className="formatted-brace" x={offset - 108} y={system.y + (TREBLE_TOP + BASS_TOP) / 2 + 26}
               fontSize={66} textAnchor="middle">{'{'}</text>
             <text className="formatted-clef" x={offset - 92} y={system.y + TREBLE_TOP + 27} fontSize={36}>{CLEFS.treble}</text>
             <text className="formatted-clef" x={offset - 92} y={system.y + BASS_TOP + 27} fontSize={36}>{CLEFS.bass}</text>
@@ -240,11 +241,13 @@ export function FormattedScore({document, title, selectedOccurrenceId}: {
             <text className="formatted-time" x={offset - 18} y={system.y + BASS_TOP + 14} fontSize={12}>{document.time_signature.numerator}</text>
             <text className="formatted-time" x={offset - 18} y={system.y + BASS_TOP + 30} fontSize={12}>{document.time_signature.denominator}</text>
             {[0, 1, 2, 3, 4].map(line => <g key={`staff-${system.index}-${line}`}>
-              <line className="formatted-staff" x1={offset} y1={system.y + TREBLE_TOP + line * LINE}
+              <line className="formatted-staff" x1={offset - 100} y1={system.y + TREBLE_TOP + line * LINE}
                 x2={offset + width} y2={system.y + TREBLE_TOP + line * LINE}/>
-              <line className="formatted-staff" x1={offset} y1={system.y + BASS_TOP + line * LINE}
+              <line className="formatted-staff" x1={offset - 100} y1={system.y + BASS_TOP + line * LINE}
                 x2={offset + width} y2={system.y + BASS_TOP + line * LINE}/>
             </g>)}
+            <line className="formatted-bar" x1={offset - 100} y1={system.y + TREBLE_TOP}
+              x2={offset - 100} y2={system.y + BASS_TOP + 4 * LINE}/>
             {system.measures.map((measureIndex, position) => {
               const measure = document.measures[measureIndex];
               let x = offset;

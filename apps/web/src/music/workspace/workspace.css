@@ -442,7 +442,7 @@
 
 .ws-score-clef {
   fill: #1f2d26;
-  font-size: 26px;
+  font-size: 32px;
 }
 
 .ws-score-key,
@@ -462,7 +462,7 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 62px;
+  width: 116px;
   background: #fff;
   border-right: 1px solid #ece9e1;
   overflow: hidden;
@@ -635,3 +635,7 @@
 .ws-formatted .formatted-staff { stroke: #1c2430; stroke-width: .8; }
 .ws-formatted .formatted-ledger { stroke: #1c2430; stroke-width: .8; }
 .formatted-flag { fill: none; stroke: #1c2430; stroke-width: 1.2; }
+/* Collapsible piano-roll accordion (collapsed by default). */
+.ws-accordion { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 0; background: transparent; padding: 8px 10px; font: inherit; font-weight: 600; cursor: pointer; color: #22303f; }
+.ws-accordion:hover { background: #f3f6f9; }
+.ws-accordion .ws-hint { font-weight: 400; }

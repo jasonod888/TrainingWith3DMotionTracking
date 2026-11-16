@@ -29,6 +29,9 @@ with sync_playwright() as pw:
         return context,page
     context,page=open_world(AddWorld())
     page.locator('[data-verification-accept]').click()
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     page.wait_for_selector('.ws-roll-note[data-occurrence="vf-add-1-a"]')
     page.locator('.ws-roll-note[data-occurrence="vf-add-1-a"]').click()
     length=page.get_by_label('Recorded length (s)',exact=True)
@@ -48,6 +51,9 @@ with sync_playwright() as pw:
     page.locator('[data-verification-accept]').click();page.wait_for_timeout(800)
     page.reload(wait_until='domcontentloaded');page.wait_for_selector('[data-recovery="offer"]')
     page.get_by_role('button',name='Restore local checkpoint',exact=True).click()
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     page.locator('.ws-roll-note[data-occurrence="fx-01"]').click()
     page.locator('[data-lesson-settings] summary').click()
     page.wait_for_selector('[data-verification-reject]')

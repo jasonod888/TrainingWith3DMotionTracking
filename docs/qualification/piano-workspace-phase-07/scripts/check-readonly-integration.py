@@ -24,6 +24,9 @@ with sync_playwright() as pw:
     context.route('**/api/**', m.World(draft).route)
     page = context.new_page()
     page.goto(f'{m.BASE}/?page=music-review&id={m.LESSON}', wait_until='domcontentloaded')
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     page.wait_for_selector('.ws-roll-note', timeout=60000)
     banner = page.locator('[data-read-only="true"]')
     assert banner.count() == 1, 'read-only banner missing'

@@ -1,0 +1,96 @@
+{
+  "accordion-desktop": {
+    "before": {
+      "top": 25,
+      "left": 92,
+      "score": 97,
+      "start": "1.2112070958215597",
+      "span": "10",
+      "selection": {
+        "occurrenceId": "bp-1",
+        "logicalNoteId": "n-bp-1",
+        "eventId": "ev-treble-1-1080-0-bp-1",
+        "staff": "treble",
+        "voice": 1,
+        "measureIndex": 0
+      }
+    },
+    "after": {
+      "top": 25,
+      "left": 92,
+      "score": 97,
+      "start": "1.2112070958215597",
+      "span": "10",
+      "selection": {
+        "occurrenceId": "bp-1",
+        "logicalNoteId": "n-bp-1",
+        "eventId": "ev-treble-1-1080-0-bp-1",
+        "staff": "treble",
+        "voice": 1,
+        "measureIndex": 0
+      }
+    },
+    "passed": true
+  },
+  "drag-preview-desktop": {
+    "before_cy": 84.0,
+    "preview_cy": 74.0,
+    "before_stem": [
+      "84",
+      "-1"
+    ],
+    "preview_stem": [
+      "29",
+      "104"
+    ],
+    "document_unchanged_after_cancel": true,
+    "passed": true
+  },
+  "accordion-mobile": {
+    "before": {
+      "top": 25,
+      "left": 35,
+      "score": 97,
+      "start": "1.2112070958215597",
+      "span": "10",
+      "selection": {
+        "occurrenceId": "bp-1",
+        "logicalNoteId": "n-bp-1",
+        "eventId": "ev-treble-1-1080-0-bp-1",
+        "staff": "treble",
+        "voice": 1,
+        "measureIndex": 0
+      }
+    },
+    "after": {
+      "top": 25,
+      "left": 35,
+      "score": 97,
+      "start": "1.2112070958215597",
+      "span": "10",
+      "selection": {
+        "occurrenceId": "bp-1",
+        "logicalNoteId": "n-bp-1",
+        "eventId": "ev-treble-1-1080-0-bp-1",
+        "staff": "treble",
+        "voice": 1,
+        "measureIndex": 0
+      }
+    },
+    "passed": true
+  },
+  "drag-preview-mobile": {
+    "before_cy": 84.0,
+    "preview_cy": 74.0,
+    "before_stem": [
+      "84",
+      "-1"
+    ],
+    "preview_stem": [
+      "29",
+      "104"
+    ],
+    "document_unchanged_after_cancel": true,
+    "passed": true
+  }
+}

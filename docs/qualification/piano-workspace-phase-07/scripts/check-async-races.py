@@ -63,6 +63,9 @@ async def open_world(browser, conflict=False):
     await context.route('**/api/**', await handler_factory(world))
     page = await context.new_page()
     await page.goto(f'{BASE}/?page=music-review&id={m.LESSON}', wait_until='domcontentloaded')
+    await page.wait_for_selector('[data-roll-toggle]', timeout=45000)
+    if await page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        await page.locator('[data-roll-toggle]').click()
     await page.wait_for_selector('.ws-roll-note', timeout=45000)
     await page.locator('[data-lesson-settings] summary').click()
     await page.wait_for_selector('[data-finding]')

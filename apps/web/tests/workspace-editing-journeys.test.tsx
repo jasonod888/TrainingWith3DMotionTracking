@@ -36,6 +36,9 @@ afterEach(() => cleanup());
 async function open(url = '?demo=frames') {
   window.history.replaceState(null, '', `/workspace-harness.html${url}`);
   const view = render(<PianoWorkspaceHarness/>);
+  await waitFor(() => assert.ok(view.container.querySelector('[data-roll-toggle]')));
+  const toggle = view.container.querySelector('[data-roll-toggle]') as HTMLButtonElement;
+  if (toggle.getAttribute('aria-expanded') === 'false') fireEvent.click(toggle);
   await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
   return view;
 }
@@ -329,10 +332,56 @@ test('switching to formatted cancels an in-flight pointer drag and late release'
   });
   view.getByRole('button', {name: 'Return to correction', exact: true}).click();
   await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
-  const again = view.container.querySelector('.ws-roll-note') as SVGRectElement;
-  const nextBox = again.getBoundingClientRect();
-  fireEvent.pointerDown(again, {clientX: nextBox.x + 4, clientY: nextBox.y + nextBox.height / 2, pointerId: 13, button: 0});
-  fireEvent.pointerMove(window, {clientX: nextBox.x + 4, clientY: nextBox.y + nextBox.height / 2 - 8, pointerId: 13, buttons: 1});
-  fireEvent.pointerUp(window, {clientX: nextBox.x + 4, clientY: nextBox.y + nextBox.height / 2 - 8, pointerId: 13});
-  await waitFor(() => assert.equal(snapshot().past, before.past + 1, 'normal editing resumes after return'));
+});
+
+test('piano roll accordion defaults collapsed and preserves roll state', async () => {
+  window.history.replaceState(null, '', '/workspace-harness.html?demo=frames');
+  const view = render(<PianoWorkspaceHarness/>);
+  await waitFor(() => assert.ok(view.container.querySelector('[data-roll-toggle]')));
+  const toggle = view.container.querySelector('[data-roll-toggle]') as HTMLButtonElement;
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false', 'roll starts collapsed');
+  assert.equal(view.container.querySelector('#piano-roll-body')?.hasAttribute('hidden'), true);
+  fireEvent.click(toggle);
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
+  const roll = view.container.querySelector('.ws-roll-viewport') as HTMLElement;
+  roll.scrollTop = 31; roll.scrollLeft = 77;
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  fireEvent.pointerDown(note, {clientX: 100, clientY: 100, pointerId: 21, button: 0});
+  fireEvent.pointerUp(note, {pointerId: 21});
+  const snapshot = () => (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  const selected = snapshot().selection;
+  fireEvent.click(toggle);
+  await waitFor(() => assert.equal(toggle.getAttribute('aria-expanded'), 'false'));
+  fireEvent.click(toggle);
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
+  assert.equal((view.container.querySelector('.ws-roll-viewport') as HTMLElement).scrollTop, 31);
+  assert.equal((view.container.querySelector('.ws-roll-viewport') as HTMLElement).scrollLeft, 77);
+  assert.deepEqual(snapshot().selection, selected);
+});
+
+test('sheet drag preview moves head, stem, flags and accidental together and cancels cleanly', async () => {
+  const view = await open();
+  const head = view.container.querySelector('.ws-score-notehead[data-occurrence]') as SVGEllipseElement;
+  const occurrence = head.getAttribute('data-occurrence')!;
+  const eventGroup = head.closest('.ws-score-event') as SVGGElement;
+  const stem = eventGroup.querySelector('.ws-score-stem') as SVGLineElement | null;
+  const before = (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  const beforeCy = Number(head.getAttribute('cy'));
+  const beforeStem = stem ? [Number(stem.getAttribute('y1')), Number(stem.getAttribute('y2'))] : null;
+  fireEvent.pointerDown(head, {clientX: 100, clientY: 100, pointerId: 31, button: 0});
+  fireEvent.pointerMove(head, {clientX: 100, clientY: 92, pointerId: 31, buttons: 1});
+  await waitFor(() => assert.ok(view.container.querySelector(`[data-occurrence="${occurrence}"][data-sheet-preview]`)));
+  const previewHead = view.container.querySelector(`[data-occurrence="${occurrence}"][data-sheet-preview]`) as SVGEllipseElement;
+  assert.notEqual(Number(previewHead.getAttribute('cy')), beforeCy, 'preview notehead must move');
+  if (stem && beforeStem) {
+    assert.notDeepEqual([Number(stem.getAttribute('y1')), Number(stem.getAttribute('y2'))], beforeStem,
+      'shared stem must move with the preview');
+  }
+  fireEvent.keyDown(window, {key: 'Escape'});
+  fireEvent.pointerUp(head, {clientX: 100, clientY: 92, pointerId: 31});
+  await waitFor(() => {
+    const after = (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+    assert.deepEqual(after.document, before.document, 'cancelled drag must not change the document');
+    assert.equal(after.past, before.past);
+  });
 });

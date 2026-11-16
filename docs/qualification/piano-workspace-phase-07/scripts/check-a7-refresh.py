@@ -105,6 +105,9 @@ async def main():
         await page.locator('.feed-card-menu summary').first.click()
         await page.get_by_role('button', name='Edit lesson').click()
         await page.wait_for_selector('.ws-shell', timeout=45000)
+        await page.wait_for_selector('[data-roll-toggle]', timeout=45000)
+        if await page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+            await page.locator('[data-roll-toggle]').click()
         await page.wait_for_selector('.ws-roll-note', timeout=45000)
         note = page.locator('.ws-roll-note').first
         before = int(await note.get_attribute('data-pitch'))

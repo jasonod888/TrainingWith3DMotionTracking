@@ -9,7 +9,8 @@
  * The score playhead and beat-linked scrolling belong to Phase 4.
  */
 import {useEffect, useMemo, useRef, useState} from 'react';
-import type {NotationDocument, NotationSegment, NotationValue} from '../../../../../packages/music-notation/index.ts';
+import {displayAccidental, keySignature as sharedKeySignature, parseSpelling, type NotationDocument, type NotationSegment, type NotationValue}
+  from '../../../../../packages/music-notation/index.ts';
 import {
   measureAtTick, scrollForMeasure, tickAtX, visibleMeasureIndexes, xForTick, type MeasureBox,
 } from './viewport';
@@ -25,7 +26,7 @@ const TREBLE_BOTTOM = 74;
 const BASS_TOP = 116;
 const BASS_BOTTOM = 156;
 const HEIGHT = RULER_HEIGHT + 162;
-const CONTEXT_WIDTH = 62;
+const CONTEXT_WIDTH = 116;
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const REST_GLYPHS: Record<NotationValue, string> = {
@@ -84,6 +85,30 @@ type Props = {
   /** Replace/Add modes disable direct manipulation in this surface. */
   editingEnabled?: boolean;
 };
+
+
+const SHARP_ORDER = [
+  {letter: 'F', treble: 5, bass: 3}, {letter: 'C', treble: 5, bass: 3},
+  {letter: 'G', treble: 5, bass: 3}, {letter: 'D', treble: 5, bass: 3},
+  {letter: 'A', treble: 4, bass: 2}, {letter: 'E', treble: 5, bass: 3},
+  {letter: 'B', treble: 4, bass: 2},
+];
+const FLAT_ORDER = [
+  {letter: 'B', treble: 4, bass: 2}, {letter: 'E', treble: 5, bass: 3},
+  {letter: 'A', treble: 4, bass: 2}, {letter: 'D', treble: 5, bass: 3},
+  {letter: 'G', treble: 4, bass: 2}, {letter: 'C', treble: 5, bass: 3},
+  {letter: 'F', treble: 4, bass: 2},
+];
+
+function renderedKeySignature(key: string) {
+  const signature = sharedKeySignature(key || 'C');
+  const count = Math.abs(signature.fifths);
+  return {
+    glyph: signature.fifths > 0 ? '♯' : signature.fifths < 0 ? '♭' : '',
+    entries: signature.fifths > 0 ? SHARP_ORDER.slice(0, count)
+      : signature.fifths < 0 ? FLAT_ORDER.slice(0, count) : [],
+  };
+}
 
 export function ContinuousScore({
   document, boxes, selectedOccurrenceId, reveal, playheadTick = null, activeOccurrenceIds = [],
@@ -257,10 +282,13 @@ export function ContinuousScore({
       const measure = document.measures[segment.measure_index];
       const local = (segment.start - measure.start) / measure.duration;
       const x = CONTEXT_WIDTH + box.x + 14 + local * (box.width - 28);
-      for (const note of segment.notes) map.set(note.id, {x, y: yForNote(segment.staff, note.spelling)});
+      for (const note of segment.notes) {
+        const preview = sheetPreview && note.performance_ids.includes(sheetPreview.occurrence) ? sheetPreview : null;
+        map.set(note.id, {x, y: yForNote(segment.staff, preview ? preview.spelling : note.spelling)});
+      }
     }
     return map;
-  }, [visibleSegments, boxes, document.measures]);
+  }, [visibleSegments, boxes, document.measures, sheetPreview]);
 
   const occurrenceFor = (note: {logical_note_id: string; performance_ids: string[]}): string | null => {
     if (note.performance_ids.length === 1) return note.performance_ids[0];
@@ -274,6 +302,7 @@ export function ContinuousScore({
     if (note.performance_ids.length > 1) onAmbiguous?.(note.logical_note_id, note.performance_ids);
   };
 
+  const signature = renderedKeySignature(document.key_signature);
   return <div className="ws-score" ref={hostRef} style={{maxWidth: '100%', overflow: 'hidden', minWidth: 0}}>
     <div className="ws-score-viewport" ref={scrollRef} style={{maxWidth: '100%', width: '100%', overflowX: 'auto', minWidth: 0}}>
       <svg className="ws-score-svg" width={canvasWidth} height={HEIGHT} role="img"
@@ -318,7 +347,10 @@ export function ContinuousScore({
               {segment.dotted ? <circle className="ws-score-dot" cx={x + 10} cy={center - 1} r={1.8}/> : null}
             </g>;
           }
-          const ys = segment.notes.map(note => yForNote(segment.staff, note.spelling));
+          const ys = segment.notes.map(note => {
+            const preview = sheetPreview && note.performance_ids.includes(sheetPreview.occurrence) ? sheetPreview : null;
+            return yForNote(segment.staff, preview ? preview.spelling : note.spelling);
+          });
           const top = Math.min(...ys);
           const bottom = Math.max(...ys);
           const stemDown = (top + bottom) / 2 < (staffTop + staffBottom) / 2;
@@ -349,11 +381,16 @@ export function ContinuousScore({
                   onPointerUp={commitSheetDrag}
                   onPointerCancel={cancelSheetDrag}
                   onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(note); } }}/>
-                {note.display_accidental && note.accidental
-                  ? <text className="ws-score-accidental" x={x - 13} y={cy + 4}>
-                      {note.accidental === 'sharp' ? '♯' : note.accidental === 'flat' ? '♭' : '♮'}
-                    </text>
-                  : null}
+                {(() => {
+                  const parsed = parseSpelling(preview ? preview.spelling : note.spelling);
+                  const show = parsed.alter !== 0
+                    ? displayAccidental(parsed.letter, parsed.alter, document.key_signature)
+                    : note.display_accidental && note.accidental;
+                  if (!show) return null;
+                  return <text className="ws-score-accidental" x={x - 13} y={cy + 4}>
+                    {parsed.alter > 0 ? '♯' : parsed.alter < 0 ? '♭' : '♮'}
+                  </text>;
+                })()}
                 {preview ? <text className="ws-score-drag-label"
                   data-sheet-drag-label={preview.spelling}
                   x={x + 12} y={cy - 9}>{preview.spelling}</text> : null}
@@ -385,11 +422,16 @@ export function ContinuousScore({
           <line className="ws-score-staff" x1={0} y1={BASS_TOP + line * LINE} x2={CONTEXT_WIDTH} y2={BASS_TOP + line * LINE}/>
         </g>)}
         <path className="ws-score-brace" d={`M 8 ${TREBLE_TOP} C -4 ${(TREBLE_TOP + BASS_BOTTOM) / 2}, -4 ${(TREBLE_TOP + BASS_BOTTOM) / 2}, 8 ${BASS_BOTTOM}`}/>
-        <text className="ws-score-clef" x={6} y={TREBLE_TOP + 34}>{'\u{1D11E}'}</text>
-        <text className="ws-score-clef" x={6} y={BASS_TOP + 34}>{'\u{1D122}'}</text>
-        <text className="ws-score-key" x={40} y={TREBLE_TOP + 14}>{document.key_signature}</text>
-        <text className="ws-score-time" x={40} y={TREBLE_TOP + 34}>{document.time_signature.numerator}</text>
-        <text className="ws-score-time" x={40} y={TREBLE_TOP + 48}>{document.time_signature.denominator}</text>
+        <text className="ws-score-clef" x={8} y={TREBLE_TOP + 33}>{'\u{1D11E}'}</text>
+        <text className="ws-score-clef" x={8} y={BASS_TOP + 33}>{'\u{1D122}'}</text>
+        {signature.entries.map((entry, index) => <g key={`key-${index}`}>
+          <text className="ws-score-key" x={42 + index * 7} y={yForNote('treble', `${entry.letter}${entry.treble}`) + 4}>{signature.glyph}</text>
+          <text className="ws-score-key" x={42 + index * 7} y={yForNote('bass', `${entry.letter}${entry.bass}`) + 4}>{signature.glyph}</text>
+        </g>)}
+        <text className="ws-score-time" x={CONTEXT_WIDTH - 14} y={TREBLE_TOP + 14}>{document.time_signature.numerator}</text>
+        <text className="ws-score-time" x={CONTEXT_WIDTH - 14} y={TREBLE_TOP + 30}>{document.time_signature.denominator}</text>
+        <text className="ws-score-time" x={CONTEXT_WIDTH - 14} y={BASS_TOP + 14}>{document.time_signature.numerator}</text>
+        <text className="ws-score-time" x={CONTEXT_WIDTH - 14} y={BASS_TOP + 30}>{document.time_signature.denominator}</text>
       </svg>
     </div>
   </div>;
