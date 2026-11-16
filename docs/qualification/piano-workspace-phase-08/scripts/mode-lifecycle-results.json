@@ -9,16 +9,16 @@
     "video_rate": true,
     "before_scroll": {
       "rollTop": 25,
-      "rollLeft": 195,
-      "scoreLeft": 137,
-      "start": "2.055408970976253",
+      "rollLeft": 185,
+      "scoreLeft": 117,
+      "start": "1.9551725709397072",
       "span": "8"
     },
     "after_scroll": {
       "rollTop": 25,
-      "rollLeft": 195,
-      "scoreLeft": 137,
-      "start": "2.055408970976253",
+      "rollLeft": 185,
+      "scoreLeft": 117,
+      "start": "1.9551725709397072",
       "span": "8"
     },
     "before_video": {
@@ -35,20 +35,20 @@
   },
   "returned_transport": {
     "native": {
-      "time": 1.772717,
+      "time": 1.744573,
       "paused": false
     },
-    "clock": 1.64,
+    "clock": 1.63,
     "passed": true
   },
   "playing_entry_policy": {
     "on_entry": {
       "paused": true,
-      "time": 0.011125
+      "time": 0.061887
     },
     "on_return": {
       "paused": true,
-      "time": 0.011125,
+      "time": 0.061887,
       "rate": 0.75
     },
     "passed": true

@@ -1,7 +1,7 @@
 {
   "occurrence": "bp-14",
-  "pages": 9,
-  "systems": 42,
+  "pages": 13,
+  "systems": 62,
   "selected_in_formatted": 1,
   "musicxml": true,
   "selection_restored": true,
@@ -16,5 +16,5 @@
   "document_unchanged": true,
   "saved_reference_agrees": true,
   "saved_reopened": true,
-  "broken_ties": 238
+  "broken_ties": 350
 }

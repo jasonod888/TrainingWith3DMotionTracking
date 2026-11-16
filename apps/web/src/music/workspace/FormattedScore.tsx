@@ -19,7 +19,7 @@ const BASS_TOP = 112;
 const LINE = 8;
 const STAFF_WIDTH = PAGE_WIDTH - MARGIN_X * 2;
 const CONTEXT_WIDTH = 112;
-const MIN_MEASURE = 92;
+const MIN_MEASURE = 120;
 const NOTE_RADIUS_X = 4.6;
 const NOTE_RADIUS_Y = 3.4;
 
@@ -48,7 +48,7 @@ export type FormattedLayout = {
 
 function measureWidth(segments: NotationSegment[]): number {
   const count = segments.reduce((total, segment) => total + Math.max(1, segment.notes.length), 0);
-  return Math.max(MIN_MEASURE, Math.min(190, 34 + count * 15));
+  return Math.max(MIN_MEASURE, Math.min(320, 44 + count * 18));
 }
 
 function yForPitch(spelling: string, staff: NotationStaff): number {

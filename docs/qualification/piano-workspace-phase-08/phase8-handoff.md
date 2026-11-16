@@ -44,7 +44,7 @@ Raw results: `scripts/mode-lifecycle-results.json`. The independent review probe
 - Note values are visually distinct: hollow whole/half, stemmed quarter, and standard flags for eighth–sixty-fourth. Dotted values retain dots.
 - Clef, key-signature and meter context: treble/bass clefs, key signature glyphs on both staves for sharp/flat keys (G/F fixtures verified), and stacked 4/4 meter numbers.
 - Ties use correct endpoints: outgoing continuations start at the source's right edge; incoming continuations approach the target's left edge. 238 continuation paths on the real recording.
-- Measure widths expand up to 260 units (minimum 110) for dense chords/accidentals/rests.
+- Measure widths expand up to 320 units (minimum 120) for dense chords/accidentals/rests.
 
 Compact fixtures in `formatted-score.test.tsx` cover both-staff line/space anchors, ledger notes above/below, whole/half/quarter/eighth/sixteenth values and flags, dotted values, rests, sharp/flat keys, chords and ties within/across systems. Real pages re-captured and visually inspected after the repair: `captures/formatted-real-page1.png`, `captures/formatted-real-page2.png`.
 
