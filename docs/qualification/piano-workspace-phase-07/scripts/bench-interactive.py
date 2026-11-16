@@ -59,6 +59,9 @@ def limit_draft(count=20_000):
 
 
 def measure(page):
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     page.wait_for_selector('.ws-roll-note', timeout=60000)
     heading = page.locator('.ws-sub').inner_text()
     assert 'notes' in heading, heading

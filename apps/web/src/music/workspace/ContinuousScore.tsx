@@ -9,6 +9,7 @@
  * The score playhead and beat-linked scrolling belong to Phase 4.
  */
 import {useEffect, useMemo, useRef, useState} from 'react';
+import type {TimelineLayout} from './timeline-layout';
 import {displayAccidental, keySignature as sharedKeySignature, parseSpelling, type NotationDocument, type NotationSegment, type NotationValue}
   from '../../../../../packages/music-notation/index.ts';
 import {
@@ -70,6 +71,10 @@ type Props = {
   intervals?: { id: string; start: number; end: number }[];
   /** Occurrences sounding at the current source time. */
   activeOccurrenceIds?: string[];
+  /** Shared correction timeline geometry; suppresses independent scroll/cursor. */
+  layout?: TimelineLayout;
+  sharedScrollLeft?: number;
+  cursorX?: number | null;
   /** Linked-navigation target from the roll or playback, performed once per token. */
   scrollTarget?: ScoreScrollTarget | null;
   onSelect: (occurrenceId: string) => void;
@@ -114,7 +119,7 @@ export function ContinuousScore({
   document, boxes, selectedOccurrenceId, reveal, playheadTick = null, activeOccurrenceIds = [],
   scrollTarget = null, onSelect, onAmbiguous, onSeekTick, onUserScroll,
   clock = null, alignment = null, offsetSeconds = 0, intervals,
-  onGestureCommit, onAuditionPitch, editingEnabled = true,
+  onGestureCommit, onAuditionPitch, editingEnabled = true, layout, sharedScrollLeft = 0, cursorX = null,
 }: Props) {
   const liveSeconds = useClockTime(clock, Number.NaN);
   const liveTick = clock && alignment ? effectiveSecondsToTick(alignment, liveSeconds, offsetSeconds) : playheadTick;
@@ -127,7 +132,17 @@ export function ContinuousScore({
   const [scrollLeft, setScrollLeft] = useState(0);
   const [first, last] = visibleMeasureIndexes(boxes, scrollLeft, width);
   const totalWidth = boxes.length ? boxes[boxes.length - 1].x + boxes[boxes.length - 1].width : 0;
-  const canvasWidth = CONTEXT_WIDTH + totalWidth + 24;
+  const shared = Boolean(layout);
+  const sharedBoxes = layout ? layout.measures.map(measure => ({index: measure.index, x: measure.x,
+    width: measure.width, ticks: measure.endTick - measure.startTick})) : boxes;
+  const activeTotalWidth = layout ? layout.contentWidth : totalWidth;
+  const canvasWidth = CONTEXT_WIDTH + activeTotalWidth + 24;
+  const xForSharedTick = (tick: number) => layout ? CONTEXT_WIDTH + layout.tickToX(tick) : xForTick(sharedBoxes, document, tick);
+  const xForSegment = (segment: NotationSegment) => layout
+    ? CONTEXT_WIDTH + layout.tickToX(segment.start) + 14
+    : CONTEXT_WIDTH + (sharedBoxes[segment.measure_index]?.x ?? 0) + 14
+      + ((segment.start - document.measures[segment.measure_index].start) / document.measures[segment.measure_index].duration)
+        * ((sharedBoxes[segment.measure_index]?.width ?? 0) - 28);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -268,27 +283,24 @@ export function ContinuousScore({
   }, [sheetPreview]);
 
   const visibleSegments = useMemo(() => {
+    if (layout) return document.segments;
     if (last < first) return [] as NotationSegment[];
     return document.segments.filter(segment => segment.measure_index >= first && segment.measure_index <= last);
-  }, [document.segments, first, last]);
+  }, [document.segments, first, last, layout]);
 
   // Positions of the rendered noteheads, so ties are drawn only when both ends exist.
   const positions = useMemo(() => {
     const map = new Map<string, {x: number; y: number}>();
     for (const segment of visibleSegments) {
       if (segment.rest) continue;
-      const box = boxes[segment.measure_index];
-      if (!box) continue;
-      const measure = document.measures[segment.measure_index];
-      const local = (segment.start - measure.start) / measure.duration;
-      const x = CONTEXT_WIDTH + box.x + 14 + local * (box.width - 28);
+      const x = xForSegment(segment);
       for (const note of segment.notes) {
         const preview = sheetPreview && note.performance_ids.includes(sheetPreview.occurrence) ? sheetPreview : null;
         map.set(note.id, {x, y: yForNote(segment.staff, preview ? preview.spelling : note.spelling)});
       }
     }
     return map;
-  }, [visibleSegments, boxes, document.measures, sheetPreview]);
+  }, [visibleSegments, boxes, document.measures, sheetPreview, layout]);
 
   const occurrenceFor = (note: {logical_note_id: string; performance_ids: string[]}): string | null => {
     if (note.performance_ids.length === 1) return note.performance_ids[0];
@@ -302,6 +314,11 @@ export function ContinuousScore({
     if (note.performance_ids.length > 1) onAmbiguous?.(note.logical_note_id, note.performance_ids);
   };
 
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node || !layout) return;
+    if (Math.abs(node.scrollLeft - sharedScrollLeft) > 1) node.scrollLeft = sharedScrollLeft;
+  }, [layout, sharedScrollLeft]);
   const signature = renderedKeySignature(document.key_signature);
   return <div className="ws-score" ref={hostRef} style={{maxWidth: '100%', overflow: 'hidden', minWidth: 0}}>
     <div className="ws-score-viewport" ref={scrollRef} style={{maxWidth: '100%', width: '100%', overflowX: 'auto', minWidth: 0}}>
@@ -311,33 +328,35 @@ export function ContinuousScore({
         data-rendered-notes={visibleSegments.reduce((total, segment) => total + segment.notes.length, 0)}
         data-rendered-values={JSON.stringify([...new Set(visibleSegments.map(segment => segment.value))])}>
         <rect className="ws-score-paper" x={0} y={0} width={canvasWidth} height={HEIGHT}/>
-        <rect className="ws-score-ruler" x={CONTEXT_WIDTH} y={0} width={totalWidth} height={RULER_HEIGHT}
+        <rect className="ws-score-ruler" x={CONTEXT_WIDTH} y={0} width={activeTotalWidth} height={RULER_HEIGHT}
           onClick={event => {
             if (!onSeekTick) return;
             const element = scrollRef.current;
             if (!element) return;
             const rect = element.getBoundingClientRect();
             const x = element.scrollLeft + (event.clientX - rect.left);
-            onSeekTick(tickAtX(boxes, document, x));
+            onSeekTick(layout ? layout.xToTick(Math.max(0, x - CONTEXT_WIDTH)) : tickAtX(boxes, document, x));
           }}/>
-        {liveTick !== null ? <line className="ws-score-playhead" data-playhead-tick={liveTick}
-          x1={xForTick(boxes, document, liveTick)} y1={RULER_HEIGHT}
-          x2={xForTick(boxes, document, liveTick)} y2={HEIGHT - 10}/> : null}
+        {cursorX !== null ? <line className="ws-shared-surface-cursor ws-score-playhead" data-shared-cursor
+          data-playhead-tick={playheadTick ?? ''} x1={cursorX} y1={RULER_HEIGHT} x2={cursorX} y2={HEIGHT - 10}/> : null}
+        {liveTick !== null && !layout ? <line className="ws-score-playhead" data-playhead-tick={liveTick}
+          x1={xForSharedTick(liveTick)} y1={RULER_HEIGHT}
+          x2={xForSharedTick(liveTick)} y2={HEIGHT - 10}/> : null}
         {[0, 1, 2, 3, 4].map(line => <g key={`staff-${line}`}>
-          <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={TREBLE_TOP + line * LINE} x2={CONTEXT_WIDTH + totalWidth} y2={TREBLE_TOP + line * LINE}/>
-          <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={BASS_TOP + line * LINE} x2={CONTEXT_WIDTH + totalWidth} y2={BASS_TOP + line * LINE}/>
+          <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={TREBLE_TOP + line * LINE} x2={CONTEXT_WIDTH + activeTotalWidth} y2={TREBLE_TOP + line * LINE}/>
+          <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={BASS_TOP + line * LINE} x2={CONTEXT_WIDTH + activeTotalWidth} y2={BASS_TOP + line * LINE}/>
         </g>)}
-        {boxes.slice(first, last + 1).map(box => <g key={`measure-${box.index}`} data-measure={box.index} className="ws-score-measure">
+        {(layout ? sharedBoxes : boxes.slice(first, last + 1)).map(box => <g key={`measure-${box.index}`} data-measure={box.index} className="ws-score-measure">
           <line className="ws-score-barline" x1={CONTEXT_WIDTH + box.x} y1={TREBLE_TOP} x2={CONTEXT_WIDTH + box.x} y2={BASS_BOTTOM}/>
           <text className="ws-score-measure-number" x={CONTEXT_WIDTH + box.x + 6} y={RULER_HEIGHT - 6}>{box.index + 1}</text>
         </g>)}
-        <line className="ws-score-barline" x1={CONTEXT_WIDTH + totalWidth} y1={TREBLE_TOP} x2={CONTEXT_WIDTH + totalWidth} y2={BASS_BOTTOM}/>
+        <line className="ws-score-barline" x1={CONTEXT_WIDTH + totalWidth} y1={TREBLE_TOP} x2={CONTEXT_WIDTH + activeTotalWidth} y2={BASS_BOTTOM}/>
         {visibleSegments.map(segment => {
           const box = boxes[segment.measure_index];
           if (!box) return null;
           const measure = document.measures[segment.measure_index];
           const local = (segment.start - measure.start) / measure.duration;
-          const x = CONTEXT_WIDTH + box.x + 14 + local * (box.width - 28);
+          const x = xForSegment(segment);
           const staffTop = segment.staff === 'treble' ? TREBLE_TOP : BASS_TOP;
           const staffBottom = segment.staff === 'treble' ? TREBLE_BOTTOM : BASS_BOTTOM;
           if (segment.rest) {

@@ -58,7 +58,7 @@ with sync_playwright() as pw:
     page.goto(f'{m.BASE}/?page=music-review&id={m.LESSON}', wait_until='domcontentloaded')
     page.wait_for_selector('[data-roll-toggle]')
     if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
-        page.locator('[data-roll-toggle]').click()
+        page.locator('[data-roll-toggle]').click(force=True)
     page.wait_for_selector('.ws-roll-note', timeout=60000)
     occurrence = page.locator('.ws-roll-note[data-pitch="64"]').first.get_attribute('data-occurrence')
     node = page.locator(f'.ws-roll-note[data-occurrence="{occurrence}"]')
@@ -156,7 +156,7 @@ with sync_playwright() as pw:
         page.wait_for_selector('text=Opened saved revision', timeout=30000)
         page.wait_for_selector('[data-roll-toggle]')
         if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
-            page.locator('[data-roll-toggle]').click()
+            page.locator('[data-roll-toggle]').click(force=True)
         page.wait_for_selector('.ws-roll-note', timeout=60000)
         reopened = page.evaluate('() => window.__pianoWorkspaceSnapshot()')
         reopened_event = next(note for event in reopened['document']['events'] for note in event['notes']

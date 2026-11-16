@@ -16,6 +16,7 @@ import {
   type Alignment, type CorrectionSelection, type NotationDocument,
 } from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
+import {buildTimelineLayout, clampScroll, heldPassageAt} from './timeline-layout';
 import {KeyboardEditor} from '../notation/KeyboardEditor';
 import {NotationAudio} from '../notation/notation-audio';
 import {usePianoSourcePlayer} from '../usePianoSourcePlayer';
@@ -144,6 +145,15 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [offsetSeconds, setOffsetSeconds] = useState(0);
   const readOnlyRef = useRef(false);
   const [follow, setFollow] = useState(true);
+  const [followSuspended, setFollowSuspended] = useState(false);
+  const [gestureLock, setGestureLock] = useState(false);
+  const [zoomFactor, setZoomFactor] = useState(1);
+  const [sharedScrollLeft, setSharedScrollLeft] = useState(0);
+  const [sharedWidth, setSharedWidth] = useState(0);
+  const [seekToken, setSeekToken] = useState(0);
+  const lastSeekToken = useRef(0);
+  const sharedBarRef = useRef<HTMLDivElement>(null);
+  const commandedScroll = useRef(0);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
   const [scoreTarget, setScoreTarget] = useState<{ tick: number; token: number } | null>(null);
@@ -223,6 +233,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   }, []);
 
   const document = state?.document ?? null;
+  const timelineLayout = useMemo(() => document ? buildTimelineLayout(document, zoomFactor) : null, [document, zoomFactor]);
+  const timelineWidth = timelineLayout ? timelineLayout.contentWidth : 0;
   const documentRef = useRef<NotationDocument | null>(null);
   const verificationRef = useRef<VerificationState | null>(null);
   const authoredSpellings = useRef<Record<string, Record<string, string>>>({});
@@ -353,6 +365,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     const clamped = Math.max(0, Math.min(state?.document.duration ?? seconds, seconds));
     setPlayhead(clamped);
     clockRef.current.set(clamped);
+    setSeekToken(token => token + 1);
     if (media) media.currentTime = clamped;
   }, [state?.document.duration]);
 
@@ -910,6 +923,21 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     if (media && !media.paused) media.pause();
   }, [scoreMode]);
 
+  const formattedScroll = useRef<number | null>(null);
+  useEffect(() => {
+    if (scoreMode === 'formatted') {
+      formattedScroll.current = sharedScrollLeft;
+      return;
+    }
+    if (formattedScroll.current === null) return;
+    const saved = formattedScroll.current;
+    formattedScroll.current = null;
+    commandedScroll.current = saved;
+    if (saved !== sharedScrollLeft) setSharedScrollLeft(saved);
+    const bar = sharedBarRef.current;
+    if (bar && Math.abs(bar.scrollLeft - saved) > 1) bar.scrollLeft = saved;
+  }, [scoreMode]);
+
   // A stale preview must fall back to Original rather than pretend it is current.
   useEffect(() => {
     if (previewStale && audioMode === 'piano') setAudioMode('original');
@@ -948,20 +976,84 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     seek(tickToEffectiveSeconds(alignment, tick, offsetSeconds));
   }, [alignment, offsetSeconds, seek]);
 
+  const commitSharedScroll = useCallback((target: number) => {
+    const width = timelineWidth + 116;
+    const liveWidth = sharedBarRef.current?.clientWidth || sharedWidth;
+    const next = clampScroll(target, width, liveWidth);
+    commandedScroll.current = next;
+    setSharedScrollLeft(next);
+    const bar = sharedBarRef.current;
+    if (bar && Math.abs(bar.scrollLeft - next) > 1) bar.scrollLeft = next;
+    for (const node of globalThis.document.querySelectorAll<HTMLElement>('.ws-roll-viewport, .ws-score-viewport')) {
+      if (Math.abs(node.scrollLeft - next) > 1) node.scrollLeft = next;
+    }
+  }, [timelineWidth, sharedWidth]);
+
+  const revealSource = useCallback((seconds: number) => {
+    const W = sharedBarRef.current?.clientWidth || sharedWidth;
+    if (!timelineLayout || !alignment || W <= 0) return;
+    const p = 116 + timelineLayout.sourceSecondsToX(seconds, alignment, 0);
+    if (p < sharedScrollLeft || p > sharedScrollLeft + W) {
+      commitSharedScroll(p - W * 0.25);
+    }
+  }, [timelineLayout, alignment, sharedWidth, sharedScrollLeft, commitSharedScroll]);
+
+  useEffect(() => {
+    if (seekToken === lastSeekToken.current) return;
+    lastSeekToken.current = seekToken;
+    revealSource(playhead);
+  }, [seekToken, playhead, revealSource]);
+
+  useEffect(() => {
+    const bar = sharedBarRef.current;
+    if (!bar) return;
+    const measure = () => setSharedWidth(bar.clientWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, [document]);
+
+  const onSharedScroll = useCallback(() => {
+    const bar = sharedBarRef.current;
+    if (!bar || scoreModeRef.current === 'formatted' || bar.clientWidth <= 0) return;
+    const next = bar.scrollLeft;
+    setSharedWidth(bar.clientWidth);
+    if (Math.abs(next - commandedScroll.current) > 2 && !gestureLock) setFollowSuspended(true);
+    commandedScroll.current = next;
+    setSharedScrollLeft(next);
+    for (const node of globalThis.document.querySelectorAll<HTMLElement>('.ws-roll-viewport, .ws-score-viewport')) {
+      if (Math.abs(node.scrollLeft - next) > 1) node.scrollLeft = next;
+    }
+  }, [gestureLock]);
+
+  const handleSharedWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.shiftKey;
+    if (!horizontal) return;
+    const bar = sharedBarRef.current;
+    if (!bar) return;
+    event.preventDefault();
+    setFollowSuspended(true);
+    const delta = event.shiftKey && Math.abs(event.deltaX) < 1 ? event.deltaY : event.deltaX;
+    bar.scrollLeft = clampScroll(bar.scrollLeft + delta, timelineWidth + 116, sharedWidth);
+  }, [timelineWidth, sharedWidth]);
+
   const returnToPlayhead = useCallback(() => {
-    if (!document || !alignment) return;
-    setWindow(clampTimeWindow({start: playhead - window.span / 4, span: window.span}, document.duration));
-    linkToken.current += 1;
-    setScoreTarget({tick: playheadTick ?? 0, token: linkToken.current});
+    if (!timelineLayout || !alignment) return;
     setFollow(true);
-  }, [document, alignment, playhead, playheadTick, window.span]);
+    setFollowSuspended(false);
+    revealSource(playhead);
+  }, [timelineLayout, alignment, revealSource, playhead]);
 
   const toggleTransport = useCallback(() => {
     const media = videoRef.current;
     if (!media) return;
-    if (media.paused) void media.play().catch(() => setNotice('The video could not start.'));
-    else media.pause();
-  }, []);
+    if (media.paused) {
+      if (follow && !followSuspended) revealSource(playhead);
+      void media.play().catch(() => setNotice('The video could not start.'));
+    } else media.pause();
+  }, [follow, followSuspended, revealSource, playhead]);
 
   const changeRate = useCallback((value: number) => {
     setRate(value);
@@ -969,22 +1061,29 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     if (media) media.playbackRate = value;
   }, []);
 
-  // Follow playback: edge-based scroll that keeps the cursor comfortably visible.
+  // One frame-driven follow writer: stationary cursor until the safe-area threshold,
+  // then content advances beneath it. No smooth-scroll timer races the clock.
   useEffect(() => {
-    if (!follow || !playing || !document) return;
-    setWindow(current => {
-      const lead = playhead - current.start;
-      if (lead >= 0 && lead <= current.span * 0.75) return current;
-      return clampTimeWindow({start: playhead - current.span * 0.25, span: current.span}, document.duration);
-    });
-  }, [playhead, follow, playing, document]);
+    if (!follow || followSuspended || gestureLock || !playing || !document || !alignment || !timelineLayout) return;
+    const W = sharedBarRef.current?.clientWidth || sharedWidth;
+    if (W <= 0) return;
+    const p = 116 + timelineLayout.sourceSecondsToX(playhead, alignment, 0);
+    const plotWidth = Math.max(1, W - 116);
+    const ratio = W < 700 ? 0.6 : 0.7;
+    const right = 116 + ratio * plotWidth;
+    const q = p - sharedScrollLeft;
+    if (q < 0 || q > W) {
+      commitSharedScroll(p - W * 0.25);
+      return;
+    }
+    if (q > right) commitSharedScroll(p - right);
+  }, [playhead, follow, followSuspended, gestureLock, playing, document, alignment,
+    timelineLayout, sharedWidth, sharedScrollLeft, commitSharedScroll]);
 
-  // The score follows the same clock by musical position.
+  // A pause freezes the view; nothing else writes scroll while paused.
   useEffect(() => {
-    if (!follow || playheadTick === null) return;
-    linkToken.current += 1;
-    setScoreTarget({tick: playheadTick, token: linkToken.current});
-  }, [playheadTick, follow]);
+    if (!playing) commandedScroll.current = sharedScrollLeft;
+  }, [playing, sharedScrollLeft]);
 
   // Keep the source clock's rate when the video (re)mounts.
   useEffect(() => {
@@ -993,14 +1092,22 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   }, [videoUrl, rate]);
 
   const zoom = useCallback((factor: number) => {
-    if (!document) return;
-    setWindow(current => {
-      const anchor = playhead >= current.start && playhead <= current.start + current.span
-        ? playhead
-        : current.start + current.span / 2;
-      return zoomAround(current, document.duration, factor, anchor);
-    });
-  }, [document, playhead]);
+    if (!timelineLayout || !alignment || gestureLock || !document) return;
+    const p = 116 + timelineLayout.sourceSecondsToX(playhead, alignment, 0);
+    const anchorX = p >= sharedScrollLeft && p <= sharedScrollLeft + sharedWidth
+      ? p : sharedScrollLeft + sharedWidth / 2;
+    const anchorTick = timelineLayout.xToTick(Math.max(0, anchorX - 116));
+    const screenOffset = anchorX - sharedScrollLeft;
+    const nextZoom = Math.max(0.25, Math.min(8, zoomFactor * factor));
+    const nextLayout = buildTimelineLayout(document, nextZoom);
+    setZoomFactor(nextZoom);
+    const nextScroll = clampScroll(116 + nextLayout.tickToX(anchorTick) - screenOffset,
+      nextLayout.contentWidth + 116, sharedWidth);
+    commandedScroll.current = nextScroll;
+    setSharedScrollLeft(nextScroll);
+    const bar = sharedBarRef.current;
+    if (bar) bar.scrollLeft = nextScroll;
+  }, [timelineLayout, alignment, gestureLock, playhead, sharedScrollLeft, sharedWidth, document, zoomFactor]);
 
   /* ------------------------------------------------------ save and reopen */
 
@@ -1322,9 +1429,21 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         </select>
       </label>
       <label className="ws-field ws-inline">
-        <span><input type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)}/> Follow</span>
+        <span><input type="checkbox" checked={follow}
+          onChange={event => { setFollow(event.target.checked); if (event.target.checked) { setFollowSuspended(false); revealSource(playhead); } }}/> Follow playback</span>
       </label>
-      <button type="button" onClick={returnToPlayhead}>Return to playhead</button>
+      <button type="button" onClick={returnToPlayhead}>{followSuspended ? 'Resume follow' : follow ? 'Return to playhead' : 'Enable follow'}</button>
+      {followSuspended && <span className="ws-hint" data-follow-suspended="true">Follow suspended · manual inspection</span>}
+      {(() => {
+        if (!timelineLayout || !alignment || sharedWidth <= 0) return null;
+        const p = 116 + timelineLayout.sourceSecondsToX(playhead, alignment, 0);
+        const direction = p < sharedScrollLeft ? 'left' : p > sharedScrollLeft + sharedWidth ? 'right' : 'visible';
+        if (direction === 'visible') return null;
+        return <span className="ws-hint" data-follow-direction={direction}>
+          {playing ? (direction === 'right' ? 'Playing to the right →' : '← Playing to the left')
+            : (direction === 'right' ? 'Playhead to the right →' : '← Playhead to the left')}
+        </span>;
+      })()}
       <label className="ws-field ws-inline">
         <span><input type="checkbox" aria-label="Confirm reviewed" checked={confirmReviewed}
           onChange={event => setConfirmReviewed(event.target.checked)}/> Reviewed</span>
@@ -1351,11 +1470,30 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       </label>
       <div className="ws-zoom" role="group" aria-label="Zoom">
         <button type="button" onClick={() => zoom(1.25)} aria-label="Zoom out">−</button>
-        <span className="ws-window-label" data-window-span={window.span.toFixed(2)}>
-          {window.span.toFixed(window.span < 10 ? 1 : 0)} s visible · from {window.start.toFixed(1)} s
+        <span className="ws-window-label" data-window-span={(() => {
+          if (!timelineLayout || !alignment || sharedWidth <= 0) return window.span.toFixed(2);
+          const from = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0);
+          const to = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116 + sharedWidth), alignment, 0);
+          return Math.max(0.01, to - from).toFixed(2);
+        })()} data-shared-zoom={zoomFactor.toFixed(3)}>
+          {(() => {
+            if (!timelineLayout || !alignment || sharedWidth <= 0) {
+              return `${window.span.toFixed(window.span < 10 ? 1 : 0)} s visible · from ${window.start.toFixed(1)} s`;
+            }
+            const from = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0);
+            const to = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116 + sharedWidth), alignment, 0);
+            return `${Math.max(0, to - from).toFixed(Math.max(0, to - from) < 10 ? 1 : 0)} s visible · from ${from.toFixed(1)} s`;
+          })()}
         </span>
         <button type="button" onClick={() => zoom(0.8)} aria-label="Zoom in">+</button>
       </div>
+      {alignment && heldPassageAt(alignment, playhead) ? <span className="ws-hint" data-held-passage="true">
+        Explanation · score paused
+      </span> : null}
+      {alignment && timelineLayout && (playhead < tickToEffectiveSeconds(alignment, 0, 0)
+        || playhead > tickToEffectiveSeconds(alignment, timelineLayout.totalTicks, 0)) ? <span className="ws-hint" data-outside-score="true">
+        Outside scored passage
+      </span> : null}
       <span className="ws-time">{playhead.toFixed(2)} s / {document.duration.toFixed(2)} s</span>
       <label className="ws-field ws-inline">
         <span>{spans.length ? 'Source clock' : 'Position'}</span>
@@ -1552,6 +1690,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           </div>}
         </section>
 
+        <div className="ws-shared-stage" onWheel={handleSharedWheel}>
         <section className="ws-panel ws-surface" aria-label="Piano roll">
           <button type="button" className="ws-accordion" data-roll-toggle="true"
             aria-expanded={rollOpen} aria-controls="piano-roll-body"
@@ -1560,11 +1699,16 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           </button>
           <div id="piano-roll-body" hidden={!rollOpen}>
           <TimeRoll document={document} window={window} onWindowChange={next => changeWindow(next, 'reveal')}
+            layout={timelineLayout ?? undefined} alignment={alignment ?? undefined}
+            sharedScrollLeft={sharedScrollLeft} sharedViewportWidth={sharedWidth} gutter={sharedWidth > 0 && sharedWidth < 700 ? 82 : 70}
+            cursorX={timelineLayout && alignment ? (sharedWidth > 0 && sharedWidth < 700 ? 82 : 70) + timelineLayout.sourceSecondsToX(playhead, alignment, 0) : null}
+            onGestureStart={() => { setGestureLock(true); setFollowSuspended(true); }}
+            onGestureEnd={() => setGestureLock(false)}
             onWindowChangeOrigin={changeWindow}
             offsetSeconds={offsetSeconds} activeOccurrenceIds={activeIds}
             clock={clockRef.current} intervals={intervals}
             selectedOccurrenceId={selection?.occurrenceId ?? null}
-            reveal={rollReveal}
+            reveal={null}
             onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
             editingEnabled={scoreMode === 'correction' && !replaceMode && !addMode}
             snapSeconds={snapTicks ? snapTicks * secondsPerTick : null}
@@ -1583,16 +1727,23 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         <section className="ws-panel ws-surface" aria-label="Score">
           <p className="ws-hint" data-score-key>Key: {keyLabel(document.key_signature || 'C')} · {document.time_signature.numerator}/{document.time_signature.denominator}</p>
           <ContinuousScore document={document} boxes={boxes} selectedOccurrenceId={selection?.occurrenceId ?? null}
-            reveal={scoreReveal} onSelect={select}
+            reveal={null} onSelect={select}
             playheadTick={playheadTick} activeOccurrenceIds={activeIds}
             clock={clockRef.current} alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals}
-            scrollTarget={scoreTarget} onSeekTick={seekToTick} onUserScroll={onScoreScroll}
+            layout={timelineLayout ?? undefined} sharedScrollLeft={sharedScrollLeft}
+            cursorX={timelineLayout && alignment ? 116 + timelineLayout.sourceSecondsToX(playhead, alignment, 0) : null}
+            onSeekTick={seekToTick}
             onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
             editingEnabled={scoreMode === 'correction' && !replaceMode && !addMode}
             onAmbiguous={(logicalNoteId, occurrenceIds) => setNotice(
               `This written note maps ${occurrenceIds.length} occurrences; choose one in the roll (logical ${logicalNoteId}).`)}/>
           <p className="ws-hint">One continuous grand staff; the cursor is the mapped musical position. Click the ruler to seek, a notehead to select.</p>
         </section>
+        <div className="ws-shared-scrollbar" ref={sharedBarRef} onScroll={onSharedScroll}
+          data-shared-scrollbar aria-label="Shared timeline horizontal scroll">
+          <div style={{width: Math.max(1, timelineWidth + 116), height: 1}}/>
+        </div>
+        </div>
 
         {overlap && <section className="ws-panel" aria-label="Overlap picker" data-overlap="true">
           <h2>Overlapping {pitchName(overlap.pitch)} notes</h2>
@@ -1608,8 +1759,17 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           </div>
         </section>}
         <section className="ws-panel ws-surface" aria-label="Overview">
-          <ClipOverview document={document} window={window} playhead={playhead}
-            onWindowChange={next => changeWindow(next, 'user')}/>
+          <ClipOverview document={document} playhead={playhead}
+            window={timelineLayout && alignment && sharedWidth > 0 ? {
+              start: timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0),
+              span: Math.max(0.01, timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116 + sharedWidth), alignment, 0)
+                - timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0)),
+            } : window}
+            onWindowChange={next => {
+              if (!timelineLayout || !alignment) return;
+              setFollowSuspended(true);
+              commitSharedScroll(116 + timelineLayout.sourceSecondsToX(next.start, alignment, 0));
+            }}/>
         </section>
       </div>
 

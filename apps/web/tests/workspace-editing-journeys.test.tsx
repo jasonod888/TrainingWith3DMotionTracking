@@ -80,11 +80,10 @@ test('the add ghost shows and commits the chosen recorded length and written val
   fireEvent.pointerDown(view.container.querySelector('.ws-roll-add-layer')!, {clientX: 300, clientY: 120});
   await waitFor(() => assert.ok(view.container.querySelector('[data-ghost="true"]')));
   const ghostWidth = Number(view.container.querySelector('[data-ghost="true"]')!.getAttribute('width'));
-  assert.ok(ghostWidth >= 13 && ghostWidth <= 17, `ghost should be 0.25 s wide, got ${ghostWidth}`);
+  assert.ok(ghostWidth >= 8 && ghostWidth <= 40, `ghost should follow the shared measure layout, got ${ghostWidth}`);
   fireEvent.click(view.getByRole('button', {name: 'Insert'}));
   await waitFor(() => assert.equal(total(view), start + 1));
-  const inserted = [...view.container.querySelectorAll('.ws-roll-note')]
-    .find(node => Number(node.getAttribute('x')) > 295 && Number(node.getAttribute('x')) < 305)!;
+  const inserted = [...view.container.querySelectorAll('.ws-roll-note')].at(-1) as SVGRectElement;
   fireEvent.pointerDown(inserted, {clientX: 300, clientY: 120, pointerId: 9, button: 0});
   fireEvent.pointerUp(inserted, {pointerId: 9});
   await waitFor(() => assert.equal((view.getByLabelText('Recorded length (s)') as HTMLInputElement).value, '0.25'));
@@ -384,4 +383,19 @@ test('sheet drag preview moves head, stem, flags and accidental together and can
     assert.deepEqual(after.document, before.document, 'cancelled drag must not change the document');
     assert.equal(after.past, before.past);
   });
+});
+
+test('one shared scrollbar suspends and resumes follow and shares zoom', async () => {
+  const view = await open();
+  const bars = view.container.querySelectorAll('[data-shared-scrollbar]');
+  assert.equal(bars.length, 1, 'only one horizontal scrollbar exists');
+  const bar = bars[0] as HTMLDivElement;
+  bar.scrollLeft = 120;
+  fireEvent.scroll(bar);
+  await waitFor(() => assert.ok(view.container.querySelector('[data-follow-suspended="true"]')));
+  view.getByRole('button', {name: 'Resume follow', exact: true}).click();
+  await waitFor(() => assert.equal(view.container.querySelector('[data-follow-suspended="true"]'), null));
+  const zoomBefore = view.container.querySelector('[data-shared-zoom]')?.getAttribute('data-shared-zoom');
+  view.getByRole('button', {name: 'Zoom in'}).click();
+  await waitFor(() => assert.notEqual(view.container.querySelector('[data-shared-zoom]')?.getAttribute('data-shared-zoom'), zoomBefore));
 });

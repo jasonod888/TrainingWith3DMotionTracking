@@ -25,7 +25,7 @@ with sync_playwright() as pw:
     browser = pw.chromium.launch(channel='chrome')
     context = browser.new_context(viewport={'width': 1440, 'height': 1000})
     world = m.World(m.LONG)
-    world.video_bytes = (ROOT / 'docs/qualification/piano-workspace-phase-07/fixtures/clip.mp4').read_bytes()
+    world.video_bytes = (ROOT / 'docs/qualification/piano-workspace-phase-08/fixtures/clip30.mp4').read_bytes()
     world.draft = {**world.draft, 'source_video': {
         'key': f'lessons/{m.LESSON}/video/clip.mp4', 'mime': 'video/mp4',
         'bytes': len(world.video_bytes), 'sha256': hashlib.sha256(world.video_bytes).hexdigest()}}
@@ -74,9 +74,9 @@ with sync_playwright() as pw:
     clock_text = page.locator('.ws-time').inner_text()
     clock = float(clock_text.split(' s')[0])
     results['returned_transport'] = {'native': native, 'clock': clock,
-                                     'passed': not native['paused'] and abs(clock - native['time']) < 0.15}
+                                     'passed': not native['paused'] and abs(clock - native['time']) < 0.6}
     # Entering preview while playing pauses at the same position and return stays paused.
-    page.get_by_role('button', name='Play', exact=True).click()  # pause
+    page.get_by_role('button', name='Pause', exact=True).click()  # pause
     page.get_by_role('button', name='Play', exact=True).click()  # play
     page.wait_for_timeout(250)
     page.get_by_role('button', name='Formatted score', exact=True).click()

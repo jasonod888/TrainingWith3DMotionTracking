@@ -1,0 +1,63 @@
+{
+  "time": {
+    "before": {
+      "pitch": 69,
+      "onset": 0.9172,
+      "duration": 0.8824
+    },
+    "after": {
+      "pitch": 69,
+      "onset": 1.1841633364685333,
+      "duration": 0.8824
+    },
+    "restored": {
+      "pitch": 69,
+      "onset": 0.9172,
+      "duration": 0.8824
+    },
+    "one_edit": true,
+    "suspended": true,
+    "undo_restored": true
+  },
+  "resize": {
+    "before": {
+      "pitch": 69,
+      "onset": 0.9172,
+      "duration": 0.8824
+    },
+    "after": {
+      "pitch": 69,
+      "onset": 0.9172,
+      "duration": 1.0468211277587653
+    },
+    "restored": {
+      "pitch": 69,
+      "onset": 0.9172,
+      "duration": 0.8824
+    },
+    "one_edit": true,
+    "suspended": true,
+    "undo_restored": true
+  },
+  "pitch": {
+    "before": {
+      "pitch": 69,
+      "onset": 0.9172,
+      "duration": 0.8824
+    },
+    "after": {
+      "pitch": 71,
+      "onset": 0.9172,
+      "duration": 0.8824
+    },
+    "restored": {
+      "pitch": 69,
+      "onset": 0.9172,
+      "duration": 0.8824
+    },
+    "one_edit": true,
+    "suspended": true,
+    "undo_restored": true,
+    "timing_unchanged": true
+  }
+}

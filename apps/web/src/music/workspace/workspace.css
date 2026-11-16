@@ -639,3 +639,11 @@
 .ws-accordion { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 0; background: transparent; padding: 8px 10px; font: inherit; font-weight: 600; cursor: pointer; color: #22303f; }
 .ws-accordion:hover { background: #f3f6f9; }
 .ws-accordion .ws-hint { font-weight: 400; }
+/* Shared correction timeline: one horizontal authority and one cursor. */
+.ws-shared-stage { position: relative; overflow: hidden; }
+.ws-shared-scrollbar { overflow-x: auto; overflow-y: hidden; height: 16px; margin: 6px 0 10px; border-radius: 8px; background: #e6eaef; }
+.ws-shared-scrollbar > div { height: 1px; }
+.ws-shared-cursor { position: absolute; top: 0; bottom: 0; width: 1px; background: #d9480f; pointer-events: none; z-index: 4; opacity: .85; }
+.ws-roll-viewport { overflow-x: hidden !important; }
+.ws-score-viewport { overflow-x: hidden !important; }
+.ws-shared-surface-cursor { stroke: #d9480f; stroke-width: 1.4; pointer-events: none; opacity: .9; }

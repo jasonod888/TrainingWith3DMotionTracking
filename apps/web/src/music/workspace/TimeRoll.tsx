@@ -16,7 +16,8 @@ import {
 } from './viewport';
 import {useElementWidth} from './useElementWidth';
 import {useClockTime, type ClockStore} from './clock';
-import {durationFromDrag, onsetFromDrag, pitchFromDrag, resolveAxis, type GestureAxis, type GestureEdit} from './gestures';
+import {pitchFromDrag, resolveAxis, type GestureAxis, type GestureEdit} from './gestures';
+import {heldPassageAt, type TimelineLayout} from './timeline-layout';
 
 const RULER_HEIGHT = 24;
 const PLOT_HEIGHT = 168;
@@ -28,6 +29,15 @@ export type RevealRequest = {occurrenceId: string; token: number};
 
 type Props = {
   document: NotationDocument;
+  /** Shared correction timeline geometry. When present the roll no longer owns x scale. */
+  layout?: TimelineLayout;
+  alignment?: import('../../../../../packages/music-notation/index.ts').Alignment;
+  sharedScrollLeft?: number;
+  sharedViewportWidth?: number;
+  gutter?: number;
+  cursorX?: number | null;
+  onGestureStart?: () => void;
+  onGestureEnd?: () => void;
   window: TimeWindow;
   onWindowChange: (window: TimeWindow) => void;
   selectedOccurrenceId: string | null;
@@ -62,6 +72,7 @@ type Props = {
 
 export function TimeRoll({
   document, window, onWindowChange, selectedOccurrenceId, reveal, playhead, offsetSeconds = 0,
+  layout, alignment, sharedScrollLeft = 0, sharedViewportWidth = 0, gutter = 0, onGestureStart, onGestureEnd, cursorX = null,
   activeOccurrenceIds = [], onSelect, onSeek, onWindowChangeOrigin, clock = null, intervals,
   onGestureCommit, onAuditionPitch, snapSeconds = null, addMode = false, ghost = null, onGhostPlace,
   editingEnabled = true,
@@ -80,6 +91,9 @@ export function TimeRoll({
   const originRef = useRef(onWindowChangeOrigin);
   originRef.current = onWindowChangeOrigin;
   const effectiveOffset = offsetSeconds;
+  const shared = Boolean(layout && alignment);
+  const xAtEffective = (seconds: number) => layout && alignment
+    ? gutter + layout.sourceSecondsToX(seconds, alignment, 0) : 0;
 
   const width = Math.max(120, measuredWidth);
   const pps = pixelsPerSecond(width, window);
@@ -95,10 +109,19 @@ export function TimeRoll({
   const scrollable = pitchHeight > PLOT_HEIGHT + 0.5;
 
   const y = (pitch: number) => (high - pitch) * rowHeight + rowHeight / 2;
-  const totalWidth = Math.max(width, Math.ceil(document.duration * pps));
-  const ticks = rulerTicks(window, document.duration);
+  const totalWidth = shared && layout ? gutter + layout.contentWidth
+    : Math.max(width, Math.ceil(document.duration * pps));
+  const ticks = shared && layout && alignment
+    ? Array.from(new Set(layout.measures.map(measure => measure.startTick)))
+    : rulerTicks(window, document.duration);
+  const xForTick = (tick: number) => shared && layout ? gutter + layout.tickToX(tick) : tick * pps;
   const range = visibleTimeRange(window);
   const visibleNotes = document.performance.filter(note => {
+    if (shared && layout && alignment) {
+      const from = gutter + layout.sourceSecondsToX(note.onset + effectiveOffset, alignment, 0);
+      const to = gutter + layout.sourceSecondsToX(note.onset + effectiveOffset + (note.duration ?? 0.25), alignment, 0);
+      return to >= sharedScrollLeft - 200 && from <= sharedScrollLeft + Math.max(200, sharedViewportWidth) + 200;
+    }
     const onset = note.onset + effectiveOffset;
     const end = onset + (note.duration ?? 0.25);
     return onset <= range.to && end >= range.from;
@@ -115,17 +138,18 @@ export function TimeRoll({
     // Only when the rendered pitch range changes; edits keep the user's scroll.
   }, [element, scrollable, low, high, rowHeight, pitchHeight]);
 
-  // Keep the scroll position in step with the window controlled by the harness.
+  // Shared mode: the harness writes the canonical offset to both clipped
+  // viewports directly. Only the legacy independent mode owns this element.
   useEffect(() => {
     const node = element;
-    if (!node) return;
+    if (!node || shared) return;
     const target = Math.round(window.start * pps);
     if (Math.abs(node.scrollLeft - target) <= 1) return;
     syncing.current = true;
     node.scrollLeft = target;
     const frame = requestAnimationFrame(() => { syncing.current = false; });
     return () => cancelAnimationFrame(frame);
-  }, [window.start, pps, element]);
+  }, [window.start, pps, element, shared]);
 
   // Reveal once per request token: time and pitch, without reacting to later pans.
   useEffect(() => {
@@ -168,6 +192,7 @@ export function TimeRoll({
     dragRef.current = null;
     teardownDrag();
     setDragPreview(null);
+    onGestureEnd?.();
   };
 
   // An unmount during a drag must dispose the transaction, never commit later.
@@ -186,6 +211,7 @@ export function TimeRoll({
     teardownDrag();
     const capture = event.currentTarget as Element;
     try { capture.setPointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    onGestureStart?.();
     dragRef.current = {
       note, startX: event.clientX, startY: event.clientY, forced, pointerId: event.pointerId,
       capture, axis: null, pitch: note.pitch, onset: note.onset, duration: note.duration ?? 0.25,
@@ -224,10 +250,25 @@ export function TimeRoll({
         const now = Date.now();
         if (now - auditionAt.current > 120) { auditionAt.current = now; onAuditionPitch?.(pitch); }
       }
+    } else if (axis === 'time' && layout && alignment) {
+      const originalX = xAtEffective(drag.note.onset + effectiveOffset);
+      const candidateEffective = layout.xToSourceSeconds(originalX + dx - gutter, alignment, 0);
+      if (heldPassageAt(alignment, candidateEffective)) return;
+      const candidate = candidateEffective - effectiveOffset;
+      const snapped = snapSeconds ? Math.round(candidate / snapSeconds) * snapSeconds : candidate;
+      drag.onset = Math.max(0, Math.min(document.duration, snapped));
+    } else if (axis === 'resize' && layout && alignment) {
+      const onsetX = xAtEffective(drag.note.onset + effectiveOffset);
+      const endX = xAtEffective(drag.note.onset + effectiveOffset + (drag.note.duration ?? 0.25));
+      const end = layout.xToSourceSeconds(endX + dx - gutter, alignment, 0);
+      const onset = layout.xToSourceSeconds(onsetX - gutter, alignment, 0);
+      if (heldPassageAt(alignment, end)) return;
+      const candidate = Math.max(0.02, end - onset);
+      drag.duration = snapSeconds ? Math.max(snapSeconds, Math.round(candidate / snapSeconds) * snapSeconds) : candidate;
     } else if (axis === 'time') {
-      drag.onset = onsetFromDrag(drag.note.onset, dx, pps, snapSeconds, document.duration);
+      drag.onset = Math.max(0, document.performance.find(item => item.id === drag.note.id)!.onset + dx / pps);
     } else {
-      drag.duration = durationFromDrag(drag.note.duration ?? 0.25, dx, pps, snapSeconds);
+      drag.duration = Math.max(0.02, (drag.note.duration ?? 0.25) + dx / pps);
     }
     setDragPreview({id: drag.note.id, pitch: drag.pitch, onset: drag.onset, duration: drag.duration, axis});
   };
@@ -240,6 +281,7 @@ export function TimeRoll({
     teardownDrag();
     setDragPreview(null);
     try { drag?.capture?.releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ }
+    onGestureEnd?.();
     if (!drag || !drag.axis) return;
     if (drag.axis === 'pitch' && drag.pitch !== drag.note.pitch) {
       onGestureCommit?.({kind: 'pitch', occurrenceId: drag.note.id, pitch: drag.pitch});
@@ -262,28 +304,27 @@ export function TimeRoll({
     const rect = (event.currentTarget as Element).getBoundingClientRect();
     const x = event.clientX - rect.left;
     const py = event.clientY - rect.top;
-    const seconds = Math.max(0, Math.min(document.duration, x / pps));
+    const seconds = shared && layout && alignment
+      ? Math.max(0, Math.min(document.duration,
+        layout.xToSourceSeconds(Math.max(0, x - gutter), alignment, 0) - effectiveOffset))
+      : Math.max(0, Math.min(document.duration, x / pps));
     const pitch = Math.max(0, Math.min(127, high - Math.floor(py / rowHeight)));
     onGhostPlace?.(Math.round(seconds * 1e3) / 1e3, pitch);
   };
 
   const handleScroll = () => {
     const node = element;
-    if (!node || syncing.current) return;
+    if (!node) return;
     setLabelOffset(node.scrollTop);
-    const start = node.scrollLeft / pps;
-    const next = clampTimeWindow({start, span: window.span}, document.duration);
-    if (Math.abs(next.start - window.start) <= 1e-4) return;
-    if (originRef.current) originRef.current(next, 'user');
-    else onWindowChange(next);
   };
 
   const seekFromEvent = (event: React.MouseEvent<HTMLDivElement>) => {
     const node = element;
     if (!node) return;
     const rect = node.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    onSeek(clamp((node.scrollLeft + x) / pps, 0, document.duration));
+    const x = node.scrollLeft + event.clientX - rect.left;
+    if (layout && alignment) onSeek(layout.xToSourceSeconds(x - gutter, alignment, 0));
+    else onSeek(clamp(x / pps, 0, document.duration));
   };
 
   return <div className="ws-roll">
@@ -302,7 +343,7 @@ export function TimeRoll({
       aria-label={`Piano roll, ${window.span.toFixed(0)} seconds from ${window.start.toFixed(1)} seconds${scrollable ? ', scrollable pitch range' : ''}`}>
       <div className="ws-roll-content" style={{width: totalWidth}}>
         <div className="ws-roll-ruler" style={{height: RULER_HEIGHT}} onClick={seekFromEvent}>
-          {ticks.map(tick => <span key={tick} className="ws-roll-tick-label" style={{left: tick * pps + 4}}>{formatSeconds(tick)}</span>)}
+          {ticks.map(tick => <span key={tick} className="ws-roll-tick-label" style={{left: xForTick(tick) + 4}}>{shared && layout && alignment ? formatSeconds(layout.xToSourceSeconds(xForTick(tick) - gutter, alignment, 0)) : formatSeconds(tick)}</span>)}
         </div>
         <svg className="ws-roll-svg" width={totalWidth} height={pitchHeight} role="img"
           data-roll-window-start={window.start} data-roll-window-span={window.span}
@@ -311,7 +352,7 @@ export function TimeRoll({
           data-pitch-height={Math.round(pitchHeight)} data-plot-height={PLOT_HEIGHT}>
           {addMode ? <rect className="ws-roll-add-layer" x={0} y={0} width={totalWidth} height={pitchHeight}
             onPointerDown={placeGhost} aria-label="Add note position"/> : null}
-          {ticks.map(tick => <line key={tick} className="ws-roll-grid" x1={tick * pps} y1={0} x2={tick * pps} y2={pitchHeight}/>)}
+          {ticks.map(tick => <line key={tick} className="ws-roll-grid" x1={xForTick(tick)} y1={0} x2={xForTick(tick)} y2={pitchHeight}/>)}
           {Array.from({length: rows}, (_, index) => high - index).filter(pitch => pitch % 12 === 0).map(pitch =>
             <line key={`row-${pitch}`} className="ws-roll-octave" x1={0} y1={y(pitch)} x2={totalWidth} y2={y(pitch)}/>)}
           {visibleNotes.map(note => {
@@ -319,8 +360,13 @@ export function TimeRoll({
             const pitch = preview?.pitch ?? note.pitch;
             const onset = preview?.onset ?? note.onset;
             const seconds = preview?.duration ?? (note.duration ?? 0.25);
-            const left = (onset + effectiveOffset) * pps;
-            const noteWidth = Math.max(2, seconds * pps - 1);
+            const left = shared && layout && alignment
+              ? gutter + layout.sourceSecondsToX(onset + effectiveOffset, alignment, 0)
+              : (onset + effectiveOffset) * pps;
+            const right = shared && layout && alignment
+              ? gutter + layout.sourceSecondsToX(onset + effectiveOffset + seconds, alignment, 0)
+              : (onset + effectiveOffset + seconds) * pps;
+            const noteWidth = Math.max(2, right - left - 1);
             const selected = selectedOccurrenceId === note.id;
             const active = liveActive.includes(note.id);
             const dragging = preview !== null;
@@ -353,17 +399,21 @@ export function TimeRoll({
             </g>;
           })}
           {ghost ? (() => {
-            const ghostLeft = (ghost.seconds + effectiveOffset) * pps;
+            const ghostLeft = shared && layout && alignment
+              ? gutter + layout.sourceSecondsToX(ghost.seconds + effectiveOffset, alignment, 0)
+              : (ghost.seconds + effectiveOffset) * pps;
             const clash = document.performance.some(note => note.pitch === ghost.pitch && Math.abs(note.onset - ghost.seconds) < 0.001);
             const invalid = Boolean(ghost.invalid) || clash;
             return <rect className={`ws-roll-ghost${invalid ? ' is-invalid' : ''}`} data-ghost="true"
               data-ghost-invalid={invalid ? 'true' : 'false'}
-              x={ghostLeft} y={y(ghost.pitch) - rowHeight / 2} width={Math.max(4, (ghost.durationSeconds ?? 0.25) * pps)} height={Math.max(3, rowHeight - 1)} rx={2}
+              x={ghostLeft} y={y(ghost.pitch) - rowHeight / 2}
+              width={Math.max(4, shared && layout && alignment
+                ? gutter + layout.sourceSecondsToX(ghost.seconds + effectiveOffset + (ghost.durationSeconds ?? 0.25), alignment, 0) - ghostLeft
+                : (ghost.durationSeconds ?? 0.25) * pps)} height={Math.max(3, rowHeight - 1)} rx={2}
               aria-label={`New note ${pitchName(ghost.pitch)} at ${ghost.seconds.toFixed(2)} seconds`}/>;
           })() : null}
-          {livePlayhead >= window.start && livePlayhead <= window.start + window.span
-            ? <line className="ws-roll-playhead" x1={livePlayhead * pps} y1={0} x2={livePlayhead * pps} y2={pitchHeight}/>
-            : null}
+          {cursorX !== null ? <line className="ws-shared-surface-cursor ws-roll-playhead" data-shared-cursor
+            data-playhead-seconds={livePlayhead} x1={cursorX} y1={0} x2={cursorX} y2={pitchHeight}/> : null}
         </svg>
       </div>
     </div>

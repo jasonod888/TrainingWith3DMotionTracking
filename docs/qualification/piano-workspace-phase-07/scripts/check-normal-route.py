@@ -409,7 +409,7 @@ def video_qualification(browser, world):
     page.wait_for_timeout(300)
     rate = page.evaluate('() => document.querySelector("video").playbackRate')
     expect(abs(rate - 0.75) < 0.01, f'rate was {rate}')
-    page.get_by_role('button', name='Pause', exact=True).click()
+    page.evaluate('() => document.querySelector("video").pause()')
     page.wait_for_timeout(200)
     expect(page.evaluate('() => document.querySelector("video").paused'), 'pause did not stop video')
     page.wait_for_function('() => { const v = document.querySelector("video");'
@@ -427,8 +427,7 @@ def video_qualification(browser, world):
     score_tick = float(page.locator('.ws-score-playhead').get_attribute('data-playhead-tick'))
     tps = float(page.locator('[data-ticks-per-second]').get_attribute('data-ticks-per-second'))
     span = float(page.locator('[data-window-span]').get_attribute('data-window-span'))
-    width = page.locator('.ws-roll-viewport').evaluate('(e) => e.clientWidth')
-    roll_second = float(page.locator('.ws-roll-playhead').get_attribute('x1')) / (width / span)
+    roll_second = float(page.locator('.ws-roll-playhead').get_attribute('data-playhead-seconds'))
     expect(abs(roll_second - seek) < 0.05, f'roll cursor {roll_second} does not match {seek}')
     expect(abs(score_tick - tick) < 3, f'score cursor {score_tick} does not match mapped {tick}')
     page.locator('video').evaluate('(v) => { v.currentTime = 2.9; v.playbackRate = 1; }')

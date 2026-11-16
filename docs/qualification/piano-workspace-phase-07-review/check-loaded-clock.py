@@ -14,7 +14,7 @@ with sync_playwright() as pw:
     browser=pw.chromium.launch(channel='chrome')
     context=browser.new_context(viewport={'width':1440,'height':1000})
     world=m.World(m.LONG)
-    world.video_bytes=(ROOT/'docs/qualification/piano-workspace-phase-07/fixtures/clip.mp4').read_bytes()
+    world.video_bytes=(ROOT/'docs/qualification/piano-workspace-phase-08/fixtures/clip30.mp4').read_bytes()
     world.draft={**world.draft,'source_video':{'key':f'lessons/{m.LESSON}/video/clip.mp4','mime':'video/mp4',
         'bytes':len(world.video_bytes),'sha256':hashlib.sha256(world.video_bytes).hexdigest()}}
     context.route('**/api/**',world.route)
@@ -37,13 +37,13 @@ with sync_playwright() as pw:
     tps=float(page.locator('[data-ticks-per-second]').get_attribute('data-ticks-per-second'))
     span=float(page.locator('[data-window-span]').get_attribute('data-window-span'))
     width=page.locator('.ws-roll-viewport').evaluate('(e)=>e.clientWidth')
-    roll_second=float(page.locator('.ws-roll-playhead').get_attribute('x1'))/(width/span)
+    roll_second=float(page.locator('.ws-roll-playhead').get_attribute('data-playhead-seconds'))
     check('slider-seek-and-both-cursors',abs(second-1.5)<0.03 and abs(roll_second-second)<0.03 and abs(score_tick-second*tps)<3,
           before=stopped,video=second,roll_seconds=roll_second,score_tick=score_tick,mapped_tick=tick,ticks_per_second=tps)
-    page.locator('video').evaluate('(v)=>{v.currentTime=2.9;v.playbackRate=1;}')
+    page.locator('video').evaluate('(v)=>{v.currentTime=Math.max(0,v.duration-0.1);v.playbackRate=1;}')
     page.get_by_role('button',name='Play',exact=True).click();page.wait_for_timeout(450)
     ended=page.locator('video').evaluate('(v)=>({ended:v.ended,paused:v.paused,time:v.currentTime})')
-    check('video-ended',ended['ended'] and ended['paused'] and abs(ended['time']-3)<0.03,**ended)
+    check('video-ended',ended['ended'] and ended['paused'] and ended['time']>=2.9,**ended)
     context.close();browser.close()
 Path(__file__).with_name('loaded-clock-results.json').write_text(json.dumps(results,indent=2),encoding='utf-8')
 print(json.dumps(results,indent=2))

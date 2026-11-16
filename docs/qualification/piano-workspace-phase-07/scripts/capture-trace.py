@@ -24,6 +24,9 @@ def capture(browser, draft, name):
     context.tracing.start(screenshots=True, snapshots=False, sources=False)
     page = context.new_page()
     page.goto(f'{BASE}/?page=music-review&id={route.LESSON}', wait_until='domcontentloaded')
+    page.wait_for_selector('[data-roll-toggle]')
+    if page.locator('[data-roll-toggle]').get_attribute('aria-expanded') == 'false':
+        page.locator('[data-roll-toggle]').click()
     page.wait_for_selector('.ws-roll-note', timeout=60000)
     node = page.locator('.ws-roll-note').first
     node.scroll_into_view_if_needed()
