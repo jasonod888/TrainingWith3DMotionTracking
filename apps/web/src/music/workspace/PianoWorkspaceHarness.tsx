@@ -137,6 +137,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [window, setWindow] = useState<TimeWindow>({start: 0, span: DEFAULT_SPAN_SECONDS});
   const [spans, setSpans] = useState<{ start: number; end: number; kind: 'playing' | 'explanation' }[]>([]);
   const [offsetSeconds, setOffsetSeconds] = useState(0);
+  const readOnlyRef = useRef(false);
   const [follow, setFollow] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
@@ -755,6 +756,10 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   }, [lessonId, draftId]);
 
   const decideFinding = useCallback(async (finding: VerificationFinding, decision: 'accepted' | 'rejected') => {
+    if (readOnlyRef.current) {
+      setNotice('This lesson is read-only; verification decisions are disabled.');
+      return;
+    }
     const current = verificationRef.current;
     const live = documentRef.current;
     if (!lessonId || !draftId || !current || !live || verificationBusy) return;
@@ -984,6 +989,10 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   /* ------------------------------------------------------ save and reopen */
 
   const save = useCallback(async (baseOverride?: string) => {
+    if (readOnlyRef.current) {
+      setNotice('This lesson is read-only; saving is disabled.');
+      return;
+    }
     if (!document || !lessonId || !confirmReviewed || saving) return;
     const snapshot = workspaceSignature;
     setSaving(true); setSaveError(''); setSaveMessage(''); setSaveConflict(false);
@@ -1140,6 +1149,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const snapshot = useCallback(() => ({anchors, map: mapState}), [anchors, mapState]);
 
   const commitAnchors = useCallback((next: AnchorPoint[], nextMap: Alignment | null) => {
+    if (readOnlyRef.current) return;
     setAnchorPast(history => [...history.slice(-19), snapshot()]);
     setAnchorFuture([]);
     setAnchors(next);
@@ -1209,6 +1219,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const summary = historySummary(state);
   const interactionPolicy = resolveInteractionPolicy(document.performance.length, interactiveLimitApproved());
   const readOnly = interactionPolicy.mode === 'read-only';
+  readOnlyRef.current = readOnly;
   const downloadReference = () => {
     const exported = buildWorkspaceExport({
       document, title, occurrenceCount: document.performance.length, editingMode: interactionPolicy.mode,
@@ -1290,8 +1301,9 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       <label className="ws-field ws-inline">
         <span>Offset</span>
         <input type="number" step={0.01} min={-10} max={10} value={offsetSeconds} style={{width: 72}}
+          disabled={readOnly}
           aria-label="Sync offset in seconds"
-          onChange={event => setOffsetSeconds(Math.max(-10, Math.min(10, Number(event.target.value) || 0)))}/>
+          onChange={event => { if (readOnlyRef.current) return; setOffsetSeconds(Math.max(-10, Math.min(10, Number(event.target.value) || 0))); }}/>
         <span className="ws-hint">s · preview alignment</span>
       </label>
       <div className="ws-zoom" role="group" aria-label="Zoom">
@@ -1351,9 +1363,11 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
     <details className="ws-panel" data-lesson-settings="true">
       <summary>Lesson settings, teaching sections and assessment</summary>
+      <fieldset disabled={readOnly} style={{border: 0, padding: 0, margin: 0, minWidth: 0}}>
       <h2>Teaching sections</h2>
       <div className="ws-row">
         <button type="button" data-section-add onClick={() => {
+          if (readOnlyRef.current) return;
           setSectionsDraft(current => {
             const last = current[current.length - 1] ?? {id: 'whole', label: 'Whole lesson', start: 0, end: document.duration};
             const sequence = current.length ? current : [last];
@@ -1420,7 +1434,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       <h2>Assessment</h2>
       <label className="ws-field ws-inline"><span>Policy</span>
         <select value={assessmentPolicy} data-assessment-policy
-          onChange={event => { setAssessmentPolicy(event.target.value === 'notes' ? 'notes' : 'none'); setConfirmReviewed(false); }}>
+          onChange={event => { if (readOnlyRef.current) return; setAssessmentPolicy(event.target.value === 'notes' ? 'notes' : 'none'); setConfirmReviewed(false); }}>
           <option value="none">Watch only (no note scoring)</option>
           <option value="notes">Pitch and timing from MIDI</option>
         </select>
@@ -1470,6 +1484,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       <p className="ws-hint" data-passage-rejected="true">Passage kind and boundary edits are validated against the existing map and
         currently rejected rather than silently re-timing engraved notes.</p>
       <p className="ws-hint">Verification decisions from the proposal remain server-authoritative; a changed verification state is reported as a conflict instead of being overwritten.</p>
+      </fieldset>
     </details>
 
     <div className="ws-grid">
@@ -1738,6 +1753,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         </section>
 
         <section className="ws-panel" aria-label="Alignment">
+          <fieldset disabled={readOnly} style={{border: 0, padding: 0, margin: 0, minWidth: 0}}>
           <h2>Alignment</h2>
           <p className="ws-hint" data-aligned={anchors.length > 0 ? 'true' : 'false'}>
             {anchors.length
@@ -1765,6 +1781,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           </p>)}
           {anchorPreview && <p className="ws-report">{anchorPreview}</p>}
           <p className="ws-hint">Applied anchors shape the score map and are saved with the review.</p>
+          </fieldset>
         </section>
 
         <section className="ws-panel" aria-label="History">

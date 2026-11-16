@@ -140,7 +140,6 @@ def click_measured(page, locator):
       const start = performance.now();
       if (typeof node.click === 'function') node.click(); else node.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
       await new Promise(resolve => requestAnimationFrame(() => resolve()));
-      await new Promise(resolve => requestAnimationFrame(() => resolve()));
       return {commit: performance.now() - start};
     }""", locator)
 
@@ -150,7 +149,6 @@ def click_locator(locator):
       const start = performance.now();
       if (typeof node.click === 'function') node.click(); else node.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
       await new Promise(resolve => requestAnimationFrame(() => resolve()));
-      await new Promise(resolve => requestAnimationFrame(() => resolve()));
       return {commit: performance.now() - start};
     }""")
 
@@ -159,7 +157,6 @@ def click_button_timed(locator):
     return locator.evaluate("""async (node) => {
       const start = performance.now();
       node.click();
-      await new Promise(resolve => requestAnimationFrame(() => resolve()));
       await new Promise(resolve => requestAnimationFrame(() => resolve()));
       return {commit: performance.now() - start};
     }""")
@@ -175,7 +172,6 @@ def click_at(page, locator):
         button: 0, clientX: x, clientY: y, bubbles: true, composed: true, cancelable: true}));
       node.dispatchEvent(new PointerEvent('pointerup', {pointerId: 97, pointerType: 'mouse',
         clientX: x, clientY: y, bubbles: true, composed: true, cancelable: true}));
-      await new Promise(resolve => requestAnimationFrame(() => resolve()));
       await new Promise(resolve => requestAnimationFrame(() => resolve()));
       return {commit: performance.now() - start};
     }""", [box['x'] + box['width'] / 2, box['y'] + box['height'] / 2])
@@ -295,10 +291,10 @@ def make_paths(page, occurrence, duration):
         return timing, pitch(page, target) == before + 2
 
     def written():
-        candidates = pick_non_tied(page, limit=8)
+        before = snapshot(page)
+        candidates = pick_non_tied(page, limit=20)
         if not candidates:
             return {'commit': 0.01}, False
-        timing = None
         for choice in candidates:
             select(page, choice['id'])
             page.wait_for_timeout(10)
@@ -307,12 +303,18 @@ def make_paths(page, occurrence, duration):
                 if not button.count() or not button.first.is_enabled():
                     continue
                 ticks = {'Half': 960, 'Whole': 1920, 'Quarter': 480, 'Eighth': 240}[label]
+                expected = {'occurrence': choice['id'], 'ticks': ticks}
                 timing = click_locator(button.first)
                 if page.locator('.ws-shell').get_attribute('data-workspace-dirty') == 'true':
-                    EXPECTED['written_duration'] = {'occurrence': choice['id'], 'ticks': ticks}
-                    return timing, True
+                    after = snapshot(page)
+                    if verify_edit('written_duration', before, after, expected):
+                        EXPECTED['written_duration'] = expected
+                        return timing, True
+                    undo = page.get_by_role('button', name='Undo', exact=True)
+                    if undo.is_enabled():
+                        undo.click()
+                        page.wait_for_timeout(60)
         return {'commit': 0.01}, False
-        return timing or {'commit': 0.01}, page.locator('.ws-shell').get_attribute('data-workspace-dirty') == 'true'
 
     def accidental():
         target = page.locator('.ws-roll-note[data-pitch="64"]').first
@@ -352,6 +354,11 @@ def make_paths(page, occurrence, duration):
                 page.mouse.click(box['x'] + seconds * pps, box['y'] + box['height'] * fraction)
                 page.wait_for_timeout(20)
                 if page.locator('[data-ghost="true"]').count() and page.locator('[data-add="invalid"]').count() == 0:
+                    panel = page.locator('[data-add="active"]').inner_text()
+                    match = __import__('re').search(r'New (\S+) at ([0-9.]+) s.*written (\d+) ticks', panel)
+                    if match:
+                        EXPECTED['add_note'] = {'total': base_total, 'pitch': pitch_name_to_midi(match.group(1)),
+                                                'onset': float(match.group(2)), 'ticks': int(match.group(3))}
                     timing = click_locator(page.locator('[data-add="commit"]'))
                     if total(page) == base_total + 1:
                         return timing, True
@@ -385,6 +392,18 @@ def make_paths(page, occurrence, duration):
     }
 
 
+def pitch_name_to_midi(name):
+    letters = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
+    letter = letters[name[0]]
+    rest = name[1:]
+    alter = 0
+    while rest and rest[0] in '#b':
+        alter += 1 if rest[0] == '#' else -1
+        rest = rest[1:]
+    octave = int(rest)
+    return 12 * (octave + 1) + letter + alter
+
+
 def performance_map_equal(left, right):
     return left.get('performance_map') == right.get('performance_map')
 
@@ -410,41 +429,70 @@ def verify_edit(path, before, after, expected):
             return False
         if path == 'accidental' and new['pitch'] != expected['pitch'] + 1:
             return False
+        preserved = ('onset', 'duration', 'velocity', 'confidence', 'optional', 'string', 'fret')
+        if any(old[key] != new[key] for key in preserved):
+            return False
+        if old.get('performance_ids') != new.get('performance_ids'):
+            return False
         event, note = locate(right, occurrence)
         if not event or not note or note['pitch'] != new['pitch']:
             return False
         others_before = {n['id']: n for n in left['performance'] if n['id'] != occurrence}
         others_after = {n['id']: n for n in right['performance'] if n['id'] != occurrence}
-        return others_before == others_after
+        return others_before == others_after and performance_map_equal(left, right)
     if path == 'roll_time':
         old = perf_note(left, occurrence)
         new = perf_note(right, occurrence)
+        preserved = ('pitch', 'duration', 'velocity', 'confidence', 'optional', 'string', 'fret')
         return (old and new and abs(new['onset'] - old['onset']) > 1e-6
-                and new['duration'] == old['duration']
+                and all(old[key] == new[key] for key in preserved)
                 and {n['id']: n for n in left['performance'] if n['id'] != occurrence}
-                == {n['id']: n for n in right['performance'] if n['id'] != occurrence})
+                == {n['id']: n for n in right['performance'] if n['id'] != occurrence}
+                and left['events'] == right['events'] and left['segments'] == right['segments']
+                and left['ties'] == right['ties'] and left['measures'] == right['measures']
+                and performance_map_equal(left, right))
     if path == 'roll_resize':
         old = perf_note(left, occurrence)
         new = perf_note(right, occurrence)
         eb, _ = locate(left, occurrence)
         ea, _ = locate(right, occurrence)
+        preserved = ('pitch', 'onset', 'velocity', 'confidence', 'optional', 'string', 'fret')
         return (old and new and old['duration'] is not None and new['duration'] is not None
                 and abs(new['duration'] - old['duration']) > 1e-6
-                and abs(new['onset'] - old['onset']) < 1e-9
+                and all(old[key] == new[key] for key in preserved)
                 and eb['duration'] == ea['duration']
                 and {n['id']: n for n in left['performance'] if n['id'] != occurrence}
-                == {n['id']: n for n in right['performance'] if n['id'] != occurrence})
+                == {n['id']: n for n in right['performance'] if n['id'] != occurrence}
+                and left['events'] == right['events'] and left['segments'] == right['segments']
+                and left['ties'] == right['ties'] and left['measures'] == right['measures']
+                and performance_map_equal(left, right))
     if path == 'written_duration':
         event, _ = locate(left, expected['occurrence'])
         new_event, _ = locate(right, expected['occurrence'])
-        return (event and new_event and new_event['duration'] == expected['ticks']
-                and left['performance'] == right['performance'])
+        if not (event and new_event and new_event['duration'] == expected['ticks']
+                and left['performance'] == right['performance']):
+            return False
+        affected = {pid for note in event['notes'] for pid in note.get('performance_ids', [])}
+        def touches(value):
+            return any(pid in affected for note in value['notes']
+                       for pid in note.get('performance_ids', []))
+        others_before = [e for e in left['events'] if not touches(e)]
+        others_after = [e for e in right['events'] if not touches(e)]
+        return others_before == others_after
     if path == 'respell':
         event, note = locate(left, expected['occurrence'])
         new_event, new_note = locate(right, expected['occurrence'])
-        return (note and new_note and new_note['spelling'] == expected['spelling']
+        if not (note and new_note and new_note['spelling'] == expected['spelling']
                 and new_note['pitch'] == note['pitch']
-                and left['performance'] == right['performance'])
+                and left['performance'] == right['performance']):
+            return False
+        affected = {pid for note in event['notes'] for pid in note.get('performance_ids', [])}
+        def touches(value):
+            return any(pid in affected for note in value['notes']
+                       for pid in note.get('performance_ids', []))
+        others_before = [e for e in left['events'] if not touches(e)]
+        others_after = [e for e in right['events'] if not touches(e)]
+        return others_before == others_after
     if path == 'add_note':
         before_ids = {n['id'] for n in left['performance']}
         after_ids = {n['id'] for n in right['performance']}
@@ -455,6 +503,15 @@ def verify_edit(path, before, after, expected):
         if not note or not note['id'] or added not in right['performance_map']:
             return False
         if any(n['id'] not in after_ids for n in left['performance']):
+            return False
+        if note['pitch'] != expected.get('pitch'):
+            return False
+        if abs(note['onset'] - expected.get('onset', -1)) > 1e-3:
+            return False
+        if not note.get('duration') or note['duration'] <= 0:
+            return False
+        event, _ = locate(right, added)
+        if not event or event['duration'] != expected.get('ticks'):
             return False
         return True
     if path == 'delete_note':
@@ -569,6 +626,10 @@ def main():
                     failures.append(f'run{run} {path}/{label}: applied {data["applied"]} restored {data["restored"]} reapplied {data["reapplied"]}')
                 if data['commit']['p95'] > 100:
                     failures.append(f'run{run} {path}/{label}: commit p95 {data["commit"]["p95"]}')
+                if data['undo']['p95'] > 100:
+                    failures.append(f'run{run} {path}/{label}: undo p95 {data["undo"]["p95"]}')
+                if data['redo']['p95'] > 100:
+                    failures.append(f'run{run} {path}/{label}: redo p95 {data["redo"]["p95"]}')
                 if data['preview'] and data['preview']['p95'] > 16.7:
                     failures.append(f'run{run} {path}/{label}: preview p95 {data["preview"]["p95"]}')
     RESULT['failures'] = failures

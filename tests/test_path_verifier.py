@@ -37,6 +37,18 @@ def test_wrong_target_and_noop_fail():
     assert bench.verify_edit('delete_note', before, after, {'occurrence': 'a'}) is False
 
 
+def test_pitch_edit_with_corrupted_preserved_onset_fails():
+    before = state(document([note('a', 60)], [{'id': 'e', 'duration': 240,
+                                                'notes': [{'id': 'a', 'pitch': 60, 'performance_ids': ['a']}]}]))
+    after = copy.deepcopy(before)
+    after['past'] = 1
+    after['document']['performance'][0]['pitch'] = 61
+    after['document']['events'][0]['notes'][0]['pitch'] = 61
+    after['document']['performance'][0]['onset'] += 0.01
+    assert bench.verify_edit('roll_pitch', before, after, {'occurrence': 'a', 'pitch': 60}) is False
+
+
+
 def test_wrong_written_ticks_and_respell_fail_even_when_changed():
     before = state(document([note('a', 60)], [{'id': 'e', 'duration': 240,
                                                 'notes': [{'id': 'a', 'pitch': 60, 'performance_ids': ['a']}]}]))

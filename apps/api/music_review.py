@@ -21,6 +21,7 @@ from .storage import storage_client
 from .music_alignment import validate_alignment
 from .music_notation import validate_notation
 from .music_preview import performance_changed, invalidate_preview
+from . import interactive_limit
 
 
 class ReviewAssessment(Contract):
@@ -101,6 +102,10 @@ def install_music_review(app,settings,identity,db):
         except ValidationError as exc:
             raise HTTPException(422,'Keep notes, spans and contiguous sections inside the clip.') from exc
         reviewed_at=now()
+        limit_error=interactive_limit.write_error(
+            len(proposal.events), interactive_limit.INTERACTIVE_LIMIT_APPROVED)
+        if limit_error:
+            raise HTTPException(422, limit_error)
         if performance_changed(row.document, proposal.events):
             invalidate_preview(proposal)
         decision_rows=list(session.scalars(select(MusicVerificationDecision).where(

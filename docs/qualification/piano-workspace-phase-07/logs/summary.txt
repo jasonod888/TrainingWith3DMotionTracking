@@ -1,6 +1,8 @@
-﻿# Phase 7 final evidence
-# web suite: 497 passed; build and tsc clean
-# canonical performance: 3 independent runs, 20/20 applied/restored/reapplied each path, real + 5,000/512
-# read-only integration: 5001 banner/save-disabled/mutation rejected/download; 4999/5000 editable
-# regressions: 16 scripts, savedpoint eviction, verifier negative control, 6 Python policy/verifier tests
+﻿# Phase 7 final integrated evidence
+# web suite 497; tsc/build clean
+# canonical 3 runs x20 at real + 5000/512; all 20/20 applied/restored/reapplied; commit/preview/undo/redo p95 gates pass
+# reviewer reproducers: metadata, legacy 5001 write, corrupted onset all pass
+# read-only mutations (offset/assessment/sections/anchors/save/gesture/decisions) zero writes; 4999/5000 editable, 5001 read-only; download 5001 + authored state
+# server: review/edit/decision guards; legacy omitted-notation request 422 no write
+# 16 regression scripts; savedpoint eviction; suppressed-resize negative control; 8 Python tests
 # hardware: HARDWARE BLOCKED

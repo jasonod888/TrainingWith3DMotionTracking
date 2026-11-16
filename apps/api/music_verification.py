@@ -27,6 +27,7 @@ from .music_corrections import (EligibilityError, PreconditionError, apply_findi
                                 apply_qualified_corrections, file_sha256)
 from .permissions import owned_lesson
 from .storage import storage_client
+from . import interactive_limit
 
 MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
@@ -675,6 +676,10 @@ def install_music_verification(app, settings, identity, db):
             raise HTTPException(409, 'This draft is no longer open for review.')
         if draft.subject != 'piano':
             raise HTTPException(404, 'Verification is unavailable for this draft.')
+        limit_error = interactive_limit.write_error(
+            len(draft.document.get('events') or []), interactive_limit.INTERACTIVE_LIMIT_APPROVED)
+        if limit_error:
+            raise HTTPException(422, limit_error)
         current = proposal_sha256(draft.document.get('events') or [])
         if current != body.base_proposal_sha256:
             raise HTTPException(409, 'The proposal changed after this report was generated. Reopen verification.')

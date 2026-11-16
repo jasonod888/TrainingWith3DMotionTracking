@@ -21,6 +21,7 @@ from .database import LessonAsset, LessonRevision, MusicRevisionEdit
 from .music_alignment import validate_alignment
 from .music_notation import validate_notation
 from .music_review import ReviewAssessment, canonical
+from . import interactive_limit
 from .permissions import accept_revision, accepted, latest_revision, owned_lesson
 from .storage import storage_client
 from .music_preview import performance_changed, invalidate_preview
@@ -94,6 +95,10 @@ def install_music_edit(app, settings, identity, db):
             sections = SectionSet(id=uuid4().hex, revision=version, duration=proposal.duration, sections=body.sections)
         except ValidationError as exc:
             raise HTTPException(422, 'Keep notes, spans and contiguous sections inside the clip.') from exc
+        limit_error = interactive_limit.write_error(
+            len(proposal.events), interactive_limit.INTERACTIVE_LIMIT_APPROVED)
+        if limit_error:
+            raise HTTPException(422, limit_error)
         # Validation-gated legacy retention: an older client that omits notation or
         # alignment keeps the authored data when it still agrees with the submitted
         # performance, and is refused clearly when it does not. Omission is never read

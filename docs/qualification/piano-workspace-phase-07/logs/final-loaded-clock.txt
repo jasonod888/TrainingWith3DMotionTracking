@@ -2,9 +2,9 @@
   {
     "name": "play-pause",
     "passed": true,
-    "played": 0.153025,
-    "paused": 0.225947,
-    "later": 0.225947
+    "played": 0.441297,
+    "paused": 0.491244,
+    "later": 0.491244
   },
   {
     "name": "rate",
@@ -13,7 +13,7 @@
   {
     "name": "slider-seek-and-both-cursors",
     "passed": true,
-    "before": 0.225947,
+    "before": 0.491244,
     "video": 1.5,
     "roll_seconds": 1.5,
     "score_tick": 1740.0,

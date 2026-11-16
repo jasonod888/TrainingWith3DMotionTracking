@@ -6,82 +6,87 @@ Branch `phase7/normal-route`. Phase 8 remains stopped.
 
 | Area | Status |
 | --- | --- |
-| Software regression | **PASS** — 497 tests, production build clean, 16 regression scripts, saved-point eviction/savepoint and negative control pass |
-| Performance | **PASS** — real recording and exact 5,000-occurrence / 512-measure fixture, every path, 3 runs × 20 valid samples, canonical assertions, p95 ≤100 ms commit and ≤16.7 ms preview |
-| 5,000 limit integration | **READY / INACTIVE** — approval-gated implementation and tests complete; default remains unrestricted pending owner approval |
+| Software / performance | **PASS (developer-controlled)** — 497 web tests, TypeScript/build clean, 16-script regression set, canonical 3×20 path matrix, reviewer reproducers and negative controls pass |
+| 5,000 limit integration | **IMPLEMENTED / TESTED / INACTIVE BY DEFAULT** — read-only enforcement and server boundary complete in controlled approved configuration; normal default remains unrestricted |
 | Physical touch | **HARDWARE BLOCKED** — H1–H9 require the owner/device tester |
+| Owner approval | **OUTSTANDING** — required before activating/deploying the 5,000 restriction |
 
-Final commit: the commit containing this handoff (SHA reported in the submission message). Parent performance commit: `1c1f8ed`.
+Final commit: the commit containing this handoff (SHA in the submission message).
 
-## R1 — saved-point identity (closed)
+## R3-A — read-only enforcement (reviewer defect fixed)
 
-`historyIdentity` uses the top history entry (or a clean/evicted origin) and is independent of retained depth. Count eviction and evicted-root tests pass; reviewer `check-savedpoint-eviction.py` restores the exact document and `entry:history-500` after eviction. Normal-route save A → edit B → undo/redo passes.
+The reviewer probe now passes: offset stays 0, assessment stays `none`, dirty stays false, and the download contains unchanged authored state.
 
-## R2 — canonical performance evidence
+- One policy is resolved from the live occurrence count and approval configuration.
+- Musical commands, gesture commands, shortcuts and history are rejected by the reducer.
+- Candidate commands that would create occurrence 5,001 are rejected atomically with no history.
+- Save and verification Accept/Reject have callback preflight guards before any request.
+- Offset, assessment, teaching sections, lesson settings and alignment/anchor/history controls are disabled; their setters/anchor commit/add-section callbacks also check the policy ref.
+- Selection, scrolling, seeking, playback, viewing and export remain available.
+- `check-readonly-mutations.py` exercises offset, assessment, add-section, save, apply/reset anchor, pitch gesture and (when present) decisions on a 5,001 lesson: canonical document, authored metadata, history, dirty/checkpoint and network state stay unchanged; **zero mutation requests**.
+- `check-readonly-decision.py` renders a verification finding on a 5,001 lesson and proves Accept and Reject send **no request**.
+- `check-limit-boundary.py`: 4,999 and 5,000 editable; 5,001 read-only.
+- `check-readonly-integration.py`: banner, disabled save, rejected gesture with no history, and real download containing 5,001 occurrences plus authored identity.
 
-### Measurement design
+## R3-B — server enforcement (reviewer defect fixed)
 
-- Production build, `vite preview` at `http://localhost:4173`, Chrome 157, Windows 11, i7-12700H, 1440×1000, no CPU throttling, mocked API/local media.
-- Three independent runs; 20 valid samples per path per run at both fixtures.
-- A render-current read-only snapshot hook exposes the canonical document authority (not DOM text). Canonical snapshots are captured outside the timed interval.
-- Per sample: before snapshot → timed action → after snapshot → exact target assertions and one-history-entry check → timed Undo → full canonical equality with before → timed Redo → full canonical equality with expected after.
-- Undo/Redo latencies are recorded separately.
-- A verifier failure makes the sample invalid and exits nonzero; no rejected/no-op action is counted.
-- Reviewer negative control (suppressed resize via stubbed `gesture`) reports `benchmark_claims_applied=false` and exits 0.
-- Python verifier-control tests prove unchanged pitch, wrong written ticks, wrong respell spelling, wrong insertion target and delete no-op fail.
+The policy is applied at the server operation boundary from authoritative current/proposed performance data, not optional client notation:
 
-### Fixtures
+- `music_review.py` (review/private reference): proposed `proposal.events` count checked before preview invalidation, revision creation or asset writes.
+- `music_edit.py` (private revision): proposed events checked before notation retention or storage.
+- `music_verification.py` (verification decision): current draft event count checked before decision writes; over-limit lessons reject decisions.
+- `music_notation.validate_notation` retains its notation-present guard.
+- Existing larger lessons remain readable/exportable; guitar paths are unchanged; access/idempotency logic is untouched.
 
-- Real recording: `1338 notes · 1146 events · 127 measures`, 209.594 s.
-- Boundary: `5000 notes · 500 written events · 512 measures`, 60 BPM, explicit 10-note chords with gaps and enharmonic pitches. Occurrence identities are exact (`big-*`); no substitution.
+Reviewer direct route reproducer (notation omitted, 5,001 occurrences) now returns **HTTP 422**, writes no reference, and passes.
 
-### Results (commit p95 in ms, runs 1–3)
+## R2 — canonical per-path verification (reviewer false positive fixed)
+
+The reviewer’s corrupted-after-state probe passes (`verifier_accepts_corrupted_after_state=false`): a +10 ms onset change alongside a valid pitch edit is rejected.
+
+The verifier now checks:
+
+- **Pitch / sheet / Replace / accidental**: expected pitch; target onset, duration, velocity, confidence, optional, string, fret and performance ids unchanged; unrelated performance and mapping unchanged.
+- **Time**: changed onset with pitch/duration/metadata preserved; authored events/segments/ties/measures/mapping unchanged.
+- **Resize**: changed recorded duration with onset/pitch/duration-related fields and written timing preserved; unrelated performance/authored state unchanged.
+- **Written duration**: exact expected ticks and scope; complete performance preservation; unrelated written events preserved.
+- **Respell**: exact spelling, unchanged MIDI and recorded fields; unrelated authored state preserved.
+- **Add**: intended ghost pitch, onset, written ticks, new identity and mapping, original occurrences preserved.
+- **Delete**: exactly the intended identity removed and all remaining performance/mapping preserved.
+- Every sample requires one history entry; Undo must equal the complete before document, Redo must equal the complete expected after document, and Undo/Redo are timed separately.
+
+Negative controls: reviewer suppressed-resize passes; reviewer corrupted-pitch probe passes; Python tests reject no-op/wrong target, wrong written ticks, wrong respell, unchanged add/delete and a valid pitch edit with corrupted onset. Add retries only canonical-valid written candidates.
+
+### Performance matrix
+
+Production build, Chrome 157, Windows 11, i7-12700H, 1440×1000, no throttling, mocked API. Three independent runs, 20 valid samples per path per run, at the real recording and `5000 notes · 500 events · 512 measures`. All runs report 20/20 applied, 20/20 restored, 20/20 reapplied. Commit p95 (ms, min–max over runs):
 
 | Path | Real 1,338 | 5,000 / 512 |
 | --- | --- | --- |
-| roll pitch | 21.0–32.0 | 35.4–50.7 |
-| roll time | 19.5–31.9 | 37.0–44.9 |
-| roll resize | 22.4–31.6 | 39.5–50.9 |
-| sheet pitch | 20.5–31.4 | 40.1–56.0 |
-| keyboard Replace | 28.1–40.9 | 53.6–79.0 |
-| written duration | 27.8–37.5 | 51.6–65.8 |
-| accidental | 19.7–25.8 | 34.9–61.8 |
-| respell | 24.5–28.7 | 39.9–50.7 |
-| add note | 59.5–97.5 | 80.1–95.6 |
-| delete note | 47.1–77.3 | 38.7–50.8 |
+| roll pitch | 19.4–29.1 | 49.3–53.4 |
+| roll time | 26.0–26.2 | 35.1–54.0 |
+| roll resize | 31.0–37.7 | 41.0–57.8 |
+| sheet pitch | 26.7–31.8 | 34.8–52.5 |
+| keyboard Replace | 36.8–40.0 | 47.0–70.3 |
+| written duration | 33.1–34.9 | 45.3–67.3 |
+| accidental | 24.7–27.3 | 33.1–46.3 |
+| respell | 26.2–30.2 | 29.3–49.4 |
+| add note | 74.4–95.4 | 65.3–87.1 |
+| delete note | 62.9–67.9 | 35.6–57.1 |
 
-Gesture preview p95: real 3.0–8.1 ms, boundary 5.1–8.6 ms. Undo/Redo p95 ranges are recorded in `phase7-paths.json` (boundary undo 33.6–61.9 ms, redo 28.4–63.0 ms). All runs report 20/20 applied, 20/20 restored, 20/20 reapplied. Raw per-run data: `phase7-paths.json` (`run1`–`run3`, plus source run files `phase7-paths-run{1,2,3}.json`).
+Preview p95: real 3.3–7.8 ms, boundary 5.1–8.6 ms. Undo/Redo p95 are enforced by the runner (all ≤100 ms; e.g. boundary add undo 29.8–46.6, delete redo 24.0–39.4). Button transactions use one DOM frame boundary; gesture preview/commit use one frame each. Raw data: `phase7-paths.json` + `phase7-paths-run{1,2,3}.json`.
 
-### Bottleneck repair retained
+## Regression (final code)
 
-`refreshNotation` rebuilt `performance_map` with `performance.some` inside a nested loop (O(notes × performance)); a Set reduced refresh from ~90 ms to ~5–18 ms. The respell segment fast path, grouped rest lookup, spelling/decomposition caches, binary measure lookup and tie-pitch update remain. Validation, history, recovery and save semantics are unchanged.
-
-## R3 — approved-limit integration (inactive)
-
-- `apps/web/src/music/workspace/interactive-limit.ts`: 5,000 boundary, policy resolution, mutation guard, lossless export including document **and** authored state (alignment, offset, spans/sections, assessment, identity), recovery.
-- `workspaceReducer`: rejects commands/commands-batches/undo/redo above 5,000 and rejects a candidate that would create occurrence 5,001, atomically and without history. 5,000 remains editable.
-- Harness: read-only banner, save disabled, Undo/Redo disabled, inspector/sections disabled; `Download reference` downloads the export.
-- Server: `apps/api/music_notation.py` calls `interactive_limit.write_error` during write validation when approved; reads of existing larger lessons remain untouched.
-- Controlled configuration: `setInteractiveLimitApproved` / `__PIANO_INTERACTIVE_LIMIT_APPROVED__` for tests; shipped default is **inactive**.
-- Tests:
-  - 4/4 policy/export tests, including authored-state round-trip.
-  - Reducer boundary test: 5,000→5,001 insert rejected, over-limit mutation rejected with no history.
-  - `check-limit-boundary.py`: 4,999 and 5,000 editable, 5,001 read-only.
-  - `check-readonly-integration.py`: 5,001 banner, save disabled, pitch gesture rejected atomically (history 0), actual download with 5,001 occurrences and authored identity.
-  - 4/4 server-policy tests (unapproved/approved boundary, write guard, lossless export).
-
-Activation still requires the owner’s explicit product approval; no production restriction or deployment has been activated.
-
-## Regression
-
-- `npm test`: **497 passed, 0 failed**; `npm run build` clean; TypeScript clean.
-- `scripts/run-final-regressions.py`: all 16 checks exit 0 (normal route/library, async A2/A3/A4, A7, transaction contract, baseline shape, verification/transitions/recovery, structural round trips, written/legacy/empty, settings, loaded clock, clip seek, integration).
-- Reviewer saved-point eviction and normal-route savepoint checks pass; path-verifier negative control passes.
-- Tie-pitch fast-path repair included; redo canonical equality holds.
+- `npm test`: **497 passed**; `npm run build` and TypeScript clean.
+- 16 regression scripts exit 0 (normal route/library, async A2/A3/A4, A7, transaction contract, baseline shape, verification/transitions/recovery, structural round trips, written/legacy/empty, settings, loaded clock, clip seek, integration).
+- Reviewer saved-point eviction and normal-route savepoint pass; suppressed-resize negative control passes.
+- Python policy/verifier tests: **7 passed**.
+- Reviewer reproducers: read-only metadata, legacy 5,001 write and corrupted-onset verifier all pass.
 
 ## H1–H9 — HARDWARE BLOCKED
 
-No physical device was available. All nine journeys are **NOT RUN**; this is not a pass. Final build: `npm run build`, serve `dist` or use the existing preview; device tester should record commit, device/OS/browser, viewport/orientation and fixture/source video for each row.
+No physical device. All nine journeys are **NOT RUN**; this is not a pass. Build: `npm run build`, serve `dist`/preview; record commit, device/OS/browser, viewport/orientation and fixture/video.
 
 | ID | Journey | Status |
 | --- | --- | --- |
@@ -95,7 +100,7 @@ No physical device was available. All nine journeys are **NOT RUN**; this is not
 | H8 | Edit→confirm→save→reopen/library revision | NOT RUN |
 | H9 | Unsaved reload/recover/navigation warning | NOT RUN |
 
-## Outstanding external action
+## External actions
 
-1. **Owner approval** of the 5,000-occurrence/512-measure interactive boundary, then activating the prepared configuration and deploying (deployment not authorised here).
-2. **H1–H9 physical-device qualification** by the owner/device tester.
+1. Owner approval of the 5,000/512 interactive boundary, then activation/deployment (deployment not authorised here).
+2. H1–H9 physical-device qualification by the owner/device tester.
