@@ -631,3 +631,7 @@
 .ws-formatted .formatted-accidental { font-size: 12px; }
 .ws-formatted .formatted-rest { font-family: serif; }
 .formatted-ledger { stroke: #1c2430; stroke-width: .7; }
+/* Phase 8 engraving corrections */
+.ws-formatted .formatted-staff { stroke: #1c2430; stroke-width: .8; }
+.ws-formatted .formatted-ledger { stroke: #1c2430; stroke-width: .8; }
+.formatted-flag { fill: none; stroke: #1c2430; stroke-width: 1.2; }

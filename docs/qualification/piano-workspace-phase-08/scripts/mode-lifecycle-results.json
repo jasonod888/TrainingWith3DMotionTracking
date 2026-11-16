@@ -1,0 +1,56 @@
+{
+  "repeated_switch_preserves": {
+    "document": true,
+    "selection": true,
+    "history": true,
+    "scroll": true,
+    "video_same_element": true,
+    "video_time": true,
+    "video_rate": true,
+    "before_scroll": {
+      "rollTop": 25,
+      "rollLeft": 195,
+      "scoreLeft": 137,
+      "start": "2.055408970976253",
+      "span": "8"
+    },
+    "after_scroll": {
+      "rollTop": 25,
+      "rollLeft": 195,
+      "scoreLeft": 137,
+      "start": "2.055408970976253",
+      "span": "8"
+    },
+    "before_video": {
+      "time": 1.5,
+      "rate": 0.75,
+      "paused": true
+    },
+    "after_video": {
+      "same": true,
+      "time": 1.5,
+      "rate": 0.75,
+      "paused": true
+    }
+  },
+  "returned_transport": {
+    "native": {
+      "time": 1.772717,
+      "paused": false
+    },
+    "clock": 1.64,
+    "passed": true
+  },
+  "playing_entry_policy": {
+    "on_entry": {
+      "paused": true,
+      "time": 0.011125
+    },
+    "on_return": {
+      "paused": true,
+      "time": 0.011125,
+      "rate": 0.75
+    },
+    "passed": true
+  }
+}

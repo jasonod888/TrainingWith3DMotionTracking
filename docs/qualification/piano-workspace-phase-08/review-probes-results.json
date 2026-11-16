@@ -1,0 +1,79 @@
+[
+  {
+    "name": "five-line-staff-visible",
+    "passed": true,
+    "computed": {
+      "stroke": "rgb(28, 36, 48)",
+      "width": "0.8px"
+    }
+  },
+  {
+    "name": "pitch-positions-align-with-staff-lines",
+    "passed": true,
+    "notes": [
+      {
+        "id": "E4",
+        "actual": 162,
+        "expected": 162,
+        "passed": true
+      },
+      {
+        "id": "F5",
+        "actual": 130,
+        "expected": 130,
+        "passed": true
+      },
+      {
+        "id": "A3",
+        "actual": 204,
+        "expected": 204,
+        "passed": true
+      }
+    ]
+  },
+  {
+    "name": "restore-nondefault-roll-and-score-scroll",
+    "passed": true,
+    "before": {
+      "rollTop": 25,
+      "rollLeft": 72,
+      "scoreLeft": 117,
+      "start": "0.9551725709397069",
+      "span": "10"
+    },
+    "after": {
+      "rollTop": 25,
+      "rollLeft": 72,
+      "scoreLeft": 117,
+      "start": "0.9551725709397069",
+      "span": "10"
+    }
+  },
+  {
+    "name": "formatted-preview-blocks-delete",
+    "passed": true,
+    "before_count": 1338,
+    "after_count": 1338,
+    "before_history": 0,
+    "after_history": 0
+  },
+  {
+    "name": "return-preserves-loaded-source-position-rate",
+    "passed": true,
+    "before_time": 1.5,
+    "after": {
+      "same": true,
+      "time": 1.5,
+      "rate": 0.75
+    }
+  },
+  {
+    "name": "returned-source-clock-follows-playing-video",
+    "passed": true,
+    "native": {
+      "time": 1.704535,
+      "paused": false
+    },
+    "clock": "1.63 s / 209.59 s"
+  }
+]

@@ -120,6 +120,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   const [state, setState] = useState<WorkspaceState | null>(null);
   const [scoreMode, setScoreMode] = useState<'correction' | 'formatted'>('correction');
+  const scoreModeRef = useRef<'correction' | 'formatted'>('correction');
+  scoreModeRef.current = scoreMode;
   /** Bumped when a document is replaced outside the undo history. */
   const [documentEpoch, setDocumentEpoch] = useState(0);
   const snapshotRef = useRef<{document: NotationDocument | null; selection: unknown; dirty: boolean;
@@ -468,6 +470,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   useEffect(() => {
     if (!addMode) return;
     const onKey = (event: KeyboardEvent) => {
+      if (scoreModeRef.current === 'formatted') return;
       const target = event.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
       if (event.key === 'Enter') { event.preventDefault(); commitAdd(); }
@@ -496,6 +499,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (scoreModeRef.current === 'formatted') return;
       const target = event.target as HTMLElement | null;
       if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
       const modifier = event.metaKey || event.ctrlKey;
@@ -896,6 +900,14 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   // Any document change requires a fresh confirmation before it can be saved.
   useEffect(() => { setConfirmReviewed(false); }, [workspaceSignature]);
 
+  // Preview-entry policy: pause the shared source at its current position; the
+  // same media element (and its clock) is retained while formatted mode is open.
+  useEffect(() => {
+    if (scoreMode !== 'formatted') return;
+    const media = videoRef.current;
+    if (media && !media.paused) media.pause();
+  }, [scoreMode]);
+
   // A stale preview must fall back to Original rather than pretend it is current.
   useEffect(() => {
     if (previewStale && audioMode === 'piano') setAudioMode('original');
@@ -1286,7 +1298,10 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     <div className="ws-toolbar" data-score-mode={scoreMode}>
       <button type="button" data-formatted-toggle="true"
         aria-pressed={scoreMode === 'formatted'}
-        onClick={() => setScoreMode(mode => mode === 'formatted' ? 'correction' : 'formatted')}>
+        onClick={() => {
+          setAddMode(null); setReplaceMode(null); setDuplicateId(null);
+          setScoreMode(mode => mode === 'formatted' ? 'correction' : 'formatted');
+        }}>
         {scoreMode === 'formatted' ? 'Return to correction' : 'Formatted score'}
       </button>
       <button type="button" onClick={downloadMusicXml}>MusicXML</button>
@@ -1294,7 +1309,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     </div>
 
     {scoreMode === 'formatted' ? <FormattedScore document={document} title={title}
-      selectedOccurrenceId={selection?.occurrenceId ?? null}/> : <>
+      selectedOccurrenceId={selection?.occurrenceId ?? null}/> : null}
+    <div className="ws-correction" hidden={scoreMode === 'formatted'}>
     <div className="ws-toolbar">
       <button type="button" onClick={toggleTransport}>{playing ? 'Pause' : 'Play'}</button>
       <label className="ws-field ws-inline">
@@ -1820,7 +1836,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         </section>
       </aside>
     </div>
-    </>}
+    </div>
   </main>;
 }
 

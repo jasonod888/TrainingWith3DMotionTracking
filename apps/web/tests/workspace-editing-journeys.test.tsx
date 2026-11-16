@@ -231,3 +231,81 @@ test('dirty state is clean after undo, dirty after redo and after branching', as
   view.getByRole('button', {name: '+ semitone'}).click();
   await waitFor(() => assert.equal(dirty(), 'true', 'branching after undo must be dirty'));
 });
+
+test('formatted mode is read-only and return keeps editing and selection', async () => {
+  const view = await open();
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  fireEvent.pointerDown(note, {clientX: 100, clientY: 100, pointerId: 7, button: 0});
+  fireEvent.pointerUp(note, {pointerId: 7});
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-facts')));
+  view.getByRole('button', {name: '+ semitone'}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('[data-workspace-dirty="true"]')));
+  const snapshot = () => (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  const before = snapshot();
+  view.getByRole('button', {name: 'Formatted score', exact: true}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('[data-formatted-page="1"]')));
+  for (const [key, options] of [['Delete', {}], ['Backspace', {}], ['z', {ctrlKey: true}],
+    ['z', {ctrlKey: true, shiftKey: true}], ['a', {}]] as const) {
+    fireEvent.keyDown(window, {key, ...options});
+  }
+  await waitFor(() => {
+    const after = snapshot();
+    assert.deepEqual(after.document, before.document, 'formatted mode must not edit');
+    assert.equal(after.past, before.past);
+    assert.equal(after.future, before.future);
+    assert.deepEqual(after.selection, before.selection);
+  });
+  view.getByRole('button', {name: 'Return to correction', exact: true}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
+  const returned = snapshot();
+  assert.deepEqual(returned.selection, before.selection);
+  fireEvent.keyDown(window, {key: 'Delete'});
+  await waitFor(() => assert.equal(snapshot().past, before.past + 1, 'correction Delete must work again'));
+  fireEvent.keyDown(window, {key: 'z', ctrlKey: true});
+  await waitFor(() => assert.equal(snapshot().past, before.past, 'correction Ctrl+Z must work again'));
+});
+
+test('repeated formatted switches preserve correction scroll positions and selection', async () => {
+  const view = await open();
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  fireEvent.pointerDown(note, {clientX: 100, clientY: 100, pointerId: 9, button: 0});
+  fireEvent.pointerUp(note, {pointerId: 9});
+  const roll = view.container.querySelector('.ws-roll-viewport') as HTMLElement;
+  const score = view.container.querySelector('.ws-score-viewport') as HTMLElement;
+  roll.scrollTop = 25; roll.scrollLeft = 72;
+  if (score) score.scrollLeft = 117;
+  const snapshot = () => (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  const selected = snapshot().selection;
+  for (let round = 0; round < 3; round += 1) {
+    view.getByRole('button', {name: 'Formatted score', exact: true}).click();
+    await waitFor(() => assert.ok(view.container.querySelector('[data-formatted-page="1"]')));
+    view.getByRole('button', {name: 'Return to correction', exact: true}).click();
+    await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
+    assert.equal((view.container.querySelector('.ws-roll-viewport') as HTMLElement).scrollTop, 25);
+    assert.equal((view.container.querySelector('.ws-roll-viewport') as HTMLElement).scrollLeft, 72);
+    if (score) assert.equal((view.container.querySelector('.ws-score-viewport') as HTMLElement).scrollLeft, 117);
+    assert.deepEqual(snapshot().selection, selected);
+  }
+});
+
+test('switching to formatted cancels active add/replace modes', async () => {
+  const view = await open();
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  fireEvent.pointerDown(note, {clientX: 100, clientY: 100, pointerId: 11, button: 0});
+  fireEvent.pointerUp(note, {pointerId: 11});
+  view.getByRole('button', {name: 'Replace pitch'}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('[data-replace="active"]')));
+  view.getByRole('button', {name: 'Formatted score', exact: true}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('[data-formatted-page="1"]')));
+  view.getByRole('button', {name: 'Return to correction', exact: true}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
+  assert.equal(view.container.querySelector('[data-replace="active"]'), null);
+
+  fireEvent.click(view.container.querySelector('[data-add="toggle"]')!);
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-add-layer')));
+  view.getByRole('button', {name: 'Formatted score', exact: true}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('[data-formatted-page="1"]')));
+  view.getByRole('button', {name: 'Return to correction', exact: true}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-note')));
+  assert.equal(view.container.querySelector('.ws-roll-add-layer'), null);
+});

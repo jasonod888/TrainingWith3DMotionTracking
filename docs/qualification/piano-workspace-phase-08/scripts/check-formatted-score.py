@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -28,12 +29,23 @@ class SaveWorld(m.World):
                          'alignment': body.get('alignment')}
             self.reference = reference
             self.reference_text = json.dumps(reference)
-            self.manifest = {**(self.manifest or {}), 'revision_id': 'rev-saved-1',
-                             'reference': {'key': 'assets/ref.json',
-                                           'sha256': __import__('hashlib').sha256(
-                                               self.reference_text.encode('utf-8')).hexdigest()}}
+            reference_sha = __import__('hashlib').sha256(self.reference_text.encode('utf-8')).hexdigest()
+            self.manifest = {'schema_version': 2, 'experience_family': 'music',
+                             'lesson_id': m.LESSON, 'revision_id': 'rev-saved-1',
+                             'title': body.get('title', 'Saved'), 'subject': 'piano',
+                             'duration': reference['duration'], 'instrument': m.LONG['instrument'],
+                             'section_set': {'id': 'sections-saved-1', 'revision': 1,
+                                             'sections': [{'id': 'whole', 'label': 'Whole lesson',
+                                                           'start': 0, 'end': reference['duration']}]},
+                             'reference': {'key': f'lessons/{m.LESSON}/ref.json', 'mime': 'application/json',
+                                           'bytes': len(self.reference_text.encode('utf-8')),
+                                           'sha256': reference_sha},
+                             'reference_reviewed': True,
+                             'assessment': {'assessment': 'notes', 'input_modes': ['midi'],
+                                            'dimensions': ['pitch', 'timing'], 'rubric_version': 'piano-midi-v1'},
+                             'source_video': None, 'piano_preview': None, 'preview_identity': None,
+                             'warnings': []}
             self.summaries = [{**item, 'revision_id': 'rev-saved-1'} for item in self.summaries]
-            self.draft_available = False
             return self.json(route, {'revision_id': 'rev-saved-1'})
         return super().route(route, request)
 
@@ -64,6 +76,14 @@ with sync_playwright() as pw:
         'span': page.locator('.ws-roll-svg').get_attribute('data-roll-window-span'),
     }
     canonical_before = json.dumps(after_edits['document'], sort_keys=True)
+    target_event = next(event for event in after_edits['document']['events']
+                        if any(occurrence in note['performance_ids'] for note in event['notes']))
+    target_note = next(note for note in target_event['notes'] if occurrence in note['performance_ids'])
+    measure_index = max(measure['index'] for measure in after_edits['document']['measures']
+                        if measure['start'] <= target_event['start'])
+    xml_measure = measure_index + 1
+    xml_staff = '1' if target_event['staff'] == 'treble' else '2'
+    xml_voice = str(target_event['voice'])
     page.locator('[data-formatted-toggle]').click()
     page.wait_for_selector('[data-formatted-page="1"]')
     after_switch = page.evaluate('() => window.__pianoWorkspaceSnapshot()')
@@ -86,8 +106,23 @@ with sync_playwright() as pw:
     with page.expect_download() as download_info:
         page.get_by_role('button', name='MusicXML').click()
     xml = Path(download_info.value.path()).read_text(encoding='utf-8')
-    assert '<step>E</step>' in xml and '<alter>1</alter>' in xml, xml[:500]
-    assert '<type>quarter</type>' in xml
+    root = ET.fromstring(xml)
+    matched = []
+    for measure in root.findall('.//part/measure'):
+        if measure.get('number') != str(xml_measure):
+            continue
+        for note in measure.findall('note'):
+            staff = note.findtext('staff') or '1'
+            voice = note.findtext('voice') or '1'
+            step = note.findtext('pitch/step')
+            alter = note.findtext('pitch/alter') or '0'
+            octave = note.findtext('pitch/octave')
+            if (staff == xml_staff and voice == xml_voice and step == 'E'
+                    and alter == '1' and octave == '4'):
+                matched.append(note)
+    assert len(matched) == 1, (xml_measure, xml_staff, xml_voice, len(matched))
+    assert matched[0].findtext('type') == 'quarter'
+    assert matched[0].findall('tie') == [], 'edited note should not gain a spurious tie'
     # Return to correction restores selection and viewport, with no document change.
     page.get_by_role('button', name='Return to correction').click()
     page.wait_for_selector('.ws-roll-note', timeout=60000)
@@ -113,11 +148,29 @@ with sync_playwright() as pw:
     assert any(event['duration'] == 480 and any(occurrence in note['performance_ids'] for note in event['notes'])
                for event in saved_notation['events'])
     assert json.loads(world.reference_text)['notation']['events'] == saved_notation['events']
+    page.goto(f'{m.BASE}/?page=music-review&id={m.LESSON}', wait_until='domcontentloaded')
+    try:
+        page.wait_for_selector('text=Opened saved revision', timeout=30000)
+        page.wait_for_selector('.ws-roll-note', timeout=60000)
+        reopened = page.evaluate('() => window.__pianoWorkspaceSnapshot()')
+        reopened_event = next(note for event in reopened['document']['events'] for note in event['notes']
+                              if occurrence in note['performance_ids'])
+        assert reopened_event['pitch'] == 65
+        assert reopened_event['spelling'] == 'E#4'
+        assert any(event['duration'] == 480 and any(occurrence in note['performance_ids'] for note in event['notes'])
+                   for event in reopened['document']['events'])
+        reopened_saved = True
+    except Exception as error:
+        print('REOPEN_FAILED', repr(error), page.locator('body').inner_text()[:600])
+        raise
+    page.locator('[data-formatted-toggle]').click()
+    page.wait_for_selector('[data-formatted-page="1"]')
+    assert page.locator('.ws-formatted [data-pitch="65"][data-spelling="E#4"]').count() >= 1
     result = {'occurrence': occurrence, 'pages': pages, 'systems': systems,
               'selected_in_formatted': selected, 'musicxml': True,
               'selection_restored': True, 'window_before': window_before,
               'window_after': window_after, 'document_unchanged': True,
-              'saved_reference_agrees': True, 'broken_ties': broken_ties}
+              'saved_reference_agrees': True, 'saved_reopened': True, 'broken_ties': broken_ties}
     (ROOT / 'docs/qualification/piano-workspace-phase-08/phase8-formatted.json').write_text(
         json.dumps(result, indent=2), encoding='utf-8')
     print(json.dumps(result, indent=2))

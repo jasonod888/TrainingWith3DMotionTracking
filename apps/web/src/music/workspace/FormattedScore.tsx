@@ -18,7 +18,7 @@ const TREBLE_TOP = 38;
 const BASS_TOP = 112;
 const LINE = 8;
 const STAFF_WIDTH = PAGE_WIDTH - MARGIN_X * 2;
-const CONTEXT_WIDTH = 76;
+const CONTEXT_WIDTH = 112;
 const MIN_MEASURE = 92;
 const NOTE_RADIUS_X = 4.6;
 const NOTE_RADIUS_Y = 3.4;
@@ -58,7 +58,7 @@ function yForPitch(spelling: string, staff: NotationStaff): number {
   const diatonic = parsed.octave * 7 + letterOrder[parsed.letter];
   const reference = staff === 'treble' ? 4 * 7 + 2 : 2 * 7 + 4;
   const bottomLine = (staff === 'treble' ? TREBLE_TOP : BASS_TOP) + 4 * LINE;
-  return bottomLine - (diatonic - reference) * 4.5;
+  return bottomLine - (diatonic - reference) * (LINE / 2);
 }
 
 export function layoutFormattedScore(document: NotationDocument): FormattedLayout {
@@ -139,30 +139,36 @@ const REST_GLYPHS: Record<string, string> = {
   thirtysecond: '𝅀', sixtyfourth: '𝅁',
 };
 
-function ledgerLines(staff: NotationStaff, y: number) {
-  const top = (staff === 'treble' ? TREBLE_TOP : BASS_TOP) - 4.5;
-  const bottom = (staff === 'treble' ? TREBLE_TOP : BASS_TOP) + 4 * LINE + 4.5;
-  if (y >= top && y <= bottom) return [];
+function ledgerLines(staff: NotationStaff, localY: number) {
+  const top = staff === 'treble' ? TREBLE_TOP : BASS_TOP;
+  const bottom = top + 4 * LINE;
+  if (localY >= top && localY <= bottom) return [];
   const lines: number[] = [];
-  if (y < top) for (let line = top; line >= Math.max(y, top - 6 * 4.5); line -= 4.5) lines.push(line);
-  else for (let line = bottom; line <= Math.min(y, bottom + 6 * 4.5); line += 4.5) lines.push(line);
+  if (localY < top) {
+    for (let line = top - LINE; line >= Math.max(localY - 0.1, top - 5 * LINE); line -= LINE) lines.push(line);
+  } else {
+    for (let line = bottom + LINE; line <= Math.min(localY + 0.1, bottom + 5 * LINE); line += LINE) lines.push(line);
+  }
   return lines;
 }
 
 function noteGlyph(segment: NotationSegment, note: NotationSegment['notes'][number], x: number, y: number,
-                   staff: NotationStaff) {
+                   staff: NotationStaff, systemY: number) {
   const hollow = segment.value === 'whole' || segment.value === 'half';
-  const ledger = ledgerLines(staff, y);
+  const ledger = ledgerLines(staff, y - systemY);
   return <g key={note.id} data-formatted-segment={segment.id}
     data-formatted-value={segment.value} data-pitch={note.pitch} data-spelling={note.spelling}
     data-tied={note.tie_from || note.tie_to ? 'true' : 'false'}>
     {ledger.map(line => <line key={`${note.id}-ledger-${line}`} className="formatted-ledger"
-      x1={x - 8} y1={line} x2={x + 8} y2={line}/>)}
+      x1={x - 8} y1={systemY + line} x2={x + 8} y2={systemY + line}/>)}
     <ellipse cx={x} cy={y} rx={NOTE_RADIUS_X} ry={NOTE_RADIUS_Y}
       className={`formatted-notehead${hollow ? ' is-hollow' : ''}`}
       transform={`rotate(-18 ${x} ${y})`}/>
     {segment.value !== 'whole' && <line className="formatted-stem" x1={x + 4.2} y1={y - 1}
       x2={x + 4.2} y2={y - 24}/>}
+    {Array.from({length: ({eighth: 1, sixteenth: 2, thirtysecond: 3, sixtyfourth: 4} as Record<string, number>)[segment.value] ?? 0},
+      (_, flag) => <path key={`${note.id}-flag-${flag}`} className="formatted-flag"
+        d={`M ${x + 4.2} ${y - 24 + flag * 5} q 7 3 5 9`}/>)}
     {segment.dotted ? <circle className="formatted-dot" cx={x + 9} cy={y} r={1.4}/> : null}
     {note.display_accidental
       ? <text className="formatted-accidental" x={x - 11} y={y + 3}>
@@ -171,11 +177,33 @@ function noteGlyph(segment: NotationSegment, note: NotationSegment['notes'][numb
   </g>;
 }
 
+const SHARP_ORDER: {letter: string; treble: number; bass: number}[] = [
+  {letter: 'F', treble: 5, bass: 3}, {letter: 'C', treble: 5, bass: 3},
+  {letter: 'G', treble: 5, bass: 3}, {letter: 'D', treble: 5, bass: 3},
+  {letter: 'A', treble: 4, bass: 2}, {letter: 'E', treble: 5, bass: 3},
+  {letter: 'B', treble: 4, bass: 2},
+];
+const FLAT_ORDER: {letter: string; treble: number; bass: number}[] = [
+  {letter: 'B', treble: 4, bass: 2}, {letter: 'E', treble: 5, bass: 3},
+  {letter: 'A', treble: 4, bass: 2}, {letter: 'D', treble: 5, bass: 3},
+  {letter: 'G', treble: 4, bass: 2}, {letter: 'C', treble: 5, bass: 3},
+  {letter: 'F', treble: 4, bass: 2},
+];
+const SHARP_KEYS: Record<string, number> = {G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7};
+const FLAT_KEYS: Record<string, number> = {F: 1, Bb: 2, Eb: 3, Ab: 4, Db: 5, Gb: 6, Cb: 7};
+
+function keySignature(key: string): {glyph: string; entries: {letter: string; treble: number; bass: number}[]} {
+  const name = (key || 'C').split(/[\s(]/)[0];
+  if (SHARP_KEYS[name]) return {glyph: '♯', entries: SHARP_ORDER.slice(0, SHARP_KEYS[name])};
+  if (FLAT_KEYS[name]) return {glyph: '♭', entries: FLAT_ORDER.slice(0, FLAT_KEYS[name])};
+  return {glyph: '', entries: []};
+}
+
 export function FormattedScore({document, title, selectedOccurrenceId}: {
   document: NotationDocument; title: string; selectedOccurrenceId?: string | null;
 }) {
   const layout = useMemo(() => layoutFormattedScore(document), [document]);
-  const time = `${document.time_signature.numerator}/${document.time_signature.denominator}`;
+  const signature = keySignature(document.key_signature);
   return <section className="ws-formatted" aria-label="Formatted final score">
     <div className="ws-formatted-toolbar">
       <strong>Formatted score</strong>
@@ -199,10 +227,18 @@ export function FormattedScore({document, title, selectedOccurrenceId}: {
           return <g key={`system-${system.index}`} data-formatted-system={system.index}>
             <text className="formatted-brace" x={offset - 22} y={system.y + (TREBLE_TOP + BASS_TOP) / 2 + 26}
               fontSize={66} textAnchor="middle">{'{'}</text>
-            <text className="formatted-clef" x={offset - 56} y={system.y + TREBLE_TOP + 27} fontSize={36}>{CLEFS.treble}</text>
-            <text className="formatted-clef" x={offset - 56} y={system.y + BASS_TOP + 27} fontSize={36}>{CLEFS.bass}</text>
-            <text className="formatted-key" x={offset - 26} y={system.y + TREBLE_TOP + 8} fontSize={12}>{document.key_signature || 'C'}</text>
-            <text className="formatted-time" x={offset - 26} y={system.y + TREBLE_TOP + 22} fontSize={11}>{time}</text>
+            <text className="formatted-clef" x={offset - 92} y={system.y + TREBLE_TOP + 27} fontSize={36}>{CLEFS.treble}</text>
+            <text className="formatted-clef" x={offset - 92} y={system.y + BASS_TOP + 27} fontSize={36}>{CLEFS.bass}</text>
+            {signature.entries.map((entry, index) => <g key={`key-${system.index}-${index}`}>
+              <text className="formatted-key" x={offset - 72 + index * 8}
+                y={system.y + yForPitch(`${entry.letter}${entry.treble}`, 'treble') + 4} fontSize={14}>{signature.glyph}</text>
+              <text className="formatted-key" x={offset - 72 + index * 8}
+                y={system.y + yForPitch(`${entry.letter}${entry.bass}`, 'bass') + 4} fontSize={14}>{signature.glyph}</text>
+            </g>)}
+            <text className="formatted-time" x={offset - 18} y={system.y + TREBLE_TOP + 14} fontSize={12}>{document.time_signature.numerator}</text>
+            <text className="formatted-time" x={offset - 18} y={system.y + TREBLE_TOP + 30} fontSize={12}>{document.time_signature.denominator}</text>
+            <text className="formatted-time" x={offset - 18} y={system.y + BASS_TOP + 14} fontSize={12}>{document.time_signature.numerator}</text>
+            <text className="formatted-time" x={offset - 18} y={system.y + BASS_TOP + 30} fontSize={12}>{document.time_signature.denominator}</text>
             {[0, 1, 2, 3, 4].map(line => <g key={`staff-${system.index}-${line}`}>
               <line className="formatted-staff" x1={offset} y1={system.y + TREBLE_TOP + line * LINE}
                 x2={offset + width} y2={system.y + TREBLE_TOP + line * LINE}/>
@@ -239,7 +275,7 @@ export function FormattedScore({document, title, selectedOccurrenceId}: {
               return segment.notes.map(note => {
                 const position = layout.notePositions.get(note.id);
                 if (!position) return null;
-                const glyph = noteGlyph(segment, note, position.x, position.y, segment.staff);
+                const glyph = noteGlyph(segment, note, position.x, position.y, segment.staff, system.y);
                 return <g key={note.id} className={selectedOccurrenceId && note.performance_ids.includes(selectedOccurrenceId)
                   ? 'is-selected' : undefined}>{glyph}</g>;
               });
@@ -253,9 +289,12 @@ export function FormattedScore({document, title, selectedOccurrenceId}: {
                 return <path key={tie.id} className="formatted-tie"
                   d={`M ${from.x + 5} ${from.y - 1} Q ${(from.x + to.x) / 2} ${from.y - 12} ${to.x - 5} ${to.y - 1}`}/>;
               }
-              const stub = from.system === system.index ? from.x + 6 : to.x - 6;
+              if (from.system === system.index) {
+                return <path key={tie.id} className="formatted-tie is-broken"
+                  d={`M ${from.x + 5} ${from.y - 1} q 8 -6 14 0`}/>;
+              }
               return <path key={tie.id} className="formatted-tie is-broken"
-                d={`M ${stub} ${(from.system === system.index ? from.y : to.y) - 1} q 8 -6 16 0`}/>;
+                d={`M ${to.x - 16} ${to.y - 1} q 8 -6 11 0`}/>;
             })}
           </g>;
         })}
