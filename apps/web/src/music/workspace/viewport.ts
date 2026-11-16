@@ -192,7 +192,7 @@ export function measureAtTick(boxes: MeasureBox[], document: NotationDocument, t
   return clamp(measure.index, 0, Math.max(0, boxes.length - 1));
 }
 
-const SCORE_CONTEXT_WIDTH = 62;
+export const SCORE_CONTEXT_WIDTH = 116;
 const SCORE_MEASURE_PAD = 14;
 
 /** Horizontal position of a score tick inside the strip (content coordinates). */

@@ -13,7 +13,8 @@ import type {TimelineLayout} from './timeline-layout';
 import {displayAccidental, keySignature as sharedKeySignature, parseSpelling, type NotationDocument, type NotationSegment, type NotationValue}
   from '../../../../../packages/music-notation/index.ts';
 import {
-  measureAtTick, scrollForMeasure, tickAtX, visibleMeasureIndexes, xForTick, type MeasureBox,
+  SCORE_CONTEXT_WIDTH as CONTEXT_WIDTH, measureAtTick, scrollForMeasure, tickAtX,
+  visibleMeasureIndexes, xForTick, type MeasureBox,
 } from './viewport';
 import {useElementWidth} from './useElementWidth';
 import {useClockTime, type ClockStore} from './clock';
@@ -27,7 +28,6 @@ const TREBLE_BOTTOM = 74;
 const BASS_TOP = 116;
 const BASS_BOTTOM = 156;
 const HEIGHT = RULER_HEIGHT + 162;
-const CONTEXT_WIDTH = 116;
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const REST_GLYPHS: Record<NotationValue, string> = {

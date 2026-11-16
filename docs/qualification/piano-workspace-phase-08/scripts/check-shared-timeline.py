@@ -139,6 +139,27 @@ with sync_playwright() as pw:
         page.wait_for_selector('[data-shared-scrollbar]')
         after_mode = state(page)
         mode_ok = abs(after_mode['barLeft'] - before_collapse['barLeft']) <= 3
+        # Ruler seek at a visible measure boundary after non-zero shared scrolling.
+        page.evaluate('''() => { const b = document.querySelector('[data-shared-scrollbar]');
+          b.scrollLeft = 500; b.dispatchEvent(new Event('scroll')); }''')
+        page.wait_for_timeout(150)
+        seek_probe = page.evaluate('''() => {
+          const snap = window.__pianoWorkspaceSnapshot();
+          const measure = document.querySelector('.ws-score-measure[data-measure="1"] .ws-score-barline')
+            || document.querySelector('.ws-score-measure:nth-of-type(2) .ws-score-barline');
+          const ruler = document.querySelector('.ws-score-ruler');
+          if (!measure || !ruler) return {ok: false};
+          const b = measure.getBoundingClientRect(); const r = ruler.getBoundingClientRect();
+          ruler.dispatchEvent(new MouseEvent('click', {bubbles: true, clientX: b.left + 1, clientY: r.top + 6}));
+          const expected = snap.document.measures[1].start;
+          return {ok: true, expected, screenX: b.left, rulerX: r.left};
+        }''')
+        page.wait_for_timeout(250)
+        seek_tick = float(page.locator('.ws-alignment').get_attribute('data-playhead-tick'))
+        seek_ok = seek_probe.get('ok') and abs(seek_tick - seek_probe['expected']) <= 12
+        seek_probe['actual'] = seek_tick
+        seek_probe['passed'] = seek_ok
+
         zoom_before = state(page)
         zoom_doc = page.evaluate('() => window.__pianoWorkspaceSnapshot()')
         page.get_by_role('button', name='Zoom in').click(); page.wait_for_timeout(300)
@@ -151,12 +172,13 @@ with sync_playwright() as pw:
                           'manual': manual, 'manual_ok': manual_ok,
                           'resume': resumed, 'resume_ok': resume_ok,
                           'collapse_ok': collapse_ok, 'mode_ok': mode_ok,
-                          'zoom_before': zoom_before['barScrollWidth'],
+                          'ruler_seek': seek_probe, 'zoom_before': zoom_before['barScrollWidth'],
                           'zoom_after': zoom_after['barScrollWidth'], 'zoom_ok': zoom_ok}
         context.close()
     browser.close()
 
 ok = all(r['manual_ok'] and r['resume_ok'] and r['collapse_ok'] and r['mode_ok'] and r['zoom_ok']
+         and r['ruler_seek']['passed']
          for r in results.values())
 Path(__file__).with_name('shared-timeline-results.json').write_text(json.dumps(results, indent=2), encoding='utf-8')
 print(json.dumps(results, indent=2))

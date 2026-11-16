@@ -179,6 +179,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [scoreReveal, setScoreReveal] = useState<{tick: number; token: number} | null>(null);
   const revealToken = useRef(0);
   const clockRef = useRef(createClock());
+  const livePlayhead = useClockTime(clockRef.current, playhead);
   const [accountId, setAccountId] = useState('');
   const [draftId, setDraftId] = useState('');
   const [sourceSha256, setSourceSha256] = useState('');
@@ -1067,7 +1068,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     if (!follow || followSuspended || gestureLock || !playing || !document || !alignment || !timelineLayout) return;
     const W = sharedBarRef.current?.clientWidth || sharedWidth;
     if (W <= 0) return;
-    const p = 116 + timelineLayout.sourceSecondsToX(playhead, alignment, 0);
+    const p = 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0);
     const plotWidth = Math.max(1, W - 116);
     const ratio = W < 700 ? 0.6 : 0.7;
     const right = 116 + ratio * plotWidth;
@@ -1093,7 +1094,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   const zoom = useCallback((factor: number) => {
     if (!timelineLayout || !alignment || gestureLock || !document) return;
-    const p = 116 + timelineLayout.sourceSecondsToX(playhead, alignment, 0);
+    const p = 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0);
     const anchorX = p >= sharedScrollLeft && p <= sharedScrollLeft + sharedWidth
       ? p : sharedScrollLeft + sharedWidth / 2;
     const anchorTick = timelineLayout.xToTick(Math.max(0, anchorX - 116));
@@ -1436,7 +1437,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       {followSuspended && <span className="ws-hint" data-follow-suspended="true">Follow suspended · manual inspection</span>}
       {(() => {
         if (!timelineLayout || !alignment || sharedWidth <= 0) return null;
-        const p = 116 + timelineLayout.sourceSecondsToX(playhead, alignment, 0);
+        const p = 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0);
         const direction = p < sharedScrollLeft ? 'left' : p > sharedScrollLeft + sharedWidth ? 'right' : 'visible';
         if (direction === 'visible') return null;
         return <span className="ws-hint" data-follow-direction={direction}>
@@ -1494,7 +1495,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         || playhead > tickToEffectiveSeconds(alignment, timelineLayout.totalTicks, 0)) ? <span className="ws-hint" data-outside-score="true">
         Outside scored passage
       </span> : null}
-      <span className="ws-time">{playhead.toFixed(2)} s / {document.duration.toFixed(2)} s</span>
+      <span className="ws-time">{livePlayhead.toFixed(2)} s / {document.duration.toFixed(2)} s</span>
       <label className="ws-field ws-inline">
         <span>{spans.length ? 'Source clock' : 'Position'}</span>
         <input type="range" min={0} max={document.duration} step={0.01} value={playhead}
@@ -1701,7 +1702,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           <TimeRoll document={document} window={window} onWindowChange={next => changeWindow(next, 'reveal')}
             layout={timelineLayout ?? undefined} alignment={alignment ?? undefined}
             sharedScrollLeft={sharedScrollLeft} sharedViewportWidth={sharedWidth} gutter={sharedWidth > 0 && sharedWidth < 700 ? 82 : 70}
-            cursorX={timelineLayout && alignment ? (sharedWidth > 0 && sharedWidth < 700 ? 82 : 70) + timelineLayout.sourceSecondsToX(playhead, alignment, 0) : null}
+            cursorX={timelineLayout && alignment ? (sharedWidth > 0 && sharedWidth < 700 ? 82 : 70) + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0) : null}
             onGestureStart={() => { setGestureLock(true); setFollowSuspended(true); }}
             onGestureEnd={() => setGestureLock(false)}
             onWindowChangeOrigin={changeWindow}
@@ -1731,7 +1732,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             playheadTick={playheadTick} activeOccurrenceIds={activeIds}
             clock={clockRef.current} alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals}
             layout={timelineLayout ?? undefined} sharedScrollLeft={sharedScrollLeft}
-            cursorX={timelineLayout && alignment ? 116 + timelineLayout.sourceSecondsToX(playhead, alignment, 0) : null}
+            cursorX={timelineLayout && alignment ? 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0) : null}
             onSeekTick={seekToTick}
             onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
             editingEnabled={scoreMode === 'correction' && !replaceMode && !addMode}

@@ -5,6 +5,7 @@ import {
   type PerformanceNote,
 } from '../../../packages/music-notation/index.ts';
 import {buildTimelineLayout, fractionalSecondsToTick} from '../src/music/workspace/timeline-layout';
+import {layoutMeasures, SCORE_CONTEXT_WIDTH, tickAtX, xForTick} from '../src/music/workspace/viewport';
 
 const note = (id: string, onset: number, pitch: number, duration = 0.5): PerformanceNote => ({
   id, onset, pitch, duration, velocity: 0.6, confidence: null, optional: false, string: null, fret: null,
@@ -69,4 +70,27 @@ test('fractional ticks preserve early/late recorded attacks', () => {
   assert.ok(layout.sourceSecondsToX(early, alignment, 0) < written);
   assert.ok(layout.sourceSecondsToX(late, alignment, 0) > written);
   assert.ok(Number.isFinite(fractionalSecondsToTick(alignment, 2.1)));
+});
+
+
+test('score context origin is one authority for drawing, seeking and linked scrolling', () => {
+  const doc = buildNotation([
+    {id: 'e4', onset: 0, duration: 0.5, pitch: 64, velocity: 0.6, confidence: null, optional: false, string: null, fret: null},
+  ], {bpm: 120, duration: 4});
+  const {boxes, totalWidth} = layoutMeasures(doc);
+  assert.equal(SCORE_CONTEXT_WIDTH, 116, 'the score gutter is 116 px');
+  assert.equal(xForTick(boxes, doc, 0), SCORE_CONTEXT_WIDTH + 14,
+    'tick 0 starts after the full context gutter plus renderer inset');
+  assert.ok(xForTick(boxes, doc, 0) > 100, 'a 62 px default would place tick 0 at 76');
+  for (const tick of [0, 240, 480, 960, 1440, 1920]) {
+    const x = xForTick(boxes, doc, tick);
+    assert.ok(Math.abs(tickAtX(boxes, doc, x) - tick) < 1e-6, `tick ${tick} round trip at ${x}`);
+    const scroll = 137;
+    assert.ok(Math.abs(tickAtX(boxes, doc, (x - scroll) + scroll) - tickAtX(boxes, doc, x)) < 1e-9,
+      'non-zero scrolling uses the same content origin');
+    const linkedTarget = Math.max(0, xForTick(boxes, doc, tick) - SCORE_CONTEXT_WIDTH - 24);
+    assert.ok(Number.isFinite(linkedTarget) && linkedTarget <= totalWidth, 'linked target uses the same gutter');
+  }
+  assert.equal(tickAtX(boxes, doc, xForTick(boxes, doc, 960)), 960,
+    'ruler decode returns the intended tick, not 1758');
 });

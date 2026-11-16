@@ -37,7 +37,17 @@ Branch `phase8/formatted-score`. Final commit reported with submission. The work
 - Collapse/reopen, formatted-mode switch/return, selection and document/history are preserved; formatted mode stops animation and retains its pause/read-only policy.
 - Save/reopen and MusicXML use the existing document path; formatted layout is display-only.
 
+## Coordinate-origin closure (review 651261b)
+
+- iewport.ts now exports the single SCORE_CONTEXT_WIDTH = 116; ContinuousScore imports it instead of keeping a second literal.
+- xForTick and 	ickAtX use the same default origin, so cursor drawing, ruler seek, linked-scroll targets and user-scroll reporting share draw/mapping input.
+- The focused regression asserts tick 0 is at 130 px (not the old 76), exact tick 960 decode, round trips at start/interior/boundaries, and identical mapping after non-zero scrolling. It fails if a 62px default returns or a consumer diverges.
+- The removed post-preview editing assertion is restored in a separate bounded test that returns from formatted mode and commits a normal edit.
+
 ## Verification evidence
+
+- Ruler seek after 500 px shared scroll: target measure tick 1920 decoded as 1926 at a 1 px click offset (within one pixel); the old 62 px helper decode returned 1758.
+- Post-preview editing: browser test returns from formatted mode, commits +1 semitone as one undo step, then Undo restores the pitch (scripts/post-preview-edit-results.json).
 
 - Pure geometry: `apps/web/tests/shared-timeline.test.ts` (boundary continuity, inverse round trip, zoom, alignment/offset, held policy, early/late attacks).
 - Shared controller test: single scrollbar, manual suspension, Resume, shared zoom.
