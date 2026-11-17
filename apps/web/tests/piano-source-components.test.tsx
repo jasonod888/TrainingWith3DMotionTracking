@@ -20,7 +20,7 @@ test('review keyboard follows supplied source time without its own audition, wit
  assert.equal(view.queryByRole('button',{name:'Play proposed notes'}),null);
  assert.ok(view.container.querySelector('.draft-key-white.is-active'));
  view.rerender(<DraftNotePreview events={events} duration={13} sourceTime={12.9}/>);
- assert.equal(view.container.querySelector('.draft-key-white.is-active'),null);
+ assert.ok(view.container.querySelector('.draft-key-white.is-active')===null);
 });
 test('actual canvas applies one offset and crops a note spanning source zero',()=>{
  const rectangles:number[][]=[];

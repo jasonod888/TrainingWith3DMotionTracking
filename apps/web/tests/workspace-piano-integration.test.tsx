@@ -3,7 +3,7 @@
  * Controlled media doubles, a bounded frame scheduler and the real preview hook and
  * source controller; no services, no writes.
  */
-import {test, afterEach} from 'node:test';
+import {test, after, afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
@@ -121,6 +121,11 @@ const {PianoWorkspaceHarness} = await import('../src/music/workspace/PianoWorksp
 const {NotationAudio} = await import('../src/music/notation/notation-audio.ts');
 
 afterEach(() => cleanup());
+after(() => {
+  for (const handle of pendingFrames.values()) clearTimeout(handle);
+  pendingFrames.clear();
+  dom.window.close();
+});
 
 let auditionStops = 0;
 NotationAudio.prototype.play = () => {};

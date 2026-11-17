@@ -98,7 +98,7 @@ test('a withheld correction is shown without an accept action', () => {
     onStop={() => {}} onAudition={() => {}}/>);
   assert.ok(screen.getByText(/correction withheld/i));
   assert.ok(screen.getByText(/only rendered evidence/i));
-  assert.equal(screen.queryByRole('button', {name: /accept suggestion/i}), null);
+  assert.ok(screen.queryByRole('button', {name: /accept suggestion/i}) === null);
   assert.ok(screen.getByRole('button', {name: /^dismiss$/i}));
 });
 

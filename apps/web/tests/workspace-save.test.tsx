@@ -79,6 +79,25 @@ async function open() {
   return view;
 }
 
+function openSettings(view: any, tab?: string) {
+  fireEvent.click(view.container.querySelector('[data-settings-toggle]'));
+  if (tab) {
+    const button = [...view.container.querySelectorAll<HTMLButtonElement>('.ws-drawer-tabs button')]
+      .find(candidate => candidate.textContent?.trim() === tab);
+    if (!button) throw new Error(`Settings tab is missing: ${tab}`);
+    fireEvent.click(button);
+  }
+}
+
+function openMore(view: any) {
+  fireEvent.click(view.container.querySelector('[data-more-toggle]'));
+}
+
+const reviewButton = (view: any) => view.container.querySelector('[data-review-save]') as HTMLButtonElement;
+const openReview = (view: any) => fireEvent.click(reviewButton(view));
+const dialogSave = (view: any) => view.container.querySelector('[data-save-button]') as HTMLButtonElement;
+const reviewConfirm = (view: any) => view.getByLabelText('Confirm reviewed') as HTMLInputElement;
+
 function dirtyEdit(view: any) {
   fireEvent.pointerDown(view.container.querySelector('.ws-roll-note'));
   fireEvent.click(view.getByRole('button', {name: '+ semitone'}));
@@ -87,22 +106,25 @@ function dirtyEdit(view: any) {
 test('edit → confirm → save carries notation, alignment and offset; confirmation resets', async () => {
   posts = []; saveStatus = 200; latestReference = null;
   const view = await open();
-  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
-  assert.equal(save().disabled, true, 'nothing to save yet');
+  openReview(view);
+  assert.equal(dialogSave(view).disabled, true, 'review confirmation is required before saving');
+  fireEvent.click(view.container.querySelector('[data-review-focus]')!);
   dirtyEdit(view);
-  const confirm = () => view.getByLabelText('Confirm reviewed') as HTMLInputElement;
-  await waitFor(() => assert.equal(confirm().checked, false, 'a change needs confirmation first'));
-  assert.equal(save().disabled, true, 'saving requires confirmation');
-  fireEvent.click(confirm());
-  await waitFor(() => assert.equal(save().disabled, false, 'an edit with confirmation should enable saving'));
+  openReview(view);
+  assert.equal(reviewConfirm(view).checked, false, 'a change needs confirmation first');
+  assert.equal(dialogSave(view).disabled, true, 'saving requires confirmation');
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false, 'an edit with confirmation should enable saving'));
 
   // A further edit must require fresh confirmation.
-  fireEvent.change(view.getByLabelText(/Velocity/), {target: {value: '0.9'}});
-  await waitFor(() => assert.equal(confirm().checked, false, 'an edit must reset the confirmation'));
-  fireEvent.click(confirm());
-  await waitFor(() => assert.equal(save().disabled, false));
+  fireEvent.click(view.container.querySelector('[data-review-focus]')!);
+  fireEvent.change(view.getByLabelText(/Loudness/), {target: {value: '0.9'}});
+  openReview(view);
+  assert.equal(reviewConfirm(view).checked, false, 'an edit must reset the confirmation');
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false));
 
-  fireEvent.click(save());
+  fireEvent.click(dialogSave(view));
   await waitFor(() => assert.ok(view.queryByText(/Saved privately/i), 'no saved status'));
   assert.equal(posts.length, 1);
   assert.match(posts[0].url, /music-draft\/review$/);
@@ -112,19 +134,19 @@ test('edit → confirm → save carries notation, alignment and offset; confirma
   assert.equal(posts[0].body.offset_seconds, 0);
   assert.equal(posts[0].body.confirm_reviewed, true);
   assert.equal(posts[0].body.events.length, 20);
-  assert.equal(save().disabled, true, 'the workspace is saved');
+  assert.equal(reviewButton(view).disabled, true, 'the workspace is saved');
 });
 
 test('a failed save keeps the edits and the local checkpoint, and never claims Saved', async () => {
   posts = []; saveStatus = 500; latestReference = null; localStorage.clear();
   const view = await open();
   dirtyEdit(view);
-  fireEvent.click(view.getByLabelText('Confirm reviewed'));
-  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
-  await waitFor(() => assert.equal(save().disabled, false));
-  fireEvent.click(save());
+  openReview(view);
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false));
+  fireEvent.click(dialogSave(view));
   await waitFor(() => assert.ok(view.queryByText(/could not be completed/i), 'no failure message'));
-  assert.equal(save().disabled, false, 'the edit remains saveable');
+  assert.equal(reviewButton(view).disabled, false, 'the edit remains saveable');
   assert.equal(view.queryByText(/Saved privately/i), null, 'a failure must not claim Saved');
   let stored = localStorage.getItem('piano-workspace-recovery-v1');
   await waitFor(() => {
@@ -144,14 +166,14 @@ test('a 409 keeps the work and offers explicit resolution on the latest revision
   posts = []; saveStatus = 409; latestReference = null; lessonGets = 0;
   const view = await open();
   dirtyEdit(view);
-  fireEvent.click(view.getByLabelText('Confirm reviewed'));
-  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
-  await waitFor(() => assert.equal(save().disabled, false));
-  fireEvent.click(save());
+  openReview(view);
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false));
+  fireEvent.click(dialogSave(view));
   await waitFor(() => assert.ok(view.queryByText(/newer saved revision/i), 'no conflict message'));
   assert.ok(view.getByRole('button', {name: 'Save on latest revision'}));
   assert.ok(view.getByRole('button', {name: 'Reload saved revision'}));
-  assert.equal(save().disabled, false, 'the edits survive the conflict');
+  assert.equal(reviewButton(view).disabled, false, 'the edits survive the conflict');
 
   saveStatus = 200;
   fireEvent.click(view.getByRole('button', {name: 'Save on latest revision'}));
@@ -188,6 +210,7 @@ test('a matching local checkpoint is offered as local work, and restored without
   await waitFor(() => assert.ok(view.queryByText(/not saved to the server/i), 'no local checkpoint offer'));
   fireEvent.click(view.getByRole('button', {name: 'Restore local checkpoint'}));
   await waitFor(() => assert.ok(view.queryByText(/it is not saved to the server/i), 'no honest restore status'));
+  openSettings(view, 'Editing');
   assert.equal((view.getByLabelText('Sync offset in seconds') as HTMLInputElement).value, '0.5');
   assert.match(view.getByText(/Score alignment anchored/i).textContent ?? '', /anchored/i);
   assert.equal(view.queryByText(/Saved privately/i), null, 'a local checkpoint must never claim Saved');
@@ -203,20 +226,20 @@ test('a checkpoint for another account is rejected and never offered', async () 
   }));
   const view = await open();
   await waitFor(() => assert.ok(view.queryByText(/different account, draft or source/i), 'no rejection notice'));
-  assert.equal(view.queryByText(/not saved to the server/i), null, 'a foreign checkpoint must not be offered');
-  assert.equal(view.queryByRole('button', {name: 'Restore local checkpoint'}), null);
+  assert.ok(view.queryByText(/not saved to the server/i) === null, 'a foreign checkpoint must not be offered');
+  assert.ok(view.queryByRole('button', {name: 'Restore local checkpoint'}) === null);
 });
 
 test('R2: an offset-only change is dirty, requires confirmation and is saveable', async () => {
   posts = []; saveStatus = 200; latestReference = null;
   const view = await open();
-  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
-  assert.equal(save().disabled, true);
+  assert.equal(reviewButton(view).disabled, false);
+  openSettings(view, 'Editing');
   fireEvent.change(view.getByLabelText('Sync offset in seconds'), {target: {value: '0.5'}});
-  const confirm = () => view.getByLabelText('Confirm reviewed') as HTMLInputElement;
-  fireEvent.click(confirm());
-  await waitFor(() => assert.equal(save().disabled, false, 'an offset-only edit must be saveable'));
-  fireEvent.click(save());
+  openReview(view);
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false, 'an offset-only edit must be saveable'));
+  fireEvent.click(dialogSave(view));
   await waitFor(() => assert.ok(view.queryByText(/Saved privately/i)));
   assert.equal(posts[0].body.offset_seconds, 0.5);
   assert.equal(posts[0].body.alignment.offset_seconds, 0.5);
@@ -239,10 +262,10 @@ test('R2: a recovered local checkpoint is dirty and saveable', async () => {
   const view = await open();
   await waitFor(() => assert.ok(view.getByRole('button', {name: 'Restore local checkpoint'})));
   fireEvent.click(view.getByRole('button', {name: 'Restore local checkpoint'}));
-  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
-  fireEvent.click(view.getByLabelText('Confirm reviewed'));
-  await waitFor(() => assert.equal(save().disabled, false, 'recovered work must be saveable'));
-  fireEvent.click(save());
+  openReview(view);
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false, 'recovered work must be saveable'));
+  fireEvent.click(dialogSave(view));
   await waitFor(() => assert.ok(view.queryByText(/Saved privately/i)));
   assert.equal(posts[0].body.offset_seconds, 0.5);
   const saved = posts[0].body.notation.events[0].notes[0].spelling;
@@ -253,10 +276,10 @@ test('workspace reopen restores the stored map, anchors and offset (component)',
   posts = []; saveStatus = 200; latestReference = null;
   const view = await open();
   dirtyEdit(view);
-  fireEvent.click(view.getByLabelText('Confirm reviewed'));
-  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
-  await waitFor(() => assert.equal(save().disabled, false));
-  fireEvent.click(save());
+  openReview(view);
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false));
+  fireEvent.click(dialogSave(view));
   await waitFor(() => assert.ok(view.queryByText(/Saved privately/i)));
 
   // A stored reference: authored spelling plus an anchored offset, as saved elsewhere.
@@ -272,6 +295,7 @@ test('workspace reopen restores the stored map, anchors and offset (component)',
   latestReference = stored;
   localStorage.clear();
 
+  openMore(view);
   fireEvent.click(view.getByRole('button', {name: 'Reopen saved'}));
   await waitFor(() => assert.ok(view.queryByText(/Reopened revision rev-late/i), 'no reopen status'));
   await waitFor(() => assert.ok(
@@ -280,29 +304,31 @@ test('workspace reopen restores the stored map, anchors and offset (component)',
   const offset = view.getByLabelText('Sync offset in seconds') as HTMLInputElement;
   assert.equal(offset.value, '0.25', 'the saved offset was not restored');
   assert.match(view.getByText(/Score alignment anchored/i).textContent ?? '', /anchored/i);
-  assert.equal(save().disabled, true, 'a reopened revision is clean');
+  assert.equal(reviewButton(view).disabled, true, 'a reopened revision is clean');
 });
 
 test('R2: an anchor-only change is dirty, resets confirmation and saves the full map', async () => {
   posts = []; saveStatus = 200; latestReference = null;
   const view = await open();
-  const confirm = () => view.getByLabelText('Confirm reviewed') as HTMLInputElement;
-  const save = () => view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement;
-  fireEvent.click(confirm());
-  await waitFor(() => assert.equal(save().disabled, false, 'an unchanged draft must be finalisable'));
+  openReview(view);
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false, 'an unchanged draft must be finalisable'));
+  fireEvent.click(view.container.querySelector('[data-review-focus]')!);
 
   const video = view.container.querySelector('video')!;
   (video as unknown as {currentTime: number}).currentTime = 1;
   video.dispatchEvent(new window.Event('seeked'));
-  await waitFor(() => assert.match(view.container.querySelector('.ws-time')?.textContent ?? '', /1\.00 s/));
+  await waitFor(() => assert.match(view.container.querySelector('.ws-time')?.textContent ?? '', /0:01/));
+  openSettings(view, 'Advanced timing');
   fireEvent.click(view.getByRole('button', {name: 'Use current'}));
   await waitFor(() => assert.notEqual((view.getByLabelText('Anchor tick') as HTMLInputElement).value, ''));
   fireEvent.click(view.getByRole('button', {name: 'Apply anchor'}));
-  await waitFor(() => assert.equal(confirm().checked, false, 'an anchor change must reset confirmation'));
-  fireEvent.click(confirm());
-  await waitFor(() => assert.equal(save().disabled, false));
+  openReview(view);
+  await waitFor(() => assert.equal(reviewConfirm(view).checked, false, 'an anchor change must reset confirmation'));
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false));
 
-  fireEvent.click(save());
+  fireEvent.click(dialogSave(view));
   await waitFor(() => assert.ok(view.queryByText(/Saved privately/i)));
   assert.equal(posts[0].body.alignment.anchors.length, 1);
   assert.ok(posts[0].body.alignment.anchors[0].tick > 0);
@@ -330,9 +356,10 @@ test('R5: opening a saved lesson uses its stored reference, not a regenerated dr
   await waitFor(() => assert.ok(view.queryByText(/Opened saved revision rev-late/i), 'no saved-reference open status'));
   await waitFor(() => assert.ok(view.container.querySelector('.ws-score-notehead[aria-label*="B#3"]'),
     'the stored spelling was not opened'));
+  openSettings(view, 'Editing');
   assert.equal((view.getByLabelText('Sync offset in seconds') as HTMLInputElement).value, '0.25');
   assert.match(view.getByText(/Score alignment anchored/i).textContent ?? '', /anchored/i);
-  assert.equal((view.getByRole('button', {name: 'Save privately'}) as HTMLButtonElement).disabled, true,
+  assert.equal(reviewButton(view).disabled, true,
     'an opened saved revision is clean');
 });
 

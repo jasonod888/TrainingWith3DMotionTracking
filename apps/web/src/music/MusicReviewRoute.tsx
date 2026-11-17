@@ -11,18 +11,25 @@ const FORMATS = {'X-Lesson-Formats': '1,2'};
  * saved music manifest first, so a saved-only piano revision opens even when no draft
  * exists, and only the guitar path mounts the legacy review form.
  */
-export function MusicReviewRoute({lessonId, onBack, onReviewed, onDirty}: {
+export function MusicReviewRoute({lessonId, onBack, onReviewed, onDirty, onFocusedChange}: {
   lessonId: string;
   onBack: () => void;
   onReviewed: (lesson: MusicLessonManifest) => void;
   onDirty: (dirty: boolean) => void;
+  /** Lets the app shell hide global navigation only for the focused piano route. */
+  onFocusedChange?: (focused: boolean) => void;
 }) {
   const [mode, setMode] = useState<'loading' | 'piano' | 'guitar' | 'error'>('loading');
   const [error, setError] = useState('');
 
   useEffect(() => {
+    onFocusedChange?.(mode === 'piano');
+  }, [mode, onFocusedChange]);
+
+  useEffect(() => {
     let stopped = false;
     setMode('loading');
+    onFocusedChange?.(false);
     setError('');
     void (async () => {
       // Saved revision wins: a reviewed lesson has a manifest even without a draft.

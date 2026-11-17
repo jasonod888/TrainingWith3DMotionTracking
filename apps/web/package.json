@@ -9,7 +9,11 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "build:spike": "vite build --config vite.spike.config.ts",
-    "test": "tsx --test ../../tests/engine/*.test.ts ../../tests/music-engine/*.test.ts tests/*.test.mjs tests/*.test.tsx",
+    "test": "node tests/runner/run-tests.mjs",
+    "test:full": "node tests/runner/run-tests.mjs --full",
+    "test:focused": "node tests/runner/run-tests.mjs --focused",
+    "test:file": "node tests/runner/run-tests.mjs --file",
+    "test:list": "node tests/runner/run-tests.mjs --full --list",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

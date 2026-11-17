@@ -41,6 +41,23 @@ function note(view: any) {
   return view.container.querySelector('.ws-roll-note') as SVGRectElement;
 }
 
+async function expandTiming(view: any) {
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-note-more-toggle')));
+  const toggle = view.container.querySelector('.ws-note-more-toggle') as HTMLButtonElement;
+  if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle);
+  await waitFor(() => assert.equal(toggle.getAttribute('aria-expanded'), 'true'));
+}
+
+function openSettings(view: any, tab?: string) {
+  fireEvent.click(view.container.querySelector('[data-settings-toggle]'));
+  if (tab) {
+    const button = [...view.container.querySelectorAll<HTMLButtonElement>('.ws-drawer-tabs button')]
+      .find(candidate => candidate.textContent?.trim() === tab);
+    if (!button) throw new Error(`Settings tab is missing: ${tab}`);
+    fireEvent.click(button);
+  }
+}
+
 test('gesture arithmetic locks an axis, keeps exact seconds and respects snap', () => {
   assert.equal(gestures.resolveAxis(2, 2), null, 'below the threshold nothing moves');
   assert.equal(gestures.resolveAxis(12, 3), 'time');
@@ -97,20 +114,17 @@ test('horizontal drag moves the exact recorded start when Snap is off', async ()
 
 test('the selected note exposes touch handles and the resize handle changes recorded length only', async () => {
   const view = await open();
+  openSettings(view);
   fireEvent.pointerDown(note(view), {clientX: 100, clientY: 100, pointerId: 1, button: 0});
   fireEvent.pointerUp(note(view), {clientX: 100, clientY: 100, pointerId: 1});
+  await expandTiming(view);
   const handle = view.container.querySelector('[data-handle="resize"]') as SVGRectElement;
   assert.ok(handle, 'a selected note needs a resize handle');
   const beforePitch = view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch');
   const beforeLength = (view.getByLabelText('Recorded length (s)') as HTMLInputElement).value;
   fireEvent.pointerDown(handle, {clientX: 100, clientY: 100, pointerId: 2, button: 0});
   fireEvent.pointerMove(handle, {clientX: 160, clientY: 100, pointerId: 2});
-  console.log('RESIZE-MID', view.container.querySelector('.ws-roll-svg')?.getAttribute('data-drag-axis'),
-    (view.container.querySelector('.ws-roll-note') as SVGRectElement)?.getAttribute('data-drag-axis'),
-    view.container.querySelector('[data-handle="resize"]') ? 'handle' : 'no-handle');
   fireEvent.pointerUp(handle, {clientX: 160, clientY: 100, pointerId: 2});
-  console.log('RESIZE-POST', view.container.querySelector('.ws-report')?.textContent,
-    (view.getByLabelText('Recorded length (s)') as HTMLInputElement).value);
   await waitFor(() => assert.notEqual((view.getByLabelText('Recorded length (s)') as HTMLInputElement).value, beforeLength));
   assert.ok(Number((view.getByLabelText('Recorded length (s)') as HTMLInputElement).value) > Number(beforeLength));
   assert.equal(view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch'), beforePitch,
@@ -130,24 +144,33 @@ test('sheet drag moves by diatonic steps and shows the candidate spelling', asyn
 
 test('Replace pitch commits once, Escape changes nothing and the same key is a no-op', async () => {
   const view = await open();
+  openSettings(view);
   fireEvent.pointerDown(note(view), {clientX: 100, clientY: 100, pointerId: 1, button: 0});
   fireEvent.pointerUp(note(view), {clientX: 100, clientY: 100, pointerId: 1});
+  await expandTiming(view);
   const target = Number(view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch'));
-  view.getByRole('button', {name: 'Replace pitch'}).click();
+  fireEvent.click(view.container.querySelector('[data-replace="start"]')!);
   await waitFor(() => assert.ok(view.container.querySelector('[data-replace="active"]')));
+  assert.equal(view.container.querySelector('[data-settings-drawer]')?.getAttribute('data-suppressed'), 'true',
+    'Replace hides the editor so the keyboard is usable');
   fireEvent.keyDown(window, {key: 'Escape'});
-  await waitFor(() => assert.equal(view.container.querySelector('[data-replace="active"]'), null));
+  await waitFor(() => assert.ok(view.container.querySelector('[data-replace="active"]') === null));
+  assert.equal(view.container.querySelector('[data-settings-drawer]')?.getAttribute('data-suppressed'), 'false',
+    'Escape restores the contextual editor');
+  assert.equal(view.container.querySelector('[data-settings-drawer]')?.getAttribute('data-mode'), 'note');
 
-  view.getByRole('button', {name: 'Replace pitch'}).click();
+  fireEvent.click(view.container.querySelector('[data-replace="start"]')!);
   await waitFor(() => assert.ok(view.container.querySelector('[data-replace="active"]')));
   const newPitch = target + 2;
   const key = view.container.querySelector(`.keyboard-white[data-pitch="${newPitch}"], .keyboard-black[data-pitch="${newPitch}"]`);
   assert.ok(key, `keyboard key for ${newPitch} is missing`);
   fireEvent.click(key!);
   await waitFor(() => assert.equal(view.container.querySelector('.ws-roll-note')?.getAttribute('data-pitch'), String(newPitch)));
-  assert.equal(view.container.querySelector('[data-replace="active"]'), null, 'replacement mode exits');
+  assert.ok(view.container.querySelector('[data-replace="active"]') === null, 'replacement mode exits');
+  assert.equal(view.container.querySelector('[data-settings-drawer]')?.getAttribute('data-suppressed'), 'false',
+    'the editor returns after replacement');
 
-  view.getByRole('button', {name: 'Replace pitch'}).click();
+  fireEvent.click(view.container.querySelector('[data-replace="start"]')!);
   await waitFor(() => assert.ok(view.container.querySelector('[data-replace="active"]')));
   const sameKey = view.container.querySelector(`.keyboard-white[data-pitch="${newPitch}"], .keyboard-black[data-pitch="${newPitch}"]`);
   assert.ok(sameKey);
@@ -157,23 +180,31 @@ test('Replace pitch commits once, Escape changes nothing and the same key is a n
 
 test('Add note places a ghost, commits with Insert, cancels with Escape and warns on duplicates', async () => {
   const view = await open();
+  openSettings(view, 'Editing');
   const total = () => Number(view.container.querySelector('.ws-roll-svg')?.getAttribute('data-total-notes'));
   const start = total();
   const toggle = () => view.container.querySelector('[data-add="toggle"]') as HTMLButtonElement;
 
   fireEvent.click(toggle());
   await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-add-layer')));
+  assert.equal(view.container.querySelector('[data-settings-drawer]')?.getAttribute('data-suppressed'), 'true',
+    'place mode hides the editor so the roll is usable');
+  assert.ok(view.container.querySelector('[data-add-mode-active="true"]'));
   fireEvent.pointerDown(view.container.querySelector('.ws-roll-add-layer')!, {clientX: 300, clientY: 120});
   await waitFor(() => assert.ok(view.container.querySelector('[data-ghost="true"]')));
-  fireEvent.click(view.getByRole('button', {name: 'Insert'}));
+  fireEvent.click(view.container.querySelector('[data-add="commit"]')!);
   await waitFor(() => assert.equal(total(), start + 1, 'Insert should add exactly one note'));
   await waitFor(() => assert.equal(toggle().getAttribute('aria-pressed'), 'false'));
+  assert.equal(view.container.querySelector('[data-settings-drawer]')?.getAttribute('data-suppressed'), 'false',
+    'the editor returns after insertion');
 
   fireEvent.click(toggle());
   await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-add-layer')));
   fireEvent.keyDown(window, {key: 'Escape'});
-  await waitFor(() => assert.equal(view.container.querySelector('[data-ghost="true"]'), null));
+  await waitFor(() => assert.ok(view.container.querySelector('[data-ghost="true"]') === null));
   await waitFor(() => assert.equal(toggle().getAttribute('aria-pressed'), 'false'));
+  assert.equal(view.container.querySelector('[data-settings-drawer]')?.getAttribute('data-suppressed'), 'false',
+    'Escape restores the editor after place mode');
   assert.equal(total(), start + 1, 'Escape must not insert');
 
   fireEvent.click(toggle());
@@ -183,7 +214,7 @@ test('Add note places a ghost, commits with Insert, cancels with Escape and warn
   const fy = Number(first.getAttribute('y')) + (Number(first.getAttribute('height')) + 1) / 2;
   fireEvent.pointerDown(view.container.querySelector('.ws-roll-add-layer')!, {clientX: fx, clientY: fy});
   await waitFor(() => assert.ok(view.container.querySelector('[data-ghost="true"]')));
-  fireEvent.click(view.getByRole('button', {name: 'Insert'}));
+  fireEvent.click(view.container.querySelector('[data-add="commit"]')!);
   await waitFor(() => assert.ok(view.getByText(/already starts here/i), 'duplicate placement must warn'));
-  assert.ok(view.getByRole('button', {name: 'Select existing'}));
+  assert.ok(view.container.querySelector('[data-select-existing]'));
 });

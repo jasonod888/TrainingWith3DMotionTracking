@@ -235,7 +235,7 @@ The score is one continuous horizontal grand-staff system with engraved measure 
 - A manual scroll turns Follow playback off and reveals a “Return to playhead” action. Both views continue showing their correct playhead, even if offscreen; show an edge indicator when useful.
 - Re-enabling Follow or pressing Return to playhead reveals the current position in both views.
 - Zoom is anchored at the playhead if visible, otherwise the centre of the current viewport. Keep that musical anchor stable during zoom.
-- The overview window represents the roll's visible seconds. Dragging it pans both views; clicking its background recentres the viewport without seeking playback.
+- The overview window represents the roll's visible seconds. Dragging it pans both views and seeks the source playback with them, preserving the playhead's position inside the window; clicking its background seeks exactly to the clicked source time and recentres the viewport.
 
 ### 7.3 Auto-follow
 

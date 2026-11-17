@@ -84,3 +84,10 @@
 }
 
 .lesson-subject-badge{display:inline-block;max-width:100%;padding:2px 7px;margin:3px 0;border-radius:6px;background:var(--surface-soft,#eef2e9);color:var(--text-muted,#46604e);font-size:11px;line-height:1.4;overflow-wrap:anywhere}
+
+/* Focused music-review route: no global feed chrome, one full-height workspace. */
+.feed-app.music-review-focus{height:100dvh;min-height:0;overflow:hidden;background:#f6f5f0}
+.feed-app.music-review-focus>.header{display:none}
+.app.feed-app.music-review-focus>main{margin:0;padding:0;max-width:none;height:100dvh;min-height:0;overflow:hidden}
+.feed-app.music-review-focus .operation-status{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:20;margin:0;padding:4px 10px;border-radius:999px;background:#fff;box-shadow:0 2px 8px #0002}
+@media(max-width:760px){.app.feed-app.music-review-focus>main{margin:0;padding:0;height:100dvh}}

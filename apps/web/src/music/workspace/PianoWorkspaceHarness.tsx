@@ -7,6 +7,9 @@
  * loads the same draft through the same API and writes nothing.
  */
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {
+  ArrowLeft, MoreHorizontal, Pause, Play, Redo2, Settings as SettingsIcon, Undo2, Video, Volume2, X,
+} from 'lucide-react';
 import {ApiError, assetUrl, getSession, request} from '../../api';
 import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
@@ -18,6 +21,10 @@ import {
 import {pitchName} from '../music-reference';
 import {buildTimelineLayout, clampScroll, heldPassageAt} from './timeline-layout';
 import {KeyboardEditor} from '../notation/KeyboardEditor';
+import {
+  clampStandardPianoWindow, FULL_PIANO_MIN_WIDTH, isStandardPianoRange,
+  narrowSemitonesForWidth, resolveKeyboardRange, STANDARD_PIANO_RANGE, type PianoRange,
+} from '../notation/piano-key-geometry';
 import {NotationAudio} from '../notation/notation-audio';
 import {usePianoSourcePlayer} from '../usePianoSourcePlayer';
 import {usePianoPreviewAsset} from '../usePianoPreviewAsset';
@@ -31,6 +38,7 @@ import {
 import type {Asset} from '../../../../../packages/lesson-schema/index';
 import {ClipOverview} from './ClipOverview';
 import {ContinuousScore} from './ContinuousScore';
+import {PianoWaterfall} from './PianoWaterfall';
 import {TimeRoll} from './TimeRoll';
 import {
   clampTimeWindow, DEFAULT_SPAN_SECONDS, layoutMeasures, zoomAround, type TimeWindow,
@@ -53,8 +61,10 @@ import {
   clearRecovery, peekRecovery, readRecovery, writeRecovery, type RecoveryCheckpoint, type RecoveryIdentity,
 } from './recovery';
 
-const DURATION_CHOICES = [
-  {label: 'Whole', ticks: 1920},
+/** Stable default order; a future layout descriptor may reorder these modules only. */
+const DEFAULT_STAGE_LAYOUT = ['instrument', 'roll', 'sheet'] as const;
+
+const DURATION_CHOICES = [  {label: 'Whole', ticks: 1920},
   {label: 'Half', ticks: 960},
   {label: 'Quarter', ticks: 480},
   {label: 'Eighth', ticks: 240},
@@ -83,6 +93,56 @@ function diffAgainst(baseline: NotationDocument, current: NotationDocument): Dif
   let added = 0;
   for (const id of after.keys()) if (!before.has(id)) added += 1;
   return {changed: changedIds.size, added, removed, total: after.size, changedIds};
+}
+
+function timeLabel(seconds: number): string {
+  const safe = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  return `${Math.floor(safe / 60)}:${String(Math.floor(safe % 60)).padStart(2, '0')}`;
+}
+
+/** Display-only title; the saved/source title is never rewritten. */
+function displayPieceTitle(raw: string): string {
+  const clean = raw.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!clean) return 'Piano review';
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+type CompactView = 'guide' | 'sheet';
+const COMPACT_VIEW_STORAGE = 'piano-review-compact-view-v1';
+
+function readCompactView(): CompactView {
+  try {
+    if (typeof globalThis.localStorage === 'undefined') return 'guide';
+    return globalThis.localStorage.getItem(COMPACT_VIEW_STORAGE) === 'sheet' ? 'sheet' : 'guide';
+  } catch {
+    return 'guide';
+  }
+}
+
+function writeCompactView(view: CompactView): void {
+  try {
+    globalThis.localStorage?.setItem(COMPACT_VIEW_STORAGE, view);
+  } catch { /* UI preference only */ }
+}
+
+/** Limited available height, not orientation alone. Safe when matchMedia is absent. */
+function useLimitedHeight(): boolean {
+  const query = () => typeof globalThis.window?.matchMedia === 'function'
+    ? globalThis.window.matchMedia('(max-height: 560px)') : null;
+  const [limited, setLimited] = useState(() => query()?.matches ?? false);
+  useEffect(() => {
+    const media = query();
+    if (!media) return;
+    const update = () => setLimited(media.matches);
+    update();
+    media.addEventListener?.('change', update);
+    media.addListener?.(update);
+    return () => {
+      media.removeEventListener?.('change', update);
+      media.removeListener?.(update);
+    };
+  }, []);
+  return limited;
 }
 
 function NumberField({label, value, min, max, step, disabled, onCommit}: {
@@ -166,6 +226,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const pianoRef = useRef<HTMLAudioElement>(null);
+  /** Latest render's "playback started" handler, used by the native media event. */
+  const playbackStart = useRef<() => void>(() => {});
   const audioRef = useRef<NotationAudio | null>(null);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
   const [previewIdentity, setPreviewIdentity] = useState('');
@@ -175,6 +237,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const preview = usePianoPreviewAsset(previewAsset);
   const [keyboardRef, keyboardWidth] = useElementWidth<HTMLDivElement>();
   const compactKeyboard = keyboardWidth > 0 && keyboardWidth < 720;
+  const tinyKeyboard = keyboardWidth > 0 && keyboardWidth < 520;
   const [rollReveal, setRollReveal] = useState<{occurrenceId: string; token: number} | null>(null);
   const [scoreReveal, setScoreReveal] = useState<{tick: number; token: number} | null>(null);
   const revealToken = useRef(0);
@@ -200,6 +263,27 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [savedRevisionId, setSavedRevisionId] = useState<string | null>(null);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [confirmReviewed, setConfirmReviewed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const limitedHeight = useLimitedHeight();
+  const [compactPreference, setCompactPreference] = useState<CompactView>(readCompactView);
+  const [drawerTarget, setDrawerTarget] = useState<'settings' | 'more' | 'video' | 'sound' | 'note'>('settings');
+  const [noteEditorExpanded, setNoteEditorExpanded] = useState(false);
+  const [noteAdvancedOpen, setNoteAdvancedOpen] = useState(false);
+  const [notePeekPosition, setNotePeekPosition] = useState<'top' | 'bottom'>('bottom');
+  const [settingsTab, setSettingsTab] = useState<'view' | 'editing' | 'lesson' | 'timing' | 'more'>('view');
+  const [pitchPickMode, setPitchPickMode] = useState<{occurrenceId: string; pitch: number} | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [saveAttempted, setSaveAttempted] = useState(false);
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const reviewRef = useRef<HTMLDivElement | null>(null);
+  const reviewTrigger = useRef<HTMLButtonElement | null>(null);
+  const noteRevealSelection = useRef<string | null>(null);
+  const drawerReturn = useRef<HTMLElement | null>(null);
+  const addMenuReturn = useRef<HTMLElement | null>(null);
+  const modeReturnFocus = useRef<HTMLElement | null>(null);
+  const modeWasActive = useRef(false);
+  const selectionReference = useRef<{occurrenceId: string; element: HTMLElement} | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -210,6 +294,23 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [staleCheckpoint, setStaleCheckpoint] = useState<RecoveryCheckpoint | null>(null);
   const [replaceMode, setReplaceMode] = useState<{occurrenceId: string; pitch: number} | null>(null);
   const [addMode, setAddMode] = useState<{seconds: number; pitch: number; ticks: number; durationSeconds: number} | null>(null);
+  const noteModeActive = Boolean(pitchPickMode || replaceMode);
+  const compactLayoutActive = limitedHeight && !addMode;
+  const compactPlaceLayout = limitedHeight && Boolean(addMode);
+  const stageView = compactPlaceLayout ? 'place' : compactLayoutActive ? compactPreference : 'regular';
+  const rollVisible = rollOpen || (limitedHeight && Boolean(addMode));
+  const compactPlaceNotice = useRef(false);
+  const chooseCompactView = useCallback((view: CompactView) => {
+    setCompactPreference(view);
+    writeCompactView(view);
+  }, []);
+  useEffect(() => {
+    if (limitedHeight && addMode && !compactPlaceNotice.current) {
+      compactPlaceNotice.current = true;
+      setNotice('Editing roll opened temporarily for placement. It will close after Insert or Cancel.');
+    }
+    if (!addMode) compactPlaceNotice.current = false;
+  }, [addMode, limitedHeight]);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [overlap, setOverlap] = useState<{pitch: number; ids: string[]} | null>(null);
   const lastWrittenTicks = useRef(480);
@@ -229,11 +330,199 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     return () => media.removeEventListener('change', update);
   }, []);
 
+  const openDrawer = useCallback((target: typeof drawerTarget, tab?: typeof settingsTab) => {
+    drawerReturn.current = globalThis.document.activeElement as HTMLElement | null;
+    modeWasActive.current = false;
+    modeReturnFocus.current = null;
+    setReplaceMode(null);
+    setAddMode(null);
+    setDuplicateId(null);
+    setDrawerTarget(target);
+    setDrawerOpen(true);
+    if (target === 'settings') setSettingsTab(tab ?? 'view');
+    setAddMenuOpen(false);
+    setReviewOpen(false);
+    setPitchPickMode(null);
+  }, []);
+
+  const openAddMenu = useCallback(() => {
+    addMenuReturn.current = globalThis.document.activeElement as HTMLElement | null;
+    modeWasActive.current = false;
+    modeReturnFocus.current = null;
+    setReplaceMode(null);
+    setAddMode(null);
+    setDuplicateId(null);
+    setAddMenuOpen(true);
+    setDrawerOpen(false);
+    setReviewOpen(false);
+    setPitchPickMode(null);
+  }, []);
+
+  useEffect(() => {
+    if (noteModeActive) {
+      modeWasActive.current = true;
+      return;
+    }
+    if (!modeWasActive.current) return;
+    modeWasActive.current = false;
+    const target = modeReturnFocus.current;
+    modeReturnFocus.current = null;
+    target?.focus?.();
+  }, [noteModeActive]);
+
+  useEffect(() => {
+    if (drawerOpen) return;
+    const target = drawerReturn.current;
+    drawerReturn.current = null;
+    target?.focus?.();
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    if (addMenuOpen) return;
+    const target = addMenuReturn.current;
+    addMenuReturn.current = null;
+    target?.focus?.();
+  }, [addMenuOpen]);
+
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setAddMenuOpen(false); };
+    globalThis.window.addEventListener('keydown', onKey);
+    return () => globalThis.window.removeEventListener('keydown', onKey);
+  }, [addMenuOpen]);
+
+  useEffect(() => {
+    if (!reviewOpen) return;
+    const previous = globalThis.document.activeElement as HTMLElement | null;
+    const dialog = reviewRef.current;
+    dialog?.querySelector<HTMLElement>('[data-review-focus="true"]')?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setReviewOpen(false); return; }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && globalThis.document.activeElement === first) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && globalThis.document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    globalThis.window.addEventListener('keydown', onKey, true);
+    return () => {
+      globalThis.window.removeEventListener('keydown', onKey, true);
+      (previous ?? reviewTrigger.current)?.focus?.();
+    };
+  }, [reviewOpen]);
+
+  useEffect(() => {
+    if (!reviewOpen || !saveAttempted) return;
+    if (saveMessage || saveError || saveConflict) {
+      setReviewOpen(false);
+      setSaveAttempted(false);
+    }
+  }, [reviewOpen, saveAttempted, saveMessage, saveError, saveConflict]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const section = drawerRef.current?.querySelector<HTMLElement>(`[data-ws-section="${drawerTarget}"]`);
+    section?.scrollIntoView?.({block: 'start'});
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      // A mode owns Escape before the surrounding inspector does.
+      if (pitchPickMode) {
+        setPitchPickMode(null);
+        setNotice('Pitch selection cancelled.');
+        return;
+      }
+      if (replaceMode) {
+        setReplaceMode(null);
+        setNotice('Replacement cancelled.');
+        return;
+      }
+      if (addMode) {
+        setAddMode(null);
+        setDuplicateId(null);
+        setNotice('Add note cancelled.');
+        return;
+      }
+      setDrawerOpen(false);
+    };
+    globalThis.window.addEventListener('keydown', onKey);
+    return () => globalThis.window.removeEventListener('keydown', onKey);
+  }, [drawerOpen, drawerTarget, pitchPickMode, replaceMode, addMode]);
+
+  useEffect(() => {
+    const occurrenceId = state?.selection?.occurrenceId ?? null;
+    if (!drawerOpen || drawerTarget !== 'note' || !occurrenceId || noteEditorExpanded) return;
+    const update = () => {
+      const candidates = [...globalThis.document.querySelectorAll<HTMLElement>(
+        '.ws-roll-note[data-occurrence], .ws-score-notehead[data-occurrence]')]
+        .filter(element => element.getAttribute('data-occurrence') === occurrenceId);
+      const referenced = selectionReference.current?.occurrenceId === occurrenceId
+        ? selectionReference.current.element : null;
+      const score = candidates.find(element => element.classList.contains('ws-score-notehead'));
+      const ordered = referenced ? [referenced, ...candidates.filter(item => item !== referenced)]
+        : [...(score ? [score] : []), ...candidates.filter(item => item !== score)];
+      const rect = ordered.map(element => element.getBoundingClientRect?.())
+        .find(item => item && item.width > 0 && item.height > 0);
+      if (rect) setNotePeekPosition(notePeekPositionFor(rect, globalThis.window.innerHeight));
+    };
+    update();
+    globalThis.window.addEventListener('resize', update);
+    return () => globalThis.window.removeEventListener('resize', update);
+  }, [drawerOpen, drawerTarget, state?.selection?.occurrenceId, noteEditorExpanded, rollOpen,
+    sharedScrollLeft, sharedWidth]);
+
   const dispatch = useCallback((action: WorkspaceAction) => {
     setState(previous => (previous ? workspaceReducer(previous, action) : previous));
   }, []);
 
   const document = state?.document ?? null;
+  const keyboardPitches = useMemo(
+    () => document ? document.performance.map(note => note.pitch) : [],
+    [document],
+  );
+  const [narrowFirst, setNarrowFirst] = useState<number | null>(null);
+  const previousNarrowWindow = useRef<number | null>(null);
+  const fullPiano = keyboardWidth >= FULL_PIANO_MIN_WIDTH;
+  const narrowWindow = narrowSemitonesForWidth(keyboardWidth);
+  const fallbackNarrow = clampStandardPianoWindow(
+    resolveKeyboardRange(keyboardPitches, keyboardWidth, 0, narrowWindow).firstPitch,
+    narrowWindow,
+  );
+  useEffect(() => {
+    if (!document || keyboardWidth <= 0) return;
+    if (fullPiano) {
+      previousNarrowWindow.current = null;
+      return;
+    }
+    setNarrowFirst(current => {
+      let next = current;
+      if (next === null) {
+        next = fallbackNarrow.firstPitch;
+      } else if (previousNarrowWindow.current !== null && previousNarrowWindow.current !== narrowWindow) {
+        next += Math.round((previousNarrowWindow.current - narrowWindow) / 2);
+      }
+      return clampStandardPianoWindow(next, narrowWindow).firstPitch;
+    });
+    previousNarrowWindow.current = narrowWindow;
+  }, [document, keyboardPitches, keyboardWidth, fullPiano, narrowWindow, fallbackNarrow.firstPitch]);
+  const keyboardRange: PianoRange | null = fullPiano
+    ? STANDARD_PIANO_RANGE
+    : keyboardWidth > 0
+      ? {firstPitch: narrowFirst ?? fallbackNarrow.firstPitch, semitones: narrowWindow}
+      : null;
+  const handleKeyboardRangeChange = useCallback((next: PianoRange) => {
+    setNarrowFirst(clampStandardPianoWindow(next.firstPitch, next.semitones).firstPitch);
+  }, []);
+  const keyboardRangeLabel = keyboardRange
+    ? isStandardPianoRange(keyboardRange)
+      ? 'A0–C8 · 88 keys'
+      : `A0–C8 · ${pitchName(keyboardRange.firstPitch)}–${pitchName(keyboardRange.firstPitch + keyboardRange.semitones)}`
+    : '';
   const timelineLayout = useMemo(() => document ? buildTimelineLayout(document, zoomFactor) : null, [document, zoomFactor]);
   const timelineWidth = timelineLayout ? timelineLayout.contentWidth : 0;
   const documentRef = useRef<NotationDocument | null>(null);
@@ -373,13 +662,55 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const select = useCallback((occurrenceId: string | null) => {
     setNotice('');
     dispatch({type: 'select', occurrenceId});
-    if (!occurrenceId) return;
+    if (!occurrenceId) {
+      selectionReference.current = null;
+      setDrawerOpen(false);
+      setPitchPickMode(null);
+      return;
+    }
     videoRef.current?.pause();
     // Clicking a note seeks to its exact effective onset, never a score approximation.
     const note = state?.document.performance.find(item => item.id === occurrenceId);
     if (note) seek(note.onset + offsetSeconds);
     requestReveal(occurrenceId);
-  }, [dispatch, offsetSeconds, requestReveal, seek, state?.document]);
+    // A stable overlay: opening it does not resize the stage under an active drag.
+    const candidates = [...globalThis.document.querySelectorAll<HTMLElement>(
+      '.ws-roll-note[data-occurrence], .ws-score-notehead[data-occurrence]')]
+      .filter(element => element.getAttribute('data-occurrence') === occurrenceId);
+    const referenced = selectionReference.current?.occurrenceId === occurrenceId
+      ? selectionReference.current.element : null;
+    const score = candidates.find(element => element.classList.contains('ws-score-notehead'));
+    const ordered = referenced ? [referenced, ...candidates.filter(item => item !== referenced)]
+      : [...(score ? [score] : []), ...candidates.filter(item => item !== score)];
+    const selectedElement = ordered.find(element => {
+      const rect = element.getBoundingClientRect?.();
+      return Boolean(rect && rect.width > 0 && rect.height > 0);
+    }) ?? ordered[0] ?? null;
+    drawerReturn.current = selectedElement;
+    const rect = selectedElement?.getBoundingClientRect?.();
+    setNotePeekPosition(notePeekPositionFor(rect, globalThis.window.innerHeight));
+    setDrawerTarget('note');
+    setDrawerOpen(true);
+    setNoteEditorExpanded(current => {
+      const sameOpenNote = drawerOpen && drawerTarget === 'note'
+        && state?.selection?.occurrenceId === occurrenceId;
+      return sameOpenNote ? current : false;
+    });
+    setNoteAdvancedOpen(current => {
+      const sameOpenNote = drawerOpen && drawerTarget === 'note'
+        && state?.selection?.occurrenceId === occurrenceId;
+      return sameOpenNote ? current : false;
+    });
+    setAddMenuOpen(false);
+    setReviewOpen(false);
+    setPitchPickMode(null);
+    setReplaceMode(null);
+    setAddMode(null);
+    setDuplicateId(null);
+    modeWasActive.current = false;
+    modeReturnFocus.current = null;
+  }, [dispatch, offsetSeconds, requestReveal, seek, state?.document, drawerOpen, drawerTarget,
+    state?.selection?.occurrenceId]);
 
   const applyGestureEdit = useCallback((edit: GestureEdit) => {
     if (scoreModeRef.current === 'formatted') return;
@@ -498,6 +829,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   const selection = state?.selection ?? null;
   const selected = selection && document ? noteFacts(document, selection) : null;
+  const editorSuppressed = Boolean(pitchPickMode || replaceMode || addMode);
   useEffect(() => {
     const inside = (target: EventTarget | null) => {
       const root = shellRef.current;
@@ -999,6 +1331,50 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     }
   }, [timelineLayout, alignment, sharedWidth, sharedScrollLeft, commitSharedScroll]);
 
+  // Open the contextual note editor after selection and reveal the note outside the
+  // narrow editor overlay. A roll drag keeps its geometry until the gesture ends.
+  useEffect(() => {
+    if (!selectionOccurrence) {
+      noteRevealSelection.current = null;
+      return;
+    }
+    if (gestureLock) return;
+    if (noteRevealSelection.current === selectionOccurrence) return;
+    noteRevealSelection.current = selectionOccurrence;
+    if (!timelineLayout || !alignment || !document) return;
+    const occurrence = document.performance.find(item => item.id === selectionOccurrence);
+    if (!occurrence) return;
+    const W = sharedBarRef.current?.clientWidth || sharedWidth;
+    if (W <= 0) return;
+    const x = 116 + timelineLayout.sourceSecondsToX(occurrence.onset + offsetSeconds, alignment, 0);
+    const reserve = W > 760 ? 354 : 0;
+    if (x < sharedScrollLeft + 70) commitSharedScroll(x - 70);
+    else if (x > sharedScrollLeft + W - reserve - 20) commitSharedScroll(x - (W - reserve - 20));
+  }, [selectionOccurrence, gestureLock, timelineLayout, alignment, document,
+    offsetSeconds, sharedWidth, sharedScrollLeft, commitSharedScroll]);
+
+  /**
+   * A real playback start (workspace transport, native controls or their keyboard
+   * activation) clears the temporary manual-inspection suspension. Follow is only
+   * resumed when the user's Follow preference is on; an explicit off stays off.
+   */
+  const handlePlaybackStart = useCallback(() => {
+    setFollowSuspended(false);
+    // An active note-edit transaction owns the horizontal geometry.
+    if (gestureLock || !follow) return;
+    const media = videoRef.current;
+    revealSource(media && Number.isFinite(media.currentTime) ? media.currentTime : playhead);
+  }, [follow, gestureLock, revealSource, playhead]);
+  playbackStart.current = handlePlaybackStart;
+
+  useEffect(() => {
+    const media = videoRef.current;
+    if (!media) return;
+    const onPlay = () => playbackStart.current();
+    media.addEventListener('play', onPlay);
+    return () => media.removeEventListener('play', onPlay);
+  }, [videoUrl]);
+
   useEffect(() => {
     if (seekToken === lastSeekToken.current) return;
     lastSeekToken.current = seekToken;
@@ -1050,17 +1426,58 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const toggleTransport = useCallback(() => {
     const media = videoRef.current;
     if (!media) return;
-    if (media.paused) {
-      if (follow && !followSuspended) revealSource(playhead);
-      void media.play().catch(() => setNotice('The video could not start.'));
-    } else media.pause();
-  }, [follow, followSuspended, revealSource, playhead]);
+    // Playback start itself (the media `play` event) clears temporary suspension and
+    // reveals the playhead, so native and keyboard-started playback share this path.
+    if (media.paused) void media.play().catch(() => setNotice('The video could not start.'));
+    else media.pause();
+  }, []);
 
   const changeRate = useCallback((value: number) => {
     setRate(value);
     const media = videoRef.current;
     if (media) media.playbackRate = value;
   }, []);
+
+  // Space is a workspace transport shortcut, not a global page shortcut. It uses the
+  // same toggleTransport path and media.paused state; interactive targets keep Space.
+  useEffect(() => {
+    const interactive = (node: Element | null): boolean => {
+      if (!node) return false;
+      return Boolean(node.closest(
+        'button, a, input, textarea, select, summary, video, audio, [contenteditable]:not([contenteditable="false"]),'
+        + ' [role="button"], [role="slider"], [role="checkbox"], [role="switch"], [role="menuitem"],'
+        + ' [role="option"], [role="link"], [role="textbox"], [role="combobox"], [role="spinbutton"]',
+      ));
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' && event.key !== ' ') return;
+      if (event.repeat || event.defaultPrevented || event.ctrlKey || event.metaKey
+        || event.altKey || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+      const shell = shellRef.current;
+      if (!shell?.isConnected || !videoRef.current) return;
+      if (shell.hidden || shell.getAttribute('aria-hidden') === 'true'
+        || shell.closest('[hidden], [inert], [aria-hidden="true"]')) return;
+      const style = shell.ownerDocument.defaultView?.getComputedStyle(shell);
+      if (style?.display === 'none' || style?.visibility === 'hidden') return;
+      if (typeof (shell as unknown as {checkVisibility?: () => boolean}).checkVisibility === 'function'
+        && !(shell as unknown as {checkVisibility: () => boolean}).checkVisibility()) return;
+      if (reviewOpen || addMenuOpen || overlap) return;
+      if (globalThis.document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      const target = event.target as Element | null;
+      const active = globalThis.document.activeElement as Element | null;
+      const inside = (node: Element | null) => Boolean(node && shell.contains(node));
+      const bare = (node: Element | null) => node === null
+        || node === globalThis.document.body || node === globalThis.document.documentElement;
+      if (!inside(target) && !bare(target)) return;
+      if (!inside(active) && !bare(active)) return;
+      if (interactive(typeof target?.closest === 'function' ? target : null)
+        || interactive(typeof active?.closest === 'function' ? active : null)) return;
+      event.preventDefault();
+      toggleTransport();
+    };
+    globalThis.window.addEventListener('keydown', onKeyDown);
+    return () => globalThis.window.removeEventListener('keydown', onKeyDown);
+  }, [addMenuOpen, overlap, reviewOpen, toggleTransport]);
 
   // One frame-driven follow writer: stationary cursor until the safe-area threshold,
   // then content advances beneath it. No smooth-scroll timer races the clock.
@@ -1374,157 +1791,121 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     URL.revokeObjectURL(url);
   };
 
-  return <main className="ws-shell" ref={shellRef} data-workspace-dirty={dirty ? 'true' : 'false'}
+  const headerStatus = readOnly ? 'Read-only lesson'
+    : saveMessage ? 'Saved'
+    : dirty ? 'Unsaved changes · private draft'
+    : savedRevisionId ? 'Saved' : 'Private draft';
+  const headerStatusDetail = saveMessage || saveError || reopenMessage || notice
+    || (readOnly ? interactionPolicy.reason : workspaceStatus(state));
+  const addModePanel = addMode ? <section className={`ws-add-panel ws-add-mode-panel${stageView === 'place' ? ' ws-add-place-panel' : ''}`}
+    data-add="active" data-add-mode-active="true" role="group" aria-label="Add note mode">
+    <p>New {pitchName(addMode.pitch)} at {addMode.seconds.toFixed(3)} s (recorded) · written {addMode.ticks} ticks ·
+      click the roll to place it.</p>
+    <div className="ws-row">
+      <label className="ws-field ws-inline"><span>Recorded length (s)</span>
+        <input type="number" step={0.01} min={0.02} max={document?.duration ?? 0} data-add="length"
+          value={addMode.durationSeconds}
+          onChange={event => setAddMode(mode => mode ? {...mode,
+            durationSeconds: Math.max(0.02, Number(event.target.value) || 0.02)} : mode)}/>
+      </label>
+      <label className="ws-field ws-inline"><span>Written value</span>
+        <select data-add="written" value={addMode.ticks}
+          onChange={event => setAddMode(mode => mode ? {...mode, ticks: Number(event.target.value)} : mode)}>
+          {DURATION_CHOICES.map(choice => <option key={choice.ticks} value={choice.ticks}>{choice.label}</option>)}
+        </select>
+      </label>
+      <button type="button" data-add="commit" aria-label="Insert" onClick={commitAdd}>Insert</button>
+      <button type="button" data-add="cancel"
+        onClick={() => { setAddMode(null); setDuplicateId(null); setNotice('Add note cancelled.'); }}>Cancel</button>
+    </div>
+    {addProblem && <p className="ws-report is-bad" data-add="invalid">{addProblem}</p>}
+    {ghostDuplicate && <p className="ws-report is-bad" data-add="duplicate">
+      A {pitchName(addMode.pitch)} already starts here.
+      <button type="button" data-select-existing aria-label="Select existing"
+        onClick={() => { if (ghostDuplicateId) select(ghostDuplicateId); setAddMode(null); }}>Select existing</button>
+    </p>}
+  </section> : null;
+
+  return <main className="ws-shell ws-shell-focused" ref={shellRef} data-workspace-dirty={dirty ? 'true' : 'false'}
     data-interactive-mode={interactionPolicy.mode}
     style={{overflowX: 'clip', maxWidth: '100vw', contain: 'paint'}}
-    onPointerDownCapture={() => { workspaceActive.current = true; }}>
-    <header className="ws-head">
-      {readOnly ? <div className="inline-notice" role="status" data-read-only="true">
-        <strong>Read-only:</strong> {interactionPolicy.reason}
-        <button type="button" onClick={downloadReference}>Download reference</button>
-      </div> : null}
-      <div>
-        <p className="ws-eyebrow">{embedded ? 'Piano review · private until you save' : 'Correction workspace · local preview'}</p>
-        <div className="ws-title-row">
-          {onBack && <button type="button" className="ws-back" data-workspace-back="true"
-            onClick={() => {
-              if (dirty && !globalThis.window.confirm('Leave without saving your changes?')) return;
-              onBack();
-            }}>← Back</button>}
-          <h1>{title || 'Piano correction workspace'}</h1>
+    onPointerDownCapture={event => {
+      workspaceActive.current = true;
+      const target = (event.target as Element | null)?.closest?.('[data-occurrence]') as HTMLElement | null;
+      const occurrenceId = target?.getAttribute('data-occurrence');
+      if (target && occurrenceId) selectionReference.current = {occurrenceId, element: target};
+    }}>
+    <header className="ws-topbar">
+      <div className="ws-topbar-lead">
+        {onBack && <button type="button" className="ws-icon-button ws-back" data-workspace-back="true"
+          aria-label="Back" title="Back"
+          onClick={() => {
+            if (dirty && !globalThis.window.confirm('Leave without saving your changes?')) return;
+            onBack();
+          }}><ArrowLeft size={19}/></button>}
+        <div className="ws-title-block">
+          <h1>{displayPieceTitle(title)}</h1>
+          <p className="ws-topbar-status" data-save-status={dirty ? 'dirty' : 'clean'}
+            title={headerStatusDetail}>{headerStatus}</p>
         </div>
-        <p className="ws-sub">
-          {document.performance.length} notes · {document.events.length} events · {document.measures.length} measures ·{' '}
-          {document.tempo.bpm} BPM (estimated). Select one note in the roll, the score or the keyboard.
-        </p>
       </div>
-      <div className="ws-status">
-        <strong>{workspaceStatus(state)}</strong>
-        {diff && <span>{diff.changed} changed · {diff.added} added · {diff.removed} removed · {diff.total} total</span>}
-        <span>{selection ? `Selected ${selection.occurrenceId}` : 'Nothing selected'}</span>
+      <div className="ws-topbar-actions">
+        {scoreMode === 'formatted' && <button type="button" className="ws-quiet-button"
+          onClick={() => setScoreMode('correction')}>Return to correction</button>}
+        <button type="button" className="ws-icon-button ws-undo" aria-label="Undo" title="Undo"
+          onClick={() => dispatch({type: 'undo'})}
+          disabled={readOnly || !state.past.length || Boolean(replaceMode) || Boolean(addMode)}><Undo2 size={19}/></button>
+        <button type="button" className="ws-icon-button ws-redo" aria-label="Redo" title="Redo"
+          onClick={() => dispatch({type: 'redo'})}
+          disabled={readOnly || !state.future.length || Boolean(replaceMode) || Boolean(addMode)}><Redo2 size={19}/></button>
+        <button type="button" className="ws-icon-button" aria-label="Settings" title="Settings"
+          aria-expanded={drawerOpen && drawerTarget === 'settings'} data-settings-toggle="true"
+          onClick={() => openDrawer('settings')}><SettingsIcon size={19}/></button>
+        <button type="button" className="ws-icon-button ws-more" aria-label="More" title="More"
+          aria-expanded={drawerOpen && drawerTarget === 'more'} data-more-toggle="true"
+          onClick={() => openDrawer('more')}><MoreHorizontal size={19}/></button>
+        {!readOnly && <button ref={reviewTrigger} type="button" className="ws-save"
+          onClick={() => {
+            setReviewOpen(true); setDrawerOpen(false); setAddMenuOpen(false);
+            setPitchPickMode(null); setReplaceMode(null); setAddMode(null); setDuplicateId(null);
+            modeWasActive.current = false; modeReturnFocus.current = null;
+          }}
+          disabled={saving || !(dirty || savedRevisionId === null)}
+          data-review-save="true" aria-label="Review and save" title="Review and save">
+          {saving ? 'Saving…' : 'Save'}
+        </button>}
       </div>
     </header>
 
-    <div className="ws-toolbar" data-score-mode={scoreMode}>
-      <button type="button" data-formatted-toggle="true"
-        aria-pressed={scoreMode === 'formatted'}
-        onClick={() => {
-          setAddMode(null); setReplaceMode(null); setDuplicateId(null);
-          setScoreMode(mode => mode === 'formatted' ? 'correction' : 'formatted');
-        }}>
-        {scoreMode === 'formatted' ? 'Return to correction' : 'Formatted score'}
-      </button>
-      <button type="button" onClick={downloadMusicXml}>MusicXML</button>
-      {scoreMode === 'formatted' ? <span className="ws-hint">Read-only formatted preview · edits and selection are preserved.</span> : null}
-    </div>
+    {(readOnly || saveMessage || saveError || saveConflict || reopenMessage || report || notice
+      || verification?.stale || verification?.report_error || verification?.conflicts.length) &&
+      <div className="ws-notice-strip">
+        {readOnly ? <div className="inline-notice" role="status" data-read-only="true">
+          <strong>Read-only:</strong> {interactionPolicy.reason}
+          <button type="button" onClick={downloadReference}>Download reference</button>
+        </div> : null}
+        {saveMessage && <span className="ws-report" data-save-state="saved">{saveMessage}</span>}
+        {saveError && <span className="ws-report is-bad" data-save-state="error">{saveError}</span>}
+        {saveConflict && <span className="ws-report" data-save-state="conflict" data-conflict={conflictKind}>
+          {conflictKind !== 'verification' &&
+            <button type="button" onClick={saveOnLatestRevision}>Save on latest revision</button>}
+          <button type="button" onClick={reopen}>Reload saved revision</button>
+        </span>}
+        {reopenMessage && <span className="ws-report" data-reopen-state="message">{reopenMessage}</span>}
+        {report && <span className={report.status === 'rejected' ? 'ws-report is-bad' : 'ws-report'}>
+          {report.status === 'rejected' ? report.message : report.label}
+        </span>}
+        {notice && <span className="ws-report">{notice}</span>}
+        {(verification?.stale || verification?.report_error || verification?.conflicts.length) &&
+          <span className="ws-report is-bad" data-verification-notice="true">
+            Verification needs attention.
+            <button type="button" onClick={() => openDrawer('settings', 'lesson')}>Review issues</button>
+          </span>}
+      </div>}
 
     {scoreMode === 'formatted' ? <FormattedScore document={document} title={title}
       selectedOccurrenceId={selection?.occurrenceId ?? null}/> : null}
     <div className="ws-correction" hidden={scoreMode === 'formatted'}>
-    <div className="ws-toolbar">
-      <button type="button" onClick={toggleTransport}>{playing ? 'Pause' : 'Play'}</button>
-      <label className="ws-field ws-inline">
-        <span>Rate</span>
-        <select value={rate} onChange={event => changeRate(Number(event.target.value))}>
-          {[0.5, 0.75, 1].map(value => <option key={value} value={value}>{value}×</option>)}
-        </select>
-      </label>
-      <label className="ws-field ws-inline">
-        <span><input type="checkbox" checked={follow}
-          onChange={event => { setFollow(event.target.checked); if (event.target.checked) { setFollowSuspended(false); revealSource(playhead); } }}/> Follow playback</span>
-      </label>
-      <button type="button" onClick={returnToPlayhead}>{followSuspended ? 'Resume follow' : follow ? 'Return to playhead' : 'Enable follow'}</button>
-      {followSuspended && <span className="ws-hint" data-follow-suspended="true">Follow suspended · manual inspection</span>}
-      {(() => {
-        if (!timelineLayout || !alignment || sharedWidth <= 0) return null;
-        const p = 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0);
-        const direction = p < sharedScrollLeft ? 'left' : p > sharedScrollLeft + sharedWidth ? 'right' : 'visible';
-        if (direction === 'visible') return null;
-        return <span className="ws-hint" data-follow-direction={direction}>
-          {playing ? (direction === 'right' ? 'Playing to the right →' : '← Playing to the left')
-            : (direction === 'right' ? 'Playhead to the right →' : '← Playhead to the left')}
-        </span>;
-      })()}
-      <label className="ws-field ws-inline">
-        <span><input type="checkbox" aria-label="Confirm reviewed" checked={confirmReviewed}
-          onChange={event => setConfirmReviewed(event.target.checked)}/> Reviewed</span>
-      </label>
-      <button type="button" onClick={() => save()} disabled={readOnly || !confirmReviewed || saving || !(dirty || savedRevisionId === null)}
-        data-save-button="true">{saving ? 'Saving…' : 'Save privately'}</button>
-      <button type="button" onClick={reopen} disabled={Boolean(replaceMode) || Boolean(addMode)}>Reopen saved</button>
-
-      <button type="button" onClick={() => dispatch({type: 'undo'})} disabled={readOnly || !state.past.length || Boolean(replaceMode) || Boolean(addMode)}>Undo</button>
-      <button type="button" onClick={() => dispatch({type: 'redo'})} disabled={readOnly || !state.future.length || Boolean(replaceMode) || Boolean(addMode)}>Redo</button>
-      <label className="ws-field ws-inline">
-        <span>Snap</span>
-        <select value={snapTicks} onChange={event => setSnapTicks(Number(event.target.value))}>
-          {SNAP_CHOICES.map(choice => <option key={choice.label} value={choice.ticks}>{choice.label}</option>)}
-        </select>
-      </label>
-      <label className="ws-field ws-inline">
-        <span>Offset</span>
-        <input type="number" step={0.01} min={-10} max={10} value={offsetSeconds} style={{width: 72}}
-          disabled={readOnly}
-          aria-label="Sync offset in seconds"
-          onChange={event => { if (readOnlyRef.current) return; setOffsetSeconds(Math.max(-10, Math.min(10, Number(event.target.value) || 0))); }}/>
-        <span className="ws-hint">s · preview alignment</span>
-      </label>
-      <div className="ws-zoom" role="group" aria-label="Zoom">
-        <button type="button" onClick={() => zoom(1.25)} aria-label="Zoom out">−</button>
-        <span className="ws-window-label" data-window-span={(() => {
-          if (!timelineLayout || !alignment || sharedWidth <= 0) return window.span.toFixed(2);
-          const from = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0);
-          const to = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116 + sharedWidth), alignment, 0);
-          return Math.max(0.01, to - from).toFixed(2);
-        })()} data-shared-zoom={zoomFactor.toFixed(3)}>
-          {(() => {
-            if (!timelineLayout || !alignment || sharedWidth <= 0) {
-              return `${window.span.toFixed(window.span < 10 ? 1 : 0)} s visible · from ${window.start.toFixed(1)} s`;
-            }
-            const from = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0);
-            const to = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116 + sharedWidth), alignment, 0);
-            return `${Math.max(0, to - from).toFixed(Math.max(0, to - from) < 10 ? 1 : 0)} s visible · from ${from.toFixed(1)} s`;
-          })()}
-        </span>
-        <button type="button" onClick={() => zoom(0.8)} aria-label="Zoom in">+</button>
-      </div>
-      {alignment && heldPassageAt(alignment, playhead) ? <span className="ws-hint" data-held-passage="true">
-        Explanation · score paused
-      </span> : null}
-      {alignment && timelineLayout && (playhead < tickToEffectiveSeconds(alignment, 0, 0)
-        || playhead > tickToEffectiveSeconds(alignment, timelineLayout.totalTicks, 0)) ? <span className="ws-hint" data-outside-score="true">
-        Outside scored passage
-      </span> : null}
-      <span className="ws-time">{livePlayhead.toFixed(2)} s / {document.duration.toFixed(2)} s</span>
-      <label className="ws-field ws-inline">
-        <span>{spans.length ? 'Source clock' : 'Position'}</span>
-        <input type="range" min={0} max={document.duration} step={0.01} value={playhead}
-          aria-label={embedded ? 'Source clock position' : 'Fixture clock'}
-          onChange={event => {
-            const value = Number(event.target.value);
-            if (videoUrl && videoRef.current) { seek(value); return; }
-            setPlayhead(value); clockRef.current.set(value); setPlaying(false);
-          }}/>
-      </label>
-      <span className="ws-alignment" data-alignment-mode={alignment?.mode ?? 'none'} data-playhead-tick={playheadTick ?? ''}
-        data-ticks-per-second={alignment ? Math.round((1 / secondsPerTick) * 1000) / 1000 : ''}>
-        {alignment?.mode === 'anchored' ? 'Score alignment anchored' : 'Score alignment estimated'}
-        {spans.length > 1 ? ` · ${spans.filter(span => span.kind === 'explanation').length} explanation passage(s)` : ''}
-      </span>
-      {saveMessage && <span className="ws-report" data-save-state="saved">{saveMessage}</span>}
-      {saveError && <span className="ws-report is-bad" data-save-state="error">{saveError}</span>}
-      {saveConflict && <span className="ws-report" data-save-state="conflict" data-conflict={conflictKind}>
-        {conflictKind !== 'verification' &&
-          <button type="button" onClick={saveOnLatestRevision}>Save on latest revision</button>}
-        <button type="button" onClick={reopen}>Reload saved revision</button>
-      </span>}
-      {reopenMessage && <span className="ws-report" data-reopen-state="message">{reopenMessage}</span>}
-      {report && <span className={report.status === 'rejected' ? 'ws-report is-bad' : 'ws-report'}>
-        {report.status === 'rejected' ? report.message : report.label}
-      </span>}
-      {notice && <span className="ws-report">{notice}</span>}
-    </div>
-
     {recoveryOffer && <section className="ws-panel" role="status" aria-label="Local recovery" data-recovery="offer">
       <p>A local checkpoint from {new Date(recoveryOffer.savedAt).toLocaleString()} is available.
         It is <strong>not saved to the server</strong>.</p>
@@ -1543,162 +1924,65 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       </div>
     </section>}
 
-    <details className="ws-panel" data-lesson-settings="true">
-      <summary>Lesson settings, teaching sections and assessment</summary>
-      <fieldset disabled={readOnly} style={{border: 0, padding: 0, margin: 0, minWidth: 0}}>
-      <h2>Teaching sections</h2>
-      <div className="ws-row">
-        <button type="button" data-section-add onClick={() => {
-          if (readOnlyRef.current) return;
-          setSectionsDraft(current => {
-            const last = current[current.length - 1] ?? {id: 'whole', label: 'Whole lesson', start: 0, end: document.duration};
-            const sequence = current.length ? current : [last];
-            const middle = (last.start + last.end) / 2;
-            return [...sequence.slice(0, -1), {...last, end: middle},
-              {id: `section-${sequence.length + 1}`, label: `Section ${sequence.length + 1}`, start: middle, end: last.end}];
-          });
-          setConfirmReviewed(false);
-        }}>Add section</button>
-      </div>
-      {sectionsDraft.map((section, index) => <fieldset key={section.id} data-section={section.id} disabled={readOnly}>
-        <legend>Section {index + 1}</legend>
-        <label className="ws-field"><span>Name</span>
-          <input value={section.label} maxLength={80} onChange={event => {
-            const label = event.target.value;
-            setSectionsDraft(current => current.map((item, position) => position === index ? {...item, label} : item));
-            setConfirmReviewed(false);
-          }}/></label>
-        <div className="ws-row">
-          <label className="ws-field ws-inline"><span>Start (s)</span>
-            <input type="number" step={0.01} min={0} max={section.end - 0.05} value={section.start}
-              onChange={event => {
-                const raw = Number(event.target.value);
-                const floor = index === 0 ? 0 : (sectionsDraft[index - 1]?.start ?? 0) + 0.05;
-                const start = index === 0 ? 0 : Math.max(floor, Math.min(section.end - 0.05, raw));
-                setSectionsDraft(current => current.map((item, position) => {
-                  if (position === index) return {...item, start};
-                  // Shared boundary: the previous section ends where this one starts.
-                  if (position === index - 1) return {...item, end: start};
-                  return item;
-                }));
-                setConfirmReviewed(false);
-              }}/></label>
-          <label className="ws-field ws-inline"><span>End (s)</span>
-            <input type="number" step={0.01} min={section.start + 0.05} max={document.duration} value={section.end}
-              onChange={event => {
-                const raw = Number(event.target.value);
-                const ceiling = index === sectionsDraft.length - 1 ? document.duration
-                  : (sectionsDraft[index + 1]?.end ?? document.duration) - 0.05;
-                const end = Math.max(section.start + 0.05, Math.min(ceiling, raw));
-                setSectionsDraft(current => current.map((item, position) => {
-                  if (position === index) return {...item, end};
-                  // Shared boundary: the next section starts where this one ends.
-                  if (position === index + 1) return {...item, start: end};
-                  return item;
-                }));
-                setConfirmReviewed(false);
-              }}/></label>
-          {sectionsDraft.length > 1 && <button type="button" onClick={() => {
-            setSectionsDraft(current => {
-              const removed = current[index];
-              const next = current.filter((_, position) => position !== index);
-              if (index > 0) {
-                // Give the removed span to the previous section.
-                return next.map((item, position) => position === index - 1 ? {...item, end: removed.end} : item);
-              }
-              // Removing the first section starts the new first one at zero.
-              return next.map((item, position) => position === 0 ? {...item, start: 0} : item);
-            });
-            setConfirmReviewed(false);
-          }}>Remove</button>}
-        </div>
-      </fieldset>)}
-      <h2>Assessment</h2>
-      <label className="ws-field ws-inline"><span>Policy</span>
-        <select value={assessmentPolicy} data-assessment-policy
-          onChange={event => { if (readOnlyRef.current) return; setAssessmentPolicy(event.target.value === 'notes' ? 'notes' : 'none'); setConfirmReviewed(false); }}>
-          <option value="none">Watch only (no note scoring)</option>
-          <option value="notes">Pitch and timing from MIDI</option>
-        </select>
-      </label>
-      <h2>Verification diagnostics</h2>
-      {!verification ? <p className="ws-hint">No verification report is available for this proposal.</p> : <>
-        <p className="ws-hint" data-verification-status>
-          {verification.stale ? 'Stale report' : verification.report ? 'Report ready' : 'Report unavailable'}
-          {' · '}{verification.decisions.length} decided
-          {verification.conflicts.length ? ` · ${verification.conflicts.length} conflict(s)` : ''}
-        </p>
-        {verification.report_error && <p className="ws-hint">{verification.report_error}</p>}
-        {verification.report?.findings.slice(0, 12).map(finding => {
-          const decision = findingDecision(verification, finding.id);
-          return <div className="ws-row" key={finding.id} data-finding={finding.id}>
-            <span>{finding.kind} · {finding.explanation}</span>
-            <span className="ws-hint">{decision ? decision.decision : finding.status}</span>
-            <button type="button" disabled={verificationBusy} data-verification-accept={finding.id}
-              onClick={() => void decideFinding(finding, 'accepted')}>Accept</button>
-            <button type="button" disabled={verificationBusy} data-verification-reject={finding.id}
-              onClick={() => void decideFinding(finding, 'rejected')}>Reject</button>
-          </div>;
-        })}
-        {verification.report && verification.report.findings.length > 12
-          && <p className="ws-hint">{verification.report.findings.length - 12} more findings are not shown here.</p>}
-      </>}
-      <h2>Passages</h2>
-      <p className="ws-hint">Playing passages carry score time; explanation passages are held and reject insertion.</p>
-      {spans.map((span, index) => <div className="ws-row" key={`${index}-${span.start}`} data-passage={index}>
-        <select aria-label={`Passage ${index + 1} kind`} value={span.kind}
-          onChange={() => setNotice('Passage changes would move the existing notation. '
-            + 'This edit was not applied; adjust the alignment instead of relabelling a passage that already carries notes.')}>
-          <option value="playing">Playing</option>
-          <option value="explanation">Explanation</option>
-        </select>
-        <label className="ws-field ws-inline"><span>Start</span>
-          <input type="number" step={0.01} value={span.start}
-            onChange={() => setNotice('Passage boundary changes would move the existing notation and were not applied.')}/></label>
-        <label className="ws-field ws-inline"><span>End</span>
-          <input type="number" step={0.01} value={span.end}
-            onChange={() => setNotice('Passage boundary changes would move the existing notation and were not applied.')}/></label>
-        {spans.length > 1 && <button type="button" onClick={() => setNotice('Passages cannot be removed while they carry scored notes.')}>Remove</button>}
-      </div>)}
-      <div className="ws-row"><button type="button"
-        onClick={() => setNotice('Adding a passage to a scored clip is not supported yet; it would overlap existing score time.')}>
-        Add passage</button></div>
-      <p className="ws-hint" data-passage-rejected="true">Passage kind and boundary edits are validated against the existing map and
-        currently rejected rather than silently re-timing engraved notes.</p>
-      <p className="ws-hint">Verification decisions from the proposal remain server-authoritative; a changed verification state is reported as a conflict instead of being overwritten.</p>
-      </fieldset>
-    </details>
 
-    <div className="ws-grid">
-      <div className="ws-edit">
-        <section className="ws-panel ws-surface" aria-label="Keyboard">
+    <div className="ws-stage" data-stage-layout={DEFAULT_STAGE_LAYOUT.join('-')}
+      data-compact-view={stageView} data-compact-preference={compactPreference}
+      data-compact-limited={limitedHeight ? 'true' : 'false'} data-roll-open={rollOpen ? 'true' : 'false'}>
+      <section className="ws-instrument" id="piano-instrument" data-stage-module="instrument"
+        aria-label="Piano instrument">
+        <div className="ws-waterfall-slot" id="piano-waterfall-slot" data-waterfall-slot="true"
+          data-stage-slot="waterfall">
+          <PianoWaterfall document={document} clock={clockRef.current} intervals={intervals}
+            range={keyboardRange} selectedOccurrenceId={selection?.occurrenceId ?? null}
+            onSelect={select}/>
+        </div>
+        <section className="ws-keyboard-surface" id="piano-keyboard" aria-label="Keyboard">
+          <div className="ws-surface-head"><span>Piano keys</span><span className="ws-surface-note">Tap to audition</span></div>
           <div ref={keyboardRef}>
             <LiveKeyboard document={document} clock={clockRef.current} intervals={intervals}
               selectedPitch={selected?.pitch ?? null}
+              range={keyboardRange ?? undefined} onRangeChange={handleKeyboardRangeChange}
               onKey={pitch => audition([pitch], 0.4)}
               onSelectKey={pitch => {
+                if (pitchPickMode) {
+                  dispatch({type: 'command', command: {type: 'set-occurrence-pitch',
+                    occurrenceId: pitchPickMode.occurrenceId, pitch}});
+                  setNotice(`Pitch set to ${pitchName(pitch)}.`);
+                  setPitchPickMode(null);
+                  return;
+                }
                 if (replaceMode) { replacementPitch(pitch); return; }
                 if (addMode) { setAddMode(mode => mode ? {...mode, pitch} : mode); return; }
                 selectKey(pitch);
               }}
-              width={compactKeyboard ? 640 : 1040} semitones={compactKeyboard ? 36 : 60}
-              toolbarHint="Tap to audition. With a note selected, tap a key to select that pitch at the playhead; it never edits a note."
-              hint="Selection and audition only; use “Add note at playhead” in the inspector to insert."/>
+              width={keyboardWidth > 0 ? keyboardWidth : tinyKeyboard ? 480 : compactKeyboard ? 640 : 1040}
+              height={tinyKeyboard ? 105 : compactKeyboard ? 100 : 150}/>
           </div>
-          {replaceMode && <div className="ws-replace-banner" data-replace="active">
-            Replacing {pitchName(replaceMode.pitch)} — click a key to commit.
+          {replaceMode && <div className="ws-replace-banner ws-mode-banner" data-replace="active">
+            Replacing {pitchName(replaceMode.pitch)} — click a key to commit. Every key and octave control is available.
             <button type="button" onClick={() => { setReplaceMode(null); setNotice('Replacement cancelled.'); }}>Cancel</button>
           </div>}
+          {pitchPickMode && <div className="ws-replace-banner ws-mode-banner" data-pitch-pick-active="true">
+            Choose a key for {selected?.spelling ?? 'the selected note'} — the note editor is hidden so every key and octave control is available.
+            <button type="button" onClick={() => { setPitchPickMode(null); setNotice('Pitch selection cancelled.'); }}>Cancel</button>
+          </div>}
         </section>
+      </section>
 
         <div className="ws-shared-stage" onWheel={handleSharedWheel}>
-        <section className="ws-panel ws-surface" aria-label="Piano roll">
+        <section className="ws-roll-surface" id="piano-roll" data-stage-module="roll" aria-label="Piano roll">
+          <div className="ws-roll-disclosure">
           <button type="button" className="ws-accordion" data-roll-toggle="true"
-            aria-expanded={rollOpen} aria-controls="piano-roll-body"
+            aria-expanded={rollVisible} aria-controls="piano-roll-body"
+            disabled={limitedHeight && Boolean(addMode)}
             onClick={() => setRollOpen(open => !open)}>
-            <span>Piano roll</span><span className="ws-hint">{rollOpen ? 'Hide' : 'Show'}</span>
+            <span>Piano roll</span><span className="ws-accordion-state">{rollVisible ? 'Hide' : 'Show'}</span>
           </button>
-          <div id="piano-roll-body" hidden={!rollOpen}>
+          <button type="button" className="ws-quiet-button ws-add-trigger" data-add-menu-toggle="true"
+            aria-expanded={addMenuOpen} aria-label="Add note" title="Add note"
+            onClick={() => addMenuOpen ? setAddMenuOpen(false) : openAddMenu()}>+ Add note</button>
+          </div>
+          <div id="piano-roll-body" hidden={!rollVisible}>
           <TimeRoll document={document} window={window} onWindowChange={next => changeWindow(next, 'reveal')}
             layout={timelineLayout ?? undefined} alignment={alignment ?? undefined}
             sharedScrollLeft={sharedScrollLeft} sharedViewportWidth={sharedWidth} gutter={sharedWidth > 0 && sharedWidth < 700 ? 82 : 70}
@@ -1721,12 +2005,11 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
               ticks: mode?.ticks ?? lastWrittenTicks.current,
               durationSeconds: mode?.durationSeconds ?? lastRecordedSeconds.current}))}
             playhead={playhead} onSelect={select} onSeek={seek}/>
-          <p className="ws-hint">Click a note to select that occurrence; click the ruler to seek. Scrolling never seeks. Drag a note to edit pitch, time or recorded length.</p>
           </div>
         </section>
 
-        <section className="ws-panel ws-surface" aria-label="Score">
-          <p className="ws-hint" data-score-key>Key: {keyLabel(document.key_signature || 'C')} · {document.time_signature.numerator}/{document.time_signature.denominator}</p>
+        <section className="ws-score-surface" id="piano-score" data-stage-module="sheet" aria-label="Score">
+          <p className="ws-score-meta" data-score-key>Key: {keyLabel(document.key_signature || 'C')} · {document.time_signature.numerator}/{document.time_signature.denominator}</p>
           <ContinuousScore document={document} boxes={boxes} selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={null} onSelect={select}
             playheadTick={playheadTick} activeOccurrenceIds={activeIds}
@@ -1738,7 +2021,6 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             editingEnabled={scoreMode === 'correction' && !replaceMode && !addMode}
             onAmbiguous={(logicalNoteId, occurrenceIds) => setNotice(
               `This written note maps ${occurrenceIds.length} occurrences; choose one in the roll (logical ${logicalNoteId}).`)}/>
-          <p className="ws-hint">One continuous grand staff; the cursor is the mapped musical position. Click the ruler to seek, a notehead to select.</p>
         </section>
         <div className="ws-shared-scrollbar" ref={sharedBarRef} onScroll={onSharedScroll}
           data-shared-scrollbar aria-label="Shared timeline horizontal scroll">
@@ -1759,58 +2041,294 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             <button type="button" onClick={() => setOverlap(null)}>Cancel</button>
           </div>
         </section>}
-        <section className="ws-panel ws-surface" aria-label="Overview">
+        {stageView === 'place' && addModePanel}
+      </div>
+
+      <div className="ws-dock" data-compact={limitedHeight ? 'true' : 'false'}>
+        <button type="button" className="ws-play" onClick={toggleTransport}
+          aria-label={playing ? 'Pause' : 'Play'} aria-keyshortcuts="Space"
+          title={playing ? 'Pause (Space)' : 'Play (Space)'}>
+          {playing ? <Pause size={22}/> : <Play size={22}/>}
+        </button>
+        <div className="ws-dock-centre">
           <ClipOverview document={document} playhead={playhead}
             window={timelineLayout && alignment && sharedWidth > 0 ? {
               start: timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0),
               span: Math.max(0.01, timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116 + sharedWidth), alignment, 0)
                 - timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0)),
             } : window}
-            onWindowChange={next => {
-              if (!timelineLayout || !alignment) return;
-              setFollowSuspended(true);
-              commitSharedScroll(116 + timelineLayout.sourceSecondsToX(next.start, alignment, 0));
+            onNavigate={(next, seekSeconds) => {
+              if (timelineLayout && alignment) {
+                commitSharedScroll(116 + timelineLayout.sourceSecondsToX(next.start, alignment, 0));
+              } else {
+                setWindow(clampTimeWindow(next, document.duration));
+              }
+              if (seekSeconds !== undefined) seek(seekSeconds);
             }}/>
-        </section>
-      </div>
-
-      <aside className="ws-side" data-inspector-sheet={narrowViewport ? 'true' : 'false'}
-        style={narrowViewport ? {position: 'sticky', bottom: 0, maxHeight: '44vh', overflow: 'auto', zIndex: 6,
-          background: '#fff', borderTop: '1px solid #d5dbe3'} : undefined}>
-        <section className="ws-panel" aria-label="Reference video">
-          {videoUrl
-            ? <video ref={videoRef} src={videoUrl} controls playsInline preload="metadata" className="ws-video"/>
-            : <p className="ws-hint">This draft has no source video.</p>}
-          {previewAsset ? <audio ref={pianoRef} src={preview.url || undefined} preload="auto"/> : null}
-          <div className="ws-row" role="group" aria-label="Source audio">
+          <div className="ws-dock-times">
+            <span className="ws-time">{timeLabel(livePlayhead)}</span>
+            <span>{timeLabel(document.duration)}</span>
+          </div>
+        </div>
+        <div className="ws-dock-actions">
+          {keyboardRange && <span className="ws-piano-range" data-piano-range="true"
+            data-first-pitch={keyboardRange.firstPitch}
+            data-last-pitch={keyboardRange.firstPitch + keyboardRange.semitones}
+            title={isStandardPianoRange(keyboardRange)
+              ? 'Full standard piano range A0–C8'
+              : `Full standard piano A0–C8; showing ${pitchName(keyboardRange.firstPitch)}–${pitchName(keyboardRange.firstPitch + keyboardRange.semitones)}`}>
+            {keyboardRangeLabel}
+          </span>}
+          {limitedHeight && !addMode && <div className="ws-compact-switch" role="group" aria-label="Compact view">
+            <button type="button" aria-pressed={compactPreference === 'guide'}
+              className={compactPreference === 'guide' ? 'is-active' : ''}
+              onClick={() => chooseCompactView('guide')}>Guide</button>
+            <button type="button" aria-pressed={compactPreference === 'sheet'}
+              className={compactPreference === 'sheet' ? 'is-active' : ''}
+              onClick={() => chooseCompactView('sheet')}>Sheet</button>
+          </div>}
+          {followSuspended && <button type="button" className="ws-pill" onClick={returnToPlayhead}>Resume follow</button>}
+          {followSuspended && <span className="ws-sr-only" data-follow-suspended="true">Follow suspended · manual inspection</span>}
+          {(() => {
+            if (!timelineLayout || !alignment || sharedWidth <= 0) return null;
+            const p = 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0);
+            const direction = p < sharedScrollLeft ? 'left' : p > sharedScrollLeft + sharedWidth ? 'right' : 'visible';
+            if (direction === 'visible') return null;
+            return <span className="ws-follow-direction" data-follow-direction={direction}
+              aria-label={playing ? (direction === 'right' ? 'Playing to the right' : 'Playing to the left')
+                : (direction === 'right' ? 'Playhead to the right' : 'Playhead to the left')}>
+              {direction === 'right' ? '→' : '←'}
+            </span>;
+          })()}
+          <label className="ws-speed">
+            <span className="ws-sr-only">Playback speed</span>
+            <select value={rate} aria-label={`Playback speed ${rate}×`}
+              onChange={event => changeRate(Number(event.target.value))}>
+              {[0.5, 0.75, 1].map(value => <option key={value} value={value}>{value}×</option>)}
+            </select>
+          </label>
+          <div className="ws-audio" role="group" aria-label="Source audio">
             <button type="button" aria-pressed={audioMode === 'original'}
               className={audioMode === 'original' ? 'is-active' : ''}
               onClick={() => setAudioMode('original')}>Original</button>
-            <button type="button" aria-pressed={audioMode === 'piano'}
+            {previewAsset && <button type="button" aria-pressed={audioMode === 'piano'}
               className={audioMode === 'piano' ? 'is-active' : ''}
               disabled={!preview.url || previewStale}
               title={previewStale ? 'The preview is stale: the notes changed since it was rendered'
                 : preview.url ? 'Verified, mapped piano preview' : preview.error || 'Piano audio is not verified for this draft'}
-              onClick={() => setAudioMode('piano')}>Piano</button>
-            <span className="ws-hint" data-preview-state={previewStale ? 'stale' : preview.url ? 'verified' : 'unavailable'}>
-              {previewStale
-                ? 'Piano preview is stale: the notes changed since it was rendered. Original audio only.'
-                : preview.url
-                  ? 'Verified preview follows the video clock; it never free-runs.'
-                  : preview.error
-                    ? `Piano unavailable: ${preview.error} Original audio remains active.`
-                    : previewAsset
-                      ? 'Verifying piano audio… Original plays until it is verified.'
-                      : 'No verified piano preview: Original audio only.'}
+              onClick={() => setAudioMode('piano')}>Piano</button>}
+          </div>
+          <button type="button" className="ws-icon-button" onClick={() => openDrawer('video')}
+            aria-label="Video" title="Video"><Video size={19}/></button>
+          <button type="button" className="ws-icon-button" onClick={() => openDrawer('sound')}
+            aria-label="Sound options" title="Sound options"><Volume2 size={19}/></button>
+        </div>
+      </div>
+
+      <aside ref={drawerRef} className="ws-side ws-drawer"
+        role={drawerTarget === 'note' ? 'region' : 'dialog'}
+        aria-label={drawerTarget === 'note' ? 'Note editor' : drawerTarget === 'more' ? 'More'
+          : drawerTarget === 'video' ? 'Video' : drawerTarget === 'sound' ? 'Sound' : 'Settings and details'}
+        aria-modal={drawerTarget === 'note' ? undefined : 'false'} hidden={!drawerOpen}
+        data-settings-drawer="true" data-mode={drawerTarget}
+        data-settings-tab={settingsTab}
+        data-note-expanded={noteEditorExpanded ? 'true' : 'false'}
+        data-note-advanced={noteAdvancedOpen ? 'true' : 'false'}
+        data-peek-position={notePeekPosition}
+        data-suppressed={editorSuppressed ? 'true' : 'false'}>
+        <header className="ws-drawer-head">
+          <h2>{drawerTarget === 'note' ? 'Note editor' : drawerTarget === 'more' ? 'More'
+            : drawerTarget === 'video' ? 'Video' : drawerTarget === 'sound' ? 'Sound' : 'Settings & details'}</h2>
+          <button type="button" className="ws-icon-button"
+            aria-label={drawerTarget === 'note' ? 'Close note editor' : 'Close settings'}
+            title={drawerTarget === 'note' ? 'Close note editor' : 'Close settings'}
+            onClick={() => { setPitchPickMode(null); setDrawerOpen(false); }}><X size={19}/></button>
+        </header>
+        <div className="ws-drawer-body">
+        <nav className="ws-drawer-tabs" aria-label="Settings sections">
+          {([
+            ['view', 'Playback & view'],
+            ['editing', 'Editing'],
+            ['lesson', 'Lesson'],
+            ['timing', 'Advanced timing'],
+            ['more', 'More'],
+          ] as const).map(([key, label]) =>
+            <button key={key} type="button" aria-pressed={settingsTab === key}
+              className={settingsTab === key ? 'is-active' : ''}
+              onClick={() => setSettingsTab(key)}>{label}</button>)}
+        </nav>
+        <section className="ws-drawer-section" data-ws-section="settings" data-settings-section="view">
+          <h3>View &amp; playback</h3>
+          <div className="ws-row">
+            <label className="ws-field ws-inline">
+              <span><input type="checkbox" aria-label="Follow playback" checked={follow}
+                onChange={event => { setFollow(event.target.checked); if (event.target.checked) { setFollowSuspended(false); revealSource(playhead); } }}/> Follow playback</span>
+            </label>
+          </div>
+          <p className="ws-hint" data-space-hint="true">Press Space to play or pause when the workspace has focus. Typing, sliders, buttons and piano keys keep their normal Space behavior.</p>
+          {narrowViewport && <div className="ws-row" data-mobile-actions="true">
+            <button type="button" onClick={() => dispatch({type: 'undo'})}
+              disabled={readOnly || !state.past.length || Boolean(replaceMode) || Boolean(addMode)}>Undo</button>
+            <button type="button" onClick={() => dispatch({type: 'redo'})}
+              disabled={readOnly || !state.future.length || Boolean(replaceMode) || Boolean(addMode)}>Redo</button>
+            <button type="button" onClick={() => setDrawerTarget('more')}>More actions</button>
+            <label className="ws-field ws-inline"><span>Speed</span>
+              <select value={rate} onChange={event => changeRate(Number(event.target.value))}>
+                {[0.5, 0.75, 1].map(value => <option key={value} value={value}>{value}×</option>)}
+              </select>
+            </label>
+          </div>}
+          <div className="ws-zoom" role="group" aria-label="Zoom">
+            <button type="button" onClick={() => zoom(1.25)} aria-label="Zoom out">−</button>
+            <span className="ws-window-label" data-window-span={(() => {
+              if (!timelineLayout || !alignment || sharedWidth <= 0) return window.span.toFixed(2);
+              const from = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0);
+              const to = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116 + sharedWidth), alignment, 0);
+              return Math.max(0.01, to - from).toFixed(2);
+            })()} data-shared-zoom={zoomFactor.toFixed(3)}>
+              {(() => {
+                if (!timelineLayout || !alignment || sharedWidth <= 0) {
+                  return `${window.span.toFixed(window.span < 10 ? 1 : 0)} s visible`;
+                }
+                const from = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116), alignment, 0);
+                const to = timelineLayout.xToSourceSeconds(Math.max(0, sharedScrollLeft - 116 + sharedWidth), alignment, 0);
+                return `${Math.max(0, to - from).toFixed(Math.max(0, to - from) < 10 ? 1 : 0)} s visible`;
+              })()}
             </span>
+            <button type="button" onClick={() => zoom(0.8)} aria-label="Zoom in">+</button>
+          </div>
+          <label className="ws-field">
+            <span>{spans.length ? 'Source clock position' : 'Position'}</span>
+            <input type="range" min={0} max={document.duration} step={0.01} value={playhead}
+              aria-label={embedded ? 'Source clock position' : 'Fixture clock'}
+              onChange={event => {
+                const value = Number(event.target.value);
+                if (videoUrl && videoRef.current) { seek(value); return; }
+                setPlayhead(value); clockRef.current.set(value); setPlaying(false);
+              }}/>
+          </label>
+          <span className="ws-alignment" data-alignment-mode={alignment?.mode ?? 'none'} data-playhead-tick={playheadTick ?? ''}
+            data-ticks-per-second={alignment ? Math.round((1 / secondsPerTick) * 1000) / 1000 : ''}>
+            {alignment?.mode === 'anchored' ? 'Score alignment anchored' : 'Score alignment estimated'}
+            {spans.length > 1 ? ` · ${spans.filter(span => span.kind === 'explanation').length} explanation passage(s)` : ''}
+          </span>
+          {alignment && heldPassageAt(alignment, playhead) ? <p className="ws-hint" data-held-passage="true">Explanation · score paused</p> : null}
+          {alignment && timelineLayout && (playhead < tickToEffectiveSeconds(alignment, 0, 0)
+            || playhead > tickToEffectiveSeconds(alignment, timelineLayout.totalTicks, 0)) ? <p className="ws-hint" data-outside-score="true">
+            Outside scored passage</p> : null}
+        </section>
+        <section className="ws-drawer-section" data-ws-section="settings" data-settings-section="editing">
+          <h3>Editing &amp; timing</h3>
+          <div className="ws-row">
+            <label className="ws-field ws-inline">
+              <span>Snap</span>
+              <select value={snapTicks} onChange={event => setSnapTicks(Number(event.target.value))}>
+                {SNAP_CHOICES.map(choice => <option key={choice.label} value={choice.ticks}>{choice.label}</option>)}
+              </select>
+            </label>
+            <label className="ws-field ws-inline">
+              <span>Offset (s)</span>
+              <input type="number" step={0.01} min={-10} max={10} value={offsetSeconds} style={{width: 72}}
+                disabled={readOnly}
+                aria-label="Sync offset in seconds"
+                onChange={event => { if (readOnlyRef.current) return; setOffsetSeconds(Math.max(-10, Math.min(10, Number(event.target.value) || 0))); }}/>
+            </label>
+          </div>
+          {diff && <p className="ws-hint">Your changes: {diff.changed} changed · {diff.added} added · {diff.removed} removed</p>}
+        </section>
+        <section className="ws-drawer-section" data-ws-section="sound" aria-label="Sound">
+          <h3>Sound</h3>
+          <div className="ws-row" role="group" aria-label="Source audio options">
+            <button type="button" aria-pressed={audioMode === 'original'}
+              className={audioMode === 'original' ? 'is-active' : ''}
+              onClick={() => setAudioMode('original')}>Original</button>
+            {previewAsset && <button type="button" aria-pressed={audioMode === 'piano'}
+              className={audioMode === 'piano' ? 'is-active' : ''}
+              disabled={!preview.url || previewStale}
+              title={previewStale ? 'The preview is stale: the notes changed since it was rendered'
+                : preview.url ? 'Verified, mapped piano preview' : preview.error || 'Piano audio is not verified for this draft'}
+              onClick={() => setAudioMode('piano')}>Piano</button>}
           </div>
         </section>
+        <section className="ws-drawer-section" data-ws-section="video" aria-label="Reference video">
+          <h3>Video</h3>
+          {videoUrl
+            ? <video ref={videoRef} src={videoUrl} controls playsInline preload="metadata" className="ws-video"/>
+            : <p className="ws-hint">This draft has no source video.</p>}
+          {previewAsset ? <audio ref={pianoRef} src={preview.url || undefined} preload="auto"/> : null}
+          <span className="ws-hint" data-preview-state={previewStale ? 'stale' : preview.url ? 'verified' : 'unavailable'}>
+            {previewStale
+              ? 'Piano preview is stale: the notes changed since it was rendered. Original audio only.'
+              : preview.url
+                ? 'Verified piano preview follows the video clock; it never free-runs.'
+                : preview.error
+                  ? `Piano unavailable: ${preview.error} Original audio remains active.`
+                  : previewAsset
+                    ? 'Verifying piano audio… Original plays until it is verified.'
+                    : 'No verified piano preview: Original audio only.'}
+          </span>
+        </section>
 
-        <section className="ws-panel" aria-label="Selected note">
-          <h2>Selected note</h2>
+        <section className="ws-drawer-section ws-note-section" data-ws-section="note"
+          data-note-expanded={noteEditorExpanded ? 'true' : 'false'}
+          data-note-advanced={noteAdvancedOpen ? 'true' : 'false'} aria-label="Selected note">
           {!selection || !selected
             ? <p className="ws-hint">Select a note in the roll, the score or the keyboard to edit it.</p>
-            : <fieldset className="ws-inspector-fieldset" disabled={readOnly || Boolean(replaceMode) || Boolean(addMode)}>
+            : <>
+              <header className="ws-note-head">
+                <div>
+                  <h2>{selected.spelling}</h2>
+                  <p className="ws-note-location">{pitchName(selected.pitch)} · measure {selection.measureIndex + 1} · {selection.staff} voice {selection.voice}</p>
+                </div>
+                {narrowViewport && !noteEditorExpanded && <div className="ws-note-peek-actions">
+                  <button type="button" disabled={readOnly}
+                    onClick={() => { audition([selected.pitch], Math.min(1.2, selected.duration ?? 0.4)); }}>Preview</button>
+                  <button type="button" onClick={() => { setNoteEditorExpanded(true); setNoteAdvancedOpen(false); }}>Edit note</button>
+                </div>}
+              </header>
+              {(!narrowViewport || noteEditorExpanded) && <div className="ws-note-primary">
+                <div className="ws-row" role="group" aria-label="Note actions">
+                  <button type="button" disabled={readOnly} onClick={() => { audition([selected.pitch], Math.min(1.2, selected.duration ?? 0.4)); }}>Preview</button>
+                  <button type="button" data-pitch-pick aria-pressed={pitchPickMode?.occurrenceId === selection.occurrenceId}
+                    disabled={readOnly}
+                    onClick={() => {
+                      modeReturnFocus.current = globalThis.document.activeElement as HTMLElement | null;
+                      setReplaceMode(null); setAddMode(null);
+                      setPitchPickMode({occurrenceId: selection.occurrenceId, pitch: selected.pitch});
+                      setNotice(`Choose a key for ${selected.spelling}, or press Escape to cancel.`);
+                    }}>Choose on keyboard</button>
+                </div>
+                {narrowViewport && <div className="ws-row ws-note-history" role="group" aria-label="Note history">
+                  <button type="button" onClick={() => dispatch({type: 'undo'})}
+                    disabled={readOnly || !state.past.length || Boolean(replaceMode) || Boolean(addMode)}>Undo</button>
+                  <button type="button" onClick={() => dispatch({type: 'redo'})}
+                    disabled={readOnly || !state.future.length || Boolean(replaceMode) || Boolean(addMode)}>Redo</button>
+                </div>}
+                <div className="ws-row" role="group" aria-label="Pitch">
+                  <button type="button" disabled={readOnly} onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch - 1}})}>− semitone</button>
+                  <button type="button" disabled={readOnly} onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch + 1}})}>+ semitone</button>
+                </div>
+                <div className="ws-row" role="group" aria-label="Written duration">
+                  <span className="ws-hint">{writtenScope === 'event' ? 'Note value · whole event' : 'Note value'}</span>
+                  {DURATION_CHOICES.map(choice => <button key={choice.label} type="button" disabled={readOnly}
+                    onClick={() => dispatch({type: 'command', command: writtenScope === 'note'
+                      ? {type: 'set-written-duration', target: {logicalNoteId: selection.logicalNoteId}, ticks: choice.ticks, scope: 'note'}
+                      : {type: 'set-written-duration', target: {eventId: selection.eventId}, ticks: choice.ticks, scope: 'event'}})}>
+                    {choice.label}
+                  </button>)}
+                </div>
+                <label className="ws-field">
+                  <span>Loudness {selected.velocity === null ? '(unknown)' : `${Math.round(selected.velocity * 100)}%`}</span>
+                  <input type="range" min={0} max={1} step={0.01} disabled={readOnly} value={selected.velocity ?? 0.7}
+                    onChange={event => dispatch({type: 'command', command: {type: 'set-occurrence-velocity', occurrenceId: selection.occurrenceId, velocity: Number(event.target.value)}})}/>
+                </label>
+                <button type="button" className="ws-note-more-toggle" aria-expanded={noteAdvancedOpen}
+                  onClick={() => setNoteAdvancedOpen(value => !value)}>
+                  {noteAdvancedOpen ? 'Less timing' : 'Timing & more…'}
+                </button>
+              </div>}
+              {noteAdvancedOpen && <div className="ws-note-secondary">
+                <fieldset className="ws-inspector-fieldset" disabled={readOnly || Boolean(replaceMode) || Boolean(addMode)}>
               <p className="ws-facts">
                 <strong>{selected.spelling}</strong> · {selection.occurrenceId} · {pitchName(selected.pitch)} (MIDI {selected.pitch})<br/>
                 {selected.onset.toFixed(3)} s · recorded {selected.duration === null ? 'unknown' : `${selected.duration.toFixed(3)} s`}<br/>
@@ -1825,14 +2343,12 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
               </>}
               </p>
 
-              <div className="ws-row" role="group" aria-label="Pitch">
-                <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch - 1}})}>− semitone</button>
-                <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch + 1}})}>+ semitone</button>
+              <div className="ws-row" role="group" aria-label="More pitch options">
+                <button type="button" data-replace="start" disabled={Boolean(addMode)} aria-label="Replace pitch"
+                  onClick={() => { modeReturnFocus.current = globalThis.document.activeElement as HTMLElement | null; setAddMode(null); setPitchPickMode(null); setReplaceMode({occurrenceId: selection.occurrenceId, pitch: selected.pitch}); setNotice(''); }}>Replace pitch</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'sharp'}})}>♯</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'flat'}})}>♭</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'apply-accidental', occurrenceId: selection.occurrenceId, accidental: 'natural'}})}>♮</button>
-                <button type="button" data-replace="start" disabled={Boolean(addMode)}
-                  onClick={() => { setAddMode(null); setReplaceMode({occurrenceId: selection.occurrenceId, pitch: selected.pitch}); setNotice(''); }}>Replace pitch</button>
               </div>
 
               <div className="ws-row" role="group" aria-label="Respell">
@@ -1883,28 +2399,10 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
                 <button type="button" aria-pressed={writtenScope === 'event'} className={writtenScope === 'event' ? 'is-active' : ''}
                   onClick={() => setWrittenScope('event')}>Whole event{selected.notesInEvent > 1 ? ` (${selected.notesInEvent} notes)` : ''}</button>
               </div>
-              <div className="ws-row" role="group" aria-label="Written duration">
-                {DURATION_CHOICES.map(choice => <button key={choice.label} type="button"
-                  onClick={() => dispatch({type: 'command', command: writtenScope === 'note'
-                    ? {type: 'set-written-duration', target: {logicalNoteId: selection.logicalNoteId}, ticks: choice.ticks, scope: 'note'}
-                    : {type: 'set-written-duration', target: {eventId: selection.eventId}, ticks: choice.ticks, scope: 'event'}})}>
-                  {choice.label}
-                </button>)}
-              </div>
-              <p className="ws-hint">
-                “This note” splits a chord member into its own voice if needed; “Whole event” rewrites every member's written value.
-              </p>
-
               <NumberField label="Start (s)" value={selected.onset} min={0} max={document.duration} step={0.001}
                 onCommit={value => { if (value !== null) dispatch({type: 'command', command: {type: 'set-occurrence-onset', occurrenceId: selection.occurrenceId, seconds: value, snapSeconds}}); }}/>
               <NumberField label="Recorded length (s)" value={selected.duration} min={0.001} max={document.duration} step={0.001}
                 onCommit={value => { if (value !== null) dispatch({type: 'command', command: {type: 'set-occurrence-duration', occurrenceId: selection.occurrenceId, seconds: value}}); }}/>
-
-              <label className="ws-field">
-                <span>Velocity {selected.velocity === null ? '(unknown)' : `${Math.round(selected.velocity * 100)}%`}</span>
-                <input type="range" min={0} max={1} step={0.01} value={selected.velocity ?? 0.7}
-                  onChange={event => dispatch({type: 'command', command: {type: 'set-occurrence-velocity', occurrenceId: selection.occurrenceId, velocity: Number(event.target.value)}})}/>
-              </label>
 
               <div className="ws-row" role="group" aria-label="Remove">
                 <button type="button" onClick={() => requestReveal(selection.occurrenceId)}>Reveal in views</button>
@@ -1915,10 +2413,12 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
               <p className="ws-hint">
                 Written value and recorded length are independent. Start uses exact seconds unless a Snap value is chosen.
               </p>
-            </fieldset>}
+                </fieldset>
+              </div>}
+            </>}
         </section>
 
-        <section className="ws-panel" aria-label="Insert">
+        <section className="ws-drawer-section" data-ws-section="insert" data-settings-section="editing" aria-label="Insert">
           <h2>Insert</h2>
           <div className="ws-row">
             <button type="button" disabled={Boolean(replaceMode) || Boolean(addMode)}
@@ -1935,36 +2435,10 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
                   ticks: lastWrittenTicks.current, durationSeconds: lastRecordedSeconds.current});
               }}>{addMode ? 'Cancel add note' : 'Add note (place)'}</button>
           </div>
-          {addMode && <div className="ws-add-panel" data-add="active">
-            <p>New {pitchName(addMode.pitch)} at {addMode.seconds.toFixed(3)} s (recorded) · written {addMode.ticks} ticks ·
-              click the roll to place it.</p>
-            <div className="ws-row">
-              <label className="ws-field ws-inline"><span>Recorded length (s)</span>
-                <input type="number" step={0.01} min={0.02} max={document.duration} data-add="length"
-                  value={addMode.durationSeconds}
-                  onChange={event => setAddMode(mode => mode ? {...mode,
-                    durationSeconds: Math.max(0.02, Number(event.target.value) || 0.02)} : mode)}/>
-              </label>
-              <label className="ws-field ws-inline"><span>Written value</span>
-                <select data-add="written" value={addMode.ticks}
-                  onChange={event => setAddMode(mode => mode ? {...mode, ticks: Number(event.target.value)} : mode)}>
-                  {DURATION_CHOICES.map(choice => <option key={choice.ticks} value={choice.ticks}>{choice.label}</option>)}
-                </select>
-              </label>
-              <button type="button" data-add="commit" onClick={commitAdd}>Insert</button>
-              <button type="button" data-add="cancel"
-                onClick={() => { setAddMode(null); setDuplicateId(null); setNotice('Add note cancelled.'); }}>Cancel</button>
-            </div>
-            {addProblem && <p className="ws-report is-bad" data-add="invalid">{addProblem}</p>}
-            {ghostDuplicate && <p className="ws-report is-bad" data-add="duplicate">
-              A {pitchName(addMode.pitch)} already starts here.
-              <button type="button" onClick={() => { if (ghostDuplicateId) select(ghostDuplicateId); setAddMode(null); }}>Select existing</button>
-            </p>}
-          </div>}
           <p className="ws-hint">Insertion is rejected when it would overwrite or collide. “Add to chord” only joins an identical written position.</p>
         </section>
 
-        <section className="ws-panel" aria-label="Alignment">
+        <section className="ws-drawer-section" data-ws-section="timing" data-settings-section="timing" aria-label="Alignment">
           <fieldset disabled={readOnly} style={{border: 0, padding: 0, margin: 0, minWidth: 0}}>
           <h2>Alignment</h2>
           <p className="ws-hint" data-aligned={anchors.length > 0 ? 'true' : 'false'}>
@@ -1996,7 +2470,20 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           </fieldset>
         </section>
 
-        <section className="ws-panel" aria-label="History">
+        <section className="ws-drawer-section" data-ws-section="more" data-settings-section="more" aria-label="History and more">
+          <h2>More</h2>
+          <div className="ws-row">
+            <button type="button" data-formatted-toggle="true"
+              aria-pressed={scoreMode === 'formatted'}
+              onClick={() => {
+                setAddMode(null); setReplaceMode(null); setDuplicateId(null);
+                setScoreMode('formatted');
+                setDrawerOpen(false);
+              }} aria-label="Formatted score">Formatted preview</button>
+            <button type="button" onClick={reopen} disabled={Boolean(replaceMode) || Boolean(addMode)}>Reopen saved</button>
+            <button type="button" onClick={downloadMusicXml}>MusicXML</button>
+            <button type="button" onClick={downloadReference}>Download reference</button>
+          </div>
           <h2>History</h2>
           <p className="ws-hint">
             {summary.undoSteps} undo step(s) · {summary.redoSteps} redoable ·{' '}
@@ -2005,10 +2492,195 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           </p>
           <p className="ws-hint">History stores only the notes and events each edit changed; the score is rebuilt on undo.</p>
         </section>
+        <section className="ws-drawer-section" data-ws-section="lesson" data-settings-section="lesson">
+          <details className="ws-advanced-details" data-lesson-settings="true">
+            <summary>Lesson settings, teaching sections and assessment</summary>
+            <fieldset disabled={readOnly} style={{border: 0, padding: 0, margin: 0, minWidth: 0}}>
+            <h2>Teaching sections</h2>
+            <div className="ws-row">
+              <button type="button" data-section-add onClick={() => {
+                if (readOnlyRef.current) return;
+                setSectionsDraft(current => {
+                  const last = current[current.length - 1] ?? {id: 'whole', label: 'Whole lesson', start: 0, end: document.duration};
+                  const sequence = current.length ? current : [last];
+                  const middle = (last.start + last.end) / 2;
+                  return [...sequence.slice(0, -1), {...last, end: middle},
+                    {id: `section-${sequence.length + 1}`, label: `Section ${sequence.length + 1}`, start: middle, end: last.end}];
+                });
+                setConfirmReviewed(false);
+              }}>Add section</button>
+            </div>
+            {sectionsDraft.map((section, index) => <fieldset key={section.id} data-section={section.id} disabled={readOnly}>
+              <legend>Section {index + 1}</legend>
+              <label className="ws-field"><span>Name</span>
+                <input value={section.label} maxLength={80} onChange={event => {
+                  const label = event.target.value;
+                  setSectionsDraft(current => current.map((item, position) => position === index ? {...item, label} : item));
+                  setConfirmReviewed(false);
+                }}/></label>
+              <div className="ws-row">
+                <label className="ws-field ws-inline"><span>Start (s)</span>
+                  <input type="number" step={0.01} min={0} max={section.end - 0.05} value={section.start}
+                    onChange={event => {
+                      const raw = Number(event.target.value);
+                      const floor = index === 0 ? 0 : (sectionsDraft[index - 1]?.start ?? 0) + 0.05;
+                      const start = index === 0 ? 0 : Math.max(floor, Math.min(section.end - 0.05, raw));
+                      setSectionsDraft(current => current.map((item, position) => {
+                        if (position === index) return {...item, start};
+                        if (position === index - 1) return {...item, end: start};
+                        return item;
+                      }));
+                      setConfirmReviewed(false);
+                    }}/></label>
+                <label className="ws-field ws-inline"><span>End (s)</span>
+                  <input type="number" step={0.01} min={section.start + 0.05} max={document.duration} value={section.end}
+                    onChange={event => {
+                      const raw = Number(event.target.value);
+                      const ceiling = index === sectionsDraft.length - 1 ? document.duration
+                        : (sectionsDraft[index + 1]?.end ?? document.duration) - 0.05;
+                      const end = Math.max(section.start + 0.05, Math.min(ceiling, raw));
+                      setSectionsDraft(current => current.map((item, position) => {
+                        if (position === index) return {...item, end};
+                        if (position === index + 1) return {...item, start: end};
+                        return item;
+                      }));
+                      setConfirmReviewed(false);
+                    }}/></label>
+                {sectionsDraft.length > 1 && <button type="button" onClick={() => {
+                  setSectionsDraft(current => {
+                    const removed = current[index];
+                    const next = current.filter((_, position) => position !== index);
+                    if (index > 0) {
+                      return next.map((item, position) => position === index - 1 ? {...item, end: removed.end} : item);
+                    }
+                    return next.map((item, position) => position === 0 ? {...item, start: 0} : item);
+                  });
+                  setConfirmReviewed(false);
+                }}>Remove</button>}
+              </div>
+            </fieldset>)}
+            <h2>Assessment</h2>
+            <label className="ws-field ws-inline"><span>Policy</span>
+              <select value={assessmentPolicy} data-assessment-policy
+                onChange={event => { if (readOnlyRef.current) return; setAssessmentPolicy(event.target.value === 'notes' ? 'notes' : 'none'); setConfirmReviewed(false); }}>
+                <option value="none">Watch only (no note scoring)</option>
+                <option value="notes">Pitch and timing from MIDI</option>
+              </select>
+            </label>
+            <h2>Verification diagnostics</h2>
+            {!verification ? <p className="ws-hint">No verification report is available for this proposal.</p> : <>
+              <p className="ws-hint" data-verification-status>
+                {verification.stale ? 'Stale report' : verification.report ? 'Report ready' : 'Report unavailable'}
+                {' · '}{verification.decisions.length} decided
+                {verification.conflicts.length ? ` · ${verification.conflicts.length} conflict(s)` : ''}
+              </p>
+              {verification.report_error && <p className="ws-hint">{verification.report_error}</p>}
+              {verification.report?.findings.slice(0, 12).map(finding => {
+                const decision = findingDecision(verification, finding.id);
+                return <div className="ws-row" key={finding.id} data-finding={finding.id}>
+                  <span>{finding.kind} · {finding.explanation}</span>
+                  <span className="ws-hint">{decision ? decision.decision : finding.status}</span>
+                  <button type="button" disabled={verificationBusy} data-verification-accept={finding.id}
+                    onClick={() => void decideFinding(finding, 'accepted')}>Accept</button>
+                  <button type="button" disabled={verificationBusy} data-verification-reject={finding.id}
+                    onClick={() => void decideFinding(finding, 'rejected')}>Reject</button>
+                </div>;
+              })}
+              {verification.report && verification.report.findings.length > 12
+                && <p className="ws-hint">{verification.report.findings.length - 12} more findings are not shown here.</p>}
+            </>}
+            <h2>Passages</h2>
+            <p className="ws-hint">Playing passages carry score time; explanation passages are held and reject insertion.</p>
+            {spans.map((span, index) => <div className="ws-row" key={`${index}-${span.start}`} data-passage={index}>
+              <select aria-label={`Passage ${index + 1} kind`} value={span.kind}
+                onChange={() => setNotice('Passage changes would move the existing notation. '
+                  + 'This edit was not applied; adjust the alignment instead of relabelling a passage that already carries notes.')}>
+                <option value="playing">Playing</option>
+                <option value="explanation">Explanation</option>
+              </select>
+              <label className="ws-field ws-inline"><span>Start</span>
+                <input type="number" step={0.01} value={span.start}
+                  onChange={() => setNotice('Passage boundary changes would move the existing notation and were not applied.')}/></label>
+              <label className="ws-field ws-inline"><span>End</span>
+                <input type="number" step={0.01} value={span.end}
+                  onChange={() => setNotice('Passage boundary changes would move the existing notation and were not applied.')}/></label>
+              {spans.length > 1 && <button type="button" onClick={() => setNotice('Passages cannot be removed while they carry scored notes.')}>Remove</button>}
+            </div>)}
+            <div className="ws-row"><button type="button"
+              onClick={() => setNotice('Adding a passage to a scored clip is not supported yet; it would overlap existing score time.')}>
+              Add passage</button></div>
+            <p className="ws-hint" data-passage-rejected="true">Passage kind and boundary edits are validated against the existing map and
+              currently rejected rather than silently re-timing engraved notes.</p>
+            <p className="ws-hint">Verification decisions from the proposal remain server-authoritative; a changed verification state is reported as a conflict instead of being overwritten.</p>
+            </fieldset>
+          </details>
+        </section>
+        </div>
       </aside>
-    </div>
+      {drawerOpen && drawerTarget !== 'note' && !editorSuppressed &&
+        <button type="button" className="ws-drawer-scrim" aria-label="Close settings"
+          onClick={() => setDrawerOpen(false)}/>}
+      {reviewOpen && <div className="ws-review-scrim">
+        <section ref={reviewRef} className="ws-review" role="dialog" aria-modal="true" aria-label="Review and save">
+          <header><h2>Review and save</h2>
+            <button type="button" className="ws-icon-button" aria-label="Close review" onClick={() => setReviewOpen(false)}><X size={18}/></button>
+          </header>
+          <p className="ws-review-title">{title || 'Piano review'}</p>
+          <p className="ws-review-state" data-review-state={dirty ? 'dirty' : 'clean'}>
+            {dirty ? 'Unsaved changes · private draft' : savedRevisionId ? 'Saved revision' : 'Private draft'}
+          </p>
+          <p className="ws-hint">Saving creates a private revision for this lesson. A local backup is not a server save.</p>
+          {saveError && <p className="ws-report is-bad">{saveError}</p>}
+          {saveConflict && <p className="ws-report is-bad">
+            This draft conflicts with a newer revision. Close review to choose “Save on latest revision” or “Reload saved revision”.
+          </p>}
+          <label className="ws-review-confirm">
+            <input type="checkbox" aria-label="Confirm reviewed" checked={confirmReviewed}
+              onChange={event => setConfirmReviewed(event.target.checked)}/>
+            <span>I reviewed these changes and want to save them privately.</span>
+          </label>
+          <div className="ws-review-actions">
+            <button type="button" data-review-focus="true" onClick={() => setReviewOpen(false)}>Cancel</button>
+            <button type="button" data-save-button="true" aria-label="Save privately" className="ws-save"
+              disabled={readOnly || !confirmReviewed || saving || !(dirty || savedRevisionId === null)}
+              onClick={() => { setSaveAttempted(true); void save(); }}>
+              {saving ? 'Saving…' : 'Save privately'}
+            </button>
+          </div>
+        </section>
+      </div>}
+
+      {stageView !== 'place' && addModePanel}
+      {addMenuOpen && <section className="ws-add-menu" role="dialog" aria-label="Add note options">
+        <header><strong>Add a note</strong>
+          <button type="button" className="ws-icon-button" aria-label="Close add note" onClick={() => setAddMenuOpen(false)}><X size={16}/></button>
+        </header>
+        <button type="button" data-add-menu="playhead" disabled={readOnly}
+          onClick={() => { insertAtPlayhead(false); setAddMenuOpen(false); }}>Insert at playhead</button>
+        <button type="button" data-add-menu="chord" disabled={readOnly}
+          onClick={() => { insertAtPlayhead(true); setAddMenuOpen(false); }}>Insert into chord</button>
+        <button type="button" data-add-menu="place" disabled={readOnly}
+          onClick={() => {
+            setDrawerOpen(false); setReplaceMode(null); setPitchPickMode(null); setDuplicateId(null);
+            setAddMode({seconds: playhead - offsetSeconds, pitch: selected?.pitch ?? 60,
+              ticks: lastWrittenTicks.current, durationSeconds: lastRecordedSeconds.current});
+            setNotice('Click the roll to place the note; Escape cancels.');
+            setAddMenuOpen(false);
+          }}>Place note on the roll</button>
+        <p className="ws-hint">Rest insertion is not supported by this score yet.</p>
+      </section>}
     </div>
   </main>;
+}
+
+function notePeekPositionFor(rect: Pick<DOMRect, 'top' | 'bottom'> | undefined,
+  viewportHeight: number): 'top' | 'bottom' {
+  if (!rect || viewportHeight <= 0) return 'bottom';
+  const bottomPeekTop = viewportHeight - 72 - 120;
+  if (rect.bottom <= bottomPeekTop - 4) return 'bottom';
+  const topPeekBottom = 56 + 120;
+  if (rect.top >= topPeekBottom + 4) return 'top';
+  return rect.top > viewportHeight / 2 ? 'top' : 'bottom';
 }
 
 function noteFacts(document: NotationDocument, selection: CorrectionSelection) {
@@ -2036,7 +2708,8 @@ export default PianoWorkspaceHarness;
  * The keyboard lights keys from the frame-rate clock, so sounding pitches stay exact
  * without re-rendering the inspector around it.
  */
-function LiveKeyboard({document, clock, intervals, selectedPitch, onKey, onSelectKey, width, semitones, toolbarHint, hint}: {
+function LiveKeyboard({document, clock, intervals, selectedPitch, onKey, onSelectKey, width, height,
+  range, onRangeChange, toolbarHint, hint}: {
   document: NotationDocument;
   clock: ClockStore | null;
   intervals: { id: string; start: number; end: number; pitch: number }[];
@@ -2044,16 +2717,19 @@ function LiveKeyboard({document, clock, intervals, selectedPitch, onKey, onSelec
   onKey: (pitch: number, auditionOnly: boolean) => void;
   onSelectKey: (pitch: number) => void;
   width: number;
-  semitones: number;
-  toolbarHint: string;
-  hint: string;
+  range?: PianoRange;
+  onRangeChange?: (range: PianoRange) => void;
+  height?: number;
+  toolbarHint?: string;
+  hint?: string;
 }) {
   const live = useClockTime(clock, 0);
   const activePitches = intervals
     .filter(interval => live >= interval.start && live < interval.end)
     .map(interval => interval.pitch);
   return <KeyboardEditor document={document} selectedPitch={selectedPitch} activePitches={activePitches}
-    onKey={onKey} onSelectKey={onSelectKey} width={width} semitones={semitones}
+    onKey={onKey} onSelectKey={onSelectKey} width={width} height={height}
+    range={range} onRangeChange={onRangeChange}
     toolbarHint={toolbarHint} hint={hint}/>;
 }
 

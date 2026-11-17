@@ -58,11 +58,13 @@ Inspect the current branch before editing; code may have advanced since this pla
 | Start/resume playback with Follow on | Reveal current position once if necessary, then follow using the safe area |
 | Normal playback | Cursor moves across a stationary view until the right threshold, then content scrolls beneath it |
 | Manual horizontal pan/scroll | Suspend Follow immediately; preserve playback and allow free inspection |
-| Playback started while manually suspended | Stay suspended; do not erase a deliberate inspection state |
-| Follow explicitly switched off | Preserve this choice across pause/play; only explicit enabling resumes it |
+| Playback started while manually suspended | Clear the temporary manual suspension, reveal the current position and follow when Follow is enabled. An explicitly unchecked Follow stays off |
+| Follow explicitly switched off | Preserve this choice across pause/play/seeking; only explicit enabling resumes it |
 | Resume follow or offscreen direction button | Enable Follow and reveal current playback position, without seeking |
 | Pause | Stop automatic scrolling immediately and preserve current view |
 | Explicit seek | Seek the existing video, reveal the destination once, preserve Follow on/off choice |
+| Overview window drag | Move the visible range and seek the source playback with it, keeping the playhead at a fixed fraction of the window. Freeze geometry and anchor at pointer-down |
+| Overview click | Seek exactly to the clicked source time and reveal it in the sheet and roll |
 | Musical edit gesture starts | Freeze horizontal geometry and automatic movement before the first preview |
 | Gesture ends or cancels | Leave Follow suspended for inspection; Resume follow is explicit |
 | Only roll vertical scroll changes | Do not suspend Follow or horizontally move the sheet |
@@ -70,7 +72,7 @@ Inspect the current branch before editing; code may have advanced since this pla
 | Formatted mode entered | Preserve editor viewport; stop its animation; retain existing pause/read-only/cancel policy |
 | Return to correction | Restore exact viewport; do not automatically reveal merely because the mode changed |
 
-Clarification of the earlier “start playback enables Follow” suggestion: starting ordinary playback uses Follow by default. It must not override a later deliberate suspension or explicit off choice. Otherwise users cannot inspect another passage while playback continues.
+Clarification of the earlier “start playback enables Follow” suggestion: starting or resuming ordinary playback clears only a *temporary* manual suspension and follows when Follow playback is enabled. It must not override an explicitly unchecked Follow, and a manual scrollbar/wheel suspension otherwise lasts until the next play or an explicit Resume follow. Otherwise users cannot inspect another passage while playback continues.
 
 ## 4. Shared coordinate system
 
@@ -151,7 +153,7 @@ The roll's vertical scrollbar must not shrink its horizontal plot relative to th
 
 The overlay has `pointer-events: none`. It must not intercept note selection, dragging, ruler seeking or scrolling. Draw one x position across the active roll/score plotting bands; avoid drawing through controls, captions or the accordion heading. Separate clipped segments are acceptable if they visibly form one line and share one overlay calculation. Do not leave old child cursors underneath.
 
-Keep the clip overview's whole-video range selector as navigation, not a second horizontal scrollbar for the expanded score/roll. Its displayed selection is derived from the shared viewport; it does not maintain another viewport state.
+Keep the clip overview's whole-video range selector as navigation, not a second horizontal scrollbar for the expanded score/roll. Its displayed selection is derived from the shared viewport; it does not maintain another viewport state. Dragging its window seeks the one source clock along with the visible range, and clicking elsewhere seeks to the clicked source time, so the overview is a seek/navigation surface rather than a pan-only control.
 
 Keep the video and correction subtree mounted across formatted-mode switches. Native overflow dimensions can clamp scrollLeft while hidden; save and restore the controller's canonical scroll value after valid remeasurement, rather than trusting a hidden element's zero dimensions.
 
@@ -307,7 +309,7 @@ Make coherent commits/checkpoints. Do not seek acceptance after step 3 or 5 whil
 - Explicit off persists through pause/play. Manual suspension persists until explicit resume.
 - Roll vertical scrolling alone does not suspend Follow or move the sheet horizontally.
 - Programmatic scrolling never masquerades as manual scrolling or creates oscillation/feedback loops.
-- Ruler/video/overview seek reveals once while preserving Follow preference. Overview range drag that only pans does not seek.
+- Ruler/video/overview seek reveals once while preserving Follow preference. Overview window dragging seeks the source playback with the visible range; overview clicking seeks exactly to the clicked source time. Only the ordinary shared scrollbar/wheel remains view-only and never seeks.
 
 ### D. Editing and lifecycle
 
