@@ -20,11 +20,17 @@ export class NotationAudio {
   private bus: AudioNode | null = null;
   private voices: PianoVoice[] = [];
   private activeByPitch = new Map<number, PianoVoice>();
+  private readonly masterCeiling: number;
   private volume = 0.65;
+
+  constructor(masterCeiling = MASTER_GAIN) {
+    this.masterCeiling = masterCeiling;
+    if (masterCeiling > MASTER_GAIN) this.volume = 1;
+  }
 
   setVolume(value: number): void {
     this.volume = Math.max(0, Math.min(1, value));
-    if (this.master && this.context) this.master.gain.value = MASTER_GAIN * this.volume;
+    if (this.master && this.context) this.master.gain.value = this.masterCeiling * this.volume;
   }
 
   private ensure(): AudioContext | null {
@@ -34,9 +40,9 @@ export class NotationAudio {
     const context = new Ctor();
     const master = context.createGain();
     const compressor = context.createDynamicsCompressor();
-    compressor.threshold.value = -18;
+    compressor.threshold.value = -8;
     compressor.knee.value = 12;
-    compressor.ratio.value = 8;
+    compressor.ratio.value = 3;
     compressor.attack.value = 0.003;
     compressor.release.value = 0.25;
     // A warm, slightly resonant soundboard stage sits before the shared limiter.
@@ -47,7 +53,7 @@ export class NotationAudio {
       body.type = 'peaking';
       body.frequency.value = 220;
       body.Q.value = 0.7;
-      body.gain.value = 2.8;
+      body.gain.value = 1.5;
       body.connect(compressor);
       bus = body;
     }
@@ -55,7 +61,7 @@ export class NotationAudio {
     this.context = context;
     this.master = master;
     this.bus = bus;
-    master.gain.value = MASTER_GAIN * this.volume;
+    master.gain.value = this.masterCeiling * this.volume;
     return context;
   }
 
@@ -69,7 +75,7 @@ export class NotationAudio {
     for (const pitch of pitches) {
       if (!Number.isInteger(pitch) || pitch < 0 || pitch > 127) continue;
       const existing = this.activeByPitch.get(pitch);
-      if (existing) existing.releaseAt?.(base, 0.015);
+      if (existing) existing.releaseAt?.(base, 0.025);
       const voice = schedulePianoVoice(context, this.bus!, {
         pitch, velocity, duration: length, startTime: base, unison: true,
         acousticDecay: true, dampedByKey: true,
@@ -90,7 +96,7 @@ export class NotationAudio {
     const delay = Math.max(0, Number.isFinite(note.delaySeconds) ? note.delaySeconds! : 0);
     const startTime = context.currentTime + delay;
     const existing = this.activeByPitch.get(note.pitch);
-    if (existing) existing.releaseAt?.(startTime, 0.015);
+    if (existing) existing.releaseAt?.(startTime, 0.025);
     const voice = schedulePianoVoice(context, this.bus!, {
       pitch: note.pitch,
       velocity: note.velocity,

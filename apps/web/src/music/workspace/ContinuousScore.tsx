@@ -8,7 +8,7 @@
  * notehead selects its occurrence, refusing to guess when a written note maps several.
  * The score playhead and beat-linked scrolling belong to Phase 4.
  */
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {TimelineLayout} from './timeline-layout';
 import {displayAccidental, keySignature as sharedKeySignature, parseSpelling, type NotationDocument, type NotationSegment, type NotationValue}
   from '../../../../../packages/music-notation/index.ts';
@@ -314,10 +314,10 @@ export function ContinuousScore({
     if (note.performance_ids.length > 1) onAmbiguous?.(note.logical_note_id, note.performance_ids);
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = scrollRef.current;
     if (!node || !layout) return;
-    if (Math.abs(node.scrollLeft - sharedScrollLeft) > 1) node.scrollLeft = sharedScrollLeft;
+    if (Math.abs(node.scrollLeft - sharedScrollLeft) > 0.5) node.scrollLeft = sharedScrollLeft;
   }, [layout, sharedScrollLeft]);
   const signature = renderedKeySignature(document.key_signature);
   return <div className="ws-score" ref={hostRef} style={{maxWidth: '100%', overflow: 'hidden', minWidth: 0}}>

@@ -7,7 +7,7 @@
  * Revealing is an explicit request (a changed selection or an explicit Reveal), not
  * a reaction to the viewport, so manual panning is never reversed.
  */
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {NotationDocument} from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
 import {
@@ -140,11 +140,11 @@ export function TimeRoll({
 
   // Shared mode: the harness writes the canonical offset to both clipped
   // viewports directly. Only the legacy independent mode owns this element.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = element;
     if (!node || shared) return;
     const target = Math.round(window.start * pps);
-    if (Math.abs(node.scrollLeft - target) <= 1) return;
+    if (Math.abs(node.scrollLeft - target) <= 0.5) return;
     syncing.current = true;
     node.scrollLeft = target;
     const frame = requestAnimationFrame(() => { syncing.current = false; });

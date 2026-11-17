@@ -46,21 +46,34 @@ export function velocityPartials(value: number | null | undefined): number[] {
 
 /**
  * Register-aware grand-piano partials. Bass gets more warm overtones, midrange stays
- * balanced, and treble keeps a strong fundamental to avoid harsh digital buzz.
+ * balanced, and treble keeps a strong fundamental. Profiles are interpolated between
+ * register anchors so adjacent notes do not jump in timbre.
  */
 export function grandPianoPartials(pitch: number, velocity: number | null | undefined): number[] {
   const value = velocityValue(velocity);
   const midi = Number.isFinite(pitch) ? Math.max(0, Math.min(127, Math.round(pitch))) : 60;
-  if (midi < 48) {
-    return [1, 0.58 + 0.22 * value, 0.42 + 0.20 * value, 0.30 + 0.17 * value,
-            0.22 + 0.14 * value, 0.16 + 0.11 * value, 0.12 + 0.08 * value,
-            0.085 + 0.06 * value, 0.06 + 0.045 * value];
-  }
-  if (midi > 76) {
-    return [1, 0.30 + 0.24 * value, 0.075 + 0.16 * value, 0.025 + 0.09 * value];
-  }
-  return [1, 0.42 + 0.26 * value, 0.14 + 0.22 * value, 0.06 + 0.14 * value,
-          0.028 + 0.08 * value, 0.012 + 0.04 * value];
+  const bass = [1, 0.58 + 0.22 * value, 0.42 + 0.20 * value, 0.30 + 0.17 * value,
+    0.22 + 0.14 * value, 0.16 + 0.11 * value, 0.12 + 0.08 * value,
+    0.085 + 0.06 * value, 0.06 + 0.045 * value];
+  const mid = [1, 0.42 + 0.26 * value, 0.14 + 0.22 * value, 0.06 + 0.14 * value,
+    0.028 + 0.08 * value, 0.012 + 0.04 * value];
+  const treble = [1, 0.30 + 0.24 * value, 0.075 + 0.16 * value, 0.025 + 0.09 * value];
+  const blend = (left: number[], right: number[], fraction: number) => {
+    const length = Math.max(left.length, right.length);
+    const partials: number[] = [];
+    for (let index = 0; index < length; index += 1) {
+      const a = left[index] ?? 0;
+      const b = right[index] ?? 0;
+      partials.push(a + (b - a) * fraction);
+    }
+    while (partials.length > 1 && Math.abs(partials[partials.length - 1]) < 1e-12) partials.pop();
+    return partials;
+  };
+  if (midi <= 36) return bass;
+  if (midi < 60) return blend(bass, mid, (midi - 36) / 24);
+  if (midi <= 60) return mid;
+  if (midi < 84) return blend(mid, treble, (midi - 60) / 24);
+  return treble;
 }
 
 /** How long the initial tone rings before the release envelope takes over. */

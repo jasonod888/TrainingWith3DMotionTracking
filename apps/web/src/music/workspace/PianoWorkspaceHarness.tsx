@@ -6,7 +6,7 @@
  * reference video and inspector alongside. Isolated from the review workflow; it
  * loads the same draft through the same API and writes nothing.
  */
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
   ArrowLeft, MoreHorizontal, Pause, Play, Redo2, Settings as SettingsIcon, Undo2, Video, Volume2, X,
 } from 'lucide-react';
@@ -238,6 +238,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const audioRef = useRef<NotationAudio | null>(null);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
   const [pedalSpans, setPedalSpans] = useState<MusicPedalSpan[]>([]);
+  const [rawModelDraft, setRawModelDraft] = useState(false);
   const [previewIdentity, setPreviewIdentity] = useState('');
   const [audioMode, setAudioMode] = useState<'original' | 'piano'>('original');
   const [preferRenderedWav, setPreferRenderedWav] = useState(false);
@@ -636,6 +637,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         : 'Fixture: arpeggiated chord');
       setSpans(demoSpans);
       setPedalSpans([]);
+      setRawModelDraft(false);
       setVideoUrl(null);
       setLoading(false);
       return () => { stopped = true; };
@@ -725,27 +727,63 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   useEffect(() => {
     if (!livePiano || !document) return;
     const media = videoRef.current;
-    const audio = liveAudioRef.current ??= new NotationAudio();
+    const audio = liveAudioRef.current ??= new NotationAudio(1.15);
     const triggered = new Set<string>();
     let frame = 0;
     let initialPass = true;
     const sourceTime = () => media && Number.isFinite(media.currentTime)
       ? media.currentTime : clockRef.current.get();
     let lastTime = sourceTime();
+    const syncVolume = () => audio.setVolume(media ? media.volume : 1);
+    syncVolume();
+    const isKongGhostBlip = (duration: number, velocity: number | null | undefined) =>
+      duration < 0.035 || (duration < 0.06 && (velocity ?? 0.5) < 0.35);
     const stopVoices = () => {
       audio.stop();
       triggered.clear();
       initialPass = true;
       lastTime = sourceTime();
     };
+    const nextRawOnset = new Map<string, number>();
+    if (rawModelDraft) {
+      const byPitch = new Map<number, {id: string; onset: number}[]>();
+      for (const note of document.performance) {
+        const rawDuration = note.duration ?? 0.25;
+        // Sub-frame and quiet overtone ghost blips must not cap surrounding real notes.
+        if (isKongGhostBlip(rawDuration, note.velocity)) continue;
+        const list = byPitch.get(note.pitch) ?? [];
+        list.push({id: note.id, onset: note.onset});
+        byPitch.set(note.pitch, list);
+      }
+      for (const list of byPitch.values()) {
+        list.sort((left, right) => left.onset - right.onset || left.id.localeCompare(right.id));
+        for (let index = 0; index + 1 < list.length; index += 1) {
+          nextRawOnset.set(list[index].id, list[index + 1].onset);
+        }
+      }
+    }
     const scheduleAt = () => {
       const now = sourceTime();
       const windowFrom = initialPass ? now - 0.04 : Math.min(lastTime, now) - 0.04;
       const windowTo = now + 0.12;
       for (const note of document.performance) {
         if (triggered.has(note.id)) continue;
-        const timing = audibleTimings.get(note.id);
-        const duration = timing?.soundingDuration ?? Math.max(0.05, note.duration ?? 0.35);
+        const rawDuration = note.duration ?? 0.25;
+        if (rawModelDraft && isKongGhostBlip(rawDuration, note.velocity)) continue;
+        let duration = rawDuration;
+        let dampedByKey = true;
+        if (!rawModelDraft && pedalSpans.length > 0) {
+          const timing = audibleTimings.get(note.id);
+          duration = timing?.soundingDuration ?? rawDuration;
+          dampedByKey = timing?.dampedByKey ?? true;
+        } else if (rawModelDraft) {
+          const nextOnset = nextRawOnset.get(note.id);
+          if (nextOnset !== undefined && nextOnset > note.onset
+            && nextOnset < note.onset + rawDuration) {
+            duration = nextOnset - note.onset;
+          }
+          dampedByKey = rawDuration < 1.2;
+        }
         const start = shiftOnset(note.onset, offsetSeconds);
         const end = start + duration;
         if (initialPass) {
@@ -754,14 +792,14 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             audio.playScheduledNote({
               pitch: note.pitch, velocity: note.velocity, duration: duration / rate,
               elapsed: (now - start) / rate, windowSeconds: (end - now) / rate,
-              dampedByKey: timing?.dampedByKey ?? true,
+              dampedByKey,
             });
           } else if (start >= now - 0.04 && start <= windowTo) {
             triggered.add(note.id);
             audio.playScheduledNote({
               pitch: note.pitch, velocity: note.velocity, duration: duration / rate,
               delaySeconds: Math.max(0, (start - now) / rate),
-              dampedByKey: timing?.dampedByKey ?? true,
+              dampedByKey,
             });
           }
         } else if (start >= windowFrom && start <= windowTo) {
@@ -771,7 +809,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           audio.playScheduledNote({
             pitch: note.pitch, velocity: note.velocity, duration: duration / rate,
             delaySeconds: Math.max(0, (start - now) / rate),
-            dampedByKey: timing?.dampedByKey ?? true,
+            dampedByKey,
           });
         }
       }
@@ -798,6 +836,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     const listeners: [string, () => void][] = [
       ['play', tick], ['playing', tick], ['timeupdate', tick], ['seeking', reset],
       ['seeked', onSeeked], ['pause', reset], ['ended', onEnded], ['ratechange', onRate],
+      ['volumechange', syncVolume],
     ];
     if (media) for (const [name, handler] of listeners) media.addEventListener(name, handler);
     if (media && !media.paused && !media.ended) tick();
@@ -805,7 +844,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       reset();
       if (media) for (const [name, handler] of listeners) media.removeEventListener(name, handler);
     };
-  }, [audibleTimings, livePiano, livePerformanceKey, offsetSeconds, rate, videoUrl]);
+  }, [audibleTimings, livePiano, livePerformanceKey, offsetSeconds, pedalSpans.length, rate, rawModelDraft, videoUrl]);
 
   const seek = useCallback((seconds: number) => {
     const media = videoRef.current;
@@ -1116,6 +1155,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     setState(createWorkspaceState(restored.document));
     setSpans(restored.spans);
     setPedalSpans(manifest?.pedal ?? []);
+    setRawModelDraft(false);
     setOffsetSeconds(restored.offsetSeconds);
     // One authoritative editable map: the stored map is the base for later anchors.
     setMapState(restored.alignment?.passages?.length ? {
@@ -1232,6 +1272,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         setTitle(draft.title);
         setSpans(draftSpans);
         setPedalSpans(draft.pedal ?? []);
+        setRawModelDraft(Boolean(draft.raw_model || draft.provenance?.model === 'kong'));
         setOffsetSeconds(draft.playback?.sync_offset_seconds ?? 0);
         setDraftId(draft.draft_id);
         setSourceSha256(draft.reference?.sha256 ?? '');
@@ -1259,7 +1300,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   // A reopened reference becomes the clean saved state once its document is applied.
   useEffect(() => {
-    if (!lessonId || !draftId) { setVerification(null); return; }
+    if (!lessonId || !draftId || rawModelDraft) { setVerification(null); return; }
     let stopped = false;
     void loadVerification(lessonId, draftId).then(value => {
       if (stopped || value === null) return;
@@ -1267,7 +1308,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       if (parsed.ok) setVerification(parsed.value);
     }).catch(() => {});
     return () => { stopped = true; };
-  }, [lessonId, draftId]);
+  }, [lessonId, draftId, rawModelDraft]);
 
   const decideFinding = useCallback(async (finding: VerificationFinding, decision: 'accepted' | 'rejected') => {
     if (readOnlyRef.current) {
@@ -1471,9 +1512,9 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     commandedScroll.current = next;
     setSharedScrollLeft(next);
     const bar = sharedBarRef.current;
-    if (bar && Math.abs(bar.scrollLeft - next) > 1) bar.scrollLeft = next;
+    if (bar && Math.abs(bar.scrollLeft - next) > 0.5) bar.scrollLeft = next;
     for (const node of globalThis.document.querySelectorAll<HTMLElement>('.ws-roll-viewport, .ws-score-viewport')) {
-      if (Math.abs(node.scrollLeft - next) > 1) node.scrollLeft = next;
+      if (Math.abs(node.scrollLeft - next) > 0.5) node.scrollLeft = next;
     }
   }, [timelineWidth, sharedWidth]);
 
@@ -1636,7 +1677,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   // One frame-driven follow writer: stationary cursor until the safe-area threshold,
   // then content advances beneath it. No smooth-scroll timer races the clock.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!follow || followSuspended || gestureLock || !playing || !document || !alignment || !timelineLayout) return;
     const W = sharedBarRef.current?.clientWidth || sharedWidth;
     if (W <= 0) return;
@@ -1650,7 +1691,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       return;
     }
     if (q > right) commitSharedScroll(p - right);
-  }, [playhead, follow, followSuspended, gestureLock, playing, document, alignment,
+  }, [livePlayhead, follow, followSuspended, gestureLock, playing, document, alignment,
     timelineLayout, sharedWidth, sharedScrollLeft, commitSharedScroll]);
 
   // A pause freezes the view; nothing else writes scroll while paused.

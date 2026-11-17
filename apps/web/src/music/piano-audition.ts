@@ -41,21 +41,21 @@ export function grandPianoEnvelope(duration: number, pitch: number, velocity?: n
   const release = dampedByKey ? Math.min(0.16, duration * 0.35) : Math.min(0.28, duration * 0.4);
   // Keep a minimum held body while preserving the full damper-release tail.
   const heldUntil = Math.max(duration * 0.2, duration - release);
-  const attack = Math.min(velocityValue(velocity) >= 0.75 ? 0.0035 : 0.007, heldUntil * 0.2);
-  const bloomEnd = Math.min(velocityDecay(velocity) * 0.45, heldUntil * 0.45);
+  const attack = Math.min(velocityValue(velocity) >= 0.75 ? 0.0035 : 0.006, heldUntil * 0.18);
+  const bloomEnd = Math.min(0.11, heldUntil * 0.35);
   const f0 = 440 * Math.pow(2, (pitch - 69) / 12);
-  const tau = Math.max(0.55, Math.min(5.5, 3.8 * Math.pow(220 / Math.max(1, f0), 0.35)));
+  const tau = Math.max(0.45, Math.min(2.6, 1.25 * Math.pow(220 / Math.max(1, f0), 0.6)));
   const heldGain = Math.max(SILENCE * 2,
-    level * 0.52 * Math.exp(-Math.max(0, heldUntil - bloomEnd) / tau));
+    level * 0.22 * Math.exp(-Math.max(0, heldUntil - bloomEnd) / tau));
   const points: EnvelopePoint[] = [
     {time: 0, gain: SILENCE},
     {time: attack, gain: level},
-    {time: bloomEnd, gain: level * 0.52},
+    {time: bloomEnd, gain: level * 0.22},
   ];
   if (heldUntil - bloomEnd > 0.25) {
     const midTime = bloomEnd + (heldUntil - bloomEnd) * 0.5;
     points.push({time: midTime,
-      gain: Math.max(SILENCE * 2, level * 0.52 * Math.exp(-(midTime - bloomEnd) / tau))});
+      gain: Math.max(SILENCE * 2, level * 0.22 * Math.exp(-(midTime - bloomEnd) / tau))});
   }
   points.push({time: heldUntil, gain: heldGain}, {time: duration, gain: SILENCE});
   // Keep automation strictly ordered even for pathological tiny durations.
@@ -114,7 +114,30 @@ export function schedulePianoVoice(context: BaseAudioContext, destination: Audio
     gain.gain.exponentialRampToValueAtTime(envelopeGainAt(points, elapsed + fadeStart), note.startTime + fadeStart);
   }
   gain.gain.exponentialRampToValueAtTime(SILENCE, note.startTime + length);
-  oscillator.connect(filter).connect(gain).connect(destination);
+  // A full browser AudioContext gets a gently detuned unison string and a hammer
+  // transient. The minimal test doubles intentionally provide neither capability.
+  const fullSynthesis = typeof (context as AudioContext).createStereoPanner === 'function';
+  if (fullSynthesis) {
+    const attackCutoff = pitchVelocityCutoff(note.pitch, note.velocity);
+    const f0 = oscillator.frequency.value;
+    const bodyCutoff = Math.max(240,
+      Math.min(attackCutoff * 0.42, f0 * (note.pitch >= 72 ? 1.75 : 2.4)));
+    const tailCutoff = Math.max(200, Math.min(bodyCutoff, f0 * 1.35));
+    if (typeof filter.frequency.setValueAtTime === 'function'
+      && typeof filter.frequency.exponentialRampToValueAtTime === 'function') {
+      filter.frequency.setValueAtTime(attackCutoff, note.startTime);
+      filter.frequency.exponentialRampToValueAtTime(bodyCutoff,
+        note.startTime + Math.min(0.24, length * 0.5));
+      filter.frequency.exponentialRampToValueAtTime(tailCutoff, note.startTime + length);
+    }
+  }
+  const panner = fullSynthesis ? context.createStereoPanner() : null;
+  if (panner) {
+    panner.pan.value = Math.max(-0.35, Math.min(0.35, ((note.pitch - 60) / 44) * 0.35));
+  }
+  oscillator.connect(filter).connect(gain);
+  if (panner) gain.connect(panner).connect(destination);
+  else gain.connect(destination);
   const extraOscillators: OscillatorNode[] = [];
   const extraGains: GainNode[] = [];
   const stopped = {value: false};
@@ -126,18 +149,16 @@ export function schedulePianoVoice(context: BaseAudioContext, destination: Audio
       try { node.disconnect(); } catch { /* disconnected */ }
     }
     for (const node of extraGains) { try { node.disconnect(); } catch { /* disconnected */ } }
+    try { panner?.disconnect(); } catch { /* disconnected */ }
   };
-  // A full browser AudioContext gets a gently detuned unison string and a hammer
-  // transient. The minimal test doubles intentionally provide neither capability.
-  const fullSynthesis = typeof (context as AudioContext).createStereoPanner === 'function';
-  if (fullSynthesis && note.unison !== false) {
+  if (fullSynthesis && note.unison !== false && note.pitch >= 40) {
     const secondary = context.createOscillator();
     secondary.setPeriodicWave(wave);
     secondary.frequency.value = oscillator.frequency.value;
-    if (secondary.detune) secondary.detune.value = 3.5;
+    if (secondary.detune) secondary.detune.value = 0.7;
     const blend = context.createGain();
     blend.gain.value = 0.16;
-    secondary.connect(blend).connect(gain);
+    secondary.connect(blend).connect(filter);
     secondary.start(note.startTime);
     secondary.stop(note.startTime + length + .005);
     extraOscillators.push(secondary);
@@ -146,14 +167,14 @@ export function schedulePianoVoice(context: BaseAudioContext, destination: Audio
   if (fullSynthesis && elapsed <= 1e-6) {
     const hammer = context.createOscillator();
     hammer.type = 'triangle';
-    hammer.frequency.value = Math.min(9000, oscillator.frequency.value * 4.2);
+    hammer.frequency.value = oscillator.frequency.value;
     const hammerGain = context.createGain();
-    const level = Math.min(.045, .008 + velocityValue(note.velocity) * .045);
+    const level = Math.min(0.018, 0.003 + velocityValue(note.velocity) * 0.015);
     hammerGain.gain.setValueAtTime(Math.max(.0001, level), note.startTime);
-    hammerGain.gain.exponentialRampToValueAtTime(SILENCE, note.startTime + .045);
-    hammer.connect(hammerGain).connect(destination);
+    hammerGain.gain.exponentialRampToValueAtTime(SILENCE, note.startTime + .009);
+    hammer.connect(hammerGain).connect(filter);
     hammer.start(note.startTime);
-    hammer.stop(note.startTime + .05);
+    hammer.stop(note.startTime + .014);
     extraOscillators.push(hammer);
     extraGains.push(hammerGain);
   }
@@ -180,5 +201,9 @@ export function schedulePianoVoice(context: BaseAudioContext, destination: Audio
     try { gain.gain.setValueAtTime(current, at); } catch { /* already ended */ }
     try { gain.gain.exponentialRampToValueAtTime(SILENCE, at + fade); } catch { /* already ended */ }
     try { oscillator.stop(at + fade + .005); } catch { /* already stopping */ }
+    for (const node of extraOscillators) {
+      try { node.stop(at + fade + .005); } catch { /* already stopping */ }
+    }
+    // Let oscillator.onended run stopExtra() after the scheduled fade completes.
   }};
 }
