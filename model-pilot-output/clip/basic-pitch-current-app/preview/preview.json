@@ -1,0 +1,109 @@
+{
+  "common": {
+    "channels": 1,
+    "gain_policy": {
+      "common_gain_db": 0.0,
+      "normalization": "none"
+    },
+    "renderer": "additive-reference-1",
+    "renderer_version": "2.1.0",
+    "sample_rate": 22050
+  },
+  "notes": [
+    "Both modes use one renderer, preset and gain policy.",
+    "As transcribed preserves each model's declared dynamics and pedal; a missing physical release uses the renderer's documented assumption.",
+    "Notes only ignores velocity and pedal and fixes intensity and duration.",
+    "No per-model normalization is applied; clipping and level are recorded."
+  ],
+  "previews": {
+    "as_transcribed": {
+      "asset_sha256": null,
+      "channels": 1,
+      "clipping": true,
+      "controls": {
+        "half_pedal": false,
+        "key_release": true,
+        "resonance": false,
+        "soft_pedal": false,
+        "sostenuto_pedal": false,
+        "sustain_pedal": true,
+        "velocity": true
+      },
+      "file": "preview.wav",
+      "gain_policy": {
+        "common_gain_db": 0.0,
+        "normalization": "none"
+      },
+      "identity": "536d87780446ef231e633b961ae137441555723d7e9984251bf106495599872a",
+      "mode": "as_transcribed",
+      "note_count": 36,
+      "notes_only_convention": null,
+      "peak_dbfs": 0.0,
+      "release_sources": {
+        "assumed": 36,
+        "legacy": 0,
+        "measured": 0
+      },
+      "rendered_notes": 36,
+      "renderer": "additive-reference-1",
+      "renderer_version": "2.1.0",
+      "rms_dbfs": -11.106,
+      "sample_rate": 22050,
+      "schema": "piano-model-preview-1",
+      "seconds": 16.616009,
+      "sha256": "e8400bac92328ce3dc068f8554f7bb715a7ec4f61495adc2903cb535c000b32f",
+      "version": "1.0.0",
+      "warnings": [
+        "release assumed for 36 note(s) with neither a measured key release nor a legacy duration (assumption 0.35s)",
+        "output clipped"
+      ]
+    },
+    "notes_only": {
+      "asset_sha256": null,
+      "channels": 1,
+      "clipping": true,
+      "controls": {
+        "half_pedal": false,
+        "key_release": true,
+        "resonance": false,
+        "soft_pedal": false,
+        "sostenuto_pedal": false,
+        "sustain_pedal": true,
+        "velocity": true
+      },
+      "file": "preview-notes.wav",
+      "gain_policy": {
+        "common_gain_db": 0.0,
+        "normalization": "none"
+      },
+      "identity": "549c4b9c1d46ab263d5f4127970badd7c53f88329b23424a497c3dd0b08d1dc0",
+      "mode": "notes_only",
+      "note_count": 36,
+      "notes_only_convention": {
+        "duration_seconds": 0.5,
+        "intensity": 0.6
+      },
+      "peak_dbfs": 0.0,
+      "release_sources": {
+        "assumed": 0,
+        "legacy": 0,
+        "measured": 36
+      },
+      "rendered_notes": 36,
+      "renderer": "additive-reference-1",
+      "renderer_version": "2.1.0",
+      "rms_dbfs": -9.989,
+      "sample_rate": 22050,
+      "schema": "piano-model-preview-1",
+      "seconds": 16.616009,
+      "sha256": "36616c94c95398e3a429879b5667cad313630821674d3ae3e7588f0f2ec6112b",
+      "version": "1.0.0",
+      "warnings": [
+        "output clipped"
+      ]
+    }
+  },
+  "schema": "piano-model-preview-1",
+  "variant": "basic-pitch-current-app-946de09ed53a",
+  "version": "1.0.0"
+}

@@ -1,0 +1,6 @@
+{
+  "scope": "Hosted Signal UI with static GET-only network access; uploads, cloud APIs, analytics and socket connections blocked",
+  "notesInFile": 1338,
+  "midiQuantizationMaxSeconds": 0.0005208333333333333,
+  "failure": "Page.goto: net::ERR_NETWORK_ACCESS_DENIED at https://signalmidi.app/edit\nCall log:\n  - navigating to \"https://signalmidi.app/edit\", waiting until \"domcontentloaded\"\n"
+}

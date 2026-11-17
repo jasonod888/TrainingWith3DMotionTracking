@@ -1,0 +1,215 @@
+TAP version 13
+# Subtest: R1 roll window pointer cancellation never commits
+not ok 1 - R1 roll window pointer cancellation never commits
+  ---
+  duration_ms: 140.6202
+  type: 'test'
+  location: 'D:\\3d_trainer\\developement\\apps\\web\\tests\\workspace-phase6-review-repro.tsx:1:3679'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    '62' !== '60'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '60'
+  actual: '62'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\3d_trainer\developement\apps\web\tests\workspace-phase6-review-repro.tsx:41:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: R1 sheet window pointer cancellation never commits
+not ok 2 - R1 sheet window pointer cancellation never commits
+  ---
+  duration_ms: 126.9276
+  type: 'test'
+  location: 'D:\\3d_trainer\\developement\\apps\\web\\tests\\workspace-phase6-review-repro.tsx:1:4020'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    'D4' !== 'C4'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'C4'
+  actual: 'D4'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\3d_trainer\developement\apps\web\tests\workspace-phase6-review-repro.tsx:47:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R1 unmount cleans up pending drag instead of committing to the old host
+not ok 3 - R1 unmount cleans up pending drag instead of committing to the old host
+  ---
+  duration_ms: 9.5616
+  type: 'test'
+  location: 'D:\\3d_trainer\\developement\\apps\\web\\tests\\workspace-phase6-review-repro.tsx:1:4404'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + [
+    +   {
+    +     kind: 'pitch',
+    +     occurrenceId: 'one',
+    +     pitch: 61
+    +   }
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0:
+      kind: 'pitch'
+      occurrenceId: 'one'
+      pitch: 61
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\3d_trainer\developement\apps\web\tests\workspace-phase6-review-repro.tsx:52:80)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R1 losing pointer capture cancels instead of committing on a later pointerup
+not ok 4 - R1 losing pointer capture cancels instead of committing on a later pointerup
+  ---
+  duration_ms: 114.6186
+  type: 'test'
+  location: 'D:\\3d_trainer\\developement\\apps\\web\\tests\\workspace-phase6-review-repro.tsx:1:4824'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    '62' !== '60'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '60'
+  actual: '62'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\3d_trainer\developement\apps\web\tests\workspace-phase6-review-repro.tsx:57:52)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R2 sheet drag follows actual staff line-space geometry
+not ok 5 - R2 sheet drag follows actual staff line-space geometry
+  ---
+  duration_ms: 15.892
+  type: 'test'
+  location: 'D:\\3d_trainer\\developement\\apps\\web\\tests\\workspace-phase6-review-repro.tsx:1:5191'
+  failureType: 'testCodeFailure'
+  error: |-
+    staff lines are 10 px apart, so C up one line must be E (two diatonic steps)
+    
+    62 !== 64
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 64
+  actual: 62
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\3d_trainer\developement\apps\web\tests\workspace-phase6-review-repro.tsx:65:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R3 add placement subtracts the displayed sync offset
+not ok 6 - R3 add placement subtracts the displayed sync offset
+  ---
+  duration_ms: 106.1868
+  type: 'test'
+  location: 'D:\\3d_trainer\\developement\\apps\\web\\tests\\workspace-phase6-review-repro.tsx:1:5711'
+  failureType: 'testCodeFailure'
+  error: |-
+    ghost should remain at the clicked source-time x
+    
+    210 !== 180
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 180
+  actual: 210
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\3d_trainer\developement\apps\web\tests\workspace-phase6-review-repro.tsx:72:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R4 Replace mode blocks roll editing until cancelled or committed
+not ok 7 - R4 Replace mode blocks roll editing until cancelled or committed
+  ---
+  duration_ms: 196.7583
+  type: 'test'
+  location: 'D:\\3d_trainer\\developement\\apps\\web\\tests\\workspace-phase6-review-repro.tsx:1:6224'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    '62' !== '60'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '60'
+  actual: '62'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\3d_trainer\developement\apps\web\tests\workspace-phase6-review-repro.tsx:80:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: R5 returning a sheet drag to its origin preserves an authored accidental
+not ok 8 - R5 returning a sheet drag to its origin preserves an authored accidental
+  ---
+  duration_ms: 9.1343
+  type: 'test'
+  location: 'D:\\3d_trainer\\developement\\apps\\web\\tests\\workspace-phase6-review-repro.tsx:1:6706'
+  failureType: 'testCodeFailure'
+  error: |-
+    return to origin must be a no-op, preserving C-sharp
+    + actual - expected
+    
+    + [
+    +   {
+    +     kind: 'pitch',
+    +     occurrenceId: 'sharp',
+    +     pitch: 62,
+    +     spelling: 'D4'
+    +   }
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0:
+      kind: 'pitch'
+      occurrenceId: 'sharp'
+      pitch: 62
+      spelling: 'D4'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (D:\3d_trainer\developement\apps\web\tests\workspace-phase6-review-repro.tsx:88:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...

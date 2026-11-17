@@ -1,0 +1,65 @@
+{
+  "adapter_version": "piano-model-adapters-1",
+  "correction_enabled": false,
+  "correction_operations": 0,
+  "created_at": "2026-11-13T02:39:29Z",
+  "expression_correction_enabled": false,
+  "family": "kong",
+  "identity": {
+    "adapter_sha256": "9155cbf762abf3d92bd0c25cc2952f574bcbb80bbc8489f489bf567859b78bb4",
+    "checkpoint_sha256": "c3fa9730725bf4a762f1c14bc80cd5986eacda01b026f5a4a2525cd607876141",
+    "decoder_profile": "kong-0.0.6/native",
+    "decoder_profile_sha256": null,
+    "environment": {
+      "backend": "pytorch",
+      "device": "cuda",
+      "isolation": "separate model environment",
+      "runtime": ".venv"
+    }
+  },
+  "mode": "raw-model-comparison-v1",
+  "outputs": {
+    "counts": {
+      "dropped_outside_interval": 0,
+      "notes": 739,
+      "offset_beyond_interval": 1,
+      "pedal_spans": 166
+    },
+    "document": "document.json",
+    "document_sha256": "ea9ae5cfa9fc7d53789c145c8c12cade723e0a57076657e6aee5557359b2ba3e",
+    "native": "native.json",
+    "native_sha256": "bbc70289b378073975f9309fe7257eb281ec437a0ebe755affcd571ec4a0f1b5",
+    "semantics": "semantics.json"
+  },
+  "runtime": {
+    "backend": "pytorch",
+    "device": "cuda",
+    "sample_rate": 16000,
+    "seconds": 22.196
+  },
+  "schema": "piano-model-run-receipt-1",
+  "source": {
+    "conversion": {
+      "interval": [
+        0.0,
+        128.199274
+      ],
+      "rules": [
+        "trim",
+        "downmix-to-mono",
+        "resample-poly:44100->16000"
+      ],
+      "source_sha256": "808a6a3e66a468e89f010a6d6e43c86b50ac6b73fad7307c3e0ffa7da9816ff5"
+    },
+    "interval": [
+      0.0,
+      128.199274
+    ],
+    "master_sha256": "808a6a3e66a468e89f010a6d6e43c86b50ac6b73fad7307c3e0ffa7da9816ff5",
+    "prepared_sha256": "27bb1339cc8a516138a5cb289bae24e38003ea884c22c56f105c275faac91bc3"
+  },
+  "status": "ready",
+  "variant": "kong-piano",
+  "version": 1,
+  "warnings": []
+}

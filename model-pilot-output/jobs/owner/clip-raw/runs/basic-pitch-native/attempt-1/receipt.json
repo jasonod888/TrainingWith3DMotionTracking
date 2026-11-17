@@ -1,0 +1,64 @@
+{
+  "adapter_version": "piano-model-adapters-1",
+  "correction_enabled": false,
+  "correction_operations": 0,
+  "created_at": "2026-11-13T02:40:31Z",
+  "expression_correction_enabled": false,
+  "family": "basic-pitch",
+  "identity": {
+    "adapter_sha256": "9155cbf762abf3d92bd0c25cc2952f574bcbb80bbc8489f489bf567859b78bb4",
+    "checkpoint_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+    "decoder_profile": "basic-pitch-0.4.0/decoding-v1",
+    "decoder_profile_sha256": "b55aceaa68d76b60b14b21266a9c4b678607776606465893b4f2eefd9f2a16d4",
+    "environment": {
+      "backend": "onnx",
+      "device": "cpu",
+      "isolation": "separate from the API environment",
+      "runtime": ".venv-music"
+    },
+    "weights_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec"
+  },
+  "mode": "raw-model-comparison-v1",
+  "outputs": {
+    "counts": {
+      "dropped_outside_interval": 0,
+      "notes": 51,
+      "offset_beyond_interval": 0,
+      "pedal_spans": 0
+    },
+    "document": "document.json",
+    "document_sha256": "fd77ae1edd87661f3de689805ff07698bc07a8642af27601766dacac788fe639",
+    "native": "native.json",
+    "native_sha256": "baabcfa95a808cffe6fe4e40696b5abb4088bac8ccafd5b5f1e8c8fc5ebee5b1",
+    "semantics": "semantics.json"
+  },
+  "runtime": {
+    "backend": "onnx",
+    "device": "cpu",
+    "model_output_sha256": "d032d6e6cdbb4780563a0c9ca3a4658442bc7c348672569fd69086f71dde4c7d",
+    "seconds": 2.696
+  },
+  "schema": "piano-model-run-receipt-1",
+  "source": {
+    "conversion": {
+      "interval": [
+        0.0,
+        15.616009
+      ],
+      "rules": [
+        "trim"
+      ],
+      "source_sha256": "5fb6b8929f1548d067637b0063bc02c19c6e34025905aa2526aa49e02f3874fd"
+    },
+    "interval": [
+      0.0,
+      15.616009
+    ],
+    "master_sha256": "5fb6b8929f1548d067637b0063bc02c19c6e34025905aa2526aa49e02f3874fd",
+    "prepared_sha256": "946de09ed53af76353a405cc2dc9635dc9b26c148a1e9d232b36780581c012d1"
+  },
+  "status": "ready",
+  "variant": "basic-pitch-native",
+  "version": 1,
+  "warnings": []
+}

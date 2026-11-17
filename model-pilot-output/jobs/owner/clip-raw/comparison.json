@@ -1,0 +1,99 @@
+{
+  "correction_enabled": false,
+  "created_at": "2026-11-13T02:40:28Z",
+  "expression_correction_enabled": false,
+  "finished_at": "2026-11-13T02:40:45Z",
+  "id": "clip-raw",
+  "mode": "raw-model-comparison-v1",
+  "owner": "owner",
+  "registry_sha256": "aa32b31dd04e23aabf1264538af1c4764b8584150fa3fbcbfb4d5eb223388bdc",
+  "requested": [
+    "basic-pitch-native",
+    "basic-pitch-current-app",
+    "kong-piano",
+    "transkun-v2",
+    "onsets-frames-piano"
+  ],
+  "runs": {
+    "basic-pitch-current-app": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "directory": "model-pilot-output\\jobs\\owner\\clip-raw\\runs\\basic-pitch-current-app\\attempt-1",
+          "finished_at": "2026-11-13T02:40:34Z",
+          "receipt": "model-pilot-output\\jobs\\owner\\clip-raw\\runs\\basic-pitch-current-app\\attempt-1\\receipt.json",
+          "receipt_sha256": "ad1a5fa5afba61d6896beba76e14570baf6d77153effee61f613cb59ebb13927",
+          "started_at": "2026-11-13T02:40:31Z",
+          "status": "ready"
+        }
+      ],
+      "blocked": false,
+      "error": null,
+      "status": "ready",
+      "variant": "basic-pitch-current-app"
+    },
+    "basic-pitch-native": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "directory": "model-pilot-output\\jobs\\owner\\clip-raw\\runs\\basic-pitch-native\\attempt-1",
+          "finished_at": "2026-11-13T02:40:31Z",
+          "receipt": "model-pilot-output\\jobs\\owner\\clip-raw\\runs\\basic-pitch-native\\attempt-1\\receipt.json",
+          "receipt_sha256": "fccbea48076b546a68bc8d9e8b07e8cbbd4f23c78dcff92f8b3eb19a3076ecf2",
+          "started_at": "2026-11-13T02:40:28Z",
+          "status": "ready"
+        }
+      ],
+      "blocked": false,
+      "error": null,
+      "status": "ready",
+      "variant": "basic-pitch-native"
+    },
+    "kong-piano": {
+      "attempts": [
+        {
+          "attempt": 1,
+          "directory": "model-pilot-output\\jobs\\owner\\clip-raw\\runs\\kong-piano\\attempt-1",
+          "finished_at": "2026-11-13T02:40:45Z",
+          "receipt": "model-pilot-output\\jobs\\owner\\clip-raw\\runs\\kong-piano\\attempt-1\\receipt.json",
+          "receipt_sha256": "df4b1c5261254996bc76c6638b5d936700564ea3107867cc71ef234edc05f217",
+          "started_at": "2026-11-13T02:40:34Z",
+          "status": "ready"
+        }
+      ],
+      "blocked": false,
+      "error": null,
+      "status": "ready",
+      "variant": "kong-piano"
+    },
+    "onsets-frames-piano": {
+      "attempts": [],
+      "blocked": true,
+      "blocked_reasons": [
+        "maestro:model_selection=prohibited"
+      ],
+      "status": "blocked_license",
+      "variant": "onsets-frames-piano"
+    },
+    "transkun-v2": {
+      "attempts": [],
+      "blocked": true,
+      "blocked_reasons": [
+        "transkun-checkpoint:model_selection=unresolved"
+      ],
+      "status": "blocked_license",
+      "variant": "transkun-v2"
+    }
+  },
+  "schema": "piano-comparison-1",
+  "seconds": 16.658,
+  "source": {
+    "interval": [
+      0.0,
+      15.616009
+    ],
+    "path": ".local\\piano-correction-trial-20261112\\source.wav",
+    "sha256": "5fb6b8929f1548d067637b0063bc02c19c6e34025905aa2526aa49e02f3874fd"
+  },
+  "status": "partial"
+}

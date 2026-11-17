@@ -1,0 +1,7 @@
+{
+  "occurrence": "bp-1",
+  "genuine_pitch_edit_accepted": true,
+  "unintended_onset_shift_seconds": 0.01,
+  "verifier_accepts_corrupted_after_state": false,
+  "passed": true
+}

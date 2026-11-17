@@ -1,0 +1,9 @@
+﻿from pathlib import Path
+p = Path('docs/qualification/kong-default-implementation.md')
+t = p.read_text(encoding='utf-8')
+t = t.replace('Status: Kong profile, adapter, route and default selection implemented; Original/Piano\nplayback with sync offset implemented in review and finalized lesson pages. Browser\nacceptance, pedal representation and drift hysteresis remain.',
+ 'Status: Kong profile, adapter, route and default selection implemented; Original/Piano\nplayback with sync offset implemented in review and finalized lesson pages. Review-page\nbrowser acceptance passes; lesson-page browser acceptance, pedal representation and drift\nhysteresis remain.')
+t = t.replace('## Not implemented yet\n\n1. Browser acceptance: leading silence, +-120 ms offsets, note crossing zero, mid-note\n   switching, loop/speed, dense input, preview failure and permissions. Deterministic\n   tests cover the backend, parser and pure clock mapping (`piano-playback`), but not a\n   real browser session.',
+ '## Browser acceptance (review page)\n\nA seeded Chromium run (`model-pilot-output/review_browser_acceptance.py`) loads a Kong\nraw draft with a real source video and rendered piano preview. It verified: the video is\nmuted and the piano element plays after switching to Piano; saving +120 ms persists\n`{sync_offset_seconds: 0.12, revision: 2}`; seeking the paused video to 2.0 s lands the\npiano at 1.88 s; and Original restores video audio and pauses the piano. Screenshot and\nseed artifacts are under `.local/repo-research/kong-review-browser/`.\n\n## Not implemented yet\n\n1. Browser acceptance for the finalized lesson page and the remaining matrix: leading\n   silence, negative offsets with a note crossing zero, mid-note switching, loop, speed,\n   dense input, preview failure and permissions. Review page and deterministic clock\n   mapping are covered.')
+p.write_text(t, encoding='utf-8')
+print('updated')

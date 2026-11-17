@@ -1,0 +1,701 @@
+{
+  "aggregate": {
+    "blocked": 2,
+    "models": 3,
+    "states": {
+      "basic-pitch-current-app": {
+        "measured": 2,
+        "not_estimated": 4,
+        "reference_unavailable": 2,
+        "unsupported_semantics": 1
+      },
+      "basic-pitch-native": {
+        "measured": 2,
+        "not_estimated": 4,
+        "reference_unavailable": 2,
+        "unsupported_semantics": 1
+      },
+      "kong-piano": {
+        "measured": 2,
+        "not_estimated": 2,
+        "reference_unavailable": 4,
+        "unsupported_semantics": 1
+      }
+    }
+  },
+  "blocked": [
+    {
+      "label": "Transkun",
+      "reasons": [
+        "transkun-checkpoint:model_selection=unresolved"
+      ],
+      "state": "blocked_license",
+      "variant": "transkun-v2"
+    },
+    {
+      "label": "Onsets and Frames",
+      "reasons": [
+        "maestro:model_selection=prohibited"
+      ],
+      "state": "blocked_license",
+      "variant": "onsets-frames-piano"
+    }
+  ],
+  "created_at": "2026-11-13T00:00:00Z",
+  "limits": [
+    "Attribute rows are not combined into an overall score or an automatic winner.",
+    "A diagnostic or reference-unavailable state is not a pass or a failure.",
+    "Model agreement is not evidence of correctness; only the reference measures it."
+  ],
+  "mode": "raw-model-comparison-v1",
+  "models": {
+    "basic-pitch-current-app": {
+      "attributes": {
+        "audible_end": {
+          "reasons": [
+            "no model estimates an independently annotated audible ending"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "detected_notes": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "notes": 36,
+            "per_second": 2.305
+          }
+        },
+        "fine_timing": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "key_release": {
+          "reasons": [
+            "no model estimates physical key release"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "note_correctness": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "pedal": {
+          "reasons": [
+            "the model does not estimate pedal"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "practicality": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "backend": "onnx",
+            "checkpoint_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+            "cold_load_seconds": null,
+            "device": "cpu",
+            "inference_seconds": 2.579,
+            "peak_memory_mib": null
+          }
+        },
+        "velocity": {
+          "reasons": [
+            "amplitude proxy, not comparable MIDI velocity"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "written_rhythm": {
+          "reasons": [
+            "no model outputs written notation"
+          ],
+          "state": "unsupported_semantics",
+          "value": null
+        }
+      },
+      "document_path": "model-pilot-output\\clip\\basic-pitch-current-app\\document.json",
+      "family": "basic-pitch",
+      "label": "Basic Pitch \u2014 current app",
+      "variant": "basic-pitch-current-app"
+    },
+    "basic-pitch-native": {
+      "attributes": {
+        "audible_end": {
+          "reasons": [
+            "no model estimates an independently annotated audible ending"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "detected_notes": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "notes": 51,
+            "per_second": 3.266
+          }
+        },
+        "fine_timing": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "key_release": {
+          "reasons": [
+            "no model estimates physical key release"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "note_correctness": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "pedal": {
+          "reasons": [
+            "the model does not estimate pedal"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "practicality": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "backend": "onnx",
+            "checkpoint_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+            "cold_load_seconds": null,
+            "device": "cpu",
+            "inference_seconds": 10.223,
+            "peak_memory_mib": null
+          }
+        },
+        "velocity": {
+          "reasons": [
+            "amplitude proxy, not comparable MIDI velocity"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "written_rhythm": {
+          "reasons": [
+            "no model outputs written notation"
+          ],
+          "state": "unsupported_semantics",
+          "value": null
+        }
+      },
+      "document_path": "model-pilot-output\\clip\\basic-pitch-native\\document.json",
+      "family": "basic-pitch",
+      "label": "Basic Pitch \u2014 native",
+      "variant": "basic-pitch-native"
+    },
+    "kong-piano": {
+      "attributes": {
+        "audible_end": {
+          "reasons": [
+            "no model estimates an independently annotated audible ending"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "detected_notes": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "notes": 38,
+            "per_second": 2.433
+          }
+        },
+        "fine_timing": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "key_release": {
+          "reasons": [
+            "no model estimates physical key release"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "note_correctness": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "pedal": {
+          "reasons": [
+            "no captured controller reference"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "practicality": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "backend": "pytorch",
+            "checkpoint_sha256": "c3fa9730725bf4a762f1c14bc80cd5986eacda01b026f5a4a2525cd607876141",
+            "cold_load_seconds": null,
+            "device": "cuda",
+            "inference_seconds": 23.207,
+            "peak_memory_mib": null
+          }
+        },
+        "velocity": {
+          "reasons": [
+            "no captured MIDI velocity reference"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "written_rhythm": {
+          "reasons": [
+            "no model outputs written notation"
+          ],
+          "state": "unsupported_semantics",
+          "value": null
+        }
+      },
+      "document_path": "model-pilot-output\\clip\\kong-piano\\document.json",
+      "family": "kong",
+      "label": "Kong",
+      "variant": "kong-piano"
+    }
+  },
+  "schema": "piano-model-comparison-1",
+  "source": {
+    "interval": [
+      0.0,
+      15.616009
+    ],
+    "master_sha256": "5fb6b8929f1548d067637b0063bc02c19c6e34025905aa2526aa49e02f3874fd",
+    "reference": null
+  },
+  "table": [
+    {
+      "attribute": "detected_notes",
+      "cells": {
+        "basic-pitch-current-app": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "notes": 36,
+            "per_second": 2.305
+          }
+        },
+        "basic-pitch-native": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "notes": 51,
+            "per_second": 3.266
+          }
+        },
+        "kong-piano": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "notes": 38,
+            "per_second": 2.433
+          }
+        },
+        "onsets-frames-piano": {
+          "reasons": [
+            "maestro:model_selection=prohibited"
+          ],
+          "state": "blocked_license",
+          "value": null
+        },
+        "transkun-v2": {
+          "reasons": [
+            "transkun-checkpoint:model_selection=unresolved"
+          ],
+          "state": "blocked_license",
+          "value": null
+        }
+      },
+      "direction": null,
+      "note": "observation only; more notes is not automatically better",
+      "units": "events"
+    },
+    {
+      "attribute": "note_correctness",
+      "cells": {
+        "basic-pitch-current-app": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "basic-pitch-native": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "kong-piano": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "onsets-frames-piano": {
+          "reasons": [
+            "maestro:model_selection=prohibited"
+          ],
+          "state": "blocked_license",
+          "value": null
+        },
+        "transkun-v2": {
+          "reasons": [
+            "transkun-checkpoint:model_selection=unresolved"
+          ],
+          "state": "blocked_license",
+          "value": null
+        }
+      },
+      "direction": "higher_is_better",
+      "note": "exact-pitch 50 ms correspondence against the reference",
+      "units": "f1"
+    },
+    {
+      "attribute": "fine_timing",
+      "cells": {
+        "basic-pitch-current-app": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "basic-pitch-native": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "kong-piano": {
+          "reasons": [
+            "no independent reference was supplied"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "onsets-frames-piano": {
+          "reasons": [
+            "maestro:model_selection=prohibited"
+          ],
+          "state": "blocked_license",
+          "value": null
+        },
+        "transkun-v2": {
+          "reasons": [
+            "transkun-checkpoint:model_selection=unresolved"
+          ],
+          "state": "blocked_license",
+          "value": null
+        }
+      },
+      "direction": "lower_is_better",
+      "note": "reference-only timing eligibility; fixed denominator",
+      "units": "seconds"
+    },
+    {
+      "attribute": "key_release",
+      "cells": {
+        "basic-pitch-current-app": {
+          "reasons": [
+            "no model estimates physical key release"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "basic-pitch-native": {
+          "reasons": [
+            "no model estimates physical key release"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "kong-piano": {
+          "reasons": [
+            "no model estimates physical key release"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "onsets-frames-piano": {
+          "reasons": [
+            "maestro:model_selection=prohibited"
+          ],
+          "state": "blocked_license",
+          "value": null
+        },
+        "transkun-v2": {
+          "reasons": [
+            "transkun-checkpoint:model_selection=unresolved"
+          ],
+          "state": "blocked_license",
+          "value": null
+        }
+      },
+      "direction": "lower_is_better",
+      "note": "needs a candidate that estimates physical release",
+      "units": "seconds"
+    },
+    {
+      "attribute": "audible_end",
+      "cells": {
+        "basic-pitch-current-app": {
+          "reasons": [
+            "no model estimates an independently annotated audible ending"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "basic-pitch-native": {
+          "reasons": [
+            "no model estimates an independently annotated audible ending"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "kong-piano": {
+          "reasons": [
+            "no model estimates an independently annotated audible ending"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "onsets-frames-piano": {
+          "reasons": [
+            "maestro:model_selection=prohibited"
+          ],
+          "state": "blocked_license",
+          "value": null
+        },
+        "transkun-v2": {
+          "reasons": [
+            "transkun-checkpoint:model_selection=unresolved"
+          ],
+          "state": "blocked_license",
+          "value": null
+        }
+      },
+      "direction": "lower_is_better",
+      "note": "needs independently annotated ending intervals",
+      "units": "seconds"
+    },
+    {
+      "attribute": "velocity",
+      "cells": {
+        "basic-pitch-current-app": {
+          "reasons": [
+            "amplitude proxy, not comparable MIDI velocity"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "basic-pitch-native": {
+          "reasons": [
+            "amplitude proxy, not comparable MIDI velocity"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "kong-piano": {
+          "reasons": [
+            "no captured MIDI velocity reference"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "onsets-frames-piano": {
+          "reasons": [
+            "maestro:model_selection=prohibited"
+          ],
+          "state": "blocked_license",
+          "value": null
+        },
+        "transkun-v2": {
+          "reasons": [
+            "transkun-checkpoint:model_selection=unresolved"
+          ],
+          "state": "blocked_license",
+          "value": null
+        }
+      },
+      "direction": "lower_is_better",
+      "note": "amplitude proxies are not comparable MIDI velocity",
+      "units": "midi_units"
+    },
+    {
+      "attribute": "pedal",
+      "cells": {
+        "basic-pitch-current-app": {
+          "reasons": [
+            "the model does not estimate pedal"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "basic-pitch-native": {
+          "reasons": [
+            "the model does not estimate pedal"
+          ],
+          "state": "not_estimated",
+          "value": null
+        },
+        "kong-piano": {
+          "reasons": [
+            "no captured controller reference"
+          ],
+          "state": "reference_unavailable",
+          "value": null
+        },
+        "onsets-frames-piano": {
+          "reasons": [
+            "maestro:model_selection=prohibited"
+          ],
+          "state": "blocked_license",
+          "value": null
+        },
+        "transkun-v2": {
+          "reasons": [
+            "transkun-checkpoint:model_selection=unresolved"
+          ],
+          "state": "blocked_license",
+          "value": null
+        }
+      },
+      "direction": "higher_is_better",
+      "note": "per pedal type; absence is not pedal-off",
+      "units": "f1"
+    },
+    {
+      "attribute": "written_rhythm",
+      "cells": {
+        "basic-pitch-current-app": {
+          "reasons": [
+            "no model outputs written notation"
+          ],
+          "state": "unsupported_semantics",
+          "value": null
+        },
+        "basic-pitch-native": {
+          "reasons": [
+            "no model outputs written notation"
+          ],
+          "state": "unsupported_semantics",
+          "value": null
+        },
+        "kong-piano": {
+          "reasons": [
+            "no model outputs written notation"
+          ],
+          "state": "unsupported_semantics",
+          "value": null
+        },
+        "onsets-frames-piano": {
+          "reasons": [
+            "maestro:model_selection=prohibited"
+          ],
+          "state": "blocked_license",
+          "value": null
+        },
+        "transkun-v2": {
+          "reasons": [
+            "transkun-checkpoint:model_selection=unresolved"
+          ],
+          "state": "blocked_license",
+          "value": null
+        }
+      },
+      "direction": null,
+      "note": "no notation output exists from these models",
+      "units": "notation"
+    },
+    {
+      "attribute": "practicality",
+      "cells": {
+        "basic-pitch-current-app": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "backend": "onnx",
+            "checkpoint_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+            "cold_load_seconds": null,
+            "device": "cpu",
+            "inference_seconds": 2.579,
+            "peak_memory_mib": null
+          }
+        },
+        "basic-pitch-native": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "backend": "onnx",
+            "checkpoint_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+            "cold_load_seconds": null,
+            "device": "cpu",
+            "inference_seconds": 10.223,
+            "peak_memory_mib": null
+          }
+        },
+        "kong-piano": {
+          "reasons": [],
+          "state": "measured",
+          "value": {
+            "backend": "pytorch",
+            "checkpoint_sha256": "c3fa9730725bf4a762f1c14bc80cd5986eacda01b026f5a4a2525cd607876141",
+            "cold_load_seconds": null,
+            "device": "cuda",
+            "inference_seconds": 23.207,
+            "peak_memory_mib": null
+          }
+        },
+        "onsets-frames-piano": {
+          "reasons": [
+            "maestro:model_selection=prohibited"
+          ],
+          "state": "blocked_license",
+          "value": null
+        },
+        "transkun-v2": {
+          "reasons": [
+            "transkun-checkpoint:model_selection=unresolved"
+          ],
+          "state": "blocked_license",
+          "value": null
+        }
+      },
+      "direction": "lower_is_better",
+      "note": "device/backend differ; not a same-device speed ranking",
+      "units": "seconds"
+    }
+  ],
+  "version": "1.0.0"
+}

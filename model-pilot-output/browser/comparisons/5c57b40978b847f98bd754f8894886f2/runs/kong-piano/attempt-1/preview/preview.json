@@ -1,0 +1,123 @@
+{
+  "common": {
+    "channels": 1,
+    "gain_policy": {
+      "common_gain_db": 0.0,
+      "headroom_db": -24.0,
+      "normalization": "none"
+    },
+    "renderer": "additive-reference-1",
+    "renderer_version": "2.1.0",
+    "sample_rate": 22050
+  },
+  "native_sidecar_sha256": "8f26aa1e2c66511a1787458382a8b5df4efb60aa2cc619ec92989d48ebff13ff",
+  "notes": [
+    "Both modes use one renderer, preset, gain and headroom policy.",
+    "As transcribed uses declared native offsets as render durations and amplitude proxies as uncalibrated intensity; neither is a measured physical quantity.",
+    "Notes only ignores native offsets and amplitude and fixes intensity and duration.",
+    "No per-model normalization is applied; clipping and level are recorded."
+  ],
+  "previews": {
+    "as_transcribed": {
+      "asset_sha256": null,
+      "channels": 1,
+      "clipping": false,
+      "controls": {
+        "half_pedal": false,
+        "key_release": true,
+        "resonance": false,
+        "soft_pedal": false,
+        "sostenuto_pedal": false,
+        "sustain_pedal": true,
+        "velocity": true
+      },
+      "file": "preview.wav",
+      "gain_policy": {
+        "common_gain_db": 0.0,
+        "headroom_db": -24.0,
+        "normalization": "none"
+      },
+      "identity": "7dbf92c895e6064d0709b8128e10c0f8927626ff2e632d08c86967dc68bf96ea",
+      "mapping": {
+        "amplitude_to_intensity": null,
+        "native_offsets": {
+          "convention": "kong/native-offset",
+          "notes": 38,
+          "sidecar_sha256": "8f26aa1e2c66511a1787458382a8b5df4efb60aa2cc619ec92989d48ebff13ff"
+        }
+      },
+      "mode": "as_transcribed",
+      "note_count": 38,
+      "notes_only_convention": null,
+      "peak_dbfs": -16.964,
+      "release_sources": {
+        "assumed": 0,
+        "legacy": 38,
+        "measured": 0
+      },
+      "rendered_notes": 38,
+      "renderer": "additive-reference-1",
+      "renderer_version": "2.1.0",
+      "rms_dbfs": -33.639,
+      "sample_rate": 22050,
+      "schema": "piano-model-preview-1",
+      "seconds": 19.24,
+      "sha256": "34113c8291cdfcf827cf7885f3b4b0c01e56bd6458442290a742db03bc117b9a",
+      "version": "1.0.0",
+      "warnings": [
+        "release estimated from legacy duration for 38 note(s); this is an estimate, not a measured key release",
+        "native predicted offsets used as render durations for 38 note(s); they are not measured physical key release"
+      ]
+    },
+    "notes_only": {
+      "asset_sha256": null,
+      "channels": 1,
+      "clipping": false,
+      "controls": {
+        "half_pedal": false,
+        "key_release": true,
+        "resonance": false,
+        "soft_pedal": false,
+        "sostenuto_pedal": false,
+        "sustain_pedal": true,
+        "velocity": true
+      },
+      "file": "preview-notes.wav",
+      "gain_policy": {
+        "common_gain_db": 0.0,
+        "headroom_db": -24.0,
+        "normalization": "none"
+      },
+      "identity": "244becb508d9d724f4eb5e4f9f9eff6930666ea3d0dce43c8a108cc0a1f815fa",
+      "mapping": {
+        "amplitude_to_intensity": null,
+        "native_offsets": null
+      },
+      "mode": "notes_only",
+      "note_count": 38,
+      "notes_only_convention": {
+        "duration_seconds": 0.5,
+        "intensity": 0.6
+      },
+      "peak_dbfs": -17.875,
+      "release_sources": {
+        "assumed": 0,
+        "legacy": 0,
+        "measured": 38
+      },
+      "rendered_notes": 38,
+      "renderer": "additive-reference-1",
+      "renderer_version": "2.1.0",
+      "rms_dbfs": -33.392,
+      "sample_rate": 22050,
+      "schema": "piano-model-preview-1",
+      "seconds": 16.616054,
+      "sha256": "75f3e7373d35430cc77165653a4e88b3217f8f6688b655350910829f7a7d5402",
+      "version": "1.0.0",
+      "warnings": []
+    }
+  },
+  "schema": "piano-model-preview-1",
+  "variant": "kong-piano-ca9591bd8ccb",
+  "version": "1.0.0"
+}

@@ -1,0 +1,66 @@
+{
+  "adapter_version": "piano-model-adapters-1",
+  "correction_enabled": false,
+  "correction_operations": 0,
+  "created_at": "2026-11-13T02:38:52Z",
+  "expression_correction_enabled": false,
+  "family": "basic-pitch",
+  "identity": {
+    "adapter_sha256": "9155cbf762abf3d92bd0c25cc2952f574bcbb80bbc8489f489bf567859b78bb4",
+    "checkpoint_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+    "decoder_profile": "basic-pitch-0.4.0/decoding-v1",
+    "decoder_profile_sha256": "b55aceaa68d76b60b14b21266a9c4b678607776606465893b4f2eefd9f2a16d4",
+    "environment": {
+      "backend": "onnx",
+      "device": "cpu",
+      "isolation": "separate from the API environment",
+      "runtime": ".venv-music"
+    },
+    "weights_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec"
+  },
+  "mode": "raw-model-comparison-v1",
+  "outputs": {
+    "counts": {
+      "dropped_outside_interval": 0,
+      "notes": 784,
+      "offset_beyond_interval": 0,
+      "pedal_spans": 0
+    },
+    "document": "document.json",
+    "document_sha256": "5a6f1042661f1ed6bb3bc283cd9ff415af9794b0a8cdd8c1a8831190337f6eea",
+    "native": "native.json",
+    "native_sha256": "5e285958f25554d6e6befa15578b11d87a250ec27fc35c17ab5fc0be2acaf58c",
+    "semantics": "semantics.json"
+  },
+  "runtime": {
+    "backend": "onnx",
+    "device": "cpu",
+    "model_output_sha256": "ec175f299936b9b605a224766c014efcbfb361aa7057e3f41c7fe2f67fd9563c",
+    "seconds": 2.407
+  },
+  "schema": "piano-model-run-receipt-1",
+  "source": {
+    "conversion": {
+      "interval": [
+        0.0,
+        128.199274
+      ],
+      "rules": [
+        "trim",
+        "downmix-to-mono",
+        "resample-poly:44100->22050"
+      ],
+      "source_sha256": "808a6a3e66a468e89f010a6d6e43c86b50ac6b73fad7307c3e0ffa7da9816ff5"
+    },
+    "interval": [
+      0.0,
+      128.199274
+    ],
+    "master_sha256": "808a6a3e66a468e89f010a6d6e43c86b50ac6b73fad7307c3e0ffa7da9816ff5",
+    "prepared_sha256": "8573170a81073d3446ea2b1e70021a86cf1d1111091e388eb1071b9f709533e9"
+  },
+  "status": "ready",
+  "variant": "basic-pitch-native",
+  "version": 1,
+  "warnings": []
+}

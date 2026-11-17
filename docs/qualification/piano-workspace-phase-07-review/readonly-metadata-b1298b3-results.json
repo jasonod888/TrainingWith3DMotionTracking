@@ -1,0 +1,13 @@
+{
+  "read_only": true,
+  "offset_enabled": false,
+  "offset_before": "0",
+  "offset_after": "0",
+  "dirty_before": "false",
+  "dirty_after": "false",
+  "assessment_before": "none",
+  "assessment_after": "none",
+  "exported_offset": 0,
+  "exported_assessment": "none",
+  "passed": true
+}

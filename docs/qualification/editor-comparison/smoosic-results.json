@@ -1,0 +1,315 @@
+{
+  "init": {
+    "importMs": 116,
+    "configureMs": 126.79999999701977,
+    "ready": true
+  },
+  "errors": [
+    "error: Failed to load resource: the server responded with a status of 404 (File not found)",
+    "error: Failed to load resource: net::ERR_FAILED",
+    "warning: Ouch, need to implement languages",
+    "Failed to fetch",
+    "warning: Failed to decode downloaded font: http://127.0.0.1:61981/smoosic/package/release/styles/fonts/SourceSerifPro-Regular.woff2",
+    "warning: OTS parsing error: invalid sfntVersion: -2147397358",
+    "warning: Failed to decode downloaded font: http://127.0.0.1:61981/smoosic/package/release/styles/fonts/SourceSansPro-Regular.woff2",
+    "warning: OTS parsing error: invalid sfntVersion: -2147379950"
+  ],
+  "blocked_external": [
+    "https://gleitz.github.io/midi-js-soundfonts/MusyngKite/acoustic_grand_piano-ogg.js"
+  ],
+  "summary": {
+    "svg": 5,
+    "heads": 2653,
+    "staves": 2,
+    "measures": [
+      127,
+      127
+    ],
+    "notes": 1743,
+    "viewMethods": [
+      "transposeScore",
+      "transposeSelections",
+      "batchDurationOperation",
+      "setPitchPiano",
+      "setPitchesPromise",
+      "setPitches",
+      "setPitch",
+      "moveSelectionPitchUp",
+      "moveSelectionPitchDown"
+    ]
+  },
+  "native_chord_selection": [
+    {
+      "clickedHeadIndex": 0,
+      "pitchIndex": -1,
+      "selection": [
+        {
+          "staff": 0,
+          "measure": 1,
+          "voice": 0,
+          "tick": 1,
+          "pitches": []
+        }
+      ]
+    },
+    {
+      "clickedHeadIndex": 0,
+      "pitchIndex": 0,
+      "selection": [
+        {
+          "staff": 0,
+          "measure": 1,
+          "voice": 0,
+          "tick": 1,
+          "pitches": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "clickedHeadIndex": 1,
+      "pitchIndex": 1,
+      "selection": [
+        {
+          "staff": 0,
+          "measure": 1,
+          "voice": 0,
+          "tick": 1,
+          "pitches": [
+            1
+          ]
+        }
+      ]
+    }
+  ],
+  "counts": {
+    "soundingPitchSegments": 2078,
+    "notes": 2335,
+    "attrs": {
+      "id": "smo32798",
+      "type": "SmoNote"
+    }
+  },
+  "model_probe": {
+    "target": {
+      "staff": 0,
+      "measure": 1,
+      "voice": 0,
+      "note": 1
+    },
+    "before": "[{\"letter\":\"c\",\"accidental\":\"#\",\"octave\":4},{\"letter\":\"g\",\"accidental\":\"#\",\"octave\":5}]",
+    "after": "[{\"letter\":\"d\",\"accidental\":\"n\",\"octave\":4},{\"letter\":\"g\",\"accidental\":\"#\",\"octave\":5}]",
+    "selectionExists": true,
+    "attributes": {
+      "id": "smo32882",
+      "type": "SmoNote"
+    },
+    "keys": [
+      "endSecondaryBeam"
+    ]
+  },
+  "duration_probe": {
+    "target": {
+      "staff": 0,
+      "measure": 0,
+      "voice": 0,
+      "note": 3
+    },
+    "before": [
+      {
+        "id": "smo63974",
+        "pitches": [
+          {
+            "letter": "b",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 8192,
+        "rest": "r"
+      },
+      {
+        "id": "smo63975",
+        "pitches": [
+          {
+            "letter": "b",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 1024,
+        "rest": "r"
+      },
+      {
+        "id": "smo63976",
+        "pitches": [
+          {
+            "letter": "a",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 4096,
+        "rest": "n"
+      },
+      {
+        "id": "smo63977",
+        "pitches": [
+          {
+            "letter": "a",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 1024,
+        "rest": "n"
+      },
+      {
+        "id": "smo63978",
+        "pitches": [
+          {
+            "letter": "a",
+            "accidental": "n",
+            "octave": 5
+          }
+        ],
+        "ticks": 2048,
+        "rest": "n"
+      }
+    ],
+    "after": [
+      {
+        "id": "smo63974",
+        "pitches": [
+          {
+            "letter": "b",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 8192,
+        "rest": "r"
+      },
+      {
+        "id": "smo63975",
+        "pitches": [
+          {
+            "letter": "b",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 1024,
+        "rest": "r"
+      },
+      {
+        "id": "smo63976",
+        "pitches": [
+          {
+            "letter": "a",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 4096,
+        "rest": "n"
+      },
+      {
+        "id": "smo74184",
+        "pitches": [
+          {
+            "letter": "a",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 2048,
+        "rest": "n"
+      },
+      {
+        "id": "smo74186",
+        "pitches": [
+          {
+            "letter": "a",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 1024,
+        "rest": "n"
+      }
+    ],
+    "removed": [
+      {
+        "id": "smo63977",
+        "pitches": [
+          {
+            "letter": "a",
+            "accidental": "n",
+            "octave": 4
+          }
+        ],
+        "ticks": 1024,
+        "rest": "n"
+      },
+      {
+        "id": "smo63978",
+        "pitches": [
+          {
+            "letter": "a",
+            "accidental": "n",
+            "octave": 5
+          }
+        ],
+        "ticks": 2048,
+        "rest": "n"
+      }
+    ]
+  },
+  "horizontal_config": {
+    "mode": "horizontal"
+  },
+  "horizontal_dom": {
+    "width": 1440,
+    "viewport": 1440,
+    "svg": [
+      {
+        "width": "161",
+        "height": "120"
+      },
+      {
+        "width": "1632",
+        "height": "2112"
+      },
+      {
+        "width": "1632",
+        "height": "2112"
+      },
+      {
+        "width": "1632",
+        "height": "2112"
+      },
+      {
+        "width": "1632",
+        "height": "2112"
+      }
+    ],
+    "scrollers": [
+      {
+        "tag": "DIV",
+        "class": "flex-lg-column musicRelief scrollContainer horizontal",
+        "width": 1206,
+        "scrollWidth": 34272,
+        "overflow": "auto"
+      }
+    ]
+  },
+  "scroll_frames": {
+    "frames": 89,
+    "medianMs": 7,
+    "p95Ms": 7.100000000000364,
+    "maxMs": 7.200000000000728,
+    "finalScroll": 33066
+  }
+}

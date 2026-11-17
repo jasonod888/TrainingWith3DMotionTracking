@@ -1,0 +1,43 @@
+{
+  "fields": {
+    "audible_end": {
+      "note": "no independently annotated audible ending exists",
+      "source": null,
+      "status": "not_estimated"
+    },
+    "key_release": {
+      "note": "a predicted offset is not a physical key release",
+      "source": null,
+      "status": "not_estimated"
+    },
+    "pedal": {
+      "source": "native",
+      "status": "native_trajectory",
+      "types": [
+        "sustain"
+      ]
+    },
+    "pitch_onset": {
+      "source": "native",
+      "status": "measured"
+    },
+    "predicted_offset": {
+      "convention": "kong/native-offset",
+      "source": "native",
+      "status": "native_sidecar"
+    },
+    "velocity_midi": {
+      "note": "predicted MIDI velocity, not a captured measurement",
+      "source": "native",
+      "status": "model_estimated",
+      "units": "midi_1_127"
+    },
+    "written_duration": {
+      "source": null,
+      "status": "not_estimated"
+    }
+  },
+  "schema": "piano-model-field-semantics-1",
+  "variant": "kong-piano",
+  "version": 1
+}

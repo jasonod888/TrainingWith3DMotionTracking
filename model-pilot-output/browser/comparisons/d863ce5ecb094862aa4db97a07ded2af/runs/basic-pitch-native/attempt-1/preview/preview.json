@@ -1,0 +1,128 @@
+{
+  "common": {
+    "channels": 1,
+    "gain_policy": {
+      "common_gain_db": 0.0,
+      "headroom_db": -24.0,
+      "normalization": "none"
+    },
+    "renderer": "additive-reference-1",
+    "renderer_version": "2.1.0",
+    "sample_rate": 22050
+  },
+  "native_sidecar_sha256": "69b3efe7d5d9a780c505aeb43632056ae892656ac3ac88d48618c6027d46185b",
+  "notes": [
+    "Both modes use one renderer, preset, gain and headroom policy.",
+    "As transcribed uses declared native offsets as render durations and amplitude proxies as uncalibrated intensity; neither is a measured physical quantity.",
+    "Notes only ignores native offsets and amplitude and fixes intensity and duration.",
+    "No per-model normalization is applied; clipping and level are recorded."
+  ],
+  "previews": {
+    "as_transcribed": {
+      "asset_sha256": null,
+      "channels": 1,
+      "clipping": false,
+      "controls": {
+        "half_pedal": false,
+        "key_release": true,
+        "resonance": false,
+        "soft_pedal": false,
+        "sostenuto_pedal": false,
+        "sustain_pedal": true,
+        "velocity": true
+      },
+      "file": "preview.wav",
+      "gain_policy": {
+        "common_gain_db": 0.0,
+        "headroom_db": -24.0,
+        "normalization": "none"
+      },
+      "identity": "cf3bb3a9ae2b5cbb06b5c4cebaa7517d0942f55cc64fc9ce48c5031811926fcd",
+      "mapping": {
+        "amplitude_to_intensity": {
+          "calibrated_midi_velocity": false,
+          "notes": 51,
+          "rule": "clamp(amplitude_proxy, 0, 1) -> render_intensity"
+        },
+        "native_offsets": {
+          "convention": "basic-pitch-native/offset",
+          "notes": 51,
+          "sidecar_sha256": "69b3efe7d5d9a780c505aeb43632056ae892656ac3ac88d48618c6027d46185b"
+        }
+      },
+      "mode": "as_transcribed",
+      "note_count": 51,
+      "notes_only_convention": null,
+      "peak_dbfs": -18.801,
+      "release_sources": {
+        "assumed": 0,
+        "legacy": 51,
+        "measured": 0
+      },
+      "rendered_notes": 51,
+      "renderer": "additive-reference-1",
+      "renderer_version": "2.1.0",
+      "rms_dbfs": -32.473,
+      "sample_rate": 22050,
+      "schema": "piano-model-preview-1",
+      "seconds": 16.616009,
+      "sha256": "69ea6445eba5d7aaa824def69dc1bcee78e2f3c2f1149f43017bbe3a6f067d17",
+      "version": "1.0.0",
+      "warnings": [
+        "release estimated from legacy duration for 51 note(s); this is an estimate, not a measured key release",
+        "native predicted offsets used as render durations for 51 note(s); they are not measured physical key release",
+        "amplitude proxy mapped to uncalibrated render intensity for 51 note(s); not MIDI velocity"
+      ]
+    },
+    "notes_only": {
+      "asset_sha256": null,
+      "channels": 1,
+      "clipping": false,
+      "controls": {
+        "half_pedal": false,
+        "key_release": true,
+        "resonance": false,
+        "soft_pedal": false,
+        "sostenuto_pedal": false,
+        "sustain_pedal": true,
+        "velocity": true
+      },
+      "file": "preview-notes.wav",
+      "gain_policy": {
+        "common_gain_db": 0.0,
+        "headroom_db": -24.0,
+        "normalization": "none"
+      },
+      "identity": "00d0428e025c84f27811c2f5e8d9a32fac6a2e892fa2e631b1dfb477218968f9",
+      "mapping": {
+        "amplitude_to_intensity": null,
+        "native_offsets": null
+      },
+      "mode": "notes_only",
+      "note_count": 51,
+      "notes_only_convention": {
+        "duration_seconds": 0.5,
+        "intensity": 0.6
+      },
+      "peak_dbfs": -16.872,
+      "release_sources": {
+        "assumed": 0,
+        "legacy": 0,
+        "measured": 51
+      },
+      "rendered_notes": 51,
+      "renderer": "additive-reference-1",
+      "renderer_version": "2.1.0",
+      "rms_dbfs": -32.086,
+      "sample_rate": 22050,
+      "schema": "piano-model-preview-1",
+      "seconds": 16.616009,
+      "sha256": "ba397f9063182c6c9f1c28860c2a43561979d5af7830c1eb1917564db4e53d27",
+      "version": "1.0.0",
+      "warnings": []
+    }
+  },
+  "schema": "piano-model-preview-1",
+  "variant": "basic-pitch-native-946de09ed53a",
+  "version": "1.0.0"
+}

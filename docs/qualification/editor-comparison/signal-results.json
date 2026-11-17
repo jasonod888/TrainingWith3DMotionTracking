@@ -1,0 +1,76 @@
+{
+  "inputNotes": 1338,
+  "loaded": 1338,
+  "loadMs": 9.194000000000003,
+  "checks": [
+    {
+      "name": "exact seconds survive mapping into Signal fractional ticks",
+      "pass": true,
+      "detail": {
+        "maxSecondsError": 2.842170943040401e-14
+      }
+    },
+    {
+      "name": "10 ms onset nudge preserves all neighbours",
+      "pass": true,
+      "detail": {
+        "changed": 1,
+        "total": 1338
+      }
+    },
+    {
+      "name": "transpose one real chord member affects only its numeric note id",
+      "pass": true,
+      "detail": {
+        "changed": 1,
+        "chordEvent": "ev-treble-1-2160-3-bp-5",
+        "members": 2
+      }
+    },
+    {
+      "name": "recorded-length extension does not delete neighbouring notes",
+      "pass": true,
+      "detail": {
+        "total": 1338
+      }
+    },
+    {
+      "name": "transaction emits one update for a multi-step gesture",
+      "pass": true,
+      "detail": {
+        "updates": 20,
+        "notifications": 1
+      }
+    },
+    {
+      "name": "fractional duration survives the editing facade",
+      "pass": true,
+      "detail": {
+        "durationTicks": 123.456
+      }
+    },
+    {
+      "name": "duplicate insertion remains distinct",
+      "pass": true,
+      "detail": {
+        "duplicatesAllowed": true,
+        "requiresHostDuplicateWarning": true
+      }
+    }
+  ],
+  "singleEditMs": {
+    "median": 0.00730000000000075,
+    "p95": 0.020899999999997476,
+    "max": 0.4067000000000007
+  },
+  "modelFields": [
+    "tick",
+    "duration",
+    "noteNumber",
+    "velocity",
+    "type",
+    "subtype",
+    "id"
+  ],
+  "scope": "Actual upstream Song/Track and piano-roll editing facade; visual React editor and playback not mounted"
+}

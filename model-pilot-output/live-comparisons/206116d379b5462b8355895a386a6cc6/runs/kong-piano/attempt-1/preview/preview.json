@@ -1,0 +1,125 @@
+{
+  "common": {
+    "channels": 1,
+    "gain_policy": {
+      "common_gain_db": 0.0,
+      "headroom_db": -24.0,
+      "normalization": "none"
+    },
+    "renderer": "additive-reference-1",
+    "renderer_version": "2.1.0",
+    "sample_rate": 22050
+  },
+  "native_sidecar_sha256": "215f828435c9f620c2fc6eede1ece9b9e3e3ac442fbb7eb0fa2fbb88e44e83a0",
+  "notes": [
+    "Both modes use one renderer, preset, gain and headroom policy.",
+    "As transcribed uses declared native offsets as render durations and amplitude proxies as uncalibrated intensity; neither is a measured physical quantity.",
+    "Notes only ignores native offsets and amplitude and fixes intensity and duration.",
+    "No per-model normalization is applied; clipping and level are recorded."
+  ],
+  "previews": {
+    "as_transcribed": {
+      "asset_sha256": null,
+      "channels": 1,
+      "clipping": false,
+      "controls": {
+        "half_pedal": false,
+        "key_release": true,
+        "resonance": false,
+        "soft_pedal": false,
+        "sostenuto_pedal": false,
+        "sustain_pedal": true,
+        "velocity": true
+      },
+      "file": "preview.wav",
+      "gain_policy": {
+        "common_gain_db": 0.0,
+        "headroom_db": -24.0,
+        "normalization": "none"
+      },
+      "identity": "d194b77aedec36fe95b356f086a238f4f0f6a19a3ef4431e4d026b54ff382932",
+      "mapping": {
+        "amplitude_to_intensity": null,
+        "native_offsets": {
+          "convention": "kong/native-offset",
+          "notes": 1119,
+          "sidecar_sha256": "215f828435c9f620c2fc6eede1ece9b9e3e3ac442fbb7eb0fa2fbb88e44e83a0"
+        }
+      },
+      "mode": "as_transcribed",
+      "note_count": 1119,
+      "notes_only_convention": null,
+      "peak_dbfs": -11.367,
+      "preview_identity": "2af026a3f4cee82ecfa8fb27f99949699e7ce489f59c5135f39798afea74ff36",
+      "release_sources": {
+        "assumed": 0,
+        "legacy": 1119,
+        "measured": 0
+      },
+      "rendered_notes": 1119,
+      "renderer": "additive-reference-1",
+      "renderer_version": "2.1.0",
+      "rms_dbfs": -28.426,
+      "sample_rate": 22050,
+      "schema": "piano-model-preview-1",
+      "seconds": 210.990023,
+      "sha256": "ba3a44d440386f3fac2147440980040bf1fc8f007e425f6fafc6f158126dc19f",
+      "version": "1.0.0",
+      "warnings": [
+        "release estimated from legacy duration for 1119 note(s); this is an estimate, not a measured key release",
+        "native predicted offsets used as render durations for 1119 note(s); they are not measured physical key release"
+      ]
+    },
+    "notes_only": {
+      "asset_sha256": null,
+      "channels": 1,
+      "clipping": false,
+      "controls": {
+        "half_pedal": false,
+        "key_release": true,
+        "resonance": false,
+        "soft_pedal": false,
+        "sostenuto_pedal": false,
+        "sustain_pedal": true,
+        "velocity": true
+      },
+      "file": "preview-notes.wav",
+      "gain_policy": {
+        "common_gain_db": 0.0,
+        "headroom_db": -24.0,
+        "normalization": "none"
+      },
+      "identity": "de75255f80ec257334747a5499f9d7d9eb07043aca9a42e8949203f2242e5a93",
+      "mapping": {
+        "amplitude_to_intensity": null,
+        "native_offsets": null
+      },
+      "mode": "notes_only",
+      "note_count": 1119,
+      "notes_only_convention": {
+        "duration_seconds": 0.5,
+        "intensity": 0.6
+      },
+      "peak_dbfs": -15.008,
+      "preview_identity": "fa8d1e949179e0c94f2229cd95f3c38eb1de690e3e92923ec6e526c2d5be1432",
+      "release_sources": {
+        "assumed": 0,
+        "legacy": 0,
+        "measured": 1119
+      },
+      "rendered_notes": 1119,
+      "renderer": "additive-reference-1",
+      "renderer_version": "2.1.0",
+      "rms_dbfs": -29.81,
+      "sample_rate": 22050,
+      "schema": "piano-model-preview-1",
+      "seconds": 210.6,
+      "sha256": "85021858651fed4f6a678cb4da00f6e9bd7c939bcfb6e461c31a9b458c55a848",
+      "version": "1.0.0",
+      "warnings": []
+    }
+  },
+  "schema": "piano-model-preview-1",
+  "variant": "kong-piano-345a48671cbd",
+  "version": "1.0.0"
+}

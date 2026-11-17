@@ -1,0 +1,391 @@
+{
+  "draft_version": 1,
+  "subject": "piano",
+  "instrument": {
+    "instrument": "piano"
+  },
+  "duration": 15.616009,
+  "reference": {
+    "key": "reference.json",
+    "mime": "application/json",
+    "bytes": 0,
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "piano_preview": {
+    "key": "preview.wav",
+    "mime": "audio/wav",
+    "bytes": 0,
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "playback": {
+    "sync_offset_seconds": 0.0,
+    "revision": 1
+  },
+  "events": [
+    {
+      "id": "kong-1",
+      "onset": 1.842861,
+      "duration": 1.037139,
+      "pitch": 49,
+      "velocity": 0.307087,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-2",
+      "onset": 9.2741,
+      "duration": 0.005899,
+      "pitch": 49,
+      "velocity": 0.354331,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-3",
+      "onset": 2.915381,
+      "duration": 4.584619,
+      "pitch": 50,
+      "velocity": 0.362205,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-4",
+      "onset": 10.389347,
+      "duration": 5.226662,
+      "pitch": 50,
+      "velocity": 0.377953,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-5",
+      "onset": 1.434906,
+      "duration": 1.095094,
+      "pitch": 54,
+      "velocity": 0.267717,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-6",
+      "onset": 2.544379,
+      "duration": 0.425621,
+      "pitch": 54,
+      "velocity": 0.338583,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-7",
+      "onset": 8.895865,
+      "duration": 1.064135,
+      "pitch": 54,
+      "velocity": 0.338583,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-8",
+      "onset": 9.967591,
+      "duration": 0.439116,
+      "pitch": 54,
+      "velocity": 0.370079,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-9",
+      "onset": 3.388755,
+      "duration": 4.111245,
+      "pitch": 57,
+      "velocity": 0.322835,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-10",
+      "onset": 10.91779,
+      "duration": 4.698219,
+      "pitch": 57,
+      "velocity": 0.299213,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-11",
+      "onset": 1.839729,
+      "duration": 1.105158,
+      "pitch": 61,
+      "velocity": 0.330709,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-12",
+      "onset": 9.270557,
+      "duration": 1.141025,
+      "pitch": 61,
+      "velocity": 0.385827,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-13",
+      "onset": 3.873444,
+      "duration": 3.626556,
+      "pitch": 64,
+      "velocity": 0.299213,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-14",
+      "onset": 11.481679,
+      "duration": 4.13433,
+      "pitch": 64,
+      "velocity": 0.299213,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-15",
+      "onset": 4.502986,
+      "duration": 2.997014,
+      "pitch": 66,
+      "velocity": 0.212598,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-16",
+      "onset": 12.240107,
+      "duration": 3.375902,
+      "pitch": 66,
+      "velocity": 0.220472,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-17",
+      "onset": 2.207131,
+      "duration": 0.740146,
+      "pitch": 68,
+      "velocity": 0.393701,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-18",
+      "onset": 9.625176,
+      "duration": 0.790776,
+      "pitch": 68,
+      "velocity": 0.456693,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-19",
+      "onset": 0.911829,
+      "duration": 2.058171,
+      "pitch": 69,
+      "velocity": 0.291339,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-20",
+      "onset": 8.440621,
+      "duration": 1.109379,
+      "pitch": 69,
+      "velocity": 0.393701,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-21",
+      "onset": 1.153033,
+      "duration": 1.816967,
+      "pitch": 73,
+      "velocity": 0.488189,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-22",
+      "onset": 8.668669,
+      "duration": 1.741331,
+      "pitch": 73,
+      "velocity": 0.598425,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-23",
+      "onset": 4.487597,
+      "duration": 3.012403,
+      "pitch": 74,
+      "velocity": 0.393701,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-24",
+      "onset": 12.210654,
+      "duration": 3.382564,
+      "pitch": 74,
+      "velocity": 0.354331,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-25",
+      "onset": 3.363165,
+      "duration": 4.136835,
+      "pitch": 76,
+      "velocity": 0.527559,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-26",
+      "onset": 10.890396,
+      "duration": 4.702395,
+      "pitch": 76,
+      "velocity": 0.519685,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-27",
+      "onset": 1.846052,
+      "duration": 0.683948,
+      "pitch": 80,
+      "velocity": 0.669291,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-28",
+      "onset": 2.536662,
+      "duration": 0.415785,
+      "pitch": 80,
+      "velocity": 0.692913,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-29",
+      "onset": 9.274064,
+      "duration": 0.675936,
+      "pitch": 80,
+      "velocity": 0.692913,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-30",
+      "onset": 9.963397,
+      "duration": 0.496603,
+      "pitch": 80,
+      "velocity": 0.669291,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-31",
+      "onset": 1.43345,
+      "duration": 0.74655,
+      "pitch": 81,
+      "velocity": 0.535433,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-32",
+      "onset": 2.192985,
+      "duration": 0.737015,
+      "pitch": 81,
+      "velocity": 0.661417,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-33",
+      "onset": 2.935163,
+      "duration": 0.924837,
+      "pitch": 81,
+      "velocity": 0.598425,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-34",
+      "onset": 3.872536,
+      "duration": 3.627464,
+      "pitch": 81,
+      "velocity": 0.464567,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-35",
+      "onset": 8.902729,
+      "duration": 0.687271,
+      "pitch": 81,
+      "velocity": 0.598425,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-36",
+      "onset": 9.604488,
+      "duration": 0.785512,
+      "pitch": 81,
+      "velocity": 0.669291,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-37",
+      "onset": 10.39641,
+      "duration": 1.05359,
+      "pitch": 81,
+      "velocity": 0.598425,
+      "confidence": null,
+      "optional": false
+    },
+    {
+      "id": "kong-38",
+      "onset": 11.46474,
+      "duration": 4.151269,
+      "pitch": 81,
+      "velocity": 0.488189,
+      "confidence": null,
+      "optional": false
+    }
+  ],
+  "spans": [
+    {
+      "start": 0,
+      "end": 15.616009,
+      "kind": "playing"
+    }
+  ],
+  "guitar_chords": [],
+  "provenance": {
+    "adapter": "kong-adapter",
+    "engine": "pytorch",
+    "model": "kong",
+    "model_version": "0.0.6",
+    "code_version": "kong-adapter-1",
+    "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "audio_sha256": "ca9591bd8ccb75e86bf7e3df005cec3b58033bab808b4f51bdb6385709172423"
+  },
+  "warnings": [
+    "Raw Kong proposal with no automatic correction.",
+    "Note lengths are model-predicted offsets, not measured release.",
+    "Velocity is model-estimated, not captured keyboard velocity.",
+    "Pedal predictions are not represented in this lesson revision."
+  ]
+}

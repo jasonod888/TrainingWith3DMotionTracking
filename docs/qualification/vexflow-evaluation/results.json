@@ -1,0 +1,189 @@
+{
+  "initial": {
+    "initialRenderMs": 39.900000005960464,
+    "source": {
+      "duration": 209.594,
+      "occurrences": 1338,
+      "description": "Existing local audit snapshot of real lesson 0df28929\u2026; no new transcription"
+    }
+  },
+  "errors": [],
+  "svg_classes": [
+    "vf-stave",
+    "vf-stavebarline",
+    "vf-clef",
+    "vf-timesignature",
+    "vf-stavenote",
+    "vf-notehead",
+    "vf-stem",
+    "vf-flag",
+    "vf-beam",
+    "vf-stavetie",
+    "hit"
+  ],
+  "geometry_sample": [
+    {
+      "x": "209.53399658203125",
+      "y": "122",
+      "bbox": "{\"x\":230.53399658203125,\"y\":308,\"width\":16,\"height\":10,\"top\":308,\"right\":246.53399658203125,\"bottom\":318,\"left\":230.53399658203125}"
+    },
+    {
+      "x": "259.5299987792969",
+      "y": "122",
+      "bbox": "{\"x\":280.5299987792969,\"y\":308,\"width\":16,\"height\":10,\"top\":308,\"right\":296.5299987792969,\"bottom\":318,\"left\":280.5299987792969}"
+    },
+    {
+      "x": "291.9960021972656",
+      "y": "87",
+      "bbox": "{\"x\":312.9960021972656,\"y\":273,\"width\":16,\"height\":10,\"top\":273,\"right\":328.9960021972656,\"bottom\":283,\"left\":312.9960021972656}"
+    },
+    {
+      "x": "208.63999938964844",
+      "y": "112",
+      "bbox": "{\"x\":229.63999938964844,\"y\":298,\"width\":28.960006713867188,\"height\":10,\"top\":298,\"right\":258.6000061035156,\"bottom\":308,\"left\":229.63999938964844}"
+    }
+  ],
+  "hit_style": {
+    "pointer": "all",
+    "svg": "<svg pointer-events=\"none\" stroke-width=\"1\" stroke-dasharray=\"none\" fill=\"black\" stroke=\"black\" shadowColor=\"black\" font-family=\"Bravura,Academico\" font-size=\"10pt\" font-weight=\"normal\" font-style=\"normal\" width=\"350\" height=\"420\" viewBox=\"0 0 350 42",
+    "atCentre": "<rect x=\"209.53399658203125\" y=\"122\" width=\"16\" height=\"10\" class=\"hit\" data-segment=\"n-bp-1:0\" data-pitch=\"69\"></rect>"
+  },
+  "initial_state": {
+    "version": "5.0.0",
+    "mounted": 6,
+    "heads": 43,
+    "totalWidth": 53546,
+    "notes": 1338,
+    "measures": 127
+  },
+  "chord_selection": {
+    "checked": 11960,
+    "wrong": 0
+  },
+  "virtual_jump_ms": {
+    "median": 4.700000002980232,
+    "p95": 8.099999994039536,
+    "max": 10.199999988079071
+  },
+  "engraved_glyph_hit_geometry": {
+    "glyph_centres": 2078,
+    "correct_target": 2047,
+    "overlap_candidates": 31,
+    "misses": 0
+  },
+  "all_render_ms": 482.69999998807907,
+  "all_state": {
+    "mounted": 127,
+    "heads": 2078,
+    "svgNodes": 24953,
+    "errors": []
+  },
+  "pointer_clicks": [
+    {
+      "expected": "n-bp-1:0",
+      "selected": "n-bp-1:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-1:1",
+      "selected": "n-bp-1:1",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-4:0",
+      "selected": "n-bp-4:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-2:0",
+      "selected": "n-bp-2:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-2:1",
+      "selected": "n-bp-2:1",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-3:0",
+      "selected": "n-bp-3:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-4:1",
+      "selected": "n-bp-4:1",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-6:0",
+      "selected": "n-bp-6:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-5:0",
+      "selected": "n-bp-5:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-7:0",
+      "selected": "n-bp-7:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-8:0",
+      "selected": "n-bp-8:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-10:0",
+      "selected": "n-bp-10:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-2:2",
+      "selected": "n-bp-2:2",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-3:1",
+      "selected": "n-bp-3:1",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-9:0",
+      "selected": "n-bp-9:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-10:1",
+      "selected": "n-bp-10:1",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-10:2",
+      "selected": "n-bp-10:2",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-13:0",
+      "selected": "n-bp-13:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-14:0",
+      "selected": "n-bp-14:0",
+      "rect_selected": false
+    },
+    {
+      "expected": "n-bp-14:1",
+      "selected": "n-bp-14:1",
+      "rect_selected": false
+    }
+  ],
+  "mobile": {
+    "pageWidth": 390,
+    "viewport": 390,
+    "mounted": 3
+  },
+  "browser": "157.0.8103.78"
+}

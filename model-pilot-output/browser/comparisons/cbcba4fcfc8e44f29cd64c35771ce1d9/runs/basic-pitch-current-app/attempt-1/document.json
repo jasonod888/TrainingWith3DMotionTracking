@@ -1,0 +1,648 @@
+{
+  "notes": [
+    {
+      "audible_end": null,
+      "id": "bp-1",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 0.9172,
+      "pitch_midi": 69,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.605,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-2",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.161,
+      "pitch_midi": 73,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5716,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-3",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.428,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.6389,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-4",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.4396,
+      "pitch_midi": 54,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5559,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-5",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.8576,
+      "pitch_midi": 80,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.6552,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-6",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.8692,
+      "pitch_midi": 61,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.61,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-7",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.184,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.6353,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-8",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.5439,
+      "pitch_midi": 80,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.6488,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-9",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.927,
+      "pitch_midi": 50,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5562,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-10",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.9386,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5307,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-11",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 3.3682,
+      "pitch_midi": 76,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.4643,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-12",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 3.3798,
+      "pitch_midi": 57,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.4965,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-13",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 3.879,
+      "pitch_midi": 64,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5356,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-14",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 3.879,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.4878,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-15",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 4.484,
+      "pitch_midi": 50,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5105,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-16",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 4.484,
+      "pitch_midi": 74,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5063,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-17",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 4.5072,
+      "pitch_midi": 66,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.3645,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-18",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 8.4456,
+      "pitch_midi": 69,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5837,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-19",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 8.6778,
+      "pitch_midi": 73,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.6494,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-20",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 8.8868,
+      "pitch_midi": 54,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.4419,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-21",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 8.91,
+      "pitch_midi": 69,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.431,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-22",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 8.91,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.6195,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-23",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.2815,
+      "pitch_midi": 61,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.475,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-24",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.2815,
+      "pitch_midi": 80,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.6031,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-25",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.6066,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.6134,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-26",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.6182,
+      "pitch_midi": 68,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5366,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-27",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.9678,
+      "pitch_midi": 54,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.4811,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-28",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.9678,
+      "pitch_midi": 80,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.6007,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-29",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 10.3973,
+      "pitch_midi": 50,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5752,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-30",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 10.3973,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5286,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-31",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 10.885,
+      "pitch_midi": 76,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.418,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-32",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 10.8966,
+      "pitch_midi": 57,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.4912,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-33",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 11.4655,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.4721,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-34",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 11.4887,
+      "pitch_midi": 64,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5389,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-35",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 12.2098,
+      "pitch_midi": 74,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.5084,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "bp-36",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 12.233,
+      "pitch_midi": 66,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": null,
+      "velocity_provenance": {
+        "amplitude": 0.4699,
+        "kind": "amplitude_proxy"
+      },
+      "written": null
+    }
+  ],
+  "pedal": [],
+  "performance_id": "basic-pitch-current-app-946de09ed53a",
+  "provenance": {
+    "baseline_id": null,
+    "changes": [],
+    "decoder": null,
+    "model": null,
+    "notes": [],
+    "origin": "model",
+    "policy": null
+  },
+  "schema": "piano-performance-1",
+  "schema_version": 1,
+  "semantics_version": "piano-performance-semantics-1",
+  "sound_model": {
+    "asset_sha256": null,
+    "channels": 2,
+    "profile": {},
+    "renderer": null,
+    "version": null
+  },
+  "source": {
+    "channels": 1,
+    "duration_seconds": 15.616009070294785,
+    "path_hint": "D:\\3d_trainer\\developement\\model-pilot-output\\browser\\comparisons\\cbcba4fcfc8e44f29cd64c35771ce1d9\\runs\\basic-pitch-current-app\\attempt-1\\prepared.wav",
+    "sample_rate": 22050,
+    "sha256": "946de09ed53af76353a405cc2dc9635dc9b26c148a1e9d232b36780581c012d1"
+  },
+  "timeline": {
+    "origin": "source_start",
+    "sample_rate": 22050
+  }
+}

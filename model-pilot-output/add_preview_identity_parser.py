@@ -1,0 +1,11 @@
+﻿from pathlib import Path
+p = Path('packages/lesson-schema/parse.ts')
+t = p.read_text(encoding='utf-8')
+t = t.replace("'piano_preview', 'playback', 'pedal', 'waveform'", "'piano_preview', 'playback', 'pedal', 'preview_identity', 'waveform'")
+t = t.replace("  const pedal = readPedal(value.pedal);\n  const waveform", "  const pedal = readPedal(value.pedal);\n  const previewIdentity = value.preview_identity ?? null;\n  if (previewIdentity !== null && (typeof previewIdentity !== 'string' || !/^[a-f0-9]{64}$/.test(previewIdentity))) return malformed('This music lesson has an invalid preview identity.');\n  const waveform")
+t = t.replace("      ...(pedal ? {pedal} : {}),\n      waveform", "      ...(pedal ? {pedal} : {}),\n      ...(previewIdentity ? {preview_identity: previewIdentity} : {}),\n      waveform")
+t = t.replace("'piano_preview','playback','pedal','raw_model'", "'piano_preview','playback','pedal','preview_identity','raw_model'")
+t = t.replace("const playback=readPlayback(value.playback),pedal=readPedal(value.pedal);", "const playback=readPlayback(value.playback),pedal=readPedal(value.pedal);\n const previewIdentity=value.preview_identity??null;\n if(previewIdentity!==null&&(typeof previewIdentity!=='string'||!/^[a-f0-9]{64}$/.test(previewIdentity)))return bad();")
+t = t.replace("...(pedal?{pedal}:{}),...(value.raw_model", "...(pedal?{pedal}:{}),...(previewIdentity?{preview_identity:previewIdentity}:{}),...(value.raw_model")
+p.write_text(t, encoding='utf-8')
+print('parser')

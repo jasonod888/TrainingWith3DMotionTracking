@@ -1,0 +1,13 @@
+{
+  "occurrence": "bp-1",
+  "gesture_was_suppressed": true,
+  "dirty_before": "false",
+  "dirty_after": "false",
+  "benchmark_claims_applied": false,
+  "benchmark_claims_restored": true,
+  "timing": {
+    "preview": 0.1,
+    "commit": 0.1
+  },
+  "passed": true
+}

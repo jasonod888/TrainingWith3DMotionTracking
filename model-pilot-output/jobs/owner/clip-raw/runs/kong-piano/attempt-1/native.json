@@ -1,0 +1,345 @@
+{
+  "dropped_outside_interval": 0,
+  "events": [
+    {
+      "id": "kong-1",
+      "offset_seconds": 2.88,
+      "onset_seconds": 1.842867,
+      "pitch": 49,
+      "velocity": 39
+    },
+    {
+      "id": "kong-2",
+      "offset_seconds": 9.28,
+      "onset_seconds": 9.274099,
+      "pitch": 49,
+      "velocity": 45
+    },
+    {
+      "id": "kong-3",
+      "offset_seconds": 7.5,
+      "onset_seconds": 2.915382,
+      "pitch": 50,
+      "velocity": 46
+    },
+    {
+      "id": "kong-4",
+      "offset_seconds": 16.389999,
+      "onset_seconds": 10.389347,
+      "pitch": 50,
+      "velocity": 48
+    },
+    {
+      "id": "kong-5",
+      "offset_seconds": 2.53,
+      "onset_seconds": 1.434907,
+      "pitch": 54,
+      "velocity": 34
+    },
+    {
+      "id": "kong-6",
+      "offset_seconds": 2.97,
+      "onset_seconds": 2.544378,
+      "pitch": 54,
+      "velocity": 43
+    },
+    {
+      "id": "kong-7",
+      "offset_seconds": 9.96,
+      "onset_seconds": 8.895865,
+      "pitch": 54,
+      "velocity": 43
+    },
+    {
+      "id": "kong-8",
+      "offset_seconds": 10.406698,
+      "onset_seconds": 9.967591,
+      "pitch": 54,
+      "velocity": 47
+    },
+    {
+      "id": "kong-9",
+      "offset_seconds": 7.5,
+      "onset_seconds": 3.388756,
+      "pitch": 57,
+      "velocity": 41
+    },
+    {
+      "id": "kong-10",
+      "offset_seconds": 16.92,
+      "onset_seconds": 10.917791,
+      "pitch": 57,
+      "velocity": 38
+    },
+    {
+      "id": "kong-11",
+      "offset_seconds": 2.944886,
+      "onset_seconds": 1.839728,
+      "pitch": 61,
+      "velocity": 42
+    },
+    {
+      "id": "kong-12",
+      "offset_seconds": 10.411572,
+      "onset_seconds": 9.270557,
+      "pitch": 61,
+      "velocity": 49
+    },
+    {
+      "id": "kong-13",
+      "offset_seconds": 7.5,
+      "onset_seconds": 3.873444,
+      "pitch": 64,
+      "velocity": 38
+    },
+    {
+      "id": "kong-14",
+      "offset_seconds": 17.48,
+      "onset_seconds": 11.481678,
+      "pitch": 64,
+      "velocity": 38
+    },
+    {
+      "id": "kong-15",
+      "offset_seconds": 7.5,
+      "onset_seconds": 4.502984,
+      "pitch": 66,
+      "velocity": 27
+    },
+    {
+      "id": "kong-16",
+      "offset_seconds": 18.24,
+      "onset_seconds": 12.240112,
+      "pitch": 66,
+      "velocity": 28
+    },
+    {
+      "id": "kong-17",
+      "offset_seconds": 2.947283,
+      "onset_seconds": 2.207142,
+      "pitch": 68,
+      "velocity": 50
+    },
+    {
+      "id": "kong-18",
+      "offset_seconds": 10.415949,
+      "onset_seconds": 9.625187,
+      "pitch": 68,
+      "velocity": 58
+    },
+    {
+      "id": "kong-19",
+      "offset_seconds": 2.97,
+      "onset_seconds": 0.91183,
+      "pitch": 69,
+      "velocity": 37
+    },
+    {
+      "id": "kong-20",
+      "offset_seconds": 9.55,
+      "onset_seconds": 8.440622,
+      "pitch": 69,
+      "velocity": 50
+    },
+    {
+      "id": "kong-21",
+      "offset_seconds": 2.97,
+      "onset_seconds": 1.153033,
+      "pitch": 73,
+      "velocity": 62
+    },
+    {
+      "id": "kong-22",
+      "offset_seconds": 10.41,
+      "onset_seconds": 8.668668,
+      "pitch": 73,
+      "velocity": 76
+    },
+    {
+      "id": "kong-23",
+      "offset_seconds": 7.5,
+      "onset_seconds": 4.487597,
+      "pitch": 74,
+      "velocity": 50
+    },
+    {
+      "id": "kong-24",
+      "offset_seconds": 15.593218,
+      "onset_seconds": 12.210653,
+      "pitch": 74,
+      "velocity": 45
+    },
+    {
+      "id": "kong-25",
+      "offset_seconds": 7.5,
+      "onset_seconds": 3.363167,
+      "pitch": 76,
+      "velocity": 67
+    },
+    {
+      "id": "kong-26",
+      "offset_seconds": 15.592791,
+      "onset_seconds": 10.890394,
+      "pitch": 76,
+      "velocity": 66
+    },
+    {
+      "id": "kong-27",
+      "offset_seconds": 2.53,
+      "onset_seconds": 1.846052,
+      "pitch": 80,
+      "velocity": 85
+    },
+    {
+      "id": "kong-28",
+      "offset_seconds": 2.952447,
+      "onset_seconds": 2.536663,
+      "pitch": 80,
+      "velocity": 88
+    },
+    {
+      "id": "kong-29",
+      "offset_seconds": 9.95,
+      "onset_seconds": 9.274064,
+      "pitch": 80,
+      "velocity": 88
+    },
+    {
+      "id": "kong-30",
+      "offset_seconds": 10.46,
+      "onset_seconds": 9.963397,
+      "pitch": 80,
+      "velocity": 85
+    },
+    {
+      "id": "kong-31",
+      "offset_seconds": 2.18,
+      "onset_seconds": 1.433451,
+      "pitch": 81,
+      "velocity": 68
+    },
+    {
+      "id": "kong-32",
+      "offset_seconds": 2.93,
+      "onset_seconds": 2.192984,
+      "pitch": 81,
+      "velocity": 84
+    },
+    {
+      "id": "kong-33",
+      "offset_seconds": 3.86,
+      "onset_seconds": 2.935165,
+      "pitch": 81,
+      "velocity": 76
+    },
+    {
+      "id": "kong-34",
+      "offset_seconds": 7.5,
+      "onset_seconds": 3.872533,
+      "pitch": 81,
+      "velocity": 59
+    },
+    {
+      "id": "kong-35",
+      "offset_seconds": 9.59,
+      "onset_seconds": 8.902729,
+      "pitch": 81,
+      "velocity": 76
+    },
+    {
+      "id": "kong-36",
+      "offset_seconds": 10.39,
+      "onset_seconds": 9.604487,
+      "pitch": 81,
+      "velocity": 85
+    },
+    {
+      "id": "kong-37",
+      "offset_seconds": 11.45,
+      "onset_seconds": 10.396408,
+      "pitch": 81,
+      "velocity": 76
+    },
+    {
+      "id": "kong-38",
+      "offset_seconds": 15.64,
+      "onset_seconds": 11.464741,
+      "pitch": 81,
+      "velocity": 62
+    }
+  ],
+  "family": "kong",
+  "field_semantics": {
+    "fields": {
+      "audible_end": {
+        "note": "no independently annotated audible ending exists",
+        "source": null,
+        "status": "not_estimated"
+      },
+      "key_release": {
+        "note": "a predicted offset is not a physical key release",
+        "source": null,
+        "status": "not_estimated"
+      },
+      "pedal": {
+        "source": "native",
+        "status": "native_trajectory",
+        "types": [
+          "sustain"
+        ]
+      },
+      "pitch_onset": {
+        "source": "native",
+        "status": "measured"
+      },
+      "predicted_offset": {
+        "convention": "kong/native-offset",
+        "source": "native",
+        "status": "native_sidecar"
+      },
+      "velocity_midi": {
+        "note": "predicted MIDI velocity, not a captured measurement",
+        "source": "native",
+        "status": "model_estimated",
+        "units": "midi_1_127"
+      },
+      "written_duration": {
+        "source": null,
+        "status": "not_estimated"
+      }
+    },
+    "schema": "piano-model-field-semantics-1",
+    "variant": "kong-piano",
+    "version": 1
+  },
+  "note_count": 38,
+  "offset_beyond_interval": 5,
+  "offset_convention": "kong/native-offset",
+  "pedal": {
+    "spans": [
+      {
+        "offset_seconds": 2.936503,
+        "onset_seconds": 1.35
+      },
+      {
+        "offset_seconds": 8.908077,
+        "onset_seconds": 3.11
+      },
+      {
+        "offset_seconds": 10.393004,
+        "onset_seconds": 9.06
+      },
+      {
+        "offset_seconds": 15.58783,
+        "onset_seconds": 10.57
+      }
+    ],
+    "status": "native_trajectory",
+    "types": [
+      "sustain"
+    ]
+  },
+  "schema": "piano-model-native-1",
+  "variant": "kong-piano",
+  "version": 1
+}

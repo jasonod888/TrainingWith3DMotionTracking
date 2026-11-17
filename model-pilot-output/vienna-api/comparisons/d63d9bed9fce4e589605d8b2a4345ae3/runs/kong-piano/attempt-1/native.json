@@ -1,0 +1,5900 @@
+{
+  "dropped_outside_interval": 0,
+  "events": [
+    {
+      "id": "kong-1",
+      "offset_seconds": 118.860001,
+      "onset_seconds": 117.973915,
+      "pitch": 29,
+      "velocity": 38
+    },
+    {
+      "id": "kong-2",
+      "offset_seconds": 126.709999,
+      "onset_seconds": 126.695656,
+      "pitch": 29,
+      "velocity": 6
+    },
+    {
+      "id": "kong-3",
+      "offset_seconds": 100.873657,
+      "onset_seconds": 100.320137,
+      "pitch": 36,
+      "velocity": 45
+    },
+    {
+      "id": "kong-4",
+      "offset_seconds": 106.626846,
+      "onset_seconds": 105.86367,
+      "pitch": 36,
+      "velocity": 49
+    },
+    {
+      "id": "kong-5",
+      "offset_seconds": 108.519997,
+      "onset_seconds": 107.793053,
+      "pitch": 36,
+      "velocity": 53
+    },
+    {
+      "id": "kong-6",
+      "offset_seconds": 109.1978,
+      "onset_seconds": 108.531853,
+      "pitch": 36,
+      "velocity": 42
+    },
+    {
+      "id": "kong-7",
+      "offset_seconds": 111.260002,
+      "onset_seconds": 110.407768,
+      "pitch": 36,
+      "velocity": 45
+    },
+    {
+      "id": "kong-8",
+      "offset_seconds": 112.003876,
+      "onset_seconds": 111.266312,
+      "pitch": 36,
+      "velocity": 41
+    },
+    {
+      "id": "kong-9",
+      "offset_seconds": 113.254486,
+      "onset_seconds": 112.735016,
+      "pitch": 36,
+      "velocity": 45
+    },
+    {
+      "id": "kong-10",
+      "offset_seconds": 114.440353,
+      "onset_seconds": 113.921204,
+      "pitch": 36,
+      "velocity": 53
+    },
+    {
+      "id": "kong-11",
+      "offset_seconds": 115.916206,
+      "onset_seconds": 115.304665,
+      "pitch": 36,
+      "velocity": 43
+    },
+    {
+      "id": "kong-12",
+      "offset_seconds": 117.985718,
+      "onset_seconds": 117.068626,
+      "pitch": 36,
+      "velocity": 31
+    },
+    {
+      "id": "kong-13",
+      "offset_seconds": 107.860542,
+      "onset_seconds": 107.326523,
+      "pitch": 38,
+      "velocity": 48
+    },
+    {
+      "id": "kong-14",
+      "offset_seconds": 110.486351,
+      "onset_seconds": 109.900711,
+      "pitch": 38,
+      "velocity": 38
+    },
+    {
+      "id": "kong-15",
+      "offset_seconds": 47.84726,
+      "onset_seconds": 47.358154,
+      "pitch": 40,
+      "velocity": 49
+    },
+    {
+      "id": "kong-16",
+      "offset_seconds": 107.862892,
+      "onset_seconds": 107.135628,
+      "pitch": 40,
+      "velocity": 43
+    },
+    {
+      "id": "kong-17",
+      "offset_seconds": 110.48558,
+      "onset_seconds": 109.714348,
+      "pitch": 40,
+      "velocity": 40
+    },
+    {
+      "id": "kong-18",
+      "offset_seconds": 14.661802,
+      "onset_seconds": 13.40161,
+      "pitch": 41,
+      "velocity": 39
+    },
+    {
+      "id": "kong-19",
+      "offset_seconds": 35.141068,
+      "onset_seconds": 33.7957,
+      "pitch": 41,
+      "velocity": 42
+    },
+    {
+      "id": "kong-20",
+      "offset_seconds": 42.650002,
+      "onset_seconds": 42.635292,
+      "pitch": 41,
+      "velocity": 38
+    },
+    {
+      "id": "kong-21",
+      "offset_seconds": 77.084908,
+      "onset_seconds": 75.797295,
+      "pitch": 41,
+      "velocity": 35
+    },
+    {
+      "id": "kong-22",
+      "offset_seconds": 101.620003,
+      "onset_seconds": 100.793404,
+      "pitch": 41,
+      "velocity": 44
+    },
+    {
+      "id": "kong-23",
+      "offset_seconds": 102.400002,
+      "onset_seconds": 101.634094,
+      "pitch": 41,
+      "velocity": 53
+    },
+    {
+      "id": "kong-24",
+      "offset_seconds": 107.863258,
+      "onset_seconds": 106.536827,
+      "pitch": 41,
+      "velocity": 40
+    },
+    {
+      "id": "kong-25",
+      "offset_seconds": 110.484894,
+      "onset_seconds": 109.085693,
+      "pitch": 41,
+      "velocity": 39
+    },
+    {
+      "id": "kong-26",
+      "offset_seconds": 113.139999,
+      "onset_seconds": 111.925453,
+      "pitch": 41,
+      "velocity": 37
+    },
+    {
+      "id": "kong-27",
+      "offset_seconds": 114.360001,
+      "onset_seconds": 113.150887,
+      "pitch": 41,
+      "velocity": 43
+    },
+    {
+      "id": "kong-28",
+      "offset_seconds": 115.879997,
+      "onset_seconds": 114.367844,
+      "pitch": 41,
+      "velocity": 39
+    },
+    {
+      "id": "kong-29",
+      "offset_seconds": 117.145638,
+      "onset_seconds": 115.885925,
+      "pitch": 41,
+      "velocity": 38
+    },
+    {
+      "id": "kong-30",
+      "offset_seconds": 122.5,
+      "onset_seconds": 118.66861,
+      "pitch": 41,
+      "velocity": 42
+    },
+    {
+      "id": "kong-31",
+      "offset_seconds": 97.650002,
+      "onset_seconds": 96.705154,
+      "pitch": 42,
+      "velocity": 53
+    },
+    {
+      "id": "kong-32",
+      "offset_seconds": 98.282555,
+      "onset_seconds": 97.657921,
+      "pitch": 42,
+      "velocity": 51
+    },
+    {
+      "id": "kong-33",
+      "offset_seconds": 103.050003,
+      "onset_seconds": 102.266899,
+      "pitch": 42,
+      "velocity": 56
+    },
+    {
+      "id": "kong-34",
+      "offset_seconds": 103.62767,
+      "onset_seconds": 103.055237,
+      "pitch": 42,
+      "velocity": 60
+    },
+    {
+      "id": "kong-35",
+      "offset_seconds": 12.045599,
+      "onset_seconds": 11.413442,
+      "pitch": 43,
+      "velocity": 48
+    },
+    {
+      "id": "kong-36",
+      "offset_seconds": 32.453991,
+      "onset_seconds": 31.895107,
+      "pitch": 43,
+      "velocity": 48
+    },
+    {
+      "id": "kong-37",
+      "offset_seconds": 52.833061,
+      "onset_seconds": 52.314098,
+      "pitch": 43,
+      "velocity": 48
+    },
+    {
+      "id": "kong-38",
+      "offset_seconds": 74.478188,
+      "onset_seconds": 73.914322,
+      "pitch": 43,
+      "velocity": 48
+    },
+    {
+      "id": "kong-39",
+      "offset_seconds": 99.044617,
+      "onset_seconds": 98.229652,
+      "pitch": 43,
+      "velocity": 52
+    },
+    {
+      "id": "kong-40",
+      "offset_seconds": 104.458946,
+      "onset_seconds": 103.553261,
+      "pitch": 43,
+      "velocity": 55
+    },
+    {
+      "id": "kong-41",
+      "offset_seconds": 48.57,
+      "onset_seconds": 47.82671,
+      "pitch": 45,
+      "velocity": 43
+    },
+    {
+      "id": "kong-42",
+      "offset_seconds": 49.150002,
+      "onset_seconds": 48.580177,
+      "pitch": 45,
+      "velocity": 53
+    },
+    {
+      "id": "kong-43",
+      "offset_seconds": 96.080002,
+      "onset_seconds": 95.194328,
+      "pitch": 45,
+      "velocity": 45
+    },
+    {
+      "id": "kong-44",
+      "offset_seconds": 96.790436,
+      "onset_seconds": 96.093689,
+      "pitch": 45,
+      "velocity": 52
+    },
+    {
+      "id": "kong-45",
+      "offset_seconds": 99.044327,
+      "onset_seconds": 98.804657,
+      "pitch": 45,
+      "velocity": 50
+    },
+    {
+      "id": "kong-46",
+      "offset_seconds": 104.474831,
+      "onset_seconds": 104.244583,
+      "pitch": 45,
+      "velocity": 40
+    },
+    {
+      "id": "kong-47",
+      "offset_seconds": 14.662023,
+      "onset_seconds": 14.197636,
+      "pitch": 46,
+      "velocity": 45
+    },
+    {
+      "id": "kong-48",
+      "offset_seconds": 15.89533,
+      "onset_seconds": 15.414629,
+      "pitch": 46,
+      "velocity": 45
+    },
+    {
+      "id": "kong-49",
+      "offset_seconds": 18.36544,
+      "onset_seconds": 17.814831,
+      "pitch": 46,
+      "velocity": 48
+    },
+    {
+      "id": "kong-50",
+      "offset_seconds": 35.135979,
+      "onset_seconds": 34.623367,
+      "pitch": 46,
+      "velocity": 41
+    },
+    {
+      "id": "kong-51",
+      "offset_seconds": 36.353916,
+      "onset_seconds": 35.869503,
+      "pitch": 46,
+      "velocity": 40
+    },
+    {
+      "id": "kong-52",
+      "offset_seconds": 38.905537,
+      "onset_seconds": 38.262341,
+      "pitch": 46,
+      "velocity": 48
+    },
+    {
+      "id": "kong-53",
+      "offset_seconds": 77.083694,
+      "onset_seconds": 76.554977,
+      "pitch": 46,
+      "velocity": 40
+    },
+    {
+      "id": "kong-54",
+      "offset_seconds": 78.285942,
+      "onset_seconds": 77.795097,
+      "pitch": 46,
+      "velocity": 46
+    },
+    {
+      "id": "kong-55",
+      "offset_seconds": 80.816849,
+      "onset_seconds": 80.257904,
+      "pitch": 46,
+      "velocity": 42
+    },
+    {
+      "id": "kong-56",
+      "offset_seconds": 99.560974,
+      "onset_seconds": 99.005653,
+      "pitch": 46,
+      "velocity": 55
+    },
+    {
+      "id": "kong-57",
+      "offset_seconds": 105.124901,
+      "onset_seconds": 104.471519,
+      "pitch": 46,
+      "velocity": 48
+    },
+    {
+      "id": "kong-58",
+      "offset_seconds": 10.624052,
+      "onset_seconds": 10.123796,
+      "pitch": 48,
+      "velocity": 41
+    },
+    {
+      "id": "kong-59",
+      "offset_seconds": 12.82,
+      "onset_seconds": 11.972479,
+      "pitch": 48,
+      "velocity": 44
+    },
+    {
+      "id": "kong-60",
+      "offset_seconds": 13.42,
+      "onset_seconds": 12.834348,
+      "pitch": 48,
+      "velocity": 35
+    },
+    {
+      "id": "kong-61",
+      "offset_seconds": 15.45,
+      "onset_seconds": 14.643411,
+      "pitch": 48,
+      "velocity": 47
+    },
+    {
+      "id": "kong-62",
+      "offset_seconds": 16.68,
+      "onset_seconds": 15.85521,
+      "pitch": 48,
+      "velocity": 45
+    },
+    {
+      "id": "kong-63",
+      "offset_seconds": 17.817448,
+      "onset_seconds": 17.114519,
+      "pitch": 48,
+      "velocity": 47
+    },
+    {
+      "id": "kong-64",
+      "offset_seconds": 19.110001,
+      "onset_seconds": 18.29311,
+      "pitch": 48,
+      "velocity": 42
+    },
+    {
+      "id": "kong-65",
+      "offset_seconds": 20.34,
+      "onset_seconds": 19.598831,
+      "pitch": 48,
+      "velocity": 34
+    },
+    {
+      "id": "kong-66",
+      "offset_seconds": 20.879999,
+      "onset_seconds": 20.348888,
+      "pitch": 48,
+      "velocity": 42
+    },
+    {
+      "id": "kong-67",
+      "offset_seconds": 21.709999,
+      "onset_seconds": 20.893251,
+      "pitch": 48,
+      "velocity": 35
+    },
+    {
+      "id": "kong-68",
+      "offset_seconds": 22.33,
+      "onset_seconds": 21.716219,
+      "pitch": 48,
+      "velocity": 40
+    },
+    {
+      "id": "kong-69",
+      "offset_seconds": 31.116001,
+      "onset_seconds": 30.623466,
+      "pitch": 48,
+      "velocity": 39
+    },
+    {
+      "id": "kong-70",
+      "offset_seconds": 33.25,
+      "onset_seconds": 32.427578,
+      "pitch": 48,
+      "velocity": 36
+    },
+    {
+      "id": "kong-71",
+      "offset_seconds": 33.819519,
+      "onset_seconds": 33.255539,
+      "pitch": 48,
+      "velocity": 37
+    },
+    {
+      "id": "kong-72",
+      "offset_seconds": 35.91,
+      "onset_seconds": 35.074535,
+      "pitch": 48,
+      "velocity": 43
+    },
+    {
+      "id": "kong-73",
+      "offset_seconds": 37.5,
+      "onset_seconds": 36.263268,
+      "pitch": 48,
+      "velocity": 53
+    },
+    {
+      "id": "kong-74",
+      "offset_seconds": 38.27,
+      "onset_seconds": 37.513256,
+      "pitch": 48,
+      "velocity": 45
+    },
+    {
+      "id": "kong-75",
+      "offset_seconds": 39.677376,
+      "onset_seconds": 38.833179,
+      "pitch": 48,
+      "velocity": 40
+    },
+    {
+      "id": "kong-76",
+      "offset_seconds": 40.810001,
+      "onset_seconds": 40.079784,
+      "pitch": 48,
+      "velocity": 42
+    },
+    {
+      "id": "kong-77",
+      "offset_seconds": 41.34,
+      "onset_seconds": 40.824169,
+      "pitch": 48,
+      "velocity": 47
+    },
+    {
+      "id": "kong-78",
+      "offset_seconds": 42.130001,
+      "onset_seconds": 41.34552,
+      "pitch": 48,
+      "velocity": 39
+    },
+    {
+      "id": "kong-79",
+      "offset_seconds": 42.689999,
+      "onset_seconds": 42.142757,
+      "pitch": 48,
+      "velocity": 43
+    },
+    {
+      "id": "kong-80",
+      "offset_seconds": 44.849998,
+      "onset_seconds": 44.103447,
+      "pitch": 48,
+      "velocity": 48
+    },
+    {
+      "id": "kong-81",
+      "offset_seconds": 45.32,
+      "onset_seconds": 44.864002,
+      "pitch": 48,
+      "velocity": 47
+    },
+    {
+      "id": "kong-82",
+      "offset_seconds": 46.68,
+      "onset_seconds": 45.325237,
+      "pitch": 48,
+      "velocity": 44
+    },
+    {
+      "id": "kong-83",
+      "offset_seconds": 49.830002,
+      "onset_seconds": 49.059235,
+      "pitch": 48,
+      "velocity": 48
+    },
+    {
+      "id": "kong-84",
+      "offset_seconds": 50.362602,
+      "onset_seconds": 49.844212,
+      "pitch": 48,
+      "velocity": 58
+    },
+    {
+      "id": "kong-85",
+      "offset_seconds": 53.84,
+      "onset_seconds": 52.825504,
+      "pitch": 48,
+      "velocity": 41
+    },
+    {
+      "id": "kong-86",
+      "offset_seconds": 54.580002,
+      "onset_seconds": 53.854225,
+      "pitch": 48,
+      "velocity": 26
+    },
+    {
+      "id": "kong-87",
+      "offset_seconds": 55.391747,
+      "onset_seconds": 54.585705,
+      "pitch": 48,
+      "velocity": 29
+    },
+    {
+      "id": "kong-88",
+      "offset_seconds": 64.410004,
+      "onset_seconds": 63.612274,
+      "pitch": 48,
+      "velocity": 45
+    },
+    {
+      "id": "kong-89",
+      "offset_seconds": 65.059998,
+      "onset_seconds": 64.421227,
+      "pitch": 48,
+      "velocity": 52
+    },
+    {
+      "id": "kong-90",
+      "offset_seconds": 73.148224,
+      "onset_seconds": 72.682526,
+      "pitch": 48,
+      "velocity": 40
+    },
+    {
+      "id": "kong-91",
+      "offset_seconds": 75.239998,
+      "onset_seconds": 74.438591,
+      "pitch": 48,
+      "velocity": 40
+    },
+    {
+      "id": "kong-92",
+      "offset_seconds": 75.841965,
+      "onset_seconds": 75.246292,
+      "pitch": 48,
+      "velocity": 38
+    },
+    {
+      "id": "kong-93",
+      "offset_seconds": 77.825279,
+      "onset_seconds": 77.008026,
+      "pitch": 48,
+      "velocity": 45
+    },
+    {
+      "id": "kong-94",
+      "offset_seconds": 79.059998,
+      "onset_seconds": 78.225716,
+      "pitch": 48,
+      "velocity": 51
+    },
+    {
+      "id": "kong-95",
+      "offset_seconds": 80.234062,
+      "onset_seconds": 79.515556,
+      "pitch": 48,
+      "velocity": 44
+    },
+    {
+      "id": "kong-96",
+      "offset_seconds": 81.610001,
+      "onset_seconds": 80.791664,
+      "pitch": 48,
+      "velocity": 32
+    },
+    {
+      "id": "kong-97",
+      "offset_seconds": 82.800003,
+      "onset_seconds": 82.045967,
+      "pitch": 48,
+      "velocity": 39
+    },
+    {
+      "id": "kong-98",
+      "offset_seconds": 83.309998,
+      "onset_seconds": 82.805099,
+      "pitch": 48,
+      "velocity": 48
+    },
+    {
+      "id": "kong-99",
+      "offset_seconds": 84.160004,
+      "onset_seconds": 83.322105,
+      "pitch": 48,
+      "velocity": 45
+    },
+    {
+      "id": "kong-100",
+      "offset_seconds": 84.809998,
+      "onset_seconds": 84.173187,
+      "pitch": 48,
+      "velocity": 54
+    },
+    {
+      "id": "kong-101",
+      "offset_seconds": 85.629997,
+      "onset_seconds": 84.816704,
+      "pitch": 48,
+      "velocity": 49
+    },
+    {
+      "id": "kong-102",
+      "offset_seconds": 86.089996,
+      "onset_seconds": 85.642265,
+      "pitch": 48,
+      "velocity": 41
+    },
+    {
+      "id": "kong-103",
+      "offset_seconds": 87.529999,
+      "onset_seconds": 86.096832,
+      "pitch": 48,
+      "velocity": 43
+    },
+    {
+      "id": "kong-104",
+      "offset_seconds": 100.790001,
+      "onset_seconds": 99.505821,
+      "pitch": 48,
+      "velocity": 49
+    },
+    {
+      "id": "kong-105",
+      "offset_seconds": 102.370995,
+      "onset_seconds": 100.802971,
+      "pitch": 48,
+      "velocity": 45
+    },
+    {
+      "id": "kong-106",
+      "offset_seconds": 106.519997,
+      "onset_seconds": 105.055672,
+      "pitch": 48,
+      "velocity": 44
+    },
+    {
+      "id": "kong-107",
+      "offset_seconds": 107.779999,
+      "onset_seconds": 106.534599,
+      "pitch": 48,
+      "velocity": 41
+    },
+    {
+      "id": "kong-108",
+      "offset_seconds": 109.080002,
+      "onset_seconds": 107.79364,
+      "pitch": 48,
+      "velocity": 50
+    },
+    {
+      "id": "kong-109",
+      "offset_seconds": 109.910004,
+      "onset_seconds": 109.093178,
+      "pitch": 48,
+      "velocity": 41
+    },
+    {
+      "id": "kong-110",
+      "offset_seconds": 111.919998,
+      "onset_seconds": 109.91526,
+      "pitch": 48,
+      "velocity": 30
+    },
+    {
+      "id": "kong-111",
+      "offset_seconds": 113.139999,
+      "onset_seconds": 111.929321,
+      "pitch": 48,
+      "velocity": 37
+    },
+    {
+      "id": "kong-112",
+      "offset_seconds": 113.910004,
+      "onset_seconds": 113.154922,
+      "pitch": 48,
+      "velocity": 41
+    },
+    {
+      "id": "kong-113",
+      "offset_seconds": 114.370003,
+      "onset_seconds": 113.922974,
+      "pitch": 48,
+      "velocity": 51
+    },
+    {
+      "id": "kong-114",
+      "offset_seconds": 115.879997,
+      "onset_seconds": 114.376083,
+      "pitch": 48,
+      "velocity": 41
+    },
+    {
+      "id": "kong-115",
+      "offset_seconds": 117.089996,
+      "onset_seconds": 115.888519,
+      "pitch": 48,
+      "velocity": 31
+    },
+    {
+      "id": "kong-116",
+      "offset_seconds": 118.0,
+      "onset_seconds": 117.104523,
+      "pitch": 48,
+      "velocity": 24
+    },
+    {
+      "id": "kong-117",
+      "offset_seconds": 122.5,
+      "onset_seconds": 119.035736,
+      "pitch": 48,
+      "velocity": 34
+    },
+    {
+      "id": "kong-118",
+      "offset_seconds": 11.41,
+      "onset_seconds": 10.614882,
+      "pitch": 50,
+      "velocity": 35
+    },
+    {
+      "id": "kong-119",
+      "offset_seconds": 12.07,
+      "onset_seconds": 11.423669,
+      "pitch": 50,
+      "velocity": 45
+    },
+    {
+      "id": "kong-120",
+      "offset_seconds": 17.17832,
+      "onset_seconds": 16.605194,
+      "pitch": 50,
+      "velocity": 41
+    },
+    {
+      "id": "kong-121",
+      "offset_seconds": 19.617277,
+      "onset_seconds": 19.083227,
+      "pitch": 50,
+      "velocity": 40
+    },
+    {
+      "id": "kong-122",
+      "offset_seconds": 31.889999,
+      "onset_seconds": 31.088577,
+      "pitch": 50,
+      "velocity": 40
+    },
+    {
+      "id": "kong-123",
+      "offset_seconds": 32.48,
+      "onset_seconds": 31.89785,
+      "pitch": 50,
+      "velocity": 39
+    },
+    {
+      "id": "kong-124",
+      "offset_seconds": 37.557407,
+      "onset_seconds": 37.025543,
+      "pitch": 50,
+      "velocity": 41
+    },
+    {
+      "id": "kong-125",
+      "offset_seconds": 40.120033,
+      "onset_seconds": 39.635773,
+      "pitch": 50,
+      "velocity": 32
+    },
+    {
+      "id": "kong-126",
+      "offset_seconds": 46.661232,
+      "onset_seconds": 46.121365,
+      "pitch": 50,
+      "velocity": 47
+    },
+    {
+      "id": "kong-127",
+      "offset_seconds": 65.887558,
+      "onset_seconds": 64.963356,
+      "pitch": 50,
+      "velocity": 51
+    },
+    {
+      "id": "kong-128",
+      "offset_seconds": 73.910004,
+      "onset_seconds": 73.123833,
+      "pitch": 50,
+      "velocity": 39
+    },
+    {
+      "id": "kong-129",
+      "offset_seconds": 74.5,
+      "onset_seconds": 73.924019,
+      "pitch": 50,
+      "velocity": 42
+    },
+    {
+      "id": "kong-130",
+      "offset_seconds": 79.589233,
+      "onset_seconds": 78.977753,
+      "pitch": 50,
+      "velocity": 45
+    },
+    {
+      "id": "kong-131",
+      "offset_seconds": 82.082909,
+      "onset_seconds": 81.588631,
+      "pitch": 50,
+      "velocity": 34
+    },
+    {
+      "id": "kong-132",
+      "offset_seconds": 87.54557,
+      "onset_seconds": 86.972084,
+      "pitch": 50,
+      "velocity": 35
+    },
+    {
+      "id": "kong-133",
+      "offset_seconds": 88.815178,
+      "onset_seconds": 88.296867,
+      "pitch": 50,
+      "velocity": 36
+    },
+    {
+      "id": "kong-134",
+      "offset_seconds": 91.305687,
+      "onset_seconds": 90.777306,
+      "pitch": 50,
+      "velocity": 40
+    },
+    {
+      "id": "kong-135",
+      "offset_seconds": 47.349998,
+      "onset_seconds": 46.579155,
+      "pitch": 52,
+      "velocity": 44
+    },
+    {
+      "id": "kong-136",
+      "offset_seconds": 47.830002,
+      "onset_seconds": 47.356541,
+      "pitch": 52,
+      "velocity": 44
+    },
+    {
+      "id": "kong-137",
+      "offset_seconds": 48.639999,
+      "onset_seconds": 47.841671,
+      "pitch": 52,
+      "velocity": 31
+    },
+    {
+      "id": "kong-138",
+      "offset_seconds": 51.650002,
+      "onset_seconds": 50.324013,
+      "pitch": 52,
+      "velocity": 52
+    },
+    {
+      "id": "kong-139",
+      "offset_seconds": 66.676498,
+      "onset_seconds": 65.877914,
+      "pitch": 52,
+      "velocity": 37
+    },
+    {
+      "id": "kong-140",
+      "offset_seconds": 88.355774,
+      "onset_seconds": 87.482162,
+      "pitch": 52,
+      "velocity": 34
+    },
+    {
+      "id": "kong-141",
+      "offset_seconds": 90.0,
+      "onset_seconds": 88.746681,
+      "pitch": 52,
+      "velocity": 40
+    },
+    {
+      "id": "kong-142",
+      "offset_seconds": 90.860001,
+      "onset_seconds": 90.007736,
+      "pitch": 52,
+      "velocity": 36
+    },
+    {
+      "id": "kong-143",
+      "offset_seconds": 92.117943,
+      "onset_seconds": 91.252731,
+      "pitch": 52,
+      "velocity": 41
+    },
+    {
+      "id": "kong-144",
+      "offset_seconds": 93.300003,
+      "onset_seconds": 92.538071,
+      "pitch": 52,
+      "velocity": 46
+    },
+    {
+      "id": "kong-145",
+      "offset_seconds": 93.870003,
+      "onset_seconds": 93.313309,
+      "pitch": 52,
+      "velocity": 46
+    },
+    {
+      "id": "kong-146",
+      "offset_seconds": 94.669998,
+      "onset_seconds": 93.883423,
+      "pitch": 52,
+      "velocity": 40
+    },
+    {
+      "id": "kong-147",
+      "offset_seconds": 95.254318,
+      "onset_seconds": 94.684959,
+      "pitch": 52,
+      "velocity": 38
+    },
+    {
+      "id": "kong-148",
+      "offset_seconds": 4.96,
+      "onset_seconds": 4.181558,
+      "pitch": 53,
+      "velocity": 39
+    },
+    {
+      "id": "kong-149",
+      "offset_seconds": 5.41,
+      "onset_seconds": 4.965466,
+      "pitch": 53,
+      "velocity": 42
+    },
+    {
+      "id": "kong-150",
+      "offset_seconds": 6.17,
+      "onset_seconds": 5.421154,
+      "pitch": 53,
+      "velocity": 44
+    },
+    {
+      "id": "kong-151",
+      "offset_seconds": 6.7,
+      "onset_seconds": 6.182187,
+      "pitch": 53,
+      "velocity": 39
+    },
+    {
+      "id": "kong-152",
+      "offset_seconds": 7.47,
+      "onset_seconds": 6.709603,
+      "pitch": 53,
+      "velocity": 41
+    },
+    {
+      "id": "kong-153",
+      "offset_seconds": 8.01,
+      "onset_seconds": 7.477499,
+      "pitch": 53,
+      "velocity": 37
+    },
+    {
+      "id": "kong-154",
+      "offset_seconds": 9.33,
+      "onset_seconds": 8.016064,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-155",
+      "offset_seconds": 14.61,
+      "onset_seconds": 14.198646,
+      "pitch": 53,
+      "velocity": 36
+    },
+    {
+      "id": "kong-156",
+      "offset_seconds": 15.4,
+      "onset_seconds": 14.620128,
+      "pitch": 53,
+      "velocity": 42
+    },
+    {
+      "id": "kong-157",
+      "offset_seconds": 15.84,
+      "onset_seconds": 15.410213,
+      "pitch": 53,
+      "velocity": 42
+    },
+    {
+      "id": "kong-158",
+      "offset_seconds": 16.59,
+      "onset_seconds": 15.854376,
+      "pitch": 53,
+      "velocity": 43
+    },
+    {
+      "id": "kong-159",
+      "offset_seconds": 17.110001,
+      "onset_seconds": 16.601561,
+      "pitch": 53,
+      "velocity": 44
+    },
+    {
+      "id": "kong-160",
+      "offset_seconds": 17.82,
+      "onset_seconds": 17.119492,
+      "pitch": 53,
+      "velocity": 42
+    },
+    {
+      "id": "kong-161",
+      "offset_seconds": 18.280001,
+      "onset_seconds": 17.831997,
+      "pitch": 53,
+      "velocity": 37
+    },
+    {
+      "id": "kong-162",
+      "offset_seconds": 19.059999,
+      "onset_seconds": 18.286482,
+      "pitch": 53,
+      "velocity": 45
+    },
+    {
+      "id": "kong-163",
+      "offset_seconds": 19.59,
+      "onset_seconds": 19.072956,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-164",
+      "offset_seconds": 20.940001,
+      "onset_seconds": 19.597691,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-165",
+      "offset_seconds": 23.09,
+      "onset_seconds": 22.286907,
+      "pitch": 53,
+      "velocity": 29
+    },
+    {
+      "id": "kong-166",
+      "offset_seconds": 23.67,
+      "onset_seconds": 23.095427,
+      "pitch": 53,
+      "velocity": 37
+    },
+    {
+      "id": "kong-167",
+      "offset_seconds": 24.440001,
+      "onset_seconds": 23.680935,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-168",
+      "offset_seconds": 24.870001,
+      "onset_seconds": 24.450338,
+      "pitch": 53,
+      "velocity": 41
+    },
+    {
+      "id": "kong-169",
+      "offset_seconds": 25.629999,
+      "onset_seconds": 24.882097,
+      "pitch": 53,
+      "velocity": 37
+    },
+    {
+      "id": "kong-170",
+      "offset_seconds": 26.08,
+      "onset_seconds": 25.638954,
+      "pitch": 53,
+      "velocity": 49
+    },
+    {
+      "id": "kong-171",
+      "offset_seconds": 26.82,
+      "onset_seconds": 26.094297,
+      "pitch": 53,
+      "velocity": 39
+    },
+    {
+      "id": "kong-172",
+      "offset_seconds": 27.33,
+      "onset_seconds": 26.831902,
+      "pitch": 53,
+      "velocity": 40
+    },
+    {
+      "id": "kong-173",
+      "offset_seconds": 28.049999,
+      "onset_seconds": 27.341625,
+      "pitch": 53,
+      "velocity": 35
+    },
+    {
+      "id": "kong-174",
+      "offset_seconds": 28.540001,
+      "onset_seconds": 28.061855,
+      "pitch": 53,
+      "velocity": 44
+    },
+    {
+      "id": "kong-175",
+      "offset_seconds": 29.77,
+      "onset_seconds": 28.551289,
+      "pitch": 53,
+      "velocity": 42
+    },
+    {
+      "id": "kong-176",
+      "offset_seconds": 30.540001,
+      "onset_seconds": 29.784037,
+      "pitch": 53,
+      "velocity": 33
+    },
+    {
+      "id": "kong-177",
+      "offset_seconds": 34.630001,
+      "onset_seconds": 33.813484,
+      "pitch": 53,
+      "velocity": 36
+    },
+    {
+      "id": "kong-178",
+      "offset_seconds": 35.07,
+      "onset_seconds": 34.635143,
+      "pitch": 53,
+      "velocity": 31
+    },
+    {
+      "id": "kong-179",
+      "offset_seconds": 35.84,
+      "onset_seconds": 35.078766,
+      "pitch": 53,
+      "velocity": 37
+    },
+    {
+      "id": "kong-180",
+      "offset_seconds": 36.259998,
+      "onset_seconds": 35.849995,
+      "pitch": 53,
+      "velocity": 41
+    },
+    {
+      "id": "kong-181",
+      "offset_seconds": 37.02,
+      "onset_seconds": 36.265491,
+      "pitch": 53,
+      "velocity": 46
+    },
+    {
+      "id": "kong-182",
+      "offset_seconds": 37.509998,
+      "onset_seconds": 37.027683,
+      "pitch": 53,
+      "velocity": 39
+    },
+    {
+      "id": "kong-183",
+      "offset_seconds": 38.27,
+      "onset_seconds": 37.515934,
+      "pitch": 53,
+      "velocity": 39
+    },
+    {
+      "id": "kong-184",
+      "offset_seconds": 38.82,
+      "onset_seconds": 38.282452,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-185",
+      "offset_seconds": 39.619999,
+      "onset_seconds": 38.834694,
+      "pitch": 53,
+      "velocity": 33
+    },
+    {
+      "id": "kong-186",
+      "offset_seconds": 40.07,
+      "onset_seconds": 39.625122,
+      "pitch": 53,
+      "velocity": 36
+    },
+    {
+      "id": "kong-187",
+      "offset_seconds": 40.869999,
+      "onset_seconds": 40.083382,
+      "pitch": 53,
+      "velocity": 35
+    },
+    {
+      "id": "kong-188",
+      "offset_seconds": 43.459999,
+      "onset_seconds": 42.638588,
+      "pitch": 53,
+      "velocity": 42
+    },
+    {
+      "id": "kong-189",
+      "offset_seconds": 44.220001,
+      "onset_seconds": 43.474171,
+      "pitch": 53,
+      "velocity": 41
+    },
+    {
+      "id": "kong-190",
+      "offset_seconds": 51.539387,
+      "onset_seconds": 51.062737,
+      "pitch": 53,
+      "velocity": 57
+    },
+    {
+      "id": "kong-191",
+      "offset_seconds": 55.965393,
+      "onset_seconds": 55.373192,
+      "pitch": 53,
+      "velocity": 34
+    },
+    {
+      "id": "kong-192",
+      "offset_seconds": 57.169868,
+      "onset_seconds": 56.654865,
+      "pitch": 53,
+      "velocity": 29
+    },
+    {
+      "id": "kong-193",
+      "offset_seconds": 59.750988,
+      "onset_seconds": 59.233604,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-194",
+      "offset_seconds": 67.529999,
+      "onset_seconds": 66.603134,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-195",
+      "offset_seconds": 68.110001,
+      "onset_seconds": 67.542351,
+      "pitch": 53,
+      "velocity": 36
+    },
+    {
+      "id": "kong-196",
+      "offset_seconds": 68.919998,
+      "onset_seconds": 68.118774,
+      "pitch": 53,
+      "velocity": 34
+    },
+    {
+      "id": "kong-197",
+      "offset_seconds": 69.400002,
+      "onset_seconds": 68.926506,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-198",
+      "offset_seconds": 70.150002,
+      "onset_seconds": 69.41275,
+      "pitch": 53,
+      "velocity": 41
+    },
+    {
+      "id": "kong-199",
+      "offset_seconds": 70.610001,
+      "onset_seconds": 70.163887,
+      "pitch": 53,
+      "velocity": 48
+    },
+    {
+      "id": "kong-200",
+      "offset_seconds": 71.470001,
+      "onset_seconds": 70.616714,
+      "pitch": 53,
+      "velocity": 45
+    },
+    {
+      "id": "kong-201",
+      "offset_seconds": 76.550003,
+      "onset_seconds": 75.827599,
+      "pitch": 53,
+      "velocity": 22
+    },
+    {
+      "id": "kong-202",
+      "offset_seconds": 77.0,
+      "onset_seconds": 76.564011,
+      "pitch": 53,
+      "velocity": 29
+    },
+    {
+      "id": "kong-203",
+      "offset_seconds": 77.800003,
+      "onset_seconds": 77.014793,
+      "pitch": 53,
+      "velocity": 39
+    },
+    {
+      "id": "kong-204",
+      "offset_seconds": 78.220001,
+      "onset_seconds": 77.806259,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-205",
+      "offset_seconds": 78.980003,
+      "onset_seconds": 78.233749,
+      "pitch": 53,
+      "velocity": 44
+    },
+    {
+      "id": "kong-206",
+      "offset_seconds": 79.510002,
+      "onset_seconds": 78.985458,
+      "pitch": 53,
+      "velocity": 36
+    },
+    {
+      "id": "kong-207",
+      "offset_seconds": 80.25,
+      "onset_seconds": 79.517021,
+      "pitch": 53,
+      "velocity": 40
+    },
+    {
+      "id": "kong-208",
+      "offset_seconds": 80.779999,
+      "onset_seconds": 80.261314,
+      "pitch": 53,
+      "velocity": 43
+    },
+    {
+      "id": "kong-209",
+      "offset_seconds": 81.559998,
+      "onset_seconds": 80.79203,
+      "pitch": 53,
+      "velocity": 37
+    },
+    {
+      "id": "kong-210",
+      "offset_seconds": 82.050003,
+      "onset_seconds": 81.570236,
+      "pitch": 53,
+      "velocity": 35
+    },
+    {
+      "id": "kong-211",
+      "offset_seconds": 83.349998,
+      "onset_seconds": 82.062027,
+      "pitch": 53,
+      "velocity": 34
+    },
+    {
+      "id": "kong-212",
+      "offset_seconds": 90.081734,
+      "onset_seconds": 89.523788,
+      "pitch": 53,
+      "velocity": 40
+    },
+    {
+      "id": "kong-213",
+      "offset_seconds": 91.304138,
+      "onset_seconds": 90.786118,
+      "pitch": 53,
+      "velocity": 34
+    },
+    {
+      "id": "kong-214",
+      "offset_seconds": 92.614029,
+      "onset_seconds": 92.066574,
+      "pitch": 53,
+      "velocity": 44
+    },
+    {
+      "id": "kong-215",
+      "offset_seconds": 122.5,
+      "onset_seconds": 119.2565,
+      "pitch": 53,
+      "velocity": 38
+    },
+    {
+      "id": "kong-216",
+      "offset_seconds": 98.309998,
+      "onset_seconds": 97.66069,
+      "pitch": 54,
+      "velocity": 43
+    },
+    {
+      "id": "kong-217",
+      "offset_seconds": 103.660004,
+      "onset_seconds": 103.055138,
+      "pitch": 54,
+      "velocity": 52
+    },
+    {
+      "id": "kong-218",
+      "offset_seconds": 21.74,
+      "onset_seconds": 21.725134,
+      "pitch": 55,
+      "velocity": 25
+    },
+    {
+      "id": "kong-219",
+      "offset_seconds": 50.36404,
+      "onset_seconds": 49.055874,
+      "pitch": 55,
+      "velocity": 51
+    },
+    {
+      "id": "kong-220",
+      "offset_seconds": 52.810001,
+      "onset_seconds": 52.326832,
+      "pitch": 55,
+      "velocity": 45
+    },
+    {
+      "id": "kong-221",
+      "offset_seconds": 53.790001,
+      "onset_seconds": 52.823334,
+      "pitch": 55,
+      "velocity": 34
+    },
+    {
+      "id": "kong-222",
+      "offset_seconds": 54.632851,
+      "onset_seconds": 53.855259,
+      "pitch": 55,
+      "velocity": 20
+    },
+    {
+      "id": "kong-223",
+      "offset_seconds": 56.704956,
+      "onset_seconds": 55.869053,
+      "pitch": 55,
+      "velocity": 37
+    },
+    {
+      "id": "kong-224",
+      "offset_seconds": 57.996643,
+      "onset_seconds": 57.096558,
+      "pitch": 55,
+      "velocity": 40
+    },
+    {
+      "id": "kong-225",
+      "offset_seconds": 59.246975,
+      "onset_seconds": 58.463108,
+      "pitch": 55,
+      "velocity": 42
+    },
+    {
+      "id": "kong-226",
+      "offset_seconds": 60.512985,
+      "onset_seconds": 59.673454,
+      "pitch": 55,
+      "velocity": 46
+    },
+    {
+      "id": "kong-227",
+      "offset_seconds": 61.720001,
+      "onset_seconds": 60.935932,
+      "pitch": 55,
+      "velocity": 44
+    },
+    {
+      "id": "kong-228",
+      "offset_seconds": 62.25,
+      "onset_seconds": 61.734264,
+      "pitch": 55,
+      "velocity": 38
+    },
+    {
+      "id": "kong-229",
+      "offset_seconds": 63.060001,
+      "onset_seconds": 62.264294,
+      "pitch": 55,
+      "velocity": 33
+    },
+    {
+      "id": "kong-230",
+      "offset_seconds": 63.599998,
+      "onset_seconds": 63.070179,
+      "pitch": 55,
+      "velocity": 44
+    },
+    {
+      "id": "kong-231",
+      "offset_seconds": 63.900002,
+      "onset_seconds": 63.605652,
+      "pitch": 55,
+      "velocity": 37
+    },
+    {
+      "id": "kong-232",
+      "offset_seconds": 98.25,
+      "onset_seconds": 98.235451,
+      "pitch": 55,
+      "velocity": 48
+    },
+    {
+      "id": "kong-233",
+      "offset_seconds": 10.11,
+      "onset_seconds": 9.302814,
+      "pitch": 57,
+      "velocity": 40
+    },
+    {
+      "id": "kong-234",
+      "offset_seconds": 10.6,
+      "onset_seconds": 10.124832,
+      "pitch": 57,
+      "velocity": 38
+    },
+    {
+      "id": "kong-235",
+      "offset_seconds": 11.49,
+      "onset_seconds": 10.609436,
+      "pitch": 57,
+      "velocity": 40
+    },
+    {
+      "id": "kong-236",
+      "offset_seconds": 20.931135,
+      "onset_seconds": 20.352087,
+      "pitch": 57,
+      "velocity": 40
+    },
+    {
+      "id": "kong-237",
+      "offset_seconds": 23.09,
+      "onset_seconds": 22.284977,
+      "pitch": 57,
+      "velocity": 34
+    },
+    {
+      "id": "kong-238",
+      "offset_seconds": 23.790001,
+      "onset_seconds": 23.103987,
+      "pitch": 57,
+      "velocity": 33
+    },
+    {
+      "id": "kong-239",
+      "offset_seconds": 30.6,
+      "onset_seconds": 29.784536,
+      "pitch": 57,
+      "velocity": 45
+    },
+    {
+      "id": "kong-240",
+      "offset_seconds": 31.08,
+      "onset_seconds": 30.613962,
+      "pitch": 57,
+      "velocity": 38
+    },
+    {
+      "id": "kong-241",
+      "offset_seconds": 31.98,
+      "onset_seconds": 31.093615,
+      "pitch": 57,
+      "velocity": 39
+    },
+    {
+      "id": "kong-242",
+      "offset_seconds": 41.419209,
+      "onset_seconds": 40.82143,
+      "pitch": 57,
+      "velocity": 46
+    },
+    {
+      "id": "kong-243",
+      "offset_seconds": 43.459999,
+      "onset_seconds": 42.641132,
+      "pitch": 57,
+      "velocity": 43
+    },
+    {
+      "id": "kong-244",
+      "offset_seconds": 44.09,
+      "onset_seconds": 43.473034,
+      "pitch": 57,
+      "velocity": 39
+    },
+    {
+      "id": "kong-245",
+      "offset_seconds": 44.860001,
+      "onset_seconds": 44.104401,
+      "pitch": 57,
+      "velocity": 51
+    },
+    {
+      "id": "kong-246",
+      "offset_seconds": 45.310001,
+      "onset_seconds": 44.865818,
+      "pitch": 57,
+      "velocity": 43
+    },
+    {
+      "id": "kong-247",
+      "offset_seconds": 46.68,
+      "onset_seconds": 45.32254,
+      "pitch": 57,
+      "velocity": 47
+    },
+    {
+      "id": "kong-248",
+      "offset_seconds": 49.150002,
+      "onset_seconds": 48.575977,
+      "pitch": 57,
+      "velocity": 53
+    },
+    {
+      "id": "kong-249",
+      "offset_seconds": 58.558258,
+      "onset_seconds": 57.909744,
+      "pitch": 57,
+      "velocity": 39
+    },
+    {
+      "id": "kong-250",
+      "offset_seconds": 61.043846,
+      "onset_seconds": 60.461586,
+      "pitch": 57,
+      "velocity": 44
+    },
+    {
+      "id": "kong-251",
+      "offset_seconds": 72.639999,
+      "onset_seconds": 71.853111,
+      "pitch": 57,
+      "velocity": 45
+    },
+    {
+      "id": "kong-252",
+      "offset_seconds": 73.110001,
+      "onset_seconds": 72.653358,
+      "pitch": 57,
+      "velocity": 44
+    },
+    {
+      "id": "kong-253",
+      "offset_seconds": 73.989998,
+      "onset_seconds": 73.121078,
+      "pitch": 57,
+      "velocity": 39
+    },
+    {
+      "id": "kong-254",
+      "offset_seconds": 83.358688,
+      "onset_seconds": 82.804718,
+      "pitch": 57,
+      "velocity": 46
+    },
+    {
+      "id": "kong-255",
+      "offset_seconds": 85.599998,
+      "onset_seconds": 84.814766,
+      "pitch": 57,
+      "velocity": 54
+    },
+    {
+      "id": "kong-256",
+      "offset_seconds": 86.089996,
+      "onset_seconds": 85.614403,
+      "pitch": 57,
+      "velocity": 50
+    },
+    {
+      "id": "kong-257",
+      "offset_seconds": 86.959999,
+      "onset_seconds": 86.095741,
+      "pitch": 57,
+      "velocity": 42
+    },
+    {
+      "id": "kong-258",
+      "offset_seconds": 87.489998,
+      "onset_seconds": 86.965698,
+      "pitch": 57,
+      "velocity": 39
+    },
+    {
+      "id": "kong-259",
+      "offset_seconds": 88.290001,
+      "onset_seconds": 87.502205,
+      "pitch": 57,
+      "velocity": 38
+    },
+    {
+      "id": "kong-260",
+      "offset_seconds": 88.75,
+      "onset_seconds": 88.300522,
+      "pitch": 57,
+      "velocity": 32
+    },
+    {
+      "id": "kong-261",
+      "offset_seconds": 89.510002,
+      "onset_seconds": 88.75515,
+      "pitch": 57,
+      "velocity": 41
+    },
+    {
+      "id": "kong-262",
+      "offset_seconds": 89.989998,
+      "onset_seconds": 89.524612,
+      "pitch": 57,
+      "velocity": 39
+    },
+    {
+      "id": "kong-263",
+      "offset_seconds": 90.779999,
+      "onset_seconds": 90.00145,
+      "pitch": 57,
+      "velocity": 42
+    },
+    {
+      "id": "kong-264",
+      "offset_seconds": 91.239998,
+      "onset_seconds": 90.788048,
+      "pitch": 57,
+      "velocity": 41
+    },
+    {
+      "id": "kong-265",
+      "offset_seconds": 92.040001,
+      "onset_seconds": 91.247002,
+      "pitch": 57,
+      "velocity": 46
+    },
+    {
+      "id": "kong-266",
+      "offset_seconds": 92.519997,
+      "onset_seconds": 92.05246,
+      "pitch": 57,
+      "velocity": 46
+    },
+    {
+      "id": "kong-267",
+      "offset_seconds": 93.43,
+      "onset_seconds": 92.534225,
+      "pitch": 57,
+      "velocity": 47
+    },
+    {
+      "id": "kong-268",
+      "offset_seconds": 101.629997,
+      "onset_seconds": 100.807945,
+      "pitch": 57,
+      "velocity": 46
+    },
+    {
+      "id": "kong-269",
+      "offset_seconds": 102.37175,
+      "onset_seconds": 101.635658,
+      "pitch": 57,
+      "velocity": 57
+    },
+    {
+      "id": "kong-270",
+      "offset_seconds": 107.309998,
+      "onset_seconds": 106.534019,
+      "pitch": 57,
+      "velocity": 50
+    },
+    {
+      "id": "kong-271",
+      "offset_seconds": 107.856773,
+      "onset_seconds": 107.317673,
+      "pitch": 57,
+      "velocity": 58
+    },
+    {
+      "id": "kong-272",
+      "offset_seconds": 109.860001,
+      "onset_seconds": 109.092087,
+      "pitch": 57,
+      "velocity": 45
+    },
+    {
+      "id": "kong-273",
+      "offset_seconds": 110.484558,
+      "onset_seconds": 109.870697,
+      "pitch": 57,
+      "velocity": 47
+    },
+    {
+      "id": "kong-274",
+      "offset_seconds": 112.779999,
+      "onset_seconds": 111.924858,
+      "pitch": 57,
+      "velocity": 42
+    },
+    {
+      "id": "kong-275",
+      "offset_seconds": 114.360001,
+      "onset_seconds": 113.153709,
+      "pitch": 57,
+      "velocity": 53
+    },
+    {
+      "id": "kong-276",
+      "offset_seconds": 115.470001,
+      "onset_seconds": 114.365799,
+      "pitch": 57,
+      "velocity": 53
+    },
+    {
+      "id": "kong-277",
+      "offset_seconds": 117.169998,
+      "onset_seconds": 115.884903,
+      "pitch": 57,
+      "velocity": 41
+    },
+    {
+      "id": "kong-278",
+      "offset_seconds": 122.5,
+      "onset_seconds": 119.511253,
+      "pitch": 57,
+      "velocity": 51
+    },
+    {
+      "id": "kong-279",
+      "offset_seconds": 9.32,
+      "onset_seconds": 8.826665,
+      "pitch": 58,
+      "velocity": 44
+    },
+    {
+      "id": "kong-280",
+      "offset_seconds": 11.96,
+      "onset_seconds": 11.401256,
+      "pitch": 58,
+      "velocity": 53
+    },
+    {
+      "id": "kong-281",
+      "offset_seconds": 12.8,
+      "onset_seconds": 11.974298,
+      "pitch": 58,
+      "velocity": 43
+    },
+    {
+      "id": "kong-282",
+      "offset_seconds": 13.42,
+      "onset_seconds": 12.813306,
+      "pitch": 58,
+      "velocity": 48
+    },
+    {
+      "id": "kong-283",
+      "offset_seconds": 17.178938,
+      "onset_seconds": 16.613245,
+      "pitch": 58,
+      "velocity": 48
+    },
+    {
+      "id": "kong-284",
+      "offset_seconds": 19.617756,
+      "onset_seconds": 19.076542,
+      "pitch": 58,
+      "velocity": 50
+    },
+    {
+      "id": "kong-285",
+      "offset_seconds": 21.690001,
+      "onset_seconds": 20.887873,
+      "pitch": 58,
+      "velocity": 37
+    },
+    {
+      "id": "kong-286",
+      "offset_seconds": 22.33,
+      "onset_seconds": 21.704489,
+      "pitch": 58,
+      "velocity": 41
+    },
+    {
+      "id": "kong-287",
+      "offset_seconds": 29.864704,
+      "onset_seconds": 29.324532,
+      "pitch": 58,
+      "velocity": 48
+    },
+    {
+      "id": "kong-288",
+      "offset_seconds": 32.419998,
+      "onset_seconds": 31.895975,
+      "pitch": 58,
+      "velocity": 47
+    },
+    {
+      "id": "kong-289",
+      "offset_seconds": 33.209999,
+      "onset_seconds": 32.428261,
+      "pitch": 58,
+      "velocity": 40
+    },
+    {
+      "id": "kong-290",
+      "offset_seconds": 33.84,
+      "onset_seconds": 33.22242,
+      "pitch": 58,
+      "velocity": 50
+    },
+    {
+      "id": "kong-291",
+      "offset_seconds": 37.556908,
+      "onset_seconds": 37.026421,
+      "pitch": 58,
+      "velocity": 49
+    },
+    {
+      "id": "kong-292",
+      "offset_seconds": 40.120483,
+      "onset_seconds": 39.629669,
+      "pitch": 58,
+      "velocity": 45
+    },
+    {
+      "id": "kong-293",
+      "offset_seconds": 42.130001,
+      "onset_seconds": 41.342552,
+      "pitch": 58,
+      "velocity": 46
+    },
+    {
+      "id": "kong-294",
+      "offset_seconds": 42.662102,
+      "onset_seconds": 42.139812,
+      "pitch": 58,
+      "velocity": 43
+    },
+    {
+      "id": "kong-295",
+      "offset_seconds": 65.870003,
+      "onset_seconds": 65.856781,
+      "pitch": 58,
+      "velocity": 40
+    },
+    {
+      "id": "kong-296",
+      "offset_seconds": 71.934593,
+      "onset_seconds": 71.405396,
+      "pitch": 58,
+      "velocity": 46
+    },
+    {
+      "id": "kong-297",
+      "offset_seconds": 74.43,
+      "onset_seconds": 73.926437,
+      "pitch": 58,
+      "velocity": 41
+    },
+    {
+      "id": "kong-298",
+      "offset_seconds": 75.199997,
+      "onset_seconds": 74.444664,
+      "pitch": 58,
+      "velocity": 42
+    },
+    {
+      "id": "kong-299",
+      "offset_seconds": 75.843277,
+      "onset_seconds": 75.207146,
+      "pitch": 58,
+      "velocity": 46
+    },
+    {
+      "id": "kong-300",
+      "offset_seconds": 79.585014,
+      "onset_seconds": 78.990631,
+      "pitch": 58,
+      "velocity": 47
+    },
+    {
+      "id": "kong-301",
+      "offset_seconds": 82.08194,
+      "onset_seconds": 81.584381,
+      "pitch": 58,
+      "velocity": 42
+    },
+    {
+      "id": "kong-302",
+      "offset_seconds": 84.150002,
+      "onset_seconds": 83.306488,
+      "pitch": 58,
+      "velocity": 52
+    },
+    {
+      "id": "kong-303",
+      "offset_seconds": 84.93,
+      "onset_seconds": 84.160866,
+      "pitch": 58,
+      "velocity": 52
+    },
+    {
+      "id": "kong-304",
+      "offset_seconds": 100.309998,
+      "onset_seconds": 99.505508,
+      "pitch": 58,
+      "velocity": 48
+    },
+    {
+      "id": "kong-305",
+      "offset_seconds": 100.871979,
+      "onset_seconds": 100.322525,
+      "pitch": 58,
+      "velocity": 43
+    },
+    {
+      "id": "kong-306",
+      "offset_seconds": 105.860001,
+      "onset_seconds": 105.064697,
+      "pitch": 58,
+      "velocity": 43
+    },
+    {
+      "id": "kong-307",
+      "offset_seconds": 106.669998,
+      "onset_seconds": 105.874374,
+      "pitch": 58,
+      "velocity": 47
+    },
+    {
+      "id": "kong-308",
+      "offset_seconds": 108.519997,
+      "onset_seconds": 107.775909,
+      "pitch": 58,
+      "velocity": 57
+    },
+    {
+      "id": "kong-309",
+      "offset_seconds": 109.370003,
+      "onset_seconds": 108.532448,
+      "pitch": 58,
+      "velocity": 52
+    },
+    {
+      "id": "kong-310",
+      "offset_seconds": 111.25,
+      "onset_seconds": 110.422966,
+      "pitch": 58,
+      "velocity": 45
+    },
+    {
+      "id": "kong-311",
+      "offset_seconds": 112.040001,
+      "onset_seconds": 111.264946,
+      "pitch": 58,
+      "velocity": 49
+    },
+    {
+      "id": "kong-312",
+      "offset_seconds": 113.247231,
+      "onset_seconds": 112.716095,
+      "pitch": 58,
+      "velocity": 53
+    },
+    {
+      "id": "kong-313",
+      "offset_seconds": 114.438873,
+      "onset_seconds": 113.905327,
+      "pitch": 58,
+      "velocity": 51
+    },
+    {
+      "id": "kong-314",
+      "offset_seconds": 115.907806,
+      "onset_seconds": 115.300056,
+      "pitch": 58,
+      "velocity": 45
+    },
+    {
+      "id": "kong-315",
+      "offset_seconds": 117.992409,
+      "onset_seconds": 117.114639,
+      "pitch": 58,
+      "velocity": 35
+    },
+    {
+      "id": "kong-316",
+      "offset_seconds": 47.849571,
+      "onset_seconds": 47.355492,
+      "pitch": 59,
+      "velocity": 58
+    },
+    {
+      "id": "kong-317",
+      "offset_seconds": 0.49,
+      "onset_seconds": 0.01969,
+      "pitch": 60,
+      "velocity": 45
+    },
+    {
+      "id": "kong-318",
+      "offset_seconds": 1.21,
+      "onset_seconds": 0.495875,
+      "pitch": 60,
+      "velocity": 39
+    },
+    {
+      "id": "kong-319",
+      "offset_seconds": 1.63,
+      "onset_seconds": 1.220162,
+      "pitch": 60,
+      "velocity": 54
+    },
+    {
+      "id": "kong-320",
+      "offset_seconds": 2.36,
+      "onset_seconds": 1.639568,
+      "pitch": 60,
+      "velocity": 47
+    },
+    {
+      "id": "kong-321",
+      "offset_seconds": 2.82,
+      "onset_seconds": 2.373311,
+      "pitch": 60,
+      "velocity": 46
+    },
+    {
+      "id": "kong-322",
+      "offset_seconds": 3.63,
+      "onset_seconds": 2.834888,
+      "pitch": 60,
+      "velocity": 43
+    },
+    {
+      "id": "kong-323",
+      "offset_seconds": 4.17,
+      "onset_seconds": 3.642658,
+      "pitch": 60,
+      "velocity": 48
+    },
+    {
+      "id": "kong-324",
+      "offset_seconds": 4.93,
+      "onset_seconds": 4.180127,
+      "pitch": 60,
+      "velocity": 39
+    },
+    {
+      "id": "kong-325",
+      "offset_seconds": 5.4,
+      "onset_seconds": 4.935305,
+      "pitch": 60,
+      "velocity": 47
+    },
+    {
+      "id": "kong-326",
+      "offset_seconds": 6.16,
+      "onset_seconds": 5.414482,
+      "pitch": 60,
+      "velocity": 48
+    },
+    {
+      "id": "kong-327",
+      "offset_seconds": 6.69,
+      "onset_seconds": 6.171412,
+      "pitch": 60,
+      "velocity": 46
+    },
+    {
+      "id": "kong-328",
+      "offset_seconds": 7.46,
+      "onset_seconds": 6.698303,
+      "pitch": 60,
+      "velocity": 48
+    },
+    {
+      "id": "kong-329",
+      "offset_seconds": 8.0,
+      "onset_seconds": 7.468572,
+      "pitch": 60,
+      "velocity": 46
+    },
+    {
+      "id": "kong-330",
+      "offset_seconds": 9.33,
+      "onset_seconds": 8.014062,
+      "pitch": 60,
+      "velocity": 39
+    },
+    {
+      "id": "kong-331",
+      "offset_seconds": 11.483968,
+      "onset_seconds": 10.61628,
+      "pitch": 60,
+      "velocity": 47
+    },
+    {
+      "id": "kong-332",
+      "offset_seconds": 14.64,
+      "onset_seconds": 13.41529,
+      "pitch": 60,
+      "velocity": 38
+    },
+    {
+      "id": "kong-333",
+      "offset_seconds": 15.84,
+      "onset_seconds": 14.64515,
+      "pitch": 60,
+      "velocity": 50
+    },
+    {
+      "id": "kong-334",
+      "offset_seconds": 16.74,
+      "onset_seconds": 15.846119,
+      "pitch": 60,
+      "velocity": 54
+    },
+    {
+      "id": "kong-335",
+      "offset_seconds": 17.816116,
+      "onset_seconds": 17.115389,
+      "pitch": 60,
+      "velocity": 54
+    },
+    {
+      "id": "kong-336",
+      "offset_seconds": 19.134916,
+      "onset_seconds": 18.28981,
+      "pitch": 60,
+      "velocity": 51
+    },
+    {
+      "id": "kong-337",
+      "offset_seconds": 20.295675,
+      "onset_seconds": 19.582865,
+      "pitch": 60,
+      "velocity": 47
+    },
+    {
+      "id": "kong-338",
+      "offset_seconds": 20.931707,
+      "onset_seconds": 20.358557,
+      "pitch": 60,
+      "velocity": 48
+    },
+    {
+      "id": "kong-339",
+      "offset_seconds": 22.27,
+      "onset_seconds": 21.730461,
+      "pitch": 60,
+      "velocity": 38
+    },
+    {
+      "id": "kong-340",
+      "offset_seconds": 23.07,
+      "onset_seconds": 22.284918,
+      "pitch": 60,
+      "velocity": 37
+    },
+    {
+      "id": "kong-341",
+      "offset_seconds": 23.67,
+      "onset_seconds": 23.075769,
+      "pitch": 60,
+      "velocity": 56
+    },
+    {
+      "id": "kong-342",
+      "offset_seconds": 24.43,
+      "onset_seconds": 23.675776,
+      "pitch": 60,
+      "velocity": 41
+    },
+    {
+      "id": "kong-343",
+      "offset_seconds": 24.860001,
+      "onset_seconds": 24.441582,
+      "pitch": 60,
+      "velocity": 42
+    },
+    {
+      "id": "kong-344",
+      "offset_seconds": 25.629999,
+      "onset_seconds": 24.869017,
+      "pitch": 60,
+      "velocity": 41
+    },
+    {
+      "id": "kong-345",
+      "offset_seconds": 26.08,
+      "onset_seconds": 25.636684,
+      "pitch": 60,
+      "velocity": 50
+    },
+    {
+      "id": "kong-346",
+      "offset_seconds": 26.82,
+      "onset_seconds": 26.092653,
+      "pitch": 60,
+      "velocity": 43
+    },
+    {
+      "id": "kong-347",
+      "offset_seconds": 27.33,
+      "onset_seconds": 26.825718,
+      "pitch": 60,
+      "velocity": 44
+    },
+    {
+      "id": "kong-348",
+      "offset_seconds": 28.040001,
+      "onset_seconds": 27.338474,
+      "pitch": 60,
+      "velocity": 44
+    },
+    {
+      "id": "kong-349",
+      "offset_seconds": 28.540001,
+      "onset_seconds": 28.053209,
+      "pitch": 60,
+      "velocity": 49
+    },
+    {
+      "id": "kong-350",
+      "offset_seconds": 29.889999,
+      "onset_seconds": 28.550108,
+      "pitch": 60,
+      "velocity": 49
+    },
+    {
+      "id": "kong-351",
+      "offset_seconds": 31.974159,
+      "onset_seconds": 31.093851,
+      "pitch": 60,
+      "velocity": 43
+    },
+    {
+      "id": "kong-352",
+      "offset_seconds": 35.07,
+      "onset_seconds": 33.803295,
+      "pitch": 60,
+      "velocity": 44
+    },
+    {
+      "id": "kong-353",
+      "offset_seconds": 36.259998,
+      "onset_seconds": 35.077579,
+      "pitch": 60,
+      "velocity": 47
+    },
+    {
+      "id": "kong-354",
+      "offset_seconds": 37.5,
+      "onset_seconds": 36.265297,
+      "pitch": 60,
+      "velocity": 55
+    },
+    {
+      "id": "kong-355",
+      "offset_seconds": 38.27,
+      "onset_seconds": 37.507107,
+      "pitch": 60,
+      "velocity": 51
+    },
+    {
+      "id": "kong-356",
+      "offset_seconds": 39.680088,
+      "onset_seconds": 38.829716,
+      "pitch": 60,
+      "velocity": 49
+    },
+    {
+      "id": "kong-357",
+      "offset_seconds": 40.84,
+      "onset_seconds": 40.072643,
+      "pitch": 60,
+      "velocity": 51
+    },
+    {
+      "id": "kong-358",
+      "offset_seconds": 41.4151,
+      "onset_seconds": 40.850498,
+      "pitch": 60,
+      "velocity": 38
+    },
+    {
+      "id": "kong-359",
+      "offset_seconds": 42.639999,
+      "onset_seconds": 42.166428,
+      "pitch": 60,
+      "velocity": 42
+    },
+    {
+      "id": "kong-360",
+      "offset_seconds": 43.450001,
+      "onset_seconds": 42.645893,
+      "pitch": 60,
+      "velocity": 45
+    },
+    {
+      "id": "kong-361",
+      "offset_seconds": 44.220001,
+      "onset_seconds": 43.456966,
+      "pitch": 60,
+      "velocity": 58
+    },
+    {
+      "id": "kong-362",
+      "offset_seconds": 47.415226,
+      "onset_seconds": 46.418179,
+      "pitch": 60,
+      "velocity": 59
+    },
+    {
+      "id": "kong-363",
+      "offset_seconds": 48.57,
+      "onset_seconds": 47.84206,
+      "pitch": 60,
+      "velocity": 41
+    },
+    {
+      "id": "kong-364",
+      "offset_seconds": 49.16,
+      "onset_seconds": 48.580719,
+      "pitch": 60,
+      "velocity": 55
+    },
+    {
+      "id": "kong-365",
+      "offset_seconds": 50.310001,
+      "onset_seconds": 49.853588,
+      "pitch": 60,
+      "velocity": 58
+    },
+    {
+      "id": "kong-366",
+      "offset_seconds": 51.549999,
+      "onset_seconds": 50.321911,
+      "pitch": 60,
+      "velocity": 56
+    },
+    {
+      "id": "kong-367",
+      "offset_seconds": 54.490002,
+      "onset_seconds": 53.854389,
+      "pitch": 60,
+      "velocity": 19
+    },
+    {
+      "id": "kong-368",
+      "offset_seconds": 55.380001,
+      "onset_seconds": 54.592213,
+      "pitch": 60,
+      "velocity": 23
+    },
+    {
+      "id": "kong-369",
+      "offset_seconds": 55.860001,
+      "onset_seconds": 55.394176,
+      "pitch": 60,
+      "velocity": 32
+    },
+    {
+      "id": "kong-370",
+      "offset_seconds": 56.639999,
+      "onset_seconds": 55.866249,
+      "pitch": 60,
+      "velocity": 30
+    },
+    {
+      "id": "kong-371",
+      "offset_seconds": 57.09,
+      "onset_seconds": 56.645134,
+      "pitch": 60,
+      "velocity": 42
+    },
+    {
+      "id": "kong-372",
+      "offset_seconds": 57.900002,
+      "onset_seconds": 57.097656,
+      "pitch": 60,
+      "velocity": 35
+    },
+    {
+      "id": "kong-373",
+      "offset_seconds": 58.450001,
+      "onset_seconds": 57.913509,
+      "pitch": 60,
+      "velocity": 37
+    },
+    {
+      "id": "kong-374",
+      "offset_seconds": 59.040001,
+      "onset_seconds": 58.457001,
+      "pitch": 60,
+      "velocity": 34
+    },
+    {
+      "id": "kong-375",
+      "offset_seconds": 59.220001,
+      "onset_seconds": 59.045418,
+      "pitch": 60,
+      "velocity": 17
+    },
+    {
+      "id": "kong-376",
+      "offset_seconds": 59.669998,
+      "onset_seconds": 59.225643,
+      "pitch": 60,
+      "velocity": 39
+    },
+    {
+      "id": "kong-377",
+      "offset_seconds": 60.450001,
+      "onset_seconds": 59.675316,
+      "pitch": 60,
+      "velocity": 38
+    },
+    {
+      "id": "kong-378",
+      "offset_seconds": 60.93,
+      "onset_seconds": 60.456226,
+      "pitch": 60,
+      "velocity": 43
+    },
+    {
+      "id": "kong-379",
+      "offset_seconds": 61.77,
+      "onset_seconds": 60.942192,
+      "pitch": 60,
+      "velocity": 38
+    },
+    {
+      "id": "kong-380",
+      "offset_seconds": 67.529999,
+      "onset_seconds": 66.588158,
+      "pitch": 60,
+      "velocity": 40
+    },
+    {
+      "id": "kong-381",
+      "offset_seconds": 68.129997,
+      "onset_seconds": 67.535744,
+      "pitch": 60,
+      "velocity": 38
+    },
+    {
+      "id": "kong-382",
+      "offset_seconds": 68.919998,
+      "onset_seconds": 68.144981,
+      "pitch": 60,
+      "velocity": 36
+    },
+    {
+      "id": "kong-383",
+      "offset_seconds": 69.400002,
+      "onset_seconds": 68.925201,
+      "pitch": 60,
+      "velocity": 37
+    },
+    {
+      "id": "kong-384",
+      "offset_seconds": 70.150002,
+      "onset_seconds": 69.40844,
+      "pitch": 60,
+      "velocity": 40
+    },
+    {
+      "id": "kong-385",
+      "offset_seconds": 70.610001,
+      "onset_seconds": 70.157143,
+      "pitch": 60,
+      "velocity": 51
+    },
+    {
+      "id": "kong-386",
+      "offset_seconds": 71.489998,
+      "onset_seconds": 70.615265,
+      "pitch": 60,
+      "velocity": 45
+    },
+    {
+      "id": "kong-387",
+      "offset_seconds": 73.976555,
+      "onset_seconds": 73.114655,
+      "pitch": 60,
+      "velocity": 48
+    },
+    {
+      "id": "kong-388",
+      "offset_seconds": 77.0,
+      "onset_seconds": 75.804626,
+      "pitch": 60,
+      "velocity": 40
+    },
+    {
+      "id": "kong-389",
+      "offset_seconds": 78.230003,
+      "onset_seconds": 77.006355,
+      "pitch": 60,
+      "velocity": 49
+    },
+    {
+      "id": "kong-390",
+      "offset_seconds": 79.160004,
+      "onset_seconds": 78.235741,
+      "pitch": 60,
+      "velocity": 54
+    },
+    {
+      "id": "kong-391",
+      "offset_seconds": 80.260002,
+      "onset_seconds": 79.509041,
+      "pitch": 60,
+      "velocity": 53
+    },
+    {
+      "id": "kong-392",
+      "offset_seconds": 81.650002,
+      "onset_seconds": 80.77697,
+      "pitch": 60,
+      "velocity": 51
+    },
+    {
+      "id": "kong-393",
+      "offset_seconds": 82.82,
+      "onset_seconds": 82.051979,
+      "pitch": 60,
+      "velocity": 47
+    },
+    {
+      "id": "kong-394",
+      "offset_seconds": 83.358757,
+      "onset_seconds": 82.828812,
+      "pitch": 60,
+      "velocity": 49
+    },
+    {
+      "id": "kong-395",
+      "offset_seconds": 84.918503,
+      "onset_seconds": 84.193573,
+      "pitch": 60,
+      "velocity": 61
+    },
+    {
+      "id": "kong-396",
+      "offset_seconds": 93.928528,
+      "onset_seconds": 93.346252,
+      "pitch": 60,
+      "velocity": 55
+    },
+    {
+      "id": "kong-397",
+      "offset_seconds": 96.07,
+      "onset_seconds": 95.186485,
+      "pitch": 60,
+      "velocity": 54
+    },
+    {
+      "id": "kong-398",
+      "offset_seconds": 96.789047,
+      "onset_seconds": 96.080681,
+      "pitch": 60,
+      "velocity": 53
+    },
+    {
+      "id": "kong-399",
+      "offset_seconds": 99.04306,
+      "onset_seconds": 98.797737,
+      "pitch": 60,
+      "velocity": 58
+    },
+    {
+      "id": "kong-400",
+      "offset_seconds": 104.471382,
+      "onset_seconds": 104.234543,
+      "pitch": 60,
+      "velocity": 50
+    },
+    {
+      "id": "kong-401",
+      "offset_seconds": 122.5,
+      "onset_seconds": 119.731598,
+      "pitch": 60,
+      "velocity": 49
+    },
+    {
+      "id": "kong-402",
+      "offset_seconds": 66.67588,
+      "onset_seconds": 65.847404,
+      "pitch": 61,
+      "velocity": 60
+    },
+    {
+      "id": "kong-403",
+      "offset_seconds": 10.75,
+      "onset_seconds": 10.605927,
+      "pitch": 62,
+      "velocity": 39
+    },
+    {
+      "id": "kong-404",
+      "offset_seconds": 13.394714,
+      "onset_seconds": 12.813236,
+      "pitch": 62,
+      "velocity": 52
+    },
+    {
+      "id": "kong-405",
+      "offset_seconds": 14.662502,
+      "onset_seconds": 14.188029,
+      "pitch": 62,
+      "velocity": 46
+    },
+    {
+      "id": "kong-406",
+      "offset_seconds": 15.893849,
+      "onset_seconds": 15.403835,
+      "pitch": 62,
+      "velocity": 52
+    },
+    {
+      "id": "kong-407",
+      "offset_seconds": 18.363119,
+      "onset_seconds": 17.824783,
+      "pitch": 62,
+      "velocity": 52
+    },
+    {
+      "id": "kong-408",
+      "offset_seconds": 21.753262,
+      "onset_seconds": 20.904551,
+      "pitch": 62,
+      "velocity": 37
+    },
+    {
+      "id": "kong-409",
+      "offset_seconds": 30.24,
+      "onset_seconds": 29.786041,
+      "pitch": 62,
+      "velocity": 31
+    },
+    {
+      "id": "kong-410",
+      "offset_seconds": 31.972082,
+      "onset_seconds": 31.072651,
+      "pitch": 62,
+      "velocity": 40
+    },
+    {
+      "id": "kong-411",
+      "offset_seconds": 33.819424,
+      "onset_seconds": 33.224239,
+      "pitch": 62,
+      "velocity": 50
+    },
+    {
+      "id": "kong-412",
+      "offset_seconds": 35.133087,
+      "onset_seconds": 34.627502,
+      "pitch": 62,
+      "velocity": 39
+    },
+    {
+      "id": "kong-413",
+      "offset_seconds": 36.354389,
+      "onset_seconds": 35.82494,
+      "pitch": 62,
+      "velocity": 50
+    },
+    {
+      "id": "kong-414",
+      "offset_seconds": 38.903999,
+      "onset_seconds": 38.28421,
+      "pitch": 62,
+      "velocity": 47
+    },
+    {
+      "id": "kong-415",
+      "offset_seconds": 40.119179,
+      "onset_seconds": 39.635292,
+      "pitch": 62,
+      "velocity": 36
+    },
+    {
+      "id": "kong-416",
+      "offset_seconds": 42.610001,
+      "onset_seconds": 41.346493,
+      "pitch": 62,
+      "velocity": 53
+    },
+    {
+      "id": "kong-417",
+      "offset_seconds": 46.65678,
+      "onset_seconds": 46.098927,
+      "pitch": 62,
+      "velocity": 52
+    },
+    {
+      "id": "kong-418",
+      "offset_seconds": 52.830872,
+      "onset_seconds": 52.334396,
+      "pitch": 62,
+      "velocity": 50
+    },
+    {
+      "id": "kong-419",
+      "offset_seconds": 65.884598,
+      "onset_seconds": 64.961815,
+      "pitch": 62,
+      "velocity": 55
+    },
+    {
+      "id": "kong-420",
+      "offset_seconds": 73.110001,
+      "onset_seconds": 73.101387,
+      "pitch": 62,
+      "velocity": 40
+    },
+    {
+      "id": "kong-421",
+      "offset_seconds": 75.843628,
+      "onset_seconds": 75.218407,
+      "pitch": 62,
+      "velocity": 48
+    },
+    {
+      "id": "kong-422",
+      "offset_seconds": 77.083176,
+      "onset_seconds": 76.543877,
+      "pitch": 62,
+      "velocity": 46
+    },
+    {
+      "id": "kong-423",
+      "offset_seconds": 78.286316,
+      "onset_seconds": 77.76873,
+      "pitch": 62,
+      "velocity": 56
+    },
+    {
+      "id": "kong-424",
+      "offset_seconds": 80.814934,
+      "onset_seconds": 80.248642,
+      "pitch": 62,
+      "velocity": 51
+    },
+    {
+      "id": "kong-425",
+      "offset_seconds": 84.235336,
+      "onset_seconds": 83.333412,
+      "pitch": 62,
+      "velocity": 52
+    },
+    {
+      "id": "kong-426",
+      "offset_seconds": 86.980003,
+      "onset_seconds": 86.969223,
+      "pitch": 62,
+      "velocity": 30
+    },
+    {
+      "id": "kong-427",
+      "offset_seconds": 90.077209,
+      "onset_seconds": 89.525398,
+      "pitch": 62,
+      "velocity": 47
+    },
+    {
+      "id": "kong-428",
+      "offset_seconds": 92.61499,
+      "onset_seconds": 92.053482,
+      "pitch": 62,
+      "velocity": 55
+    },
+    {
+      "id": "kong-429",
+      "offset_seconds": 94.709999,
+      "onset_seconds": 93.895126,
+      "pitch": 62,
+      "velocity": 52
+    },
+    {
+      "id": "kong-430",
+      "offset_seconds": 95.269997,
+      "onset_seconds": 94.715904,
+      "pitch": 62,
+      "velocity": 42
+    },
+    {
+      "id": "kong-431",
+      "offset_seconds": 99.010002,
+      "onset_seconds": 98.244675,
+      "pitch": 62,
+      "velocity": 46
+    },
+    {
+      "id": "kong-432",
+      "offset_seconds": 99.589996,
+      "onset_seconds": 99.017754,
+      "pitch": 62,
+      "velocity": 60
+    },
+    {
+      "id": "kong-433",
+      "offset_seconds": 104.459999,
+      "onset_seconds": 103.306984,
+      "pitch": 62,
+      "velocity": 65
+    },
+    {
+      "id": "kong-434",
+      "offset_seconds": 105.122368,
+      "onset_seconds": 104.467125,
+      "pitch": 62,
+      "velocity": 57
+    },
+    {
+      "id": "kong-435",
+      "offset_seconds": 97.650002,
+      "onset_seconds": 96.703247,
+      "pitch": 63,
+      "velocity": 59
+    },
+    {
+      "id": "kong-436",
+      "offset_seconds": 98.282227,
+      "onset_seconds": 97.661522,
+      "pitch": 63,
+      "velocity": 55
+    },
+    {
+      "id": "kong-437",
+      "offset_seconds": 103.050003,
+      "onset_seconds": 102.269363,
+      "pitch": 63,
+      "velocity": 58
+    },
+    {
+      "id": "kong-438",
+      "offset_seconds": 103.628815,
+      "onset_seconds": 103.056229,
+      "pitch": 63,
+      "velocity": 64
+    },
+    {
+      "id": "kong-439",
+      "offset_seconds": 10.618532,
+      "onset_seconds": 10.147264,
+      "pitch": 64,
+      "velocity": 47
+    },
+    {
+      "id": "kong-440",
+      "offset_seconds": 13.38,
+      "onset_seconds": 11.965119,
+      "pitch": 64,
+      "velocity": 54
+    },
+    {
+      "id": "kong-441",
+      "offset_seconds": 22.306824,
+      "onset_seconds": 21.702089,
+      "pitch": 64,
+      "velocity": 50
+    },
+    {
+      "id": "kong-442",
+      "offset_seconds": 31.11441,
+      "onset_seconds": 30.604733,
+      "pitch": 64,
+      "velocity": 51
+    },
+    {
+      "id": "kong-443",
+      "offset_seconds": 33.810001,
+      "onset_seconds": 32.415184,
+      "pitch": 64,
+      "velocity": 52
+    },
+    {
+      "id": "kong-444",
+      "offset_seconds": 42.659313,
+      "onset_seconds": 42.143246,
+      "pitch": 64,
+      "velocity": 55
+    },
+    {
+      "id": "kong-445",
+      "offset_seconds": 44.849998,
+      "onset_seconds": 44.103443,
+      "pitch": 64,
+      "velocity": 64
+    },
+    {
+      "id": "kong-446",
+      "offset_seconds": 45.279999,
+      "onset_seconds": 44.856205,
+      "pitch": 64,
+      "velocity": 61
+    },
+    {
+      "id": "kong-447",
+      "offset_seconds": 46.509998,
+      "onset_seconds": 45.28817,
+      "pitch": 64,
+      "velocity": 69
+    },
+    {
+      "id": "kong-448",
+      "offset_seconds": 46.659069,
+      "onset_seconds": 46.523621,
+      "pitch": 64,
+      "velocity": 62
+    },
+    {
+      "id": "kong-449",
+      "offset_seconds": 47.82,
+      "onset_seconds": 47.355061,
+      "pitch": 64,
+      "velocity": 48
+    },
+    {
+      "id": "kong-450",
+      "offset_seconds": 48.57,
+      "onset_seconds": 47.825657,
+      "pitch": 64,
+      "velocity": 43
+    },
+    {
+      "id": "kong-451",
+      "offset_seconds": 49.049999,
+      "onset_seconds": 48.576473,
+      "pitch": 64,
+      "velocity": 56
+    },
+    {
+      "id": "kong-452",
+      "offset_seconds": 49.84,
+      "onset_seconds": 49.056286,
+      "pitch": 64,
+      "velocity": 54
+    },
+    {
+      "id": "kong-453",
+      "offset_seconds": 50.364033,
+      "onset_seconds": 49.847206,
+      "pitch": 64,
+      "velocity": 59
+    },
+    {
+      "id": "kong-454",
+      "offset_seconds": 52.392895,
+      "onset_seconds": 51.328083,
+      "pitch": 64,
+      "velocity": 70
+    },
+    {
+      "id": "kong-455",
+      "offset_seconds": 53.810001,
+      "onset_seconds": 52.853065,
+      "pitch": 64,
+      "velocity": 40
+    },
+    {
+      "id": "kong-456",
+      "offset_seconds": 54.634071,
+      "onset_seconds": 53.820808,
+      "pitch": 64,
+      "velocity": 38
+    },
+    {
+      "id": "kong-457",
+      "offset_seconds": 62.294662,
+      "onset_seconds": 61.723274,
+      "pitch": 64,
+      "velocity": 48
+    },
+    {
+      "id": "kong-458",
+      "offset_seconds": 64.410004,
+      "onset_seconds": 63.613647,
+      "pitch": 64,
+      "velocity": 53
+    },
+    {
+      "id": "kong-459",
+      "offset_seconds": 65.033943,
+      "onset_seconds": 64.419914,
+      "pitch": 64,
+      "velocity": 63
+    },
+    {
+      "id": "kong-460",
+      "offset_seconds": 73.146301,
+      "onset_seconds": 72.654251,
+      "pitch": 64,
+      "velocity": 55
+    },
+    {
+      "id": "kong-461",
+      "offset_seconds": 75.844055,
+      "onset_seconds": 74.432953,
+      "pitch": 64,
+      "velocity": 50
+    },
+    {
+      "id": "kong-462",
+      "offset_seconds": 84.809998,
+      "onset_seconds": 84.159576,
+      "pitch": 64,
+      "velocity": 74
+    },
+    {
+      "id": "kong-463",
+      "offset_seconds": 85.599998,
+      "onset_seconds": 84.818245,
+      "pitch": 64,
+      "velocity": 66
+    },
+    {
+      "id": "kong-464",
+      "offset_seconds": 86.059998,
+      "onset_seconds": 85.609138,
+      "pitch": 64,
+      "velocity": 71
+    },
+    {
+      "id": "kong-465",
+      "offset_seconds": 87.120003,
+      "onset_seconds": 86.072533,
+      "pitch": 64,
+      "velocity": 71
+    },
+    {
+      "id": "kong-466",
+      "offset_seconds": 88.370003,
+      "onset_seconds": 87.499176,
+      "pitch": 64,
+      "velocity": 43
+    },
+    {
+      "id": "kong-467",
+      "offset_seconds": 89.574684,
+      "onset_seconds": 88.756317,
+      "pitch": 64,
+      "velocity": 49
+    },
+    {
+      "id": "kong-468",
+      "offset_seconds": 90.820099,
+      "onset_seconds": 90.003342,
+      "pitch": 64,
+      "velocity": 48
+    },
+    {
+      "id": "kong-469",
+      "offset_seconds": 92.121292,
+      "onset_seconds": 91.252647,
+      "pitch": 64,
+      "velocity": 54
+    },
+    {
+      "id": "kong-470",
+      "offset_seconds": 93.349998,
+      "onset_seconds": 92.532135,
+      "pitch": 64,
+      "velocity": 61
+    },
+    {
+      "id": "kong-471",
+      "offset_seconds": 95.279999,
+      "onset_seconds": 93.357582,
+      "pitch": 64,
+      "velocity": 46
+    },
+    {
+      "id": "kong-472",
+      "offset_seconds": 96.786354,
+      "onset_seconds": 96.074181,
+      "pitch": 64,
+      "velocity": 55
+    },
+    {
+      "id": "kong-473",
+      "offset_seconds": 100.309998,
+      "onset_seconds": 99.528442,
+      "pitch": 64,
+      "velocity": 50
+    },
+    {
+      "id": "kong-474",
+      "offset_seconds": 100.869438,
+      "onset_seconds": 100.319084,
+      "pitch": 64,
+      "velocity": 49
+    },
+    {
+      "id": "kong-475",
+      "offset_seconds": 105.870003,
+      "onset_seconds": 105.075294,
+      "pitch": 64,
+      "velocity": 50
+    },
+    {
+      "id": "kong-476",
+      "offset_seconds": 106.660004,
+      "onset_seconds": 105.879303,
+      "pitch": 64,
+      "velocity": 53
+    },
+    {
+      "id": "kong-477",
+      "offset_seconds": 108.519997,
+      "onset_seconds": 107.794807,
+      "pitch": 64,
+      "velocity": 52
+    },
+    {
+      "id": "kong-478",
+      "offset_seconds": 109.230003,
+      "onset_seconds": 108.526802,
+      "pitch": 64,
+      "velocity": 53
+    },
+    {
+      "id": "kong-479",
+      "offset_seconds": 111.260002,
+      "onset_seconds": 110.432549,
+      "pitch": 64,
+      "velocity": 44
+    },
+    {
+      "id": "kong-480",
+      "offset_seconds": 112.004623,
+      "onset_seconds": 111.272423,
+      "pitch": 64,
+      "velocity": 52
+    },
+    {
+      "id": "kong-481",
+      "offset_seconds": 113.24749,
+      "onset_seconds": 112.742844,
+      "pitch": 64,
+      "velocity": 50
+    },
+    {
+      "id": "kong-482",
+      "offset_seconds": 114.453156,
+      "onset_seconds": 113.920227,
+      "pitch": 64,
+      "velocity": 58
+    },
+    {
+      "id": "kong-483",
+      "offset_seconds": 115.907196,
+      "onset_seconds": 115.330902,
+      "pitch": 64,
+      "velocity": 45
+    },
+    {
+      "id": "kong-484",
+      "offset_seconds": 117.992264,
+      "onset_seconds": 117.120735,
+      "pitch": 64,
+      "velocity": 28
+    },
+    {
+      "id": "kong-485",
+      "offset_seconds": 9.3,
+      "onset_seconds": 8.825064,
+      "pitch": 65,
+      "velocity": 48
+    },
+    {
+      "id": "kong-486",
+      "offset_seconds": 10.22,
+      "onset_seconds": 9.313676,
+      "pitch": 65,
+      "velocity": 32
+    },
+    {
+      "id": "kong-487",
+      "offset_seconds": 11.39,
+      "onset_seconds": 10.573464,
+      "pitch": 65,
+      "velocity": 60
+    },
+    {
+      "id": "kong-488",
+      "offset_seconds": 12.07,
+      "onset_seconds": 11.403172,
+      "pitch": 65,
+      "velocity": 56
+    },
+    {
+      "id": "kong-489",
+      "offset_seconds": 15.894691,
+      "onset_seconds": 15.384597,
+      "pitch": 65,
+      "velocity": 62
+    },
+    {
+      "id": "kong-490",
+      "offset_seconds": 18.36454,
+      "onset_seconds": 17.796427,
+      "pitch": 65,
+      "velocity": 60
+    },
+    {
+      "id": "kong-491",
+      "offset_seconds": 20.938057,
+      "onset_seconds": 20.315418,
+      "pitch": 65,
+      "velocity": 58
+    },
+    {
+      "id": "kong-492",
+      "offset_seconds": 23.67,
+      "onset_seconds": 22.243874,
+      "pitch": 65,
+      "velocity": 46
+    },
+    {
+      "id": "kong-493",
+      "offset_seconds": 24.440001,
+      "onset_seconds": 23.677956,
+      "pitch": 65,
+      "velocity": 46
+    },
+    {
+      "id": "kong-494",
+      "offset_seconds": 25.705025,
+      "onset_seconds": 24.450178,
+      "pitch": 65,
+      "velocity": 44
+    },
+    {
+      "id": "kong-495",
+      "offset_seconds": 29.34,
+      "onset_seconds": 28.55785,
+      "pitch": 65,
+      "velocity": 42
+    },
+    {
+      "id": "kong-496",
+      "offset_seconds": 29.780001,
+      "onset_seconds": 29.346144,
+      "pitch": 65,
+      "velocity": 41
+    },
+    {
+      "id": "kong-497",
+      "offset_seconds": 30.700001,
+      "onset_seconds": 29.788271,
+      "pitch": 65,
+      "velocity": 42
+    },
+    {
+      "id": "kong-498",
+      "offset_seconds": 31.879999,
+      "onset_seconds": 31.051512,
+      "pitch": 65,
+      "velocity": 57
+    },
+    {
+      "id": "kong-499",
+      "offset_seconds": 32.490002,
+      "onset_seconds": 31.893744,
+      "pitch": 65,
+      "velocity": 51
+    },
+    {
+      "id": "kong-500",
+      "offset_seconds": 36.355209,
+      "onset_seconds": 35.80233,
+      "pitch": 65,
+      "velocity": 60
+    },
+    {
+      "id": "kong-501",
+      "offset_seconds": 38.905659,
+      "onset_seconds": 38.257019,
+      "pitch": 65,
+      "velocity": 64
+    },
+    {
+      "id": "kong-502",
+      "offset_seconds": 41.417412,
+      "onset_seconds": 40.791843,
+      "pitch": 65,
+      "velocity": 66
+    },
+    {
+      "id": "kong-503",
+      "offset_seconds": 44.203503,
+      "onset_seconds": 42.605133,
+      "pitch": 65,
+      "velocity": 60
+    },
+    {
+      "id": "kong-504",
+      "offset_seconds": 46.659039,
+      "onset_seconds": 46.103733,
+      "pitch": 65,
+      "velocity": 54
+    },
+    {
+      "id": "kong-505",
+      "offset_seconds": 51.57,
+      "onset_seconds": 51.092049,
+      "pitch": 65,
+      "velocity": 49
+    },
+    {
+      "id": "kong-506",
+      "offset_seconds": 58.563229,
+      "onset_seconds": 57.915451,
+      "pitch": 65,
+      "velocity": 39
+    },
+    {
+      "id": "kong-507",
+      "offset_seconds": 61.041344,
+      "onset_seconds": 60.458042,
+      "pitch": 65,
+      "velocity": 43
+    },
+    {
+      "id": "kong-508",
+      "offset_seconds": 63.080002,
+      "onset_seconds": 62.283524,
+      "pitch": 65,
+      "velocity": 26
+    },
+    {
+      "id": "kong-509",
+      "offset_seconds": 63.73,
+      "onset_seconds": 63.087196,
+      "pitch": 65,
+      "velocity": 39
+    },
+    {
+      "id": "kong-510",
+      "offset_seconds": 65.887329,
+      "onset_seconds": 64.961357,
+      "pitch": 65,
+      "velocity": 55
+    },
+    {
+      "id": "kong-511",
+      "offset_seconds": 68.194466,
+      "onset_seconds": 67.518326,
+      "pitch": 65,
+      "velocity": 37
+    },
+    {
+      "id": "kong-512",
+      "offset_seconds": 71.860001,
+      "onset_seconds": 71.414398,
+      "pitch": 65,
+      "velocity": 55
+    },
+    {
+      "id": "kong-513",
+      "offset_seconds": 73.059998,
+      "onset_seconds": 71.866379,
+      "pitch": 65,
+      "velocity": 41
+    },
+    {
+      "id": "kong-514",
+      "offset_seconds": 73.900002,
+      "onset_seconds": 73.074593,
+      "pitch": 65,
+      "velocity": 61
+    },
+    {
+      "id": "kong-515",
+      "offset_seconds": 74.519997,
+      "onset_seconds": 73.905899,
+      "pitch": 65,
+      "velocity": 55
+    },
+    {
+      "id": "kong-516",
+      "offset_seconds": 78.287338,
+      "onset_seconds": 77.758736,
+      "pitch": 65,
+      "velocity": 64
+    },
+    {
+      "id": "kong-517",
+      "offset_seconds": 81.290001,
+      "onset_seconds": 80.216858,
+      "pitch": 65,
+      "velocity": 65
+    },
+    {
+      "id": "kong-518",
+      "offset_seconds": 83.363106,
+      "onset_seconds": 82.764473,
+      "pitch": 65,
+      "velocity": 67
+    },
+    {
+      "id": "kong-519",
+      "offset_seconds": 87.545898,
+      "onset_seconds": 86.946404,
+      "pitch": 65,
+      "velocity": 49
+    },
+    {
+      "id": "kong-520",
+      "offset_seconds": 88.815659,
+      "onset_seconds": 88.295639,
+      "pitch": 65,
+      "velocity": 39
+    },
+    {
+      "id": "kong-521",
+      "offset_seconds": 91.304367,
+      "onset_seconds": 90.796249,
+      "pitch": 65,
+      "velocity": 44
+    },
+    {
+      "id": "kong-522",
+      "offset_seconds": 102.372177,
+      "onset_seconds": 100.793884,
+      "pitch": 65,
+      "velocity": 57
+    },
+    {
+      "id": "kong-523",
+      "offset_seconds": 107.861,
+      "onset_seconds": 106.525513,
+      "pitch": 65,
+      "velocity": 52
+    },
+    {
+      "id": "kong-524",
+      "offset_seconds": 110.485954,
+      "onset_seconds": 109.074898,
+      "pitch": 65,
+      "velocity": 53
+    },
+    {
+      "id": "kong-525",
+      "offset_seconds": 113.129997,
+      "onset_seconds": 111.918999,
+      "pitch": 65,
+      "velocity": 47
+    },
+    {
+      "id": "kong-526",
+      "offset_seconds": 114.349998,
+      "onset_seconds": 113.143372,
+      "pitch": 65,
+      "velocity": 61
+    },
+    {
+      "id": "kong-527",
+      "offset_seconds": 115.391205,
+      "onset_seconds": 114.362267,
+      "pitch": 65,
+      "velocity": 57
+    },
+    {
+      "id": "kong-528",
+      "offset_seconds": 117.145531,
+      "onset_seconds": 115.878563,
+      "pitch": 65,
+      "velocity": 42
+    },
+    {
+      "id": "kong-529",
+      "offset_seconds": 122.5,
+      "onset_seconds": 119.940582,
+      "pitch": 65,
+      "velocity": 56
+    },
+    {
+      "id": "kong-530",
+      "offset_seconds": 99.044403,
+      "onset_seconds": 98.803085,
+      "pitch": 66,
+      "velocity": 60
+    },
+    {
+      "id": "kong-531",
+      "offset_seconds": 104.474319,
+      "onset_seconds": 104.235222,
+      "pitch": 66,
+      "velocity": 60
+    },
+    {
+      "id": "kong-532",
+      "offset_seconds": 11.94,
+      "onset_seconds": 11.38303,
+      "pitch": 67,
+      "velocity": 74
+    },
+    {
+      "id": "kong-533",
+      "offset_seconds": 13.42,
+      "onset_seconds": 11.945709,
+      "pitch": 67,
+      "velocity": 67
+    },
+    {
+      "id": "kong-534",
+      "offset_seconds": 17.816263,
+      "onset_seconds": 17.63694,
+      "pitch": 67,
+      "velocity": 75
+    },
+    {
+      "id": "kong-535",
+      "offset_seconds": 20.300156,
+      "onset_seconds": 20.127392,
+      "pitch": 67,
+      "velocity": 68
+    },
+    {
+      "id": "kong-536",
+      "offset_seconds": 22.23,
+      "onset_seconds": 20.854174,
+      "pitch": 67,
+      "velocity": 65
+    },
+    {
+      "id": "kong-537",
+      "offset_seconds": 26.809999,
+      "onset_seconds": 26.089216,
+      "pitch": 67,
+      "velocity": 59
+    },
+    {
+      "id": "kong-538",
+      "offset_seconds": 27.33,
+      "onset_seconds": 26.824749,
+      "pitch": 67,
+      "velocity": 61
+    },
+    {
+      "id": "kong-539",
+      "offset_seconds": 28.09,
+      "onset_seconds": 27.344387,
+      "pitch": 67,
+      "velocity": 50
+    },
+    {
+      "id": "kong-540",
+      "offset_seconds": 28.620001,
+      "onset_seconds": 28.096556,
+      "pitch": 67,
+      "velocity": 55
+    },
+    {
+      "id": "kong-541",
+      "offset_seconds": 32.380001,
+      "onset_seconds": 31.879848,
+      "pitch": 67,
+      "velocity": 64
+    },
+    {
+      "id": "kong-542",
+      "offset_seconds": 33.849998,
+      "onset_seconds": 32.386292,
+      "pitch": 67,
+      "velocity": 68
+    },
+    {
+      "id": "kong-543",
+      "offset_seconds": 38.244934,
+      "onset_seconds": 38.101467,
+      "pitch": 67,
+      "velocity": 73
+    },
+    {
+      "id": "kong-544",
+      "offset_seconds": 40.83548,
+      "onset_seconds": 40.618679,
+      "pitch": 67,
+      "velocity": 71
+    },
+    {
+      "id": "kong-545",
+      "offset_seconds": 42.662647,
+      "onset_seconds": 41.31258,
+      "pitch": 67,
+      "velocity": 77
+    },
+    {
+      "id": "kong-546",
+      "offset_seconds": 49.830002,
+      "onset_seconds": 49.058872,
+      "pitch": 67,
+      "velocity": 66
+    },
+    {
+      "id": "kong-547",
+      "offset_seconds": 50.290001,
+      "onset_seconds": 49.837437,
+      "pitch": 67,
+      "velocity": 70
+    },
+    {
+      "id": "kong-548",
+      "offset_seconds": 51.41,
+      "onset_seconds": 50.304443,
+      "pitch": 67,
+      "velocity": 77
+    },
+    {
+      "id": "kong-549",
+      "offset_seconds": 52.330002,
+      "onset_seconds": 51.4249,
+      "pitch": 67,
+      "velocity": 69
+    },
+    {
+      "id": "kong-550",
+      "offset_seconds": 52.810001,
+      "onset_seconds": 52.336349,
+      "pitch": 67,
+      "velocity": 55
+    },
+    {
+      "id": "kong-551",
+      "offset_seconds": 53.860001,
+      "onset_seconds": 52.820801,
+      "pitch": 67,
+      "velocity": 49
+    },
+    {
+      "id": "kong-552",
+      "offset_seconds": 55.860001,
+      "onset_seconds": 54.596088,
+      "pitch": 67,
+      "velocity": 33
+    },
+    {
+      "id": "kong-553",
+      "offset_seconds": 56.701195,
+      "onset_seconds": 55.87067,
+      "pitch": 67,
+      "velocity": 42
+    },
+    {
+      "id": "kong-554",
+      "offset_seconds": 57.997944,
+      "onset_seconds": 57.097412,
+      "pitch": 67,
+      "velocity": 45
+    },
+    {
+      "id": "kong-555",
+      "offset_seconds": 59.27,
+      "onset_seconds": 58.455765,
+      "pitch": 67,
+      "velocity": 46
+    },
+    {
+      "id": "kong-556",
+      "offset_seconds": 60.512882,
+      "onset_seconds": 59.680233,
+      "pitch": 67,
+      "velocity": 53
+    },
+    {
+      "id": "kong-557",
+      "offset_seconds": 61.720001,
+      "onset_seconds": 60.936924,
+      "pitch": 67,
+      "velocity": 48
+    },
+    {
+      "id": "kong-558",
+      "offset_seconds": 62.369999,
+      "onset_seconds": 61.728584,
+      "pitch": 67,
+      "velocity": 47
+    },
+    {
+      "id": "kong-559",
+      "offset_seconds": 65.07,
+      "onset_seconds": 63.615021,
+      "pitch": 67,
+      "velocity": 54
+    },
+    {
+      "id": "kong-560",
+      "offset_seconds": 66.580002,
+      "onset_seconds": 65.857178,
+      "pitch": 67,
+      "velocity": 60
+    },
+    {
+      "id": "kong-561",
+      "offset_seconds": 67.639999,
+      "onset_seconds": 66.592056,
+      "pitch": 67,
+      "velocity": 55
+    },
+    {
+      "id": "kong-562",
+      "offset_seconds": 74.389999,
+      "onset_seconds": 73.895325,
+      "pitch": 67,
+      "velocity": 65
+    },
+    {
+      "id": "kong-563",
+      "offset_seconds": 75.870003,
+      "onset_seconds": 74.403885,
+      "pitch": 67,
+      "velocity": 64
+    },
+    {
+      "id": "kong-564",
+      "offset_seconds": 80.23484,
+      "onset_seconds": 80.052536,
+      "pitch": 67,
+      "velocity": 76
+    },
+    {
+      "id": "kong-565",
+      "offset_seconds": 82.802513,
+      "onset_seconds": 82.600739,
+      "pitch": 67,
+      "velocity": 71
+    },
+    {
+      "id": "kong-566",
+      "offset_seconds": 84.760002,
+      "onset_seconds": 83.300621,
+      "pitch": 67,
+      "velocity": 76
+    },
+    {
+      "id": "kong-567",
+      "offset_seconds": 98.959999,
+      "onset_seconds": 98.246445,
+      "pitch": 67,
+      "velocity": 48
+    },
+    {
+      "id": "kong-568",
+      "offset_seconds": 99.669998,
+      "onset_seconds": 98.969841,
+      "pitch": 67,
+      "velocity": 75
+    },
+    {
+      "id": "kong-569",
+      "offset_seconds": 103.625565,
+      "onset_seconds": 103.416763,
+      "pitch": 67,
+      "velocity": 66
+    },
+    {
+      "id": "kong-570",
+      "offset_seconds": 105.123466,
+      "onset_seconds": 104.432381,
+      "pitch": 67,
+      "velocity": 72
+    },
+    {
+      "id": "kong-571",
+      "offset_seconds": 47.846169,
+      "onset_seconds": 47.346676,
+      "pitch": 68,
+      "velocity": 70
+    },
+    {
+      "id": "kong-572",
+      "offset_seconds": 95.254646,
+      "onset_seconds": 94.676079,
+      "pitch": 68,
+      "velocity": 67
+    },
+    {
+      "id": "kong-573",
+      "offset_seconds": 4.92,
+      "onset_seconds": 4.178461,
+      "pitch": 69,
+      "velocity": 39
+    },
+    {
+      "id": "kong-574",
+      "offset_seconds": 5.56,
+      "onset_seconds": 4.929157,
+      "pitch": 69,
+      "velocity": 57
+    },
+    {
+      "id": "kong-575",
+      "offset_seconds": 9.3132,
+      "onset_seconds": 8.01534,
+      "pitch": 69,
+      "velocity": 51
+    },
+    {
+      "id": "kong-576",
+      "offset_seconds": 10.621762,
+      "onset_seconds": 10.107404,
+      "pitch": 69,
+      "velocity": 59
+    },
+    {
+      "id": "kong-577",
+      "offset_seconds": 14.6,
+      "onset_seconds": 13.373256,
+      "pitch": 69,
+      "velocity": 54
+    },
+    {
+      "id": "kong-578",
+      "offset_seconds": 15.8,
+      "onset_seconds": 14.611136,
+      "pitch": 69,
+      "velocity": 71
+    },
+    {
+      "id": "kong-579",
+      "offset_seconds": 16.75,
+      "onset_seconds": 15.81279,
+      "pitch": 69,
+      "velocity": 75
+    },
+    {
+      "id": "kong-580",
+      "offset_seconds": 17.815355,
+      "onset_seconds": 17.073427,
+      "pitch": 69,
+      "velocity": 77
+    },
+    {
+      "id": "kong-581",
+      "offset_seconds": 19.132849,
+      "onset_seconds": 18.244234,
+      "pitch": 69,
+      "velocity": 74
+    },
+    {
+      "id": "kong-582",
+      "offset_seconds": 20.296068,
+      "onset_seconds": 19.563713,
+      "pitch": 69,
+      "velocity": 61
+    },
+    {
+      "id": "kong-583",
+      "offset_seconds": 24.42,
+      "onset_seconds": 23.674747,
+      "pitch": 69,
+      "velocity": 54
+    },
+    {
+      "id": "kong-584",
+      "offset_seconds": 24.860001,
+      "onset_seconds": 24.428051,
+      "pitch": 69,
+      "velocity": 54
+    },
+    {
+      "id": "kong-585",
+      "offset_seconds": 25.629999,
+      "onset_seconds": 24.874542,
+      "pitch": 69,
+      "velocity": 31
+    },
+    {
+      "id": "kong-586",
+      "offset_seconds": 26.18,
+      "onset_seconds": 25.635098,
+      "pitch": 69,
+      "velocity": 57
+    },
+    {
+      "id": "kong-587",
+      "offset_seconds": 29.86492,
+      "onset_seconds": 28.54615,
+      "pitch": 69,
+      "velocity": 62
+    },
+    {
+      "id": "kong-588",
+      "offset_seconds": 31.114532,
+      "onset_seconds": 30.566765,
+      "pitch": 69,
+      "velocity": 63
+    },
+    {
+      "id": "kong-589",
+      "offset_seconds": 35.0,
+      "onset_seconds": 33.756592,
+      "pitch": 69,
+      "velocity": 57
+    },
+    {
+      "id": "kong-590",
+      "offset_seconds": 36.209999,
+      "onset_seconds": 35.044437,
+      "pitch": 69,
+      "velocity": 64
+    },
+    {
+      "id": "kong-591",
+      "offset_seconds": 37.459999,
+      "onset_seconds": 36.224148,
+      "pitch": 69,
+      "velocity": 75
+    },
+    {
+      "id": "kong-592",
+      "offset_seconds": 38.242489,
+      "onset_seconds": 37.470417,
+      "pitch": 69,
+      "velocity": 70
+    },
+    {
+      "id": "kong-593",
+      "offset_seconds": 40.040001,
+      "onset_seconds": 38.793301,
+      "pitch": 69,
+      "velocity": 63
+    },
+    {
+      "id": "kong-594",
+      "offset_seconds": 40.838543,
+      "onset_seconds": 40.054794,
+      "pitch": 69,
+      "velocity": 62
+    },
+    {
+      "id": "kong-595",
+      "offset_seconds": 47.799999,
+      "onset_seconds": 46.609993,
+      "pitch": 69,
+      "velocity": 72
+    },
+    {
+      "id": "kong-596",
+      "offset_seconds": 48.669998,
+      "onset_seconds": 47.811699,
+      "pitch": 69,
+      "velocity": 52
+    },
+    {
+      "id": "kong-597",
+      "offset_seconds": 51.539101,
+      "onset_seconds": 51.085182,
+      "pitch": 69,
+      "velocity": 62
+    },
+    {
+      "id": "kong-598",
+      "offset_seconds": 55.965904,
+      "onset_seconds": 55.414627,
+      "pitch": 69,
+      "velocity": 35
+    },
+    {
+      "id": "kong-599",
+      "offset_seconds": 57.168018,
+      "onset_seconds": 56.645523,
+      "pitch": 69,
+      "velocity": 42
+    },
+    {
+      "id": "kong-600",
+      "offset_seconds": 59.43,
+      "onset_seconds": 59.236488,
+      "pitch": 69,
+      "velocity": 44
+    },
+    {
+      "id": "kong-601",
+      "offset_seconds": 63.73,
+      "onset_seconds": 62.275414,
+      "pitch": 69,
+      "velocity": 42
+    },
+    {
+      "id": "kong-602",
+      "offset_seconds": 67.510002,
+      "onset_seconds": 66.576935,
+      "pitch": 69,
+      "velocity": 56
+    },
+    {
+      "id": "kong-603",
+      "offset_seconds": 68.120003,
+      "onset_seconds": 67.524834,
+      "pitch": 69,
+      "velocity": 49
+    },
+    {
+      "id": "kong-604",
+      "offset_seconds": 68.910004,
+      "onset_seconds": 68.127205,
+      "pitch": 69,
+      "velocity": 47
+    },
+    {
+      "id": "kong-605",
+      "offset_seconds": 69.489998,
+      "onset_seconds": 68.920662,
+      "pitch": 69,
+      "velocity": 58
+    },
+    {
+      "id": "kong-606",
+      "offset_seconds": 71.448921,
+      "onset_seconds": 70.615334,
+      "pitch": 69,
+      "velocity": 59
+    },
+    {
+      "id": "kong-607",
+      "offset_seconds": 73.147026,
+      "onset_seconds": 72.618782,
+      "pitch": 69,
+      "velocity": 71
+    },
+    {
+      "id": "kong-608",
+      "offset_seconds": 76.970001,
+      "onset_seconds": 75.773949,
+      "pitch": 69,
+      "velocity": 52
+    },
+    {
+      "id": "kong-609",
+      "offset_seconds": 78.169998,
+      "onset_seconds": 76.975975,
+      "pitch": 69,
+      "velocity": 71
+    },
+    {
+      "id": "kong-610",
+      "offset_seconds": 79.220001,
+      "onset_seconds": 78.183838,
+      "pitch": 69,
+      "velocity": 81
+    },
+    {
+      "id": "kong-611",
+      "offset_seconds": 80.226173,
+      "onset_seconds": 79.473099,
+      "pitch": 69,
+      "velocity": 74
+    },
+    {
+      "id": "kong-612",
+      "offset_seconds": 82.0,
+      "onset_seconds": 80.742355,
+      "pitch": 69,
+      "velocity": 61
+    },
+    {
+      "id": "kong-613",
+      "offset_seconds": 82.797256,
+      "onset_seconds": 82.011734,
+      "pitch": 69,
+      "velocity": 69
+    },
+    {
+      "id": "kong-614",
+      "offset_seconds": 87.545456,
+      "onset_seconds": 86.922485,
+      "pitch": 69,
+      "velocity": 62
+    },
+    {
+      "id": "kong-615",
+      "offset_seconds": 88.818184,
+      "onset_seconds": 88.263062,
+      "pitch": 69,
+      "velocity": 55
+    },
+    {
+      "id": "kong-616",
+      "offset_seconds": 91.305473,
+      "onset_seconds": 90.740784,
+      "pitch": 69,
+      "velocity": 68
+    },
+    {
+      "id": "kong-617",
+      "offset_seconds": 93.879997,
+      "onset_seconds": 93.307426,
+      "pitch": 69,
+      "velocity": 77
+    },
+    {
+      "id": "kong-618",
+      "offset_seconds": 95.150002,
+      "onset_seconds": 93.894653,
+      "pitch": 69,
+      "velocity": 58
+    },
+    {
+      "id": "kong-619",
+      "offset_seconds": 96.699997,
+      "onset_seconds": 95.161934,
+      "pitch": 69,
+      "velocity": 64
+    },
+    {
+      "id": "kong-620",
+      "offset_seconds": 98.32,
+      "onset_seconds": 96.708565,
+      "pitch": 69,
+      "velocity": 61
+    },
+    {
+      "id": "kong-621",
+      "offset_seconds": 99.040306,
+      "onset_seconds": 98.794441,
+      "pitch": 69,
+      "velocity": 68
+    },
+    {
+      "id": "kong-622",
+      "offset_seconds": 100.87677,
+      "onset_seconds": 99.466507,
+      "pitch": 69,
+      "velocity": 71
+    },
+    {
+      "id": "kong-623",
+      "offset_seconds": 103.625664,
+      "onset_seconds": 102.274796,
+      "pitch": 69,
+      "velocity": 61
+    },
+    {
+      "id": "kong-624",
+      "offset_seconds": 104.468445,
+      "onset_seconds": 104.228035,
+      "pitch": 69,
+      "velocity": 63
+    },
+    {
+      "id": "kong-625",
+      "offset_seconds": 105.934349,
+      "onset_seconds": 105.025635,
+      "pitch": 69,
+      "velocity": 65
+    },
+    {
+      "id": "kong-626",
+      "offset_seconds": 109.290001,
+      "onset_seconds": 107.757111,
+      "pitch": 69,
+      "velocity": 67
+    },
+    {
+      "id": "kong-627",
+      "offset_seconds": 112.004677,
+      "onset_seconds": 110.377083,
+      "pitch": 69,
+      "velocity": 58
+    },
+    {
+      "id": "kong-628",
+      "offset_seconds": 113.251266,
+      "onset_seconds": 112.705101,
+      "pitch": 69,
+      "velocity": 58
+    },
+    {
+      "id": "kong-629",
+      "offset_seconds": 114.448112,
+      "onset_seconds": 113.89389,
+      "pitch": 69,
+      "velocity": 68
+    },
+    {
+      "id": "kong-630",
+      "offset_seconds": 116.269997,
+      "onset_seconds": 115.287384,
+      "pitch": 69,
+      "velocity": 53
+    },
+    {
+      "id": "kong-631",
+      "offset_seconds": 120.43,
+      "onset_seconds": 117.073517,
+      "pitch": 69,
+      "velocity": 46
+    },
+    {
+      "id": "kong-632",
+      "offset_seconds": 121.309998,
+      "onset_seconds": 120.439774,
+      "pitch": 69,
+      "velocity": 54
+    },
+    {
+      "id": "kong-633",
+      "offset_seconds": 121.949997,
+      "onset_seconds": 121.315086,
+      "pitch": 69,
+      "velocity": 46
+    },
+    {
+      "id": "kong-634",
+      "offset_seconds": 122.650002,
+      "onset_seconds": 121.963783,
+      "pitch": 69,
+      "velocity": 48
+    },
+    {
+      "id": "kong-635",
+      "offset_seconds": 123.480003,
+      "onset_seconds": 122.663055,
+      "pitch": 69,
+      "velocity": 40
+    },
+    {
+      "id": "kong-636",
+      "offset_seconds": 124.779999,
+      "onset_seconds": 123.491982,
+      "pitch": 69,
+      "velocity": 38
+    },
+    {
+      "id": "kong-637",
+      "offset_seconds": 129.990005,
+      "onset_seconds": 124.787468,
+      "pitch": 69,
+      "velocity": 37
+    },
+    {
+      "id": "kong-638",
+      "offset_seconds": 6.17,
+      "onset_seconds": 5.412327,
+      "pitch": 70,
+      "velocity": 61
+    },
+    {
+      "id": "kong-639",
+      "offset_seconds": 6.68,
+      "onset_seconds": 6.175519,
+      "pitch": 70,
+      "velocity": 54
+    },
+    {
+      "id": "kong-640",
+      "offset_seconds": 7.47,
+      "onset_seconds": 6.685007,
+      "pitch": 70,
+      "velocity": 56
+    },
+    {
+      "id": "kong-641",
+      "offset_seconds": 8.038242,
+      "onset_seconds": 7.484605,
+      "pitch": 70,
+      "velocity": 57
+    },
+    {
+      "id": "kong-642",
+      "offset_seconds": 14.665,
+      "onset_seconds": 14.155529,
+      "pitch": 70,
+      "velocity": 71
+    },
+    {
+      "id": "kong-643",
+      "offset_seconds": 17.177631,
+      "onset_seconds": 16.566233,
+      "pitch": 70,
+      "velocity": 79
+    },
+    {
+      "id": "kong-644",
+      "offset_seconds": 19.619802,
+      "onset_seconds": 19.041201,
+      "pitch": 70,
+      "velocity": 72
+    },
+    {
+      "id": "kong-645",
+      "offset_seconds": 26.82,
+      "onset_seconds": 26.097067,
+      "pitch": 70,
+      "velocity": 59
+    },
+    {
+      "id": "kong-646",
+      "offset_seconds": 27.33,
+      "onset_seconds": 26.827183,
+      "pitch": 70,
+      "velocity": 63
+    },
+    {
+      "id": "kong-647",
+      "offset_seconds": 28.08,
+      "onset_seconds": 27.341198,
+      "pitch": 70,
+      "velocity": 61
+    },
+    {
+      "id": "kong-648",
+      "offset_seconds": 28.620001,
+      "onset_seconds": 28.089676,
+      "pitch": 70,
+      "velocity": 66
+    },
+    {
+      "id": "kong-649",
+      "offset_seconds": 35.133881,
+      "onset_seconds": 34.594559,
+      "pitch": 70,
+      "velocity": 62
+    },
+    {
+      "id": "kong-650",
+      "offset_seconds": 37.55769,
+      "onset_seconds": 36.995983,
+      "pitch": 70,
+      "velocity": 78
+    },
+    {
+      "id": "kong-651",
+      "offset_seconds": 40.124458,
+      "onset_seconds": 39.601261,
+      "pitch": 70,
+      "velocity": 67
+    },
+    {
+      "id": "kong-652",
+      "offset_seconds": 65.890526,
+      "onset_seconds": 64.943115,
+      "pitch": 70,
+      "velocity": 76
+    },
+    {
+      "id": "kong-653",
+      "offset_seconds": 70.160004,
+      "onset_seconds": 69.391945,
+      "pitch": 70,
+      "velocity": 59
+    },
+    {
+      "id": "kong-654",
+      "offset_seconds": 70.676163,
+      "onset_seconds": 70.17337,
+      "pitch": 70,
+      "velocity": 59
+    },
+    {
+      "id": "kong-655",
+      "offset_seconds": 77.08461,
+      "onset_seconds": 76.514496,
+      "pitch": 70,
+      "velocity": 67
+    },
+    {
+      "id": "kong-656",
+      "offset_seconds": 79.586044,
+      "onset_seconds": 78.963089,
+      "pitch": 70,
+      "velocity": 83
+    },
+    {
+      "id": "kong-657",
+      "offset_seconds": 82.082298,
+      "onset_seconds": 81.544884,
+      "pitch": 70,
+      "velocity": 71
+    },
+    {
+      "id": "kong-658",
+      "offset_seconds": 99.046158,
+      "onset_seconds": 98.195992,
+      "pitch": 70,
+      "velocity": 70
+    },
+    {
+      "id": "kong-659",
+      "offset_seconds": 100.900002,
+      "onset_seconds": 99.514053,
+      "pitch": 70,
+      "velocity": 55
+    },
+    {
+      "id": "kong-660",
+      "offset_seconds": 104.510002,
+      "onset_seconds": 103.558022,
+      "pitch": 70,
+      "velocity": 74
+    },
+    {
+      "id": "kong-661",
+      "offset_seconds": 46.470001,
+      "onset_seconds": 46.085087,
+      "pitch": 71,
+      "velocity": 75
+    },
+    {
+      "id": "kong-662",
+      "offset_seconds": 46.660278,
+      "onset_seconds": 46.483871,
+      "pitch": 71,
+      "velocity": 72
+    },
+    {
+      "id": "kong-663",
+      "offset_seconds": 52.827587,
+      "onset_seconds": 52.303864,
+      "pitch": 71,
+      "velocity": 70
+    },
+    {
+      "id": "kong-664",
+      "offset_seconds": 63.693592,
+      "onset_seconds": 63.060127,
+      "pitch": 71,
+      "velocity": 61
+    },
+    {
+      "id": "kong-665",
+      "offset_seconds": 90.82119,
+      "onset_seconds": 90.570641,
+      "pitch": 71,
+      "velocity": 72
+    },
+    {
+      "id": "kong-666",
+      "offset_seconds": 93.357285,
+      "onset_seconds": 93.12471,
+      "pitch": 71,
+      "velocity": 79
+    },
+    {
+      "id": "kong-667",
+      "offset_seconds": 95.300003,
+      "onset_seconds": 93.840057,
+      "pitch": 71,
+      "velocity": 82
+    },
+    {
+      "id": "kong-668",
+      "offset_seconds": 0.45,
+      "onset_seconds": 0.01501,
+      "pitch": 72,
+      "velocity": 48
+    },
+    {
+      "id": "kong-669",
+      "offset_seconds": 1.21,
+      "onset_seconds": 0.460595,
+      "pitch": 72,
+      "velocity": 65
+    },
+    {
+      "id": "kong-670",
+      "offset_seconds": 1.6,
+      "onset_seconds": 1.223933,
+      "pitch": 72,
+      "velocity": 71
+    },
+    {
+      "id": "kong-671",
+      "offset_seconds": 2.35,
+      "onset_seconds": 1.609571,
+      "pitch": 72,
+      "velocity": 72
+    },
+    {
+      "id": "kong-672",
+      "offset_seconds": 2.77,
+      "onset_seconds": 2.362988,
+      "pitch": 72,
+      "velocity": 72
+    },
+    {
+      "id": "kong-673",
+      "offset_seconds": 3.59,
+      "onset_seconds": 2.784153,
+      "pitch": 72,
+      "velocity": 72
+    },
+    {
+      "id": "kong-674",
+      "offset_seconds": 4.14,
+      "onset_seconds": 3.60484,
+      "pitch": 72,
+      "velocity": 68
+    },
+    {
+      "id": "kong-675",
+      "offset_seconds": 4.9,
+      "onset_seconds": 4.145317,
+      "pitch": 72,
+      "velocity": 61
+    },
+    {
+      "id": "kong-676",
+      "offset_seconds": 5.36,
+      "onset_seconds": 4.908075,
+      "pitch": 72,
+      "velocity": 73
+    },
+    {
+      "id": "kong-677",
+      "offset_seconds": 6.12,
+      "onset_seconds": 5.374209,
+      "pitch": 72,
+      "velocity": 75
+    },
+    {
+      "id": "kong-678",
+      "offset_seconds": 6.764129,
+      "onset_seconds": 6.132698,
+      "pitch": 72,
+      "velocity": 79
+    },
+    {
+      "id": "kong-679",
+      "offset_seconds": 8.036353,
+      "onset_seconds": 7.43918,
+      "pitch": 72,
+      "velocity": 79
+    },
+    {
+      "id": "kong-680",
+      "offset_seconds": 10.184313,
+      "onset_seconds": 9.26753,
+      "pitch": 72,
+      "velocity": 68
+    },
+    {
+      "id": "kong-681",
+      "offset_seconds": 25.6,
+      "onset_seconds": 23.626183,
+      "pitch": 72,
+      "velocity": 81
+    },
+    {
+      "id": "kong-682",
+      "offset_seconds": 26.040001,
+      "onset_seconds": 25.614347,
+      "pitch": 72,
+      "velocity": 72
+    },
+    {
+      "id": "kong-683",
+      "offset_seconds": 26.780001,
+      "onset_seconds": 26.046616,
+      "pitch": 72,
+      "velocity": 82
+    },
+    {
+      "id": "kong-684",
+      "offset_seconds": 27.40502,
+      "onset_seconds": 26.791876,
+      "pitch": 72,
+      "velocity": 78
+    },
+    {
+      "id": "kong-685",
+      "offset_seconds": 28.601757,
+      "onset_seconds": 28.037159,
+      "pitch": 72,
+      "velocity": 86
+    },
+    {
+      "id": "kong-686",
+      "offset_seconds": 31.115444,
+      "onset_seconds": 29.764374,
+      "pitch": 72,
+      "velocity": 78
+    },
+    {
+      "id": "kong-687",
+      "offset_seconds": 45.379997,
+      "onset_seconds": 44.080322,
+      "pitch": 72,
+      "velocity": 84
+    },
+    {
+      "id": "kong-688",
+      "offset_seconds": 49.134789,
+      "onset_seconds": 48.573914,
+      "pitch": 72,
+      "velocity": 77
+    },
+    {
+      "id": "kong-689",
+      "offset_seconds": 52.77,
+      "onset_seconds": 51.516521,
+      "pitch": 72,
+      "velocity": 83
+    },
+    {
+      "id": "kong-690",
+      "offset_seconds": 54.633358,
+      "onset_seconds": 52.78207,
+      "pitch": 72,
+      "velocity": 72
+    },
+    {
+      "id": "kong-691",
+      "offset_seconds": 57.172218,
+      "onset_seconds": 56.614868,
+      "pitch": 72,
+      "velocity": 64
+    },
+    {
+      "id": "kong-692",
+      "offset_seconds": 59.750294,
+      "onset_seconds": 59.193405,
+      "pitch": 72,
+      "velocity": 74
+    },
+    {
+      "id": "kong-693",
+      "offset_seconds": 62.292698,
+      "onset_seconds": 61.673416,
+      "pitch": 72,
+      "velocity": 81
+    },
+    {
+      "id": "kong-694",
+      "offset_seconds": 65.031418,
+      "onset_seconds": 63.573746,
+      "pitch": 72,
+      "velocity": 77
+    },
+    {
+      "id": "kong-695",
+      "offset_seconds": 68.089996,
+      "onset_seconds": 67.503067,
+      "pitch": 72,
+      "velocity": 63
+    },
+    {
+      "id": "kong-696",
+      "offset_seconds": 68.889999,
+      "onset_seconds": 68.104614,
+      "pitch": 72,
+      "velocity": 59
+    },
+    {
+      "id": "kong-697",
+      "offset_seconds": 69.5,
+      "onset_seconds": 68.90374,
+      "pitch": 72,
+      "velocity": 70
+    },
+    {
+      "id": "kong-698",
+      "offset_seconds": 70.675659,
+      "onset_seconds": 70.121628,
+      "pitch": 72,
+      "velocity": 82
+    },
+    {
+      "id": "kong-699",
+      "offset_seconds": 73.148155,
+      "onset_seconds": 71.834686,
+      "pitch": 72,
+      "velocity": 79
+    },
+    {
+      "id": "kong-700",
+      "offset_seconds": 86.148239,
+      "onset_seconds": 84.785042,
+      "pitch": 72,
+      "velocity": 87
+    },
+    {
+      "id": "kong-701",
+      "offset_seconds": 88.354858,
+      "onset_seconds": 87.477348,
+      "pitch": 72,
+      "velocity": 63
+    },
+    {
+      "id": "kong-702",
+      "offset_seconds": 89.980003,
+      "onset_seconds": 88.736275,
+      "pitch": 72,
+      "velocity": 67
+    },
+    {
+      "id": "kong-703",
+      "offset_seconds": 90.818199,
+      "onset_seconds": 89.98555,
+      "pitch": 72,
+      "velocity": 68
+    },
+    {
+      "id": "kong-704",
+      "offset_seconds": 92.116898,
+      "onset_seconds": 91.234619,
+      "pitch": 72,
+      "velocity": 75
+    },
+    {
+      "id": "kong-705",
+      "offset_seconds": 93.357178,
+      "onset_seconds": 92.514915,
+      "pitch": 72,
+      "velocity": 80
+    },
+    {
+      "id": "kong-706",
+      "offset_seconds": 98.2836,
+      "onset_seconds": 96.674828,
+      "pitch": 72,
+      "velocity": 81
+    },
+    {
+      "id": "kong-707",
+      "offset_seconds": 103.410004,
+      "onset_seconds": 102.242653,
+      "pitch": 72,
+      "velocity": 79
+    },
+    {
+      "id": "kong-708",
+      "offset_seconds": 103.660004,
+      "onset_seconds": 103.42025,
+      "pitch": 72,
+      "velocity": 76
+    },
+    {
+      "id": "kong-709",
+      "offset_seconds": 8.036031,
+      "onset_seconds": 7.269564,
+      "pitch": 74,
+      "velocity": 79
+    },
+    {
+      "id": "kong-710",
+      "offset_seconds": 9.315992,
+      "onset_seconds": 8.794926,
+      "pitch": 74,
+      "velocity": 67
+    },
+    {
+      "id": "kong-711",
+      "offset_seconds": 28.610001,
+      "onset_seconds": 27.880798,
+      "pitch": 74,
+      "velocity": 84
+    },
+    {
+      "id": "kong-712",
+      "offset_seconds": 29.869776,
+      "onset_seconds": 29.287289,
+      "pitch": 74,
+      "velocity": 78
+    },
+    {
+      "id": "kong-713",
+      "offset_seconds": 51.389999,
+      "onset_seconds": 51.061424,
+      "pitch": 74,
+      "velocity": 80
+    },
+    {
+      "id": "kong-714",
+      "offset_seconds": 51.542854,
+      "onset_seconds": 51.398396,
+      "pitch": 74,
+      "velocity": 69
+    },
+    {
+      "id": "kong-715",
+      "offset_seconds": 59.250286,
+      "onset_seconds": 59.015858,
+      "pitch": 74,
+      "velocity": 62
+    },
+    {
+      "id": "kong-716",
+      "offset_seconds": 61.754921,
+      "onset_seconds": 61.515129,
+      "pitch": 74,
+      "velocity": 65
+    },
+    {
+      "id": "kong-717",
+      "offset_seconds": 63.695946,
+      "onset_seconds": 62.225117,
+      "pitch": 74,
+      "velocity": 72
+    },
+    {
+      "id": "kong-718",
+      "offset_seconds": 70.68,
+      "onset_seconds": 69.967033,
+      "pitch": 74,
+      "velocity": 77
+    },
+    {
+      "id": "kong-719",
+      "offset_seconds": 71.938057,
+      "onset_seconds": 71.382492,
+      "pitch": 74,
+      "velocity": 76
+    },
+    {
+      "id": "kong-720",
+      "offset_seconds": 90.083862,
+      "onset_seconds": 89.491249,
+      "pitch": 74,
+      "velocity": 66
+    },
+    {
+      "id": "kong-721",
+      "offset_seconds": 92.615318,
+      "onset_seconds": 92.027283,
+      "pitch": 74,
+      "velocity": 76
+    },
+    {
+      "id": "kong-722",
+      "offset_seconds": 8.042203,
+      "onset_seconds": 6.648461,
+      "pitch": 76,
+      "velocity": 76
+    },
+    {
+      "id": "kong-723",
+      "offset_seconds": 28.116983,
+      "onset_seconds": 27.292999,
+      "pitch": 76,
+      "velocity": 78
+    },
+    {
+      "id": "kong-724",
+      "offset_seconds": 49.810001,
+      "onset_seconds": 49.034496,
+      "pitch": 76,
+      "velocity": 86
+    },
+    {
+      "id": "kong-725",
+      "offset_seconds": 50.27,
+      "onset_seconds": 49.824898,
+      "pitch": 76,
+      "velocity": 88
+    },
+    {
+      "id": "kong-726",
+      "offset_seconds": 51.580002,
+      "onset_seconds": 50.284584,
+      "pitch": 76,
+      "velocity": 86
+    },
+    {
+      "id": "kong-727",
+      "offset_seconds": 55.82,
+      "onset_seconds": 54.532982,
+      "pitch": 76,
+      "velocity": 56
+    },
+    {
+      "id": "kong-728",
+      "offset_seconds": 56.704918,
+      "onset_seconds": 55.830734,
+      "pitch": 76,
+      "velocity": 62
+    },
+    {
+      "id": "kong-729",
+      "offset_seconds": 57.996609,
+      "onset_seconds": 57.064568,
+      "pitch": 76,
+      "velocity": 67
+    },
+    {
+      "id": "kong-730",
+      "offset_seconds": 59.248569,
+      "onset_seconds": 58.434616,
+      "pitch": 76,
+      "velocity": 64
+    },
+    {
+      "id": "kong-731",
+      "offset_seconds": 60.514839,
+      "onset_seconds": 59.646652,
+      "pitch": 76,
+      "velocity": 73
+    },
+    {
+      "id": "kong-732",
+      "offset_seconds": 61.75584,
+      "onset_seconds": 60.909359,
+      "pitch": 76,
+      "velocity": 70
+    },
+    {
+      "id": "kong-733",
+      "offset_seconds": 70.22332,
+      "onset_seconds": 69.361969,
+      "pitch": 76,
+      "velocity": 75
+    },
+    {
+      "id": "kong-734",
+      "offset_seconds": 9.32,
+      "onset_seconds": 7.973693,
+      "pitch": 77,
+      "velocity": 71
+    },
+    {
+      "id": "kong-735",
+      "offset_seconds": 29.889999,
+      "onset_seconds": 28.51725,
+      "pitch": 77,
+      "velocity": 81
+    },
+    {
+      "id": "kong-736",
+      "offset_seconds": 55.966602,
+      "onset_seconds": 55.380081,
+      "pitch": 77,
+      "velocity": 52
+    },
+    {
+      "id": "kong-737",
+      "offset_seconds": 58.56459,
+      "onset_seconds": 57.884701,
+      "pitch": 77,
+      "velocity": 67
+    },
+    {
+      "id": "kong-738",
+      "offset_seconds": 61.045269,
+      "onset_seconds": 60.4259,
+      "pitch": 77,
+      "velocity": 73
+    },
+    {
+      "id": "kong-739",
+      "offset_seconds": 71.444962,
+      "onset_seconds": 70.583595,
+      "pitch": 77,
+      "velocity": 79
+    }
+  ],
+  "family": "kong",
+  "field_semantics": {
+    "fields": {
+      "audible_end": {
+        "note": "no independently annotated audible ending exists",
+        "source": null,
+        "status": "not_estimated"
+      },
+      "key_release": {
+        "note": "a predicted offset is not a physical key release",
+        "source": null,
+        "status": "not_estimated"
+      },
+      "pedal": {
+        "source": "native",
+        "status": "native_trajectory",
+        "types": [
+          "sustain"
+        ]
+      },
+      "pitch_onset": {
+        "source": "native",
+        "status": "measured"
+      },
+      "predicted_offset": {
+        "convention": "kong/native-offset",
+        "source": "native",
+        "status": "native_sidecar"
+      },
+      "velocity_midi": {
+        "note": "predicted MIDI velocity, not a captured measurement",
+        "source": "native",
+        "status": "model_estimated",
+        "units": "midi_1_127"
+      },
+      "written_duration": {
+        "source": null,
+        "status": "not_estimated"
+      }
+    },
+    "schema": "piano-model-field-semantics-1",
+    "variant": "kong-piano",
+    "version": 1
+  },
+  "note_count": 739,
+  "offset_beyond_interval": 1,
+  "offset_convention": "kong/native-offset",
+  "pedal": {
+    "spans": [
+      {
+        "offset_seconds": 0.055051,
+        "onset_seconds": 0.01
+      },
+      {
+        "offset_seconds": 0.562516,
+        "onset_seconds": 0.08
+      },
+      {
+        "offset_seconds": 1.265403,
+        "onset_seconds": 0.58
+      },
+      {
+        "offset_seconds": 2.451656,
+        "onset_seconds": 1.31
+      },
+      {
+        "offset_seconds": 2.902981,
+        "onset_seconds": 2.47
+      },
+      {
+        "offset_seconds": 3.675016,
+        "onset_seconds": 2.93
+      },
+      {
+        "offset_seconds": 4.265574,
+        "onset_seconds": 3.7
+      },
+      {
+        "offset_seconds": 4.985457,
+        "onset_seconds": 4.36
+      },
+      {
+        "offset_seconds": 5.494738,
+        "onset_seconds": 5.07
+      },
+      {
+        "offset_seconds": 6.764078,
+        "onset_seconds": 5.71
+      },
+      {
+        "offset_seconds": 7.451325,
+        "onset_seconds": 6.95
+      },
+      {
+        "offset_seconds": 8.035092,
+        "onset_seconds": 7.58
+      },
+      {
+        "offset_seconds": 8.83,
+        "onset_seconds": 8.28
+      },
+      {
+        "offset_seconds": 9.293716,
+        "onset_seconds": 8.94
+      },
+      {
+        "offset_seconds": 10.118263,
+        "onset_seconds": 9.46
+      },
+      {
+        "offset_seconds": 10.625125,
+        "onset_seconds": 10.17
+      },
+      {
+        "offset_seconds": 11.478333,
+        "onset_seconds": 10.81
+      },
+      {
+        "offset_seconds": 12.037115,
+        "onset_seconds": 11.58
+      },
+      {
+        "offset_seconds": 12.82188,
+        "onset_seconds": 12.26
+      },
+      {
+        "offset_seconds": 13.401664,
+        "onset_seconds": 13.04
+      },
+      {
+        "offset_seconds": 14.222716,
+        "onset_seconds": 13.63
+      },
+      {
+        "offset_seconds": 14.664145,
+        "onset_seconds": 14.25
+      },
+      {
+        "offset_seconds": 15.430257,
+        "onset_seconds": 14.91
+      },
+      {
+        "offset_seconds": 15.887614,
+        "onset_seconds": 15.5
+      },
+      {
+        "offset_seconds": 16.66213,
+        "onset_seconds": 16.07
+      },
+      {
+        "offset_seconds": 17.165024,
+        "onset_seconds": 16.76
+      },
+      {
+        "offset_seconds": 17.815462,
+        "onset_seconds": 17.370001
+      },
+      {
+        "offset_seconds": 18.353039,
+        "onset_seconds": 17.959999
+      },
+      {
+        "offset_seconds": 19.094694,
+        "onset_seconds": 18.530001
+      },
+      {
+        "offset_seconds": 19.615606,
+        "onset_seconds": 19.18
+      },
+      {
+        "offset_seconds": 20.2904,
+        "onset_seconds": 19.799999
+      },
+      {
+        "offset_seconds": 20.916294,
+        "onset_seconds": 20.41
+      },
+      {
+        "offset_seconds": 21.75761,
+        "onset_seconds": 21.129999
+      },
+      {
+        "offset_seconds": 22.308363,
+        "onset_seconds": 21.77
+      },
+      {
+        "offset_seconds": 23.170443,
+        "onset_seconds": 22.450001
+      },
+      {
+        "offset_seconds": 23.755051,
+        "onset_seconds": 23.26
+      },
+      {
+        "offset_seconds": 24.514687,
+        "onset_seconds": 23.92
+      },
+      {
+        "offset_seconds": 24.933395,
+        "onset_seconds": 24.58
+      },
+      {
+        "offset_seconds": 25.705673,
+        "onset_seconds": 24.98
+      },
+      {
+        "offset_seconds": 26.152842,
+        "onset_seconds": 25.76
+      },
+      {
+        "offset_seconds": 26.87109,
+        "onset_seconds": 26.35
+      },
+      {
+        "offset_seconds": 27.379492,
+        "onset_seconds": 26.98
+      },
+      {
+        "offset_seconds": 28.107319,
+        "onset_seconds": 27.549999
+      },
+      {
+        "offset_seconds": 28.597128,
+        "onset_seconds": 28.200001
+      },
+      {
+        "offset_seconds": 29.8547,
+        "onset_seconds": 28.799999
+      },
+      {
+        "offset_seconds": 30.644821,
+        "onset_seconds": 30.030001
+      },
+      {
+        "offset_seconds": 31.117813,
+        "onset_seconds": 30.709999
+      },
+      {
+        "offset_seconds": 31.946199,
+        "onset_seconds": 31.290001
+      },
+      {
+        "offset_seconds": 32.447865,
+        "onset_seconds": 32.049999
+      },
+      {
+        "offset_seconds": 33.323917,
+        "onset_seconds": 32.650002
+      },
+      {
+        "offset_seconds": 33.825516,
+        "onset_seconds": 33.400002
+      },
+      {
+        "offset_seconds": 34.66,
+        "onset_seconds": 34.130001
+      },
+      {
+        "offset_seconds": 35.112282,
+        "onset_seconds": 34.77
+      },
+      {
+        "offset_seconds": 35.886124,
+        "onset_seconds": 35.349998
+      },
+      {
+        "offset_seconds": 36.33247,
+        "onset_seconds": 35.990002
+      },
+      {
+        "offset_seconds": 37.045345,
+        "onset_seconds": 36.509998
+      },
+      {
+        "offset_seconds": 37.548599,
+        "onset_seconds": 37.119999
+      },
+      {
+        "offset_seconds": 38.218529,
+        "onset_seconds": 37.75
+      },
+      {
+        "offset_seconds": 38.892757,
+        "onset_seconds": 38.43
+      },
+      {
+        "offset_seconds": 39.66626,
+        "onset_seconds": 39.119999
+      },
+      {
+        "offset_seconds": 40.105465,
+        "onset_seconds": 39.73
+      },
+      {
+        "offset_seconds": 40.823654,
+        "onset_seconds": 40.279999
+      },
+      {
+        "offset_seconds": 41.403038,
+        "onset_seconds": 40.950001
+      },
+      {
+        "offset_seconds": 42.654297,
+        "onset_seconds": 41.630001
+      },
+      {
+        "offset_seconds": 43.555149,
+        "onset_seconds": 42.919998
+      },
+      {
+        "offset_seconds": 44.205173,
+        "onset_seconds": 43.599998
+      },
+      {
+        "offset_seconds": 44.926197,
+        "onset_seconds": 44.43
+      },
+      {
+        "offset_seconds": 45.363647,
+        "onset_seconds": 44.950001
+      },
+      {
+        "offset_seconds": 46.125797,
+        "onset_seconds": 45.509998
+      },
+      {
+        "offset_seconds": 46.653976,
+        "onset_seconds": 46.189999
+      },
+      {
+        "offset_seconds": 47.403309,
+        "onset_seconds": 46.849998
+      },
+      {
+        "offset_seconds": 47.837017,
+        "onset_seconds": 47.470001
+      },
+      {
+        "offset_seconds": 48.63567,
+        "onset_seconds": 47.970001
+      },
+      {
+        "offset_seconds": 49.127666,
+        "onset_seconds": 48.669998
+      },
+      {
+        "offset_seconds": 49.914963,
+        "onset_seconds": 49.310001
+      },
+      {
+        "offset_seconds": 50.370907,
+        "onset_seconds": 50.0
+      },
+      {
+        "offset_seconds": 51.535969,
+        "onset_seconds": 50.540001
+      },
+      {
+        "offset_seconds": 52.357353,
+        "onset_seconds": 51.779999
+      },
+      {
+        "offset_seconds": 52.835861,
+        "onset_seconds": 52.450001
+      },
+      {
+        "offset_seconds": 53.790817,
+        "onset_seconds": 53.009998
+      },
+      {
+        "offset_seconds": 54.616741,
+        "onset_seconds": 53.919998
+      },
+      {
+        "offset_seconds": 55.40564,
+        "onset_seconds": 54.860001
+      },
+      {
+        "offset_seconds": 55.907635,
+        "onset_seconds": 55.439999
+      },
+      {
+        "offset_seconds": 56.705894,
+        "onset_seconds": 56.119999
+      },
+      {
+        "offset_seconds": 57.175793,
+        "onset_seconds": 56.759998
+      },
+      {
+        "offset_seconds": 57.979942,
+        "onset_seconds": 57.360001
+      },
+      {
+        "offset_seconds": 58.535862,
+        "onset_seconds": 58.07
+      },
+      {
+        "offset_seconds": 59.249287,
+        "onset_seconds": 58.73
+      },
+      {
+        "offset_seconds": 59.748272,
+        "onset_seconds": 59.389999
+      },
+      {
+        "offset_seconds": 60.503345,
+        "onset_seconds": 60.0
+      },
+      {
+        "offset_seconds": 61.032413,
+        "onset_seconds": 60.630001
+      },
+      {
+        "offset_seconds": 61.752785,
+        "onset_seconds": 61.18
+      },
+      {
+        "offset_seconds": 62.295391,
+        "onset_seconds": 61.869999
+      },
+      {
+        "offset_seconds": 63.66851,
+        "onset_seconds": 62.459999
+      },
+      {
+        "offset_seconds": 64.528671,
+        "onset_seconds": 63.869999
+      },
+      {
+        "offset_seconds": 65.025925,
+        "onset_seconds": 64.540001
+      },
+      {
+        "offset_seconds": 65.905228,
+        "onset_seconds": 65.190002
+      },
+      {
+        "offset_seconds": 66.670403,
+        "onset_seconds": 66.0
+      },
+      {
+        "offset_seconds": 67.612946,
+        "onset_seconds": 66.93
+      },
+      {
+        "offset_seconds": 68.187683,
+        "onset_seconds": 67.68
+      },
+      {
+        "offset_seconds": 69.005684,
+        "onset_seconds": 68.349998
+      },
+      {
+        "offset_seconds": 69.472801,
+        "onset_seconds": 69.040001
+      },
+      {
+        "offset_seconds": 70.225479,
+        "onset_seconds": 69.669998
+      },
+      {
+        "offset_seconds": 70.679604,
+        "onset_seconds": 70.309998
+      },
+      {
+        "offset_seconds": 71.43763,
+        "onset_seconds": 70.879997
+      },
+      {
+        "offset_seconds": 71.934296,
+        "onset_seconds": 71.529999
+      },
+      {
+        "offset_seconds": 72.69751,
+        "onset_seconds": 72.059998
+      },
+      {
+        "offset_seconds": 73.151184,
+        "onset_seconds": 72.769997
+      },
+      {
+        "offset_seconds": 73.955765,
+        "onset_seconds": 73.349998
+      },
+      {
+        "offset_seconds": 74.471336,
+        "onset_seconds": 74.080002
+      },
+      {
+        "offset_seconds": 75.846741,
+        "onset_seconds": 74.68
+      },
+      {
+        "offset_seconds": 76.607224,
+        "onset_seconds": 76.099998
+      },
+      {
+        "offset_seconds": 77.06723,
+        "onset_seconds": 76.650002
+      },
+      {
+        "offset_seconds": 77.827843,
+        "onset_seconds": 77.279999
+      },
+      {
+        "offset_seconds": 78.279457,
+        "onset_seconds": 77.919998
+      },
+      {
+        "offset_seconds": 79.037422,
+        "onset_seconds": 78.470001
+      },
+      {
+        "offset_seconds": 79.570305,
+        "onset_seconds": 79.18
+      },
+      {
+        "offset_seconds": 80.218102,
+        "onset_seconds": 79.760002
+      },
+      {
+        "offset_seconds": 80.798424,
+        "onset_seconds": 80.410004
+      },
+      {
+        "offset_seconds": 81.606644,
+        "onset_seconds": 81.010002
+      },
+      {
+        "offset_seconds": 82.076561,
+        "onset_seconds": 81.709999
+      },
+      {
+        "offset_seconds": 82.786148,
+        "onset_seconds": 82.269997
+      },
+      {
+        "offset_seconds": 83.355309,
+        "onset_seconds": 82.910004
+      },
+      {
+        "offset_seconds": 84.231934,
+        "onset_seconds": 83.580002
+      },
+      {
+        "offset_seconds": 84.886375,
+        "onset_seconds": 84.330002
+      },
+      {
+        "offset_seconds": 85.677422,
+        "onset_seconds": 85.099998
+      },
+      {
+        "offset_seconds": 86.154274,
+        "onset_seconds": 85.730003
+      },
+      {
+        "offset_seconds": 86.997665,
+        "onset_seconds": 86.330002
+      },
+      {
+        "offset_seconds": 87.536064,
+        "onset_seconds": 87.07
+      },
+      {
+        "offset_seconds": 88.335098,
+        "onset_seconds": 87.839996
+      },
+      {
+        "offset_seconds": 88.809258,
+        "onset_seconds": 88.459999
+      },
+      {
+        "offset_seconds": 89.574409,
+        "onset_seconds": 88.970001
+      },
+      {
+        "offset_seconds": 90.065018,
+        "onset_seconds": 89.660004
+      },
+      {
+        "offset_seconds": 90.802155,
+        "onset_seconds": 90.239998
+      },
+      {
+        "offset_seconds": 91.312851,
+        "onset_seconds": 90.919998
+      },
+      {
+        "offset_seconds": 92.124176,
+        "onset_seconds": 91.489998
+      },
+      {
+        "offset_seconds": 92.61293,
+        "onset_seconds": 92.220001
+      },
+      {
+        "offset_seconds": 93.351357,
+        "onset_seconds": 92.809998
+      },
+      {
+        "offset_seconds": 93.93766,
+        "onset_seconds": 93.470001
+      },
+      {
+        "offset_seconds": 94.769997,
+        "onset_seconds": 94.129997
+      },
+      {
+        "offset_seconds": 95.246506,
+        "onset_seconds": 94.879997
+      },
+      {
+        "offset_seconds": 96.165504,
+        "onset_seconds": 95.449997
+      },
+      {
+        "offset_seconds": 96.786705,
+        "onset_seconds": 96.199997
+      },
+      {
+        "offset_seconds": 97.731102,
+        "onset_seconds": 96.989998
+      },
+      {
+        "offset_seconds": 98.275604,
+        "onset_seconds": 97.75
+      },
+      {
+        "offset_seconds": 99.036804,
+        "onset_seconds": 98.489998
+      },
+      {
+        "offset_seconds": 99.552094,
+        "onset_seconds": 99.190002
+      },
+      {
+        "offset_seconds": 100.891907,
+        "onset_seconds": 99.75
+      },
+      {
+        "offset_seconds": 102.374184,
+        "onset_seconds": 101.050003
+      },
+      {
+        "offset_seconds": 103.617126,
+        "onset_seconds": 102.589996
+      },
+      {
+        "offset_seconds": 104.466156,
+        "onset_seconds": 103.860001
+      },
+      {
+        "offset_seconds": 105.11956,
+        "onset_seconds": 104.650002
+      },
+      {
+        "offset_seconds": 105.941963,
+        "onset_seconds": 105.300003
+      },
+      {
+        "offset_seconds": 106.61644,
+        "onset_seconds": 106.019997
+      },
+      {
+        "offset_seconds": 107.854851,
+        "onset_seconds": 106.849998
+      },
+      {
+        "offset_seconds": 109.200752,
+        "onset_seconds": 108.059998
+      },
+      {
+        "offset_seconds": 110.465767,
+        "onset_seconds": 109.459999
+      },
+      {
+        "offset_seconds": 111.997467,
+        "onset_seconds": 110.739998
+      },
+      {
+        "offset_seconds": 113.223808,
+        "onset_seconds": 112.230003
+      },
+      {
+        "offset_seconds": 114.446022,
+        "onset_seconds": 113.480003
+      },
+      {
+        "offset_seconds": 115.372375,
+        "onset_seconds": 114.699997
+      },
+      {
+        "offset_seconds": 115.915733,
+        "onset_seconds": 115.440002
+      },
+      {
+        "offset_seconds": 117.141609,
+        "onset_seconds": 116.120003
+      },
+      {
+        "offset_seconds": 117.985298,
+        "onset_seconds": 117.290001
+      },
+      {
+        "offset_seconds": 118.715576,
+        "onset_seconds": 118.18
+      },
+      {
+        "offset_seconds": 128.073349,
+        "onset_seconds": 118.760002
+      }
+    ],
+    "status": "native_trajectory",
+    "types": [
+      "sustain"
+    ]
+  },
+  "schema": "piano-model-native-1",
+  "variant": "kong-piano",
+  "version": 1
+}

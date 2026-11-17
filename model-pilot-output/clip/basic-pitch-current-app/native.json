@@ -1,0 +1,310 @@
+{
+  "dropped_outside_interval": 0,
+  "events": [
+    {
+      "amplitude": 0.605,
+      "id": "bp-1",
+      "offset_seconds": 1.1494,
+      "onset_seconds": 0.9172,
+      "pitch": 69
+    },
+    {
+      "amplitude": 0.5716,
+      "id": "bp-2",
+      "offset_seconds": 1.7995,
+      "onset_seconds": 1.161,
+      "pitch": 73
+    },
+    {
+      "amplitude": 0.6389,
+      "id": "bp-3",
+      "offset_seconds": 1.8227,
+      "onset_seconds": 1.428,
+      "pitch": 81
+    },
+    {
+      "amplitude": 0.5559,
+      "id": "bp-4",
+      "offset_seconds": 1.8924,
+      "onset_seconds": 1.4396,
+      "pitch": 54
+    },
+    {
+      "amplitude": 0.6552,
+      "id": "bp-5",
+      "offset_seconds": 2.184,
+      "onset_seconds": 1.8576,
+      "pitch": 80
+    },
+    {
+      "amplitude": 0.61,
+      "id": "bp-6",
+      "offset_seconds": 2.1956,
+      "onset_seconds": 1.8692,
+      "pitch": 61
+    },
+    {
+      "amplitude": 0.6353,
+      "id": "bp-7",
+      "offset_seconds": 2.5439,
+      "onset_seconds": 2.184,
+      "pitch": 81
+    },
+    {
+      "amplitude": 0.6488,
+      "id": "bp-8",
+      "offset_seconds": 2.9386,
+      "onset_seconds": 2.5439,
+      "pitch": 80
+    },
+    {
+      "amplitude": 0.5562,
+      "id": "bp-9",
+      "offset_seconds": 4.4492,
+      "onset_seconds": 2.927,
+      "pitch": 50
+    },
+    {
+      "amplitude": 0.5307,
+      "id": "bp-10",
+      "offset_seconds": 3.879,
+      "onset_seconds": 2.9386,
+      "pitch": 81
+    },
+    {
+      "amplitude": 0.4643,
+      "id": "bp-11",
+      "offset_seconds": 4.9601,
+      "onset_seconds": 3.3682,
+      "pitch": 76
+    },
+    {
+      "amplitude": 0.4965,
+      "id": "bp-12",
+      "offset_seconds": 8.3411,
+      "onset_seconds": 3.3798,
+      "pitch": 57
+    },
+    {
+      "amplitude": 0.5356,
+      "id": "bp-13",
+      "offset_seconds": 8.2018,
+      "onset_seconds": 3.879,
+      "pitch": 64
+    },
+    {
+      "amplitude": 0.4878,
+      "id": "bp-14",
+      "offset_seconds": 4.3447,
+      "onset_seconds": 3.879,
+      "pitch": 81
+    },
+    {
+      "amplitude": 0.5105,
+      "id": "bp-15",
+      "offset_seconds": 5.5637,
+      "onset_seconds": 4.484,
+      "pitch": 50
+    },
+    {
+      "amplitude": 0.5063,
+      "id": "bp-16",
+      "offset_seconds": 5.1458,
+      "onset_seconds": 4.484,
+      "pitch": 74
+    },
+    {
+      "amplitude": 0.3645,
+      "id": "bp-17",
+      "offset_seconds": 4.751,
+      "onset_seconds": 4.5072,
+      "pitch": 66
+    },
+    {
+      "amplitude": 0.5837,
+      "id": "bp-18",
+      "offset_seconds": 8.91,
+      "onset_seconds": 8.4456,
+      "pitch": 69
+    },
+    {
+      "amplitude": 0.6494,
+      "id": "bp-19",
+      "offset_seconds": 9.2583,
+      "onset_seconds": 8.6778,
+      "pitch": 73
+    },
+    {
+      "amplitude": 0.4419,
+      "id": "bp-20",
+      "offset_seconds": 9.9678,
+      "onset_seconds": 8.8868,
+      "pitch": 54
+    },
+    {
+      "amplitude": 0.431,
+      "id": "bp-21",
+      "offset_seconds": 9.2351,
+      "onset_seconds": 8.91,
+      "pitch": 69
+    },
+    {
+      "amplitude": 0.6195,
+      "id": "bp-22",
+      "offset_seconds": 9.2467,
+      "onset_seconds": 8.91,
+      "pitch": 81
+    },
+    {
+      "amplitude": 0.475,
+      "id": "bp-23",
+      "offset_seconds": 10.0374,
+      "onset_seconds": 9.2815,
+      "pitch": 61
+    },
+    {
+      "amplitude": 0.6031,
+      "id": "bp-24",
+      "offset_seconds": 9.6066,
+      "onset_seconds": 9.2815,
+      "pitch": 80
+    },
+    {
+      "amplitude": 0.6134,
+      "id": "bp-25",
+      "offset_seconds": 9.9562,
+      "onset_seconds": 9.6066,
+      "pitch": 81
+    },
+    {
+      "amplitude": 0.5366,
+      "id": "bp-26",
+      "offset_seconds": 10.3974,
+      "onset_seconds": 9.6182,
+      "pitch": 68
+    },
+    {
+      "amplitude": 0.4811,
+      "id": "bp-27",
+      "offset_seconds": 10.3858,
+      "onset_seconds": 9.9678,
+      "pitch": 54
+    },
+    {
+      "amplitude": 0.6007,
+      "id": "bp-28",
+      "offset_seconds": 10.3974,
+      "onset_seconds": 9.9678,
+      "pitch": 80
+    },
+    {
+      "amplitude": 0.5752,
+      "id": "bp-29",
+      "offset_seconds": 15.4966,
+      "onset_seconds": 10.3973,
+      "pitch": 50
+    },
+    {
+      "amplitude": 0.5286,
+      "id": "bp-30",
+      "offset_seconds": 10.8965,
+      "onset_seconds": 10.3973,
+      "pitch": 81
+    },
+    {
+      "amplitude": 0.418,
+      "id": "bp-31",
+      "offset_seconds": 12.5233,
+      "onset_seconds": 10.885,
+      "pitch": 76
+    },
+    {
+      "amplitude": 0.4912,
+      "id": "bp-32",
+      "offset_seconds": 15.4967,
+      "onset_seconds": 10.8966,
+      "pitch": 57
+    },
+    {
+      "amplitude": 0.4721,
+      "id": "bp-33",
+      "offset_seconds": 12.2447,
+      "onset_seconds": 11.4655,
+      "pitch": 81
+    },
+    {
+      "amplitude": 0.5389,
+      "id": "bp-34",
+      "offset_seconds": 15.4967,
+      "onset_seconds": 11.4887,
+      "pitch": 64
+    },
+    {
+      "amplitude": 0.5084,
+      "id": "bp-35",
+      "offset_seconds": 12.5581,
+      "onset_seconds": 12.2098,
+      "pitch": 74
+    },
+    {
+      "amplitude": 0.4699,
+      "id": "bp-36",
+      "offset_seconds": 12.4304,
+      "onset_seconds": 12.233,
+      "pitch": 66
+    }
+  ],
+  "family": "basic-pitch",
+  "field_semantics": {
+    "fields": {
+      "audible_end": {
+        "note": "no independently annotated audible ending exists",
+        "source": null,
+        "status": "not_estimated"
+      },
+      "key_release": {
+        "note": "a predicted offset is not a physical key release",
+        "source": null,
+        "status": "not_estimated"
+      },
+      "pedal": {
+        "source": null,
+        "status": "none",
+        "types": []
+      },
+      "pitch_onset": {
+        "source": "native",
+        "status": "measured"
+      },
+      "predicted_offset": {
+        "convention": "basic-pitch-piano-peaks-v1/offset",
+        "source": "native",
+        "status": "native_sidecar"
+      },
+      "velocity_midi": {
+        "note": "amplitude is a proxy, never calibrated strike velocity",
+        "source": "native",
+        "status": "amplitude_proxy",
+        "units": null
+      },
+      "written_duration": {
+        "source": null,
+        "status": "not_estimated"
+      }
+    },
+    "schema": "piano-model-field-semantics-1",
+    "variant": "basic-pitch-current-app",
+    "version": 1
+  },
+  "note_count": 36,
+  "offset_beyond_interval": 0,
+  "offset_convention": "basic-pitch-piano-peaks-v1/offset",
+  "pedal": {
+    "spans": [],
+    "status": "not_estimated",
+    "types": []
+  },
+  "schema": "piano-model-native-1",
+  "variant": "basic-pitch-current-app",
+  "version": 1
+}

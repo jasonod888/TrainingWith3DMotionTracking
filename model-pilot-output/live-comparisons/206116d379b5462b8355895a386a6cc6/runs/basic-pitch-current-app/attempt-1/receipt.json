@@ -1,0 +1,66 @@
+{
+  "adapter_version": "piano-model-adapters-1",
+  "correction_enabled": false,
+  "correction_operations": 0,
+  "created_at": "2026-11-13T08:09:56Z",
+  "expression_correction_enabled": false,
+  "family": "basic-pitch",
+  "identity": {
+    "adapter_sha256": "9155cbf762abf3d92bd0c25cc2952f574bcbb80bbc8489f489bf567859b78bb4",
+    "checkpoint_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec",
+    "decoder_profile": "basic-pitch-0.4.0/piano-peaks-v1",
+    "decoder_profile_sha256": "24095f356458c4a426fe16af3c360378478d544f32cf5ee92ca4b2024d477a59",
+    "environment": {
+      "backend": "onnx",
+      "device": "cpu",
+      "isolation": "separate from the API environment",
+      "runtime": ".venv-music"
+    },
+    "weights_sha256": "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec"
+  },
+  "mode": "raw-model-comparison-v1",
+  "outputs": {
+    "counts": {
+      "dropped_outside_interval": 0,
+      "notes": 1338,
+      "offset_beyond_interval": 0,
+      "pedal_spans": 0
+    },
+    "document": "document.json",
+    "document_sha256": "915edfbe42d08021428095372571354cdde5c9ac3adf1b99b5e00dd9890fcacf",
+    "native": "native.json",
+    "native_sha256": "a4cd256c923d71be12b2450bc5b2e3bdda298b1170a9ea2aaa578b531b6112f9",
+    "semantics": "semantics.json"
+  },
+  "runtime": {
+    "backend": "onnx",
+    "device": "cpu",
+    "model_output_sha256": "8e04f095ef1278a6a3bbd0c04287d14b4bd8d7c02ed32e5dabe29520b372ca85",
+    "seconds": 3.692
+  },
+  "schema": "piano-model-run-receipt-1",
+  "source": {
+    "conversion": {
+      "interval": [
+        0.0,
+        209.6
+      ],
+      "rules": [
+        "trim",
+        "downmix-to-mono",
+        "resample-poly:48000->22050"
+      ],
+      "source_sha256": "ef289987e0d1c11cc5e3551270af523f952cbd1832a9c94dba162073688a094a"
+    },
+    "interval": [
+      0.0,
+      209.6
+    ],
+    "master_sha256": "ef289987e0d1c11cc5e3551270af523f952cbd1832a9c94dba162073688a094a",
+    "prepared_sha256": "26e06fb7a61ee08265a006dfe8a450b6e4ff1f4ecf12e932d453c27c804abc4b"
+  },
+  "status": "ready",
+  "variant": "basic-pitch-current-app",
+  "version": 1,
+  "warnings": []
+}

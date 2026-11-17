@@ -1,0 +1,41 @@
+{
+  "fields": {
+    "audible_end": {
+      "note": "no independently annotated audible ending exists",
+      "source": null,
+      "status": "not_estimated"
+    },
+    "key_release": {
+      "note": "a predicted offset is not a physical key release",
+      "source": null,
+      "status": "not_estimated"
+    },
+    "pedal": {
+      "source": null,
+      "status": "none",
+      "types": []
+    },
+    "pitch_onset": {
+      "source": "native",
+      "status": "measured"
+    },
+    "predicted_offset": {
+      "convention": "basic-pitch-piano-peaks-v1/offset",
+      "source": "native",
+      "status": "native_sidecar"
+    },
+    "velocity_midi": {
+      "note": "amplitude is a proxy, never calibrated strike velocity",
+      "source": "native",
+      "status": "amplitude_proxy",
+      "units": null
+    },
+    "written_duration": {
+      "source": null,
+      "status": "not_estimated"
+    }
+  },
+  "schema": "piano-model-field-semantics-1",
+  "variant": "basic-pitch-current-app",
+  "version": 1
+}

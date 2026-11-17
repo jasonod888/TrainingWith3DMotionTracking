@@ -1,0 +1,771 @@
+{
+  "notes": [
+    {
+      "audible_end": null,
+      "id": "kong-1",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.842867,
+      "pitch_midi": 49,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 39,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-2",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.274099,
+      "pitch_midi": 49,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 45,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-3",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.915382,
+      "pitch_midi": 50,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 46,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-4",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 10.389347,
+      "pitch_midi": 50,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 48,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-5",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.434907,
+      "pitch_midi": 54,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 34,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-6",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.544378,
+      "pitch_midi": 54,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 43,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-7",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 8.895865,
+      "pitch_midi": 54,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 43,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-8",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.967591,
+      "pitch_midi": 54,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 47,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-9",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 3.388756,
+      "pitch_midi": 57,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 41,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-10",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 10.917791,
+      "pitch_midi": 57,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 38,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-11",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.839728,
+      "pitch_midi": 61,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 42,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-12",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.270557,
+      "pitch_midi": 61,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 49,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-13",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 3.873444,
+      "pitch_midi": 64,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 38,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-14",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 11.481678,
+      "pitch_midi": 64,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 38,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-15",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 4.502984,
+      "pitch_midi": 66,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 27,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-16",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 12.240112,
+      "pitch_midi": 66,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 28,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-17",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.207142,
+      "pitch_midi": 68,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 50,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-18",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.625187,
+      "pitch_midi": 68,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 58,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-19",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 0.91183,
+      "pitch_midi": 69,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 37,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-20",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 8.440622,
+      "pitch_midi": 69,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 50,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-21",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.153033,
+      "pitch_midi": 73,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 62,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-22",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 8.668668,
+      "pitch_midi": 73,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 76,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-23",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 4.487597,
+      "pitch_midi": 74,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 50,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-24",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 12.210653,
+      "pitch_midi": 74,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 45,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-25",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 3.363167,
+      "pitch_midi": 76,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 67,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-26",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 10.890394,
+      "pitch_midi": 76,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 66,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-27",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.846052,
+      "pitch_midi": 80,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 85,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-28",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.536663,
+      "pitch_midi": 80,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 88,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-29",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.274064,
+      "pitch_midi": 80,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 88,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-30",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.963397,
+      "pitch_midi": 80,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 85,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-31",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 1.433451,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 68,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-32",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.192984,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 84,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-33",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 2.935165,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 76,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-34",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 3.872533,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 59,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-35",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 8.902729,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 76,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-36",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 9.604487,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 85,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-37",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 10.396408,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 76,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    },
+    {
+      "audible_end": null,
+      "id": "kong-38",
+      "key_release_seconds": null,
+      "legacy": null,
+      "onset_seconds": 11.464741,
+      "pitch_midi": 81,
+      "release_provenance": null,
+      "render_intensity": null,
+      "tags": [],
+      "velocity_midi": 62,
+      "velocity_provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "written": null
+    }
+  ],
+  "pedal": [
+    {
+      "confidence": null,
+      "id": "pedal-0-on",
+      "onset_seconds": 1.350000023841858,
+      "provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "type": "sustain",
+      "value": 1.0
+    },
+    {
+      "confidence": null,
+      "id": "pedal-0-off",
+      "onset_seconds": 2.9365034103393555,
+      "provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "type": "sustain",
+      "value": 0.0
+    },
+    {
+      "confidence": null,
+      "id": "pedal-1-on",
+      "onset_seconds": 3.109999895095825,
+      "provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "type": "sustain",
+      "value": 1.0
+    },
+    {
+      "confidence": null,
+      "id": "pedal-1-off",
+      "onset_seconds": 8.908077239990234,
+      "provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "type": "sustain",
+      "value": 0.0
+    },
+    {
+      "confidence": null,
+      "id": "pedal-2-on",
+      "onset_seconds": 9.0600004196167,
+      "provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "type": "sustain",
+      "value": 1.0
+    },
+    {
+      "confidence": null,
+      "id": "pedal-2-off",
+      "onset_seconds": 10.393004417419434,
+      "provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "type": "sustain",
+      "value": 0.0
+    },
+    {
+      "confidence": null,
+      "id": "pedal-3-on",
+      "onset_seconds": 10.569999694824219,
+      "provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "type": "sustain",
+      "value": 1.0
+    },
+    {
+      "confidence": null,
+      "id": "pedal-3-off",
+      "onset_seconds": 15.58782958984375,
+      "provenance": {
+        "kind": "model_estimated",
+        "model": "kong"
+      },
+      "type": "sustain",
+      "value": 0.0
+    }
+  ],
+  "performance_id": "kong-piano-ca9591bd8ccb",
+  "provenance": {
+    "baseline_id": null,
+    "changes": [],
+    "decoder": null,
+    "model": null,
+    "notes": [],
+    "origin": "model",
+    "policy": null
+  },
+  "schema": "piano-performance-1",
+  "schema_version": 1,
+  "semantics_version": "piano-performance-semantics-1",
+  "sound_model": {
+    "asset_sha256": null,
+    "channels": 2,
+    "profile": {},
+    "renderer": null,
+    "version": null
+  },
+  "source": {
+    "channels": 1,
+    "duration_seconds": 15.6160625,
+    "path_hint": "D:\\3d_trainer\\developement\\model-pilot-output\\browser\\comparisons\\a660e9d2dbf04375b131555e0092f553\\runs\\kong-piano\\attempt-1\\prepared.wav",
+    "sample_rate": 16000,
+    "sha256": "ca9591bd8ccb75e86bf7e3df005cec3b58033bab808b4f51bdb6385709172423"
+  },
+  "timeline": {
+    "origin": "source_start",
+    "sample_rate": 16000
+  }
+}
