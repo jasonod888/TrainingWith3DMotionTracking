@@ -125,6 +125,79 @@ test('Choose on keyboard changes the selected pitch only in explicit mode and Es
     'a subsequent Escape closes the note editor');
 });
 
+test('manual hand assignment, auto reset and shared waterfall colour', async () => {
+  const view = await open();
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  const occurrence = note.getAttribute('data-occurrence')!;
+  fireEvent.pointerDown(note, {clientX: 100, clientY: 100, pointerId: 40, button: 0});
+  fireEvent.pointerUp(note, {pointerId: 40});
+  await waitFor(() => assert.equal(drawer(view).getAttribute('data-mode'), 'note'));
+  assert.ok(view.container.querySelector('[data-hand-assignment="true"]'));
+  let snapshot = (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  assert.equal(snapshot.dirty, false, 'derived hand estimates do not dirty the lesson');
+  assert.equal(snapshot.document.hand_assignments, undefined);
+  fireEvent.click(view.container.querySelector('[data-hand-choice="left"]')!);
+  await waitFor(() => assert.equal(
+    view.container.querySelector('[data-hand-assignment="true"]')?.getAttribute('data-hand-current'), 'left'));
+  snapshot = (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  assert.equal(snapshot.document.hand_assignments?.[occurrence]?.manual, true);
+  assert.equal(snapshot.document.hand_assignments?.[occurrence]?.hand, 'left');
+  const block = view.container.querySelector(`.ws-waterfall-note[data-occurrence="${occurrence}"]`);
+  assert.ok(block?.classList.contains('hand-left'), 'waterfall uses the same manual hand');
+  assert.equal(block?.getAttribute('data-hand'), 'left');
+
+  fireEvent.click(view.container.querySelector('[data-hand-reset="true"]')!);
+  await waitFor(() => assert.ok(
+    view.container.querySelector('[data-hand-assignment="true"]')?.getAttribute('data-hand-current')));
+  snapshot = (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  assert.equal(snapshot.document.hand_assignments?.[occurrence], undefined,
+    'Auto removes the manual override');
+
+  fireEvent.click(view.container.querySelector('[data-hand-choice="unassigned"]')!);
+  await waitFor(() => assert.equal(
+    view.container.querySelector('[data-hand-assignment="true"]')?.getAttribute('data-hand-current'), 'unassigned'));
+  snapshot = (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  assert.equal(snapshot.document.hand_assignments?.[occurrence]?.hand, 'unassigned');
+  assert.equal(snapshot.document.hand_assignments?.[occurrence]?.manual, true,
+    'manual unknown is an explicit lock');
+  fireEvent.click(view.container.querySelector('[data-hand-reset="true"]')!);
+  await waitFor(() => assert.ok(
+    view.container.querySelector('[data-hand-assignment="true"]')?.getAttribute('data-hand-current')));
+  snapshot = (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  assert.equal(snapshot.document.hand_assignments?.[occurrence], undefined);
+
+  view.getByRole('button', {name: 'Settings'}).click();
+  await waitFor(() => assert.ok(view.container.querySelector('[data-hands-legend="true"]')));
+  assert.ok(view.container.querySelector('[data-hands-status="baseline"]'));
+  assert.ok(view.container.querySelector('[data-hands-inline-legend="true"]'));
+  assert.ok(view.container.querySelector('[data-hands-reliability="true"]'));
+});
+
+test('Note Editor Preview uses the selected occurrence velocity', async () => {
+  const view = await open();
+  const note = view.container.querySelector('.ws-roll-note') as SVGRectElement;
+  const occurrence = note.getAttribute('data-occurrence')!;
+  fireEvent.pointerDown(note, {clientX: 100, clientY: 100, pointerId: 41, button: 0});
+  fireEvent.pointerUp(note, {pointerId: 41});
+  await waitFor(() => assert.equal(drawer(view).getAttribute('data-mode'), 'note'));
+  const snapshot = (globalThis as unknown as {__pianoWorkspaceSnapshot: () => any}).__pianoWorkspaceSnapshot();
+  const velocity = snapshot.document.performance.find((item: any) => item.id === occurrence).velocity;
+  const {NotationAudio} = await import('../src/music/notation/notation-audio.ts');
+  const calls: {seconds: number | undefined; velocity: number | null | undefined}[] = [];
+  const original = NotationAudio.prototype.play;
+  NotationAudio.prototype.play = function (_pitches: number[], seconds?: number,
+    previewVelocity?: number | null) {
+    calls.push({seconds, velocity: previewVelocity});
+  };
+  try {
+    fireEvent.click(view.getAllByRole('button', {name: 'Preview', exact: true})[0]);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].velocity, velocity);
+  } finally {
+    NotationAudio.prototype.play = original;
+  }
+});
+
 test('Review and save opens from the header, gates on confirmation and restores focus', async () => {
   const view = await open();
   const trigger = view.container.querySelector('[data-review-save]') as HTMLButtonElement;

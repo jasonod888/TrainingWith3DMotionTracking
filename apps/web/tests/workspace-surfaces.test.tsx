@@ -23,7 +23,7 @@ if (!window.matchMedia) {
 }
 Object.defineProperty(window.HTMLElement.prototype, 'clientWidth', {get() { return 600; }, configurable: true});
 
-const {render, cleanup} = await import('@testing-library/react');
+const {render, cleanup, fireEvent, waitFor} = await import('@testing-library/react');
 const {buildNotation, applyCommand, refreshNotation} = await import('../../../packages/music-notation/index.ts');
 import type {NotationDocument} from '../../../packages/music-notation/index.ts';
 const {TimeRoll} = await import('../src/music/workspace/TimeRoll.tsx');
@@ -206,13 +206,23 @@ test('R4: a written note mapping several occurrences is not silently guessed', (
   assert.deepEqual([...ambiguous[0]].sort(), ['one', 'two']);
 });
 
-test('R5: Piano is absent without a verified preview, Original stays active and Sound explains it', async () => {
+test('R5: Piano is available without a WAV and uses live synthesized grand piano notes', async () => {
   window.history.replaceState(null, '', '/?demo=arpeggio');
   const {PianoWorkspaceHarness} = await import('../src/music/workspace/PianoWorkspaceHarness.tsx');
   const view = render(<PianoWorkspaceHarness/>);
-  assert.ok(view.queryByRole('button', {name: 'Piano'}) === null,
-    'an unavailable preview must not leave a permanently disabled Piano pill');
-  assert.ok(view.getByText(/No verified piano preview/i));
-  const original = view.getByRole('button', {name: 'Original'});
-  assert.equal(original.getAttribute('aria-pressed'), 'true');
+  await waitFor(() => assert.ok(view.queryByRole('button', {name: 'Piano', exact: true})));
+  const original = view.getByRole('button', {name: 'Original', exact: true});
+  const piano = view.getByRole('button', {name: 'Piano', exact: true}) as HTMLButtonElement;
+  await waitFor(() => assert.equal(piano.disabled, false));
+  assert.equal(original.getAttribute('aria-pressed'), 'true', 'Original remains the safe default');
+  fireEvent.click(piano);
+  await waitFor(() => assert.equal(
+    view.getByRole('button', {name: 'Piano', exact: true}).getAttribute('aria-pressed'), 'true'));
+  fireEvent.click(original);
+  await waitFor(() => assert.equal(
+    view.getByRole('button', {name: 'Original', exact: true}).getAttribute('aria-pressed'), 'true'));
+  fireEvent.click(view.getByRole('button', {name: 'Sound options'}));
+  await waitFor(() => assert.ok(view.container.querySelector('[data-preview-state="live"]')));
+  assert.match(view.getByText(/live synthesized grand piano notes/i).textContent ?? '',
+    /live synthesized grand piano notes/i);
 });

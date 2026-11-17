@@ -768,7 +768,12 @@
 .ws-waterfall-note { fill: #8fbf9d; stroke: #4d7c5d; stroke-width: .8; cursor: pointer; }
 .ws-waterfall-note:hover { fill: #78af88; }
 .ws-waterfall-note.is-active { fill: #3f8c5c; stroke: #28623e; }
-.ws-waterfall-note.is-selected { fill: #2a7be0; stroke: #144a8c; stroke-width: 2; }
+.ws-waterfall-note.hand-left { fill: #7aa9dd; stroke: #466f9c; }
+.ws-waterfall-note.hand-right { fill: #d9a45f; stroke: #9b6a2d; }
+.ws-waterfall-note.hand-unassigned { fill: #9aab9f; stroke: #66766c; }
+.ws-waterfall-note.hand-left.is-active { fill: #3f7fc4; stroke: #244f82; }
+.ws-waterfall-note.hand-right.is-active { fill: #c17b28; stroke: #7f4c14; }
+.ws-waterfall-note.is-selected { stroke: #173c2a; stroke-width: 3; }
 .ws-waterfall-strike { stroke: #53645a; stroke-width: 2; }
 .ws-waterfall-empty { margin: 0; padding: 10px; font-size: 11px; color: #68766d; }
 .ws-waterfall-range-cue {
@@ -828,7 +833,10 @@
   font-weight: 650;
   line-height: 1;
 }
-.keyboard-overlay-label.is-selected { color: #fff; }
+.keyboard-overlay-label.is-selected {
+  color: #173c2a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .75);
+}
 .keyboard-overlay-label.is-middle-c::after {
   content: '';
   position: absolute;
@@ -1233,16 +1241,50 @@
 }
 .ws-shell-focused .keyboard-white.is-selected,
 .ws-shell-focused .keyboard-black.is-selected {
-  fill: #2a7be0;
-  stroke: #144a8c;
-  stroke-width: 2;
+  stroke: #173c2a;
+  stroke-width: 3;
 }
-.ws-shell-focused .keyboard-black.is-selected {
-  fill: #0b63ce;
-  stroke: #dceafb;
-}
+.ws-shell-focused .keyboard-black.is-selected { stroke: #dceafb; }
 .ws-shell-focused .keyboard-white.is-active:not(.is-selected) { fill: #cfe6d6; }
 .ws-shell-focused .keyboard-black.is-active:not(.is-selected) { fill: #3e6c4c; }
+.ws-shell-focused .keyboard-white.is-active.hand-left { fill: #a9c9ea; }
+.ws-shell-focused .keyboard-white.is-active.hand-right { fill: #efd2a2; }
+.ws-shell-focused .keyboard-white.is-active.hand-unassigned { fill: #c7d2c9; }
+.ws-shell-focused .keyboard-black.is-active.hand-left { fill: #315d8f; }
+.ws-shell-focused .keyboard-black.is-active.hand-right { fill: #8f5d20; }
+.ws-shell-focused .keyboard-black.is-active.hand-unassigned { fill: #52645a; }
+.ws-shell-focused .keyboard-white.is-active.hand-mixed,
+.ws-shell-focused .keyboard-black.is-active.hand-mixed {
+  fill: url(#keyboard-hand-mixed-pattern);
+}
+.ws-hand-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border: 1px solid #d8d5c9;
+  border-radius: 999px;
+  background: #fbfaf6;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.ws-hand-mini > span { padding: 1px 3px; border-radius: 999px; }
+.ws-hand-mini .hand-left { background: #dcebf8; color: #315d8f; }
+.ws-hand-mini .hand-right { background: #f7e7cc; color: #8f5d20; }
+.ws-hand-mini .hand-unassigned { background: #e4e9e4; color: #52645a; }
+.ws-hand-legend { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2ded2; }
+.ws-hand-legend h2 { font-size: 12px; margin: 0 0 5px; }
+.ws-hand-swatch {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 24px;
+  padding: 2px 7px; border-radius: 999px; font-size: 11px; color: #26352c;
+}
+.ws-hand-swatch::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.ws-hand-swatch.hand-left { background: #dcebf8; color: #315d8f; }
+.ws-hand-swatch.hand-right { background: #f7e7cc; color: #8f5d20; }
+.ws-hand-swatch.hand-unassigned { background: #e4e9e4; color: #52645a; }
+.ws-hand-picker { align-items: center; }
+.ws-hand-picker button[aria-pressed="true"] { outline: 2px solid #2a7be0; outline-offset: 1px; }
 .ws-note-history button { min-height: 32px; }
 .ws-shell-focused .ws-play:focus-visible,
 .ws-icon-button:focus-visible,
@@ -1305,6 +1347,49 @@
 @media (max-width: 760px) {
   .keyboard-overlay-label { font-size: 11px; }
 }
+
+@media (max-width: 560px) and (min-height: 561px) {
+  /* Portrait phones: keep Play + a real seek bar in the primary row and move
+     legend/range/secondary controls to one bounded second row. */
+  .ws-shell-focused .ws-dock {
+    height: 96px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-rows: 44px 26px;
+    grid-template-areas: "play centre" "actions actions";
+    gap: 2px 8px;
+    padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+  }
+  .ws-shell-focused .ws-play { grid-area: play; width: 44px; height: 44px; }
+  .ws-shell-focused .ws-dock-centre { grid-area: centre; min-width: 0; gap: 0; }
+  .ws-shell-focused .ws-dock-times { font-size: 11px; padding: 0 1px; }
+  .ws-shell-focused .ws-dock-actions {
+    grid-area: actions;
+    width: 100%;
+    justify-content: flex-start;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .ws-shell-focused .ws-dock-actions::-webkit-scrollbar { display: none; }
+  .ws-shell-focused .ws-hand-mini { flex: 0 0 auto; font-size: 11px; padding: 1px 3px; }
+  .ws-shell-focused .ws-piano-range { flex: 0 1 auto; min-width: 0; font-size: 11px; padding: 2px 6px; }
+  .ws-shell-focused .ws-dock-actions > .ws-icon-button { flex: 0 0 auto; width: 28px; height: 26px; }
+  .ws-drawer-scrim { inset: 56px 0 calc(96px + env(safe-area-inset-bottom)); }
+  .ws-shell-focused .ws-drawer,
+  .ws-shell-focused .ws-side.ws-drawer {
+    bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+  .ws-shell-focused .ws-side.ws-drawer[data-mode="note"] {
+    bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+  .ws-shell-focused .ws-side.ws-drawer[data-mode="note"][data-note-expanded="true"] {
+    bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+  .ws-mode-banner,
+  .ws-add-mode-panel { bottom: calc(104px + env(safe-area-inset-bottom)); }
+}
+
 
 @media (max-height: 560px) {
   .ws-stage[data-compact-view="guide"] .ws-shared-stage { display: none; }

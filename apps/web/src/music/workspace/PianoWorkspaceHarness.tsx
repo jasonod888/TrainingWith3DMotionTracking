@@ -17,7 +17,9 @@ import {
   activeOccurrenceIds, alignmentFromSpans, effectiveSecondsToTick, occurrenceIntervals,
   addAnchor, applyAnchors, scoreClock, secondsToTick, tickToEffectiveSeconds, tickToSeconds, toMusicXML, keyLabel, type AnchorPoint,
   type Alignment, type CorrectionSelection, type NotationDocument,
+  withHandAssignments, type Hand,
 } from '../../../../../packages/music-notation/index.ts';
+import {useHandAssignments} from './useHandAssignments';
 import {pitchName} from '../music-reference';
 import {buildTimelineLayout, clampScroll, heldPassageAt} from './timeline-layout';
 import {KeyboardEditor} from '../notation/KeyboardEditor';
@@ -35,7 +37,8 @@ import {
 import {
   invertFinding, prepareFinding, type AcceptedBaseline,
 } from './verification-transaction';
-import type {Asset} from '../../../../../packages/lesson-schema/index';
+import type {Asset, MusicPedalSpan} from '../../../../../packages/lesson-schema/index';
+import {resolvePerformanceAudibleTimings, shiftOnset} from '../piano-playback';
 import {ClipOverview} from './ClipOverview';
 import {ContinuousScore} from './ContinuousScore';
 import {PianoWaterfall} from './PianoWaterfall';
@@ -226,12 +229,21 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const pianoRef = useRef<HTMLAudioElement>(null);
+  const emptyPianoRef = useRef<HTMLAudioElement | null>(null);
+  const liveAudioRef = useRef<NotationAudio | null>(null);
+  const liveMutedRef = useRef<boolean | null>(null);
+  const userVideoMutedRef = useRef<boolean | null>(null);
   /** Latest render's "playback started" handler, used by the native media event. */
   const playbackStart = useRef<() => void>(() => {});
   const audioRef = useRef<NotationAudio | null>(null);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
+  const [pedalSpans, setPedalSpans] = useState<MusicPedalSpan[]>([]);
   const [previewIdentity, setPreviewIdentity] = useState('');
   const [audioMode, setAudioMode] = useState<'original' | 'piano'>('original');
+  const [preferRenderedWav, setPreferRenderedWav] = useState(false);
+  const hasWebAudio = typeof globalThis.window !== 'undefined'
+    && Boolean(globalThis.window.AudioContext
+      || (globalThis.window as typeof globalThis.window & {webkitAudioContext?: typeof AudioContext}).webkitAudioContext);
   // Bytes and SHA-256 are verified before Piano may be enabled; a pending or failed
   // asset keeps Original audio and never exposes a URL.
   const preview = usePianoPreviewAsset(previewAsset);
@@ -481,6 +493,32 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   }, []);
 
   const document = state?.document ?? null;
+  const previewStale = Boolean(previewBaseline && document && performanceChanged(previewBaseline, document));
+  const verifyingPreview = Boolean(previewAsset && !preview.url && !preview.error);
+  const verifiedPreview = Boolean(previewAsset && preview.url && !previewStale);
+  const useWavPreview = verifiedPreview && (!hasWebAudio || preferRenderedWav);
+  const livePiano = audioMode === 'piano' && !useWavPreview && !verifyingPreview;
+  const pianoDisabled = verifyingPreview || Boolean(previewAsset && !preview.url) || !document?.performance.length;
+  const pianoTitle = verifyingPreview ? 'Verifying piano audio…'
+    : previewAsset && !preview.url ? preview.error || 'The verified piano WAV is unavailable'
+    : livePiano ? 'Live Web Audio grand piano from the score and sustain pedal'
+    : useWavPreview ? 'Rendered piano preview WAV'
+    : previewStale ? 'Notes changed since the WAV preview; Piano now plays live synthesized notes from the edited score'
+    : 'Piano plays live synthesized grand piano notes from the score';
+  const livePerformanceKey = useMemo(
+    () => document ? JSON.stringify(document.performance.map(note =>
+      [note.id, note.pitch, note.onset, note.duration, note.velocity])) : '',
+    [document]);
+  const audibleTimings = useMemo(
+    () => document ? resolvePerformanceAudibleTimings(document.performance, pedalSpans) : new Map(),
+    [document, pedalSpans]);
+  const interactionPolicy = document
+    ? resolveInteractionPolicy(document.performance.length, interactiveLimitApproved())
+    : {mode: 'read-only' as const, reason: 'The score is not ready.'};
+  const readOnly = interactionPolicy.mode === 'read-only';
+  readOnlyRef.current = readOnly;
+  const hands = useHandAssignments(document, lessonId,
+    Boolean(lessonId) && !readOnly && !params.get('demo'));
   const keyboardPitches = useMemo(
     () => document ? document.performance.map(note => note.pitch) : [],
     [document],
@@ -597,6 +635,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         : demo === 'double' ? 'Fixture: two attacks on one written note'
         : 'Fixture: arpeggiated chord');
       setSpans(demoSpans);
+      setPedalSpans([]);
       setVideoUrl(null);
       setLoading(false);
       return () => { stopped = true; };
@@ -631,24 +670,142 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     };
   }, [videoUrl]);
 
-  useEffect(() => () => { audioRef.current?.dispose(); }, []);
+  useEffect(() => () => { audioRef.current?.dispose(); liveAudioRef.current?.dispose(); }, []);
 
-  // The existing source-driven controller: one clock, Piano mapped to it, never free-running.
-  const player = usePianoSourcePlayer(videoRef, pianoRef, audioMode, offsetSeconds, previewIdentity,
+  // The existing source-driven controller for a verified WAV preview. Live synthesis has
+  // its own source-clock scheduler and must not bind an empty/stale audio element.
+  const player = usePianoSourcePlayer(videoRef, livePiano ? emptyPianoRef : pianoRef,
+    livePiano ? 'original' : audioMode, offsetSeconds, previewIdentity,
     () => setNotice('Piano audio is unavailable. The original video keeps playing.'));
 
   // Audition yields to real playback and to a source-mode change.
   useEffect(() => { if (playing) audioRef.current?.stop(); }, [playing]);
-  useEffect(() => { if (!preview.url && audioMode === 'piano') setAudioMode('original'); }, [preview.url, audioMode]);
+  useEffect(() => {
+    if (previewAsset && !preview.url && audioMode === 'piano') setAudioMode('original');
+  }, [previewAsset, preview.url, audioMode]);
   // A controller failure visibly returns the source audio, never a silent Piano.
-  useEffect(() => { if (player.error && audioMode === 'piano') setAudioMode('original'); }, [player.error, audioMode]);
+  useEffect(() => {
+    if (!livePiano && player.error && audioMode === 'piano') setAudioMode('original');
+  }, [player.error, audioMode, livePiano]);
   useEffect(() => { audioRef.current?.stop(); }, [audioMode]);
 
-  const audition = useCallback((pitches: number[], seconds = 0.5) => {
+  const audition = useCallback((pitches: number[], seconds = 0.5, velocity?: number | null) => {
     if (!pitches.length) return;
     audioRef.current ??= new NotationAudio();
-    audioRef.current.play(pitches, Math.max(0.12, Math.min(2, seconds)), 0.7);
+    audioRef.current.play(pitches, Math.max(0.12, Math.min(2, seconds)), velocity ?? 0.7);
   }, []);
+
+  // Track the user's own mute choice while Original owns the video element, so a
+  // verified-preview-to-live transition cannot mistake the controller's mute for it.
+  useEffect(() => {
+    if (audioMode !== 'original' || livePiano) return;
+    const media = videoRef.current;
+    if (!media) return;
+    userVideoMutedRef.current = media.muted;
+    const update = () => { userVideoMutedRef.current = media.muted; };
+    media.addEventListener('volumechange', update);
+    return () => media.removeEventListener('volumechange', update);
+  }, [audioMode, livePiano, videoUrl]);
+
+  // Live synthesis is source-clocked. The video stays unmuted only in Original mode.
+  useEffect(() => {
+    if (!livePiano) return;
+    const media = videoRef.current;
+    if (!media) return;
+    if (liveMutedRef.current === null) {
+      liveMutedRef.current = userVideoMutedRef.current ?? media.muted;
+    }
+    media.muted = true;
+    return () => {
+      if (liveMutedRef.current !== null) media.muted = liveMutedRef.current;
+      liveMutedRef.current = null;
+    };
+  }, [livePiano, videoUrl]);
+
+  useEffect(() => {
+    if (!livePiano || !document) return;
+    const media = videoRef.current;
+    const audio = liveAudioRef.current ??= new NotationAudio();
+    const triggered = new Set<string>();
+    let frame = 0;
+    let initialPass = true;
+    const sourceTime = () => media && Number.isFinite(media.currentTime)
+      ? media.currentTime : clockRef.current.get();
+    let lastTime = sourceTime();
+    const stopVoices = () => {
+      audio.stop();
+      triggered.clear();
+      initialPass = true;
+      lastTime = sourceTime();
+    };
+    const scheduleAt = () => {
+      const now = sourceTime();
+      const windowFrom = initialPass ? now - 0.04 : Math.min(lastTime, now) - 0.04;
+      const windowTo = now + 0.12;
+      for (const note of document.performance) {
+        if (triggered.has(note.id)) continue;
+        const timing = audibleTimings.get(note.id);
+        const duration = timing?.soundingDuration ?? Math.max(0.05, note.duration ?? 0.35);
+        const start = shiftOnset(note.onset, offsetSeconds);
+        const end = start + duration;
+        if (initialPass) {
+          if (start < now - 0.04 && now < end) {
+            triggered.add(note.id);
+            audio.playScheduledNote({
+              pitch: note.pitch, velocity: note.velocity, duration: duration / rate,
+              elapsed: (now - start) / rate, windowSeconds: (end - now) / rate,
+              dampedByKey: timing?.dampedByKey ?? true,
+            });
+          } else if (start >= now - 0.04 && start <= windowTo) {
+            triggered.add(note.id);
+            audio.playScheduledNote({
+              pitch: note.pitch, velocity: note.velocity, duration: duration / rate,
+              delaySeconds: Math.max(0, (start - now) / rate),
+              dampedByKey: timing?.dampedByKey ?? true,
+            });
+          }
+        } else if (start >= windowFrom && start <= windowTo) {
+          // Even when a frame arrives just after the onset, schedule a fresh hammer
+          // strike rather than a mid-note seek.
+          triggered.add(note.id);
+          audio.playScheduledNote({
+            pitch: note.pitch, velocity: note.velocity, duration: duration / rate,
+            delaySeconds: Math.max(0, (start - now) / rate),
+            dampedByKey: timing?.dampedByKey ?? true,
+          });
+        }
+      }
+      initialPass = false;
+      lastTime = now;
+    };
+    const tick = () => {
+      if (frame) return;
+      if (!media || media.paused || media.ended || media.seeking || media.readyState < 2) {
+        stopVoices();
+        return;
+      }
+      scheduleAt();
+      frame = requestAnimationFrame(() => { frame = 0; tick(); });
+    };
+    const reset = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      stopVoices();
+    };
+    const onSeeked = () => { reset(); if (media && !media.paused && !media.ended) tick(); };
+    const onRate = () => reset();
+    const onEnded = () => reset();
+    const listeners: [string, () => void][] = [
+      ['play', tick], ['playing', tick], ['timeupdate', tick], ['seeking', reset],
+      ['seeked', onSeeked], ['pause', reset], ['ended', onEnded], ['ratechange', onRate],
+    ];
+    if (media) for (const [name, handler] of listeners) media.addEventListener(name, handler);
+    if (media && !media.paused && !media.ended) tick();
+    return () => {
+      reset();
+      if (media) for (const [name, handler] of listeners) media.removeEventListener(name, handler);
+    };
+  }, [audibleTimings, livePiano, livePerformanceKey, offsetSeconds, rate, videoUrl]);
 
   const seek = useCallback((seconds: number) => {
     const media = videoRef.current;
@@ -941,7 +1098,6 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     ? workspaceSignature !== savedSignature
     : workspaceSignature !== (serverSignature ?? '') || Boolean(state?.dirty);
   useEffect(() => { onDirty?.(dirty); }, [dirty, onDirty]);
-  const previewStale = Boolean(previewBaseline && document && performanceChanged(previewBaseline, document));
   const recoveryIdentity = useMemo<RecoveryIdentity>(
     () => ({accountId, lessonId: lessonId ?? '', draftId, sourceSha256,
       baseRevisionId: savedRevisionId}),
@@ -952,12 +1108,14 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     revisionId: string, manifest: {draft_id?: string | null; source_video?: Asset | null;
       reference?: {key: string; sha256?: string} | null;
       preview_identity?: string | null; sha256?: string;
+      pedal?: MusicPedalSpan[];
       section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
       assessment?: unknown; piano_preview?: Asset | null} | null) => {
     setBaseline(restored.document);
     setDocumentEpoch(value => value + 1);
     setState(createWorkspaceState(restored.document));
     setSpans(restored.spans);
+    setPedalSpans(manifest?.pedal ?? []);
     setOffsetSeconds(restored.offsetSeconds);
     // One authoritative editable map: the stored map is the base for later anchors.
     setMapState(restored.alignment?.passages?.length ? {
@@ -1004,6 +1162,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         .catch(() => null);
       let manifest: {revision_id: string; reference: {key: string; sha256?: string};
         source_video?: Asset | null; piano_preview?: Asset | null; preview_identity?: string | null;
+        pedal?: MusicPedalSpan[];
         draft_id?: string | null;
         section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
         assessment?: unknown} | null = null;
@@ -1072,6 +1231,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         setState(createWorkspaceState(document));
         setTitle(draft.title);
         setSpans(draftSpans);
+        setPedalSpans(draft.pedal ?? []);
         setOffsetSeconds(draft.playback?.sync_offset_seconds ?? 0);
         setDraftId(draft.draft_id);
         setSourceSha256(draft.reference?.sha256 ?? '');
@@ -1270,11 +1430,6 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     const bar = sharedBarRef.current;
     if (bar && Math.abs(bar.scrollLeft - saved) > 1) bar.scrollLeft = saved;
   }, [scoreMode]);
-
-  // A stale preview must fall back to Original rather than pretend it is current.
-  useEffect(() => {
-    if (previewStale && audioMode === 'piano') setAudioMode('original');
-  }, [previewStale, audioMode]);
 
   // The roll opens at a readable window rather than fitting the whole recording.
   useEffect(() => {
@@ -1539,7 +1694,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     setSaving(true); setSaveError(''); setSaveMessage(''); setSaveConflict(false);
     const base = baseOverride ?? savedRevisionId;
     const body = buildSaveBody({
-      title, document, spans, alignment, anchors, offsetSeconds, baseRevisionId: base,
+      title, document: withHandAssignments(document, hands.assignments), spans, alignment, anchors, offsetSeconds, baseRevisionId: base,
       draftId, referenceSha256: sourceSha256, verificationStateToken: verificationToken || null,
       sections: sectionsDraft.length ? sectionsDraft : (savedSections ?? undefined),
       assessment: assessmentPolicy === 'notes'
@@ -1588,7 +1743,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       setSaving(false);
     }
   }, [document, lessonId, confirmReviewed, saving, title, spans, alignment, anchors, offsetSeconds,
-      savedRevisionId, workspaceSignature, draftId, sourceSha256, verificationToken, savedSections, savedAssessment, onSaved]);
+      savedRevisionId, workspaceSignature, draftId, sourceSha256, verificationToken, savedSections, savedAssessment, onSaved,
+      hands.assignments]);
 
   const saveOnLatestRevision = useCallback(async () => {
     if (!lessonId) return;
@@ -1758,9 +1914,6 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const snapSeconds = snapTicks ? snapTicks * secondsPerTick : null;
   const report = state.lastReport;
   const summary = historySummary(state);
-  const interactionPolicy = resolveInteractionPolicy(document.performance.length, interactiveLimitApproved());
-  const readOnly = interactionPolicy.mode === 'read-only';
-  readOnlyRef.current = readOnly;
   const downloadReference = () => {
     const exported = buildWorkspaceExport({
       document, title, occurrenceCount: document.performance.length, editingMode: interactionPolicy.mode,
@@ -1933,7 +2086,9 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         <div className="ws-waterfall-slot" id="piano-waterfall-slot" data-waterfall-slot="true"
           data-stage-slot="waterfall">
           <PianoWaterfall document={document} clock={clockRef.current} intervals={intervals}
-            range={keyboardRange} selectedOccurrenceId={selection?.occurrenceId ?? null}
+            range={keyboardRange}
+            selectedOccurrenceId={selection?.occurrenceId ?? null}
+            hands={hands.assignments}
             onSelect={select}/>
         </div>
         <section className="ws-keyboard-surface" id="piano-keyboard" aria-label="Keyboard">
@@ -1942,7 +2097,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             <LiveKeyboard document={document} clock={clockRef.current} intervals={intervals}
               selectedPitch={selected?.pitch ?? null}
               range={keyboardRange ?? undefined} onRangeChange={handleKeyboardRangeChange}
-              onKey={pitch => audition([pitch], 0.4)}
+              onKey={(pitch, _auditionOnly, velocity) => audition([pitch], 0.4, velocity)}
               onSelectKey={pitch => {
                 if (pitchPickMode) {
                   dispatch({type: 'command', command: {type: 'set-occurrence-pitch',
@@ -1956,7 +2111,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
                 selectKey(pitch);
               }}
               width={keyboardWidth > 0 ? keyboardWidth : tinyKeyboard ? 480 : compactKeyboard ? 640 : 1040}
-              height={tinyKeyboard ? 105 : compactKeyboard ? 100 : 150}/>
+              height={tinyKeyboard ? 105 : compactKeyboard ? 100 : 150}
+              hands={hands.assignments}/>
           </div>
           {replaceMode && <div className="ws-replace-banner ws-mode-banner" data-replace="active">
             Replacing {pitchName(replaceMode.pitch)} — click a key to commit. Every key and octave control is available.
@@ -2071,6 +2227,12 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           </div>
         </div>
         <div className="ws-dock-actions">
+          <span className="ws-hand-mini" data-hands-inline-legend="true" role="img"
+            aria-label="Hand colour legend: blue left, amber right, grey-green unknown">
+            <span className="hand-left" title="Left hand">Left</span>
+            <span className="hand-right" title="Right hand">Right</span>
+            <span className="hand-unassigned" title="Unassigned/unknown hand">?</span>
+          </span>
           {keyboardRange && <span className="ws-piano-range" data-piano-range="true"
             data-first-pitch={keyboardRange.firstPitch}
             data-last-pitch={keyboardRange.firstPitch + keyboardRange.semitones}
@@ -2111,12 +2273,11 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             <button type="button" aria-pressed={audioMode === 'original'}
               className={audioMode === 'original' ? 'is-active' : ''}
               onClick={() => setAudioMode('original')}>Original</button>
-            {previewAsset && <button type="button" aria-pressed={audioMode === 'piano'}
+            <button type="button" aria-pressed={audioMode === 'piano'}
               className={audioMode === 'piano' ? 'is-active' : ''}
-              disabled={!preview.url || previewStale}
-              title={previewStale ? 'The preview is stale: the notes changed since it was rendered'
-                : preview.url ? 'Verified, mapped piano preview' : preview.error || 'Piano audio is not verified for this draft'}
-              onClick={() => setAudioMode('piano')}>Piano</button>}
+              disabled={pianoDisabled}
+              title={pianoTitle}
+              onClick={() => setAudioMode('piano')}>Piano</button>
           </div>
           <button type="button" className="ws-icon-button" onClick={() => openDrawer('video')}
             aria-label="Video" title="Video"><Video size={19}/></button>
@@ -2166,6 +2327,30 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             </label>
           </div>
           <p className="ws-hint" data-space-hint="true">Press Space to play or pause when the workspace has focus. Typing, sliders, buttons and piano keys keep their normal Space behavior.</p>
+          <section className="ws-hand-legend" data-hands-legend="true" aria-label="Hand estimate legend">
+            <h2>Hands</h2>
+            <div className="ws-row">
+              <span className="ws-hand-swatch hand-left">Left</span>
+              <span className="ws-hand-swatch hand-right">Right</span>
+              <span className="ws-hand-swatch hand-unassigned">Unknown</span>
+            </div>
+            <p className="ws-hint" data-hands-status={hands.status}>
+              {hands.status === 'loading' ? 'Checking the piano-hand model…'
+                : hands.status === 'model' ? 'Model estimate applied; manual choices stay locked.'
+                : hands.status === 'too-many' ? 'Musical baseline only: this lesson exceeds the bounded model limit.'
+                : hands.status === 'unavailable' ? 'Musical baseline only: the model is unavailable.'
+                : 'Musical baseline estimate. Manual choices stay locked.'}
+            </p>
+            {hands.modelInfo && <p className="ws-hint" data-hands-model-identity="true">
+              midi2hands · {hands.modelInfo.version.slice(0, 12)} · {hands.modelInfo.sha256.slice(0, 12)}…
+            </p>}
+            <p className="ws-hint" data-hands-reliability="true">
+              Automatic labels are uncalibrated estimates, not verified pianist truth. Use Left/Right/Unknown in the note editor to lock an override; Auto returns to these estimates.
+            </p>
+            <button type="button" data-hands-refresh="true" disabled={readOnly || hands.status === 'loading'}
+              onClick={hands.refresh}>Refresh hand estimates</button>
+            <p className="ws-hint">Colours are estimates, not verified truth. Blue is left, amber is right, grey-green is unknown; striped means both hands at the same pitch.</p>
+          </section>
           {narrowViewport && <div className="ws-row" data-mobile-actions="true">
             <button type="button" onClick={() => dispatch({type: 'undo'})}
               disabled={readOnly || !state.past.length || Boolean(replaceMode) || Boolean(addMode)}>Undo</button>
@@ -2242,13 +2427,21 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             <button type="button" aria-pressed={audioMode === 'original'}
               className={audioMode === 'original' ? 'is-active' : ''}
               onClick={() => setAudioMode('original')}>Original</button>
-            {previewAsset && <button type="button" aria-pressed={audioMode === 'piano'}
+            <button type="button" aria-pressed={audioMode === 'piano'}
               className={audioMode === 'piano' ? 'is-active' : ''}
-              disabled={!preview.url || previewStale}
-              title={previewStale ? 'The preview is stale: the notes changed since it was rendered'
-                : preview.url ? 'Verified, mapped piano preview' : preview.error || 'Piano audio is not verified for this draft'}
-              onClick={() => setAudioMode('piano')}>Piano</button>}
+              disabled={pianoDisabled}
+              title={pianoTitle}
+              onClick={() => setAudioMode('piano')}>Piano</button>
           </div>
+          {verifiedPreview && hasWebAudio && <div className="ws-row" role="group"
+            aria-label="Piano synthesis source" data-piano-source="true">
+            <button type="button" aria-pressed={!preferRenderedWav}
+              className={!preferRenderedWav ? 'is-active' : ''}
+              onClick={() => setPreferRenderedWav(false)}>Live grand piano</button>
+            <button type="button" aria-pressed={preferRenderedWav}
+              className={preferRenderedWav ? 'is-active' : ''}
+              onClick={() => setPreferRenderedWav(true)}>Rendered WAV</button>
+          </div>}
         </section>
         <section className="ws-drawer-section" data-ws-section="video" aria-label="Reference video">
           <h3>Video</h3>
@@ -2256,16 +2449,17 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             ? <video ref={videoRef} src={videoUrl} controls playsInline preload="metadata" className="ws-video"/>
             : <p className="ws-hint">This draft has no source video.</p>}
           {previewAsset ? <audio ref={pianoRef} src={preview.url || undefined} preload="auto"/> : null}
-          <span className="ws-hint" data-preview-state={previewStale ? 'stale' : preview.url ? 'verified' : 'unavailable'}>
+          <span className="ws-hint" data-preview-state={verifyingPreview ? 'verifying'
+            : previewAsset && !preview.url ? 'unavailable' : useWavPreview ? 'verified' : 'live'}>
             {previewStale
-              ? 'Piano preview is stale: the notes changed since it was rendered. Original audio only.'
-              : preview.url
-                ? 'Verified piano preview follows the video clock; it never free-runs.'
-                : preview.error
-                  ? `Piano unavailable: ${preview.error} Original audio remains active.`
-                  : previewAsset
-                    ? 'Verifying piano audio… Original plays until it is verified.'
-                    : 'No verified piano preview: Original audio only.'}
+              ? 'Piano preview is stale: the notes changed. Piano plays live synthesized grand piano notes from the edited score, with velocity dynamics and sustain pedal.'
+              : verifyingPreview
+                ? 'Verifying piano audio… Original plays until it is verified.'
+                : previewAsset && !preview.url
+                  ? `Piano unavailable as a verified WAV: ${preview.error ?? 'the audio could not be verified'} Original audio remains active.`
+                  : useWavPreview
+                    ? 'Verified piano preview follows the video clock; it never free-runs. Choose Live grand piano above for the synthesized performance.'
+                    : 'Piano plays live synthesized grand piano notes from the score and performance, with velocity dynamics and sustain pedal; Original keeps the video sound.'}
           </span>
         </section>
 
@@ -2282,13 +2476,13 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
                 </div>
                 {narrowViewport && !noteEditorExpanded && <div className="ws-note-peek-actions">
                   <button type="button" disabled={readOnly}
-                    onClick={() => { audition([selected.pitch], Math.min(1.2, selected.duration ?? 0.4)); }}>Preview</button>
+                    onClick={() => { audition([selected.pitch], Math.min(1.2, selected.duration ?? 0.4), selected.velocity); }}>Preview</button>
                   <button type="button" onClick={() => { setNoteEditorExpanded(true); setNoteAdvancedOpen(false); }}>Edit note</button>
                 </div>}
               </header>
               {(!narrowViewport || noteEditorExpanded) && <div className="ws-note-primary">
                 <div className="ws-row" role="group" aria-label="Note actions">
-                  <button type="button" disabled={readOnly} onClick={() => { audition([selected.pitch], Math.min(1.2, selected.duration ?? 0.4)); }}>Preview</button>
+                  <button type="button" disabled={readOnly} onClick={() => { audition([selected.pitch], Math.min(1.2, selected.duration ?? 0.4), selected.velocity); }}>Preview</button>
                   <button type="button" data-pitch-pick aria-pressed={pitchPickMode?.occurrenceId === selection.occurrenceId}
                     disabled={readOnly}
                     onClick={() => {
@@ -2307,6 +2501,27 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
                 <div className="ws-row" role="group" aria-label="Pitch">
                   <button type="button" disabled={readOnly} onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch - 1}})}>− semitone</button>
                   <button type="button" disabled={readOnly} onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch + 1}})}>+ semitone</button>
+                </div>
+                <div className="ws-row ws-hand-picker" role="group" aria-label="Hand assignment"
+                  data-hand-assignment="true" data-hand-current={hands.assignments[selection.occurrenceId]?.hand ?? 'unassigned'}>
+                  <span className="ws-hint">Hand</span>
+                  {(['left', 'right', 'unassigned'] as const).map(hand =>
+                    <button key={hand} type="button" data-hand-choice={hand}
+                      aria-pressed={(hands.assignments[selection.occurrenceId]?.hand ?? 'unassigned') === hand}
+                      disabled={readOnly || Boolean(replaceMode) || Boolean(addMode)}
+                      onClick={() => dispatch({type: 'command',
+                        command: {type: 'set-occurrence-hand', occurrenceId: selection.occurrenceId, hand}})}>
+                      {hand === 'left' ? 'Left' : hand === 'right' ? 'Right' : 'Unknown'}
+                    </button>)}
+                  <button type="button" data-hand-reset="true"
+                    disabled={readOnly || !document.hand_assignments?.[selection.occurrenceId]?.manual}
+                    title="Remove the manual override and return to automatic estimates"
+                    onClick={() => dispatch({type: 'command',
+                      command: {type: 'reset-occurrence-hand', occurrenceId: selection.occurrenceId}})}>Auto</button>
+                  <span className="ws-hint" data-hand-provenance="true">
+                    {hands.assignments[selection.occurrenceId]?.manual ? 'manual override' :
+                      `${hands.assignments[selection.occurrenceId]?.source ?? 'baseline'} · ${hands.assignments[selection.occurrenceId]?.confidence ?? 'ambiguous'}`}
+                  </span>
                 </div>
                 <div className="ws-row" role="group" aria-label="Written duration">
                   <span className="ws-hint">{writtenScope === 'event' ? 'Note value · whole event' : 'Note value'}</span>
@@ -2406,7 +2621,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
               <div className="ws-row" role="group" aria-label="Remove">
                 <button type="button" onClick={() => requestReveal(selection.occurrenceId)}>Reveal in views</button>
-                <button type="button" onClick={() => { audition([selected.pitch], Math.min(1.2, selected.duration ?? 0.4)); }}>Audition</button>
+                <button type="button" onClick={() => { audition([selected.pitch], Math.min(1.2, selected.duration ?? 0.4), selected.velocity); }}>Audition</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'delete-occurrence', occurrenceId: selection.occurrenceId}})}>Delete note</button>
                 <button type="button" onClick={() => dispatch({type: 'command', command: {type: 'delete-logical-note', logicalNoteId: selection.logicalNoteId}})}>Delete logical note</button>
               </div>
@@ -2709,12 +2924,12 @@ export default PianoWorkspaceHarness;
  * without re-rendering the inspector around it.
  */
 function LiveKeyboard({document, clock, intervals, selectedPitch, onKey, onSelectKey, width, height,
-  range, onRangeChange, toolbarHint, hint}: {
+  range, onRangeChange, toolbarHint, hint, hands}: {
   document: NotationDocument;
   clock: ClockStore | null;
   intervals: { id: string; start: number; end: number; pitch: number }[];
   selectedPitch: number | null;
-  onKey: (pitch: number, auditionOnly: boolean) => void;
+  onKey: (pitch: number, auditionOnly: boolean, velocity?: number) => void;
   onSelectKey: (pitch: number) => void;
   width: number;
   range?: PianoRange;
@@ -2722,12 +2937,20 @@ function LiveKeyboard({document, clock, intervals, selectedPitch, onKey, onSelec
   height?: number;
   toolbarHint?: string;
   hint?: string;
+  hands?: Record<string, {hand: Hand}>;
 }) {
   const live = useClockTime(clock, 0);
-  const activePitches = intervals
-    .filter(interval => live >= interval.start && live < interval.end)
-    .map(interval => interval.pitch);
+  const soundingHands: Record<number, 'left' | 'right' | 'unassigned' | 'mixed'> = {};
+  const activePitches: number[] = [];
+  for (const interval of intervals) {
+    if (!(live >= interval.start && live < interval.end)) continue;
+    activePitches.push(interval.pitch);
+    const hand = hands?.[interval.id]?.hand ?? 'unassigned';
+    const previous = soundingHands[interval.pitch];
+    soundingHands[interval.pitch] = previous && previous !== hand ? 'mixed' : hand;
+  }
   return <KeyboardEditor document={document} selectedPitch={selectedPitch} activePitches={activePitches}
+    soundingHands={soundingHands}
     onKey={onKey} onSelectKey={onSelectKey} width={width} height={height}
     range={range} onRangeChange={onRangeChange}
     toolbarHint={toolbarHint} hint={hint}/>;

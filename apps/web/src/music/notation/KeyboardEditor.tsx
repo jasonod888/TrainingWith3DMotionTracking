@@ -9,14 +9,25 @@ import {
 
 const DEFAULT_WIDTH = 640;
 
+/** Map vertical strike position and meaningful pointer pressure to audition velocity. */
+export function keyTouchVelocity(relativeY: number, pressure?: number): number {
+  const y = Number.isFinite(relativeY) ? Math.max(0, Math.min(1, relativeY)) : 0.65;
+  let velocity = 0.35 + 0.55 * y;
+  if (Number.isFinite(pressure) && pressure! > 0 && pressure !== 0.5) {
+    velocity = velocity * 0.55 + Math.max(0.05, Math.min(1, pressure!)) * 0.45;
+  }
+  return Math.max(0.25, Math.min(0.95, velocity));
+}
+
 export function KeyboardEditor({
   document: score, selectedPitch, activePitches, onKey, onSelectKey, hint, toolbarHint,
-  width = DEFAULT_WIDTH, semitones, height, range, onRangeChange,
+  width = DEFAULT_WIDTH, semitones, height, range, onRangeChange, soundingHands,
 }: {
   document: NotationDocument;
   selectedPitch: number | null;
   activePitches: number[];
-  onKey: (pitch: number, auditionOnly: boolean) => void;
+  soundingHands?: Record<number, 'left' | 'right' | 'unassigned' | 'mixed'>;
+  onKey: (pitch: number, auditionOnly: boolean, velocity?: number) => void;
   /** Optional occurrence-level selection hook used by the correction workspace. */
   onSelectKey?: (pitch: number) => void;
   /** Replaces the default editing hint; hosts that only audition should say so. */
@@ -62,6 +73,16 @@ export function KeyboardEditor({
   const atRangeStart = controlledRange && (range?.firstPitch ?? 0) <= STANDARD_PIANO_FIRST;
   const atRangeEnd = controlledRange
     && (range?.firstPitch ?? 0) + (range?.semitones ?? 0) >= STANDARD_PIANO_LAST;
+  const touchVelocity = (event: {clientY: number; currentTarget: Element; nativeEvent: Event}) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const relativeY = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.65;
+    const pressure = 'pressure' in event.nativeEvent
+      ? (event.nativeEvent as PointerEvent).pressure : undefined;
+    return keyTouchVelocity(relativeY, pressure);
+  };
+  const handText = (hand: 'left' | 'right' | 'unassigned' | 'mixed' | undefined) =>
+    hand === 'left' ? 'left hand' : hand === 'right' ? 'right hand'
+      : hand === 'mixed' ? 'both hands (mixed)' : hand === 'unassigned' ? 'unassigned/unknown hand' : '';
 
   return <div className="keyboard-editor">
     <div className="keyboard-toolbar">
@@ -83,25 +104,37 @@ export function KeyboardEditor({
         preserveAspectRatio={height ? 'none' : undefined}
         style={height ? {height: `${height}px`, width: '100%'} : undefined}>
         <rect x="0" y="0" width={width} height={PIANO_GEOMETRY_HEIGHT} className="keyboard-bg"/>
+        <defs>
+          <pattern id="keyboard-hand-mixed-pattern" width="8" height="8" patternUnits="userSpaceOnUse">
+            <rect width="8" height="8" fill="#d9a45f"/>
+            <rect width="4" height="8" fill="#6f9fd8"/>
+          </pattern>
+        </defs>
         {geometry.whites.map(key => {
           const selected = selectedPitch === key.pitch;
           const active = activePitches.includes(key.pitch);
+          const hand = active ? soundingHands?.[key.pitch] : undefined;
           return <rect key={key.pitch} x={key.x} y="0" width={key.width} height="130" rx="3"
             data-pitch={key.pitch}
-            className={`keyboard-white${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
-            onClick={() => { onKey(key.pitch, false); onSelectKey?.(key.pitch); }} role="button" tabIndex={0}
-            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onKey(key.pitch, false); onSelectKey?.(key.pitch); } }}
-            aria-label={`${pitchName(key.pitch)}${selected ? ', selected' : ''}`}/>;
+            className={`keyboard-white${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}${hand ? ` hand-${hand}` : ''}`}
+            onClick={event => { onKey(key.pitch, false, touchVelocity(event)); onSelectKey?.(key.pitch); }} role="button" tabIndex={0}
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onKey(key.pitch, false, 0.7); onSelectKey?.(key.pitch); } }}
+            aria-label={`${pitchName(key.pitch)}${selected ? ', selected' : ''}${hand ? `, ${handText(hand)}` : ''}`}>
+            <title>{`${pitchName(key.pitch)}${selected ? ' · selected' : ''}${hand ? ` · ${handText(hand)}` : ''}`}</title>
+          </rect>;
         })}
         {geometry.blacks.map(key => {
           const selected = selectedPitch === key.pitch;
           const active = activePitches.includes(key.pitch);
+          const hand = active ? soundingHands?.[key.pitch] : undefined;
           return <rect key={key.pitch} x={key.x} y="0" width={key.width} height="82" rx="3"
             data-pitch={key.pitch}
-            className={`keyboard-black${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
-            onClick={() => { onKey(key.pitch, false); onSelectKey?.(key.pitch); }} role="button" tabIndex={0}
-            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onKey(key.pitch, false); onSelectKey?.(key.pitch); } }}
-            aria-label={`${pitchName(key.pitch)}${selected ? ', selected' : ''}`}/>;
+            className={`keyboard-black${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}${hand ? ` hand-${hand}` : ''}`}
+            onClick={event => { onKey(key.pitch, false, touchVelocity(event)); onSelectKey?.(key.pitch); }} role="button" tabIndex={0}
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onKey(key.pitch, false, 0.7); onSelectKey?.(key.pitch); } }}
+            aria-label={`${pitchName(key.pitch)}${selected ? ', selected' : ''}${hand ? `, ${handText(hand)}` : ''}`}>
+            <title>{`${pitchName(key.pitch)}${selected ? ' · selected' : ''}${hand ? ` · ${handText(hand)}` : ''}`}</title>
+          </rect>;
         })}
       </svg>
       <div className="keyboard-labels" aria-hidden="true">
@@ -114,7 +147,7 @@ export function KeyboardEditor({
     </div>
     <div className="keyboard-hint small muted">
       {hint ?? <>With no note selected, a key adds a note at the playhead using the chosen duration.</>}{' '}
-      <button type="button" onClick={() => onKey(basePitch, true)}>Audition {pitchName(basePitch)}</button>
+      <button type="button" onClick={() => onKey(basePitch, true, 0.7)}>Audition {pitchName(basePitch)}</button>
     </div>
   </div>;
 }

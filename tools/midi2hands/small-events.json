@@ -1,0 +1,9 @@
+{
+  "events": [
+    {"id": "low", "onset": 0.0, "duration": 0.5, "pitch": 36},
+    {"id": "mid", "onset": 1.0, "duration": 0.5, "pitch": 60},
+    {"id": "high", "onset": 2.0, "duration": 0.5, "pitch": 84},
+    {"id": "repeat-a", "onset": 3.0, "duration": 0.2, "pitch": 72},
+    {"id": "repeat-b", "onset": 3.0, "duration": 0.2, "pitch": 72}
+  ]
+}

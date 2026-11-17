@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "model": "kong",
+  "model_version": "0.0.6",
+  "package_version": "0.0.6",
+  "sample_rate": 16000,
+  "preprocessing": "mono-pcm-s16le",
+  "device": "cuda",
+  "package_path": "D:\\3d_trainer\\developement\\.local\\piano-diagnosis\\reference-packages\\extracted",
+  "package_sha256": "90b156126afffaff0454bfff7166afbeda4c52a4d248494c0d1de14a7485715a",
+  "implementation_sha256": "e4d09dead473702a79fa063f5255ff9e199cbbb291099abfc37ac62dfb6b113c",
+  "runtime_versions": {
+    "torch": "2.8.0+cu128",
+    "numpy": "2.5.2",
+    "scipy": "1.18.1",
+    "librosa": "0.10.2.post1",
+    "soundfile": "0.14.0"
+  },
+  "config": {
+    "onset_threshold": 0.3,
+    "offset_threshold": 0.3,
+    "frame_threshold": 0.1,
+    "pedal_offset_threshold": 0.2
+  },
+  "weights_sha256": "c3fa9730725bf4a762f1c14bc80cd5986eacda01b026f5a4a2525cd607876141",
+  "code_sha256": "01f5082883b06df8c9e890b48ede760b14ff9cf49fbd91f9c089dfea9ae54cc2",
+  "config_sha256": "56880b2ea51ca4d4e7b533dbf6792b35b89739d3c392c3c86afbb750d79369d1",
+  "commercial_evidence_sha256": "5441acc41165395e30ffaffb82b9da6b52a3016dbd7cdfa20db893eb5cad6b66"
+}

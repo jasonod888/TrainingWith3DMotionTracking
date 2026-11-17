@@ -10,6 +10,7 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import React from 'react';
 import {JSDOM} from 'jsdom';
+import type {ScheduledPianoNote} from '../src/music/notation/notation-audio';
 
 const dom = new JSDOM('<!doctype html><html><body></body></html>', {
   url: 'http://localhost/workspace-harness.html?id=fixture', pretendToBeVisual: true,
@@ -94,7 +95,7 @@ const fixture = JSON.parse(readFileSync(
   resolve('..', '..', 'docs', 'qualification', 'piano-workspace-phase-01', 'fixtures', 'phase1-draft-fixture.json'), 'utf8'));
 const previewBytes = new Uint8Array([1, 2, 3, 4]);
 const previewHash = createHash('sha256').update(previewBytes).digest('hex');
-const draft = {...fixture,
+const draft: Record<string, any> = {...fixture,
   draft_id: 'fixture', lesson_id: 'fixture', title: 'Verified piano fixture', status: 'draft',
   source_video: {key: 'lessons/fixture/video.mp4', mime: 'video/mp4', bytes: 3, sha256: '0'.repeat(64)},
   piano_preview: {key: 'lessons/fixture/preview.wav', mime: 'audio/wav', bytes: previewBytes.length, sha256: previewHash},
@@ -128,9 +129,11 @@ after(() => {
 });
 
 let auditionStops = 0;
+const liveNotes: {pitch: number; velocity?: number | null}[] = [];
 NotationAudio.prototype.play = () => {};
 NotationAudio.prototype.stop = () => { auditionStops += 1; };
 NotationAudio.prototype.dispose = () => {};
+NotationAudio.prototype.playScheduledNote = (note: ScheduledPianoNote) => { liveNotes.push(note); return null; };
 
 const flush = () => new Promise(resolve => setTimeout(resolve, 20));
 
@@ -139,6 +142,51 @@ async function openWorkspace() {
   await waitFor(() => assert.ok(view.queryByRole('button', {name: 'Piano', exact: true})));
   return view;
 }
+
+test('live Piano plays edited performance notes, mutes video, and restores Original', async () => {
+  draft.piano_preview = null;
+  draft.preview_identity = null;
+  draft.pedal = [{onset: 0, offset: 2, type: 'sustain'}];
+  previewGate = Promise.resolve();
+  liveNotes.length = 0;
+  try {
+    const view = await openWorkspace();
+    const video = view.container.querySelector('video')!;
+    const originalMuted = (video as unknown as {muted: boolean}).muted;
+    const piano = view.getByRole('button', {name: 'Piano', exact: true}) as HTMLButtonElement;
+    await waitFor(() => assert.equal(piano.disabled, false));
+    assert.equal(piano.disabled, false, 'live Piano is available without a WAV');
+    fireEvent.click(piano);
+    await waitFor(() => assert.equal(
+      view.getByRole('button', {name: 'Piano', exact: true}).getAttribute('aria-pressed'), 'true'));
+    assert.equal((video as unknown as {muted: boolean}).muted, true, 'live Piano mutes source audio');
+    (video as unknown as {currentTime: number}).currentTime = 0;
+    await video.play();
+    await waitFor(() => assert.ok(liveNotes.length > 0), {timeout: 2000});
+    assert.equal(liveNotes[0].velocity, fixture.events[0].velocity,
+      'live synthesis receives the recorded occurrence velocity');
+    // A note crossed between normal frame ticks must still receive a fresh hammer
+    // strike (no mid-note elapsed window) rather than being swallowed.
+    (video as unknown as {currentTime: number}).currentTime = 0.51;
+    video.dispatchEvent(new window.Event('timeupdate'));
+    await waitFor(() => assert.ok(liveNotes.some(note =>
+      note.pitch === 64 && note.elapsed === undefined)), {timeout: 2000});
+    assert.ok(!liveNotes.some(note => note.pitch === 64 && note.elapsed !== undefined),
+      'frame-step notes never use a mid-note attack');
+    assert.equal(liveNotes.find(note => note.pitch === 72)?.duration, 1.5,
+      'sustain pedal extends the audible occurrence beyond its notated duration');
+    fireEvent.click(view.getByRole('button', {name: 'Original', exact: true}));
+    await waitFor(() => assert.equal(
+      view.getByRole('button', {name: 'Original', exact: true}).getAttribute('aria-pressed'), 'true'));
+    assert.equal((video as unknown as {muted: boolean}).muted, originalMuted,
+      'Original restores the user’s prior video mute state');
+  } finally {
+    draft.piano_preview = {key: 'lessons/fixture/preview.wav', mime: 'audio/wav', bytes: previewBytes.length,
+      sha256: previewHash};
+    draft.preview_identity = previewHash;
+    draft.pedal = [];
+  }
+});
 
 test('acceptance 1: pending verification keeps Piano disabled; success exposes the blob and enables', async () => {
   previewGate = new Promise<void>(resolve => { holdPreview = resolve; });
@@ -224,4 +272,30 @@ test('acceptance 2-4: Piano follows the source clock, Original restores, failure
   await flush();
   assert.ok(revoked.includes('blob:verified-preview'), 'the preview URL was not revoked');
   assert.equal(pendingFrames.size, 0, 'scheduled frame callbacks were not cancelled');
+});
+
+test('a Web Audio host defaults to live grand piano and exposes the WAV source choice', async () => {
+  const webAudio = window as unknown as {AudioContext?: unknown};
+  const previous = webAudio.AudioContext;
+  webAudio.AudioContext = function AudioContextDouble() {};
+  previewGate = Promise.resolve();
+  try {
+    const view = await openWorkspace();
+    const piano = view.getByRole('button', {name: 'Piano', exact: true}) as HTMLButtonElement;
+    await waitFor(() => assert.equal(piano.disabled, false));
+    fireEvent.click(piano);
+    await waitFor(() => assert.equal(
+      view.getByRole('button', {name: 'Piano', exact: true}).getAttribute('aria-pressed'), 'true'));
+    fireEvent.click(view.getByRole('button', {name: 'Sound options'}));
+    await waitFor(() => assert.ok(view.container.querySelector('[aria-label="Piano synthesis source"]')));
+    assert.equal(view.getByRole('button', {name: 'Live grand piano'}).getAttribute('aria-pressed'), 'true',
+      'verified WAV must not override the live grand piano default on a Web Audio host');
+    assert.equal(view.container.querySelector('[data-preview-state="live"]') !== null, true);
+    fireEvent.click(view.getByRole('button', {name: 'Rendered WAV'}));
+    await waitFor(() => assert.equal(
+      view.getByRole('button', {name: 'Rendered WAV'}).getAttribute('aria-pressed'), 'true'));
+  } finally {
+    if (previous === undefined) delete webAudio.AudioContext;
+    else webAudio.AudioContext = previous;
+  }
 });

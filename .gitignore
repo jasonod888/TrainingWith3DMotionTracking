@@ -36,4 +36,10 @@ build/
 .spike-dist/
 
 .venv-music/
+.venv-midi2hands/
+tools/midi2hands/model.onnx
+tools/midi2hands/__pycache__/
 music-candidate-run/
+
+# Temporary files from the running local Kong conversion worker
+model-pilot-output/kong-dev-jobs/

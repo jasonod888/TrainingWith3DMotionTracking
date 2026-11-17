@@ -7,6 +7,7 @@ editable core and the performance binding.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from . import interactive_limit
@@ -76,6 +77,46 @@ def _performance_matches(notation: dict[str, Any], events: list[Any], duration: 
             _fail('A notation performance optional flag does not match the reviewed event.')
     if any(item.onset + (item.duration or 0) > duration + 1e-6 for item in events):
         _fail('The notation performance leaves the clip.')
+
+
+def _validate_hand_metadata(value: dict[str, Any], performance_ids: set[str]) -> None:
+    version = value.get('hand_assignment_version')
+    assignments = value.get('hand_assignments')
+    if version is None and assignments is None:
+        return
+    if version != 1:
+        _fail('The hand assignment metadata version is invalid.')
+    if not isinstance(assignments, dict):
+        _fail('The hand assignment metadata is invalid.')
+    for occurrence_id, item in assignments.items():
+        if occurrence_id not in performance_ids:
+            _fail('A hand assignment references a missing performance note.')
+        if not isinstance(item, dict):
+            _fail('A hand assignment is invalid.')
+        if item.get('hand') not in ('left', 'right', 'unassigned'):
+            _fail('A hand assignment label is invalid.')
+        if item.get('source') not in ('manual', 'baseline', 'midi2hands', 'hybrid'):
+            _fail('A hand assignment source is invalid.')
+        if item.get('confidence') not in ('clear', 'ambiguous', 'conflict'):
+            _fail('A hand assignment confidence is invalid.')
+        manual = item.get('manual')
+        if not isinstance(manual, bool) or (item.get('source') == 'manual') != manual:
+            _fail('A hand assignment manual flag is invalid.')
+        reason = item.get('reason')
+        if reason is not None and (not isinstance(reason, str) or len(reason) > 200):
+            _fail('A hand assignment reason is invalid.')
+        fingerprint = item.get('fingerprint')
+        if not manual:
+            if not isinstance(fingerprint, str) or not re.fullmatch(r'ph1:[0-9a-f]{64}', fingerprint):
+                _fail('An automatic hand assignment has no valid performance fingerprint.')
+        model = item.get('model')
+        if model is not None:
+            if (not isinstance(model, dict) or not isinstance(model.get('name'), str)
+                    or not model.get('name') or not isinstance(model.get('version'), str)
+                    or not model.get('version')):
+                _fail('A hand assignment model identity is invalid.')
+        if item.get('source') in ('midi2hands', 'hybrid') and model is None:
+            _fail('A model hand assignment has no model identity.')
 
 
 def validate_notation(value: Any, events: list[Any], duration: float) -> dict[str, Any]:
@@ -223,4 +264,5 @@ def validate_notation(value: Any, events: list[Any], duration: float) -> dict[st
     for identifier, written in owned.items():
         if recorded.get(identifier) != written:
             _fail('A written note pitch disagrees with the occurrence it is linked to.')
+    _validate_hand_metadata(value, performance_ids)
     return value

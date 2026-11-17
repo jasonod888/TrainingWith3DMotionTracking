@@ -4,6 +4,7 @@ export * from './rhythm';
 export * from './build';
 export * from './edit';
 export * from './correction';
+export * from './hands';
 export * from './alignment';
 export * from './parse';
 export * from './musicxml';

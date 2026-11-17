@@ -88,17 +88,17 @@ default for speed; `--source-maps` enables inline TypeScript maps for debugging 
 - `apps/web/tests/*.test.ts` (2 files: shared timeline and piano-key geometry)
 - `apps/web/tests/*.test.tsx` (26 files)
 
-Total: **76 files** currently. The independent full run before the full-range/Space work
-reported **552/552 passing in 120.05 s** and build PASS. This bounded change adds nine
-focused tests (geometry 2, waterfall 2, shell 1, overview/Space 4); focused inventory
-is now **149 tests**; geometry/waterfall/compact extras run separately. A new full run
-was not required for this change. The old package script did not include
-`apps/web/tests/*.test.ts`,
+Total: **78 files** currently. The independent full run before the later hand/full-range
+work reported **552/552 passing in 120.05 s** and build PASS. The current final-correction
+inventory is expected to be **582 JS tests**; the maintained full run in this worker
+environment could not execute because Node child-process creation is sandbox-blocked
+(`spawn EPERM`). Focused inventory is now **151 tests**. The old package script did not
+include `apps/web/tests/*.test.ts`,
 so `shared-timeline.test.ts` was silently absent from full runs; it is now included.
 The former 17-test journey file is split into three independently scoped files
 (`workspace-editing-journeys`, `workspace-mode-journeys`,
 `workspace-formatted-lifecycle-journeys`) with a shared setup helper; all assertions
-and scenarios are preserved. `--focused` runs 16 files / **149 tests**: 14
+and scenarios are preserved. `--focused` runs 16 files / **151 tests**: 14
 `workspace-*.test.tsx` files (including the phase-1 shell, phase-2 contextual and
 targeted phase-3 mobile-peek regression), `shared-timeline.test.ts` and
 `formatted-score.test.tsx`.

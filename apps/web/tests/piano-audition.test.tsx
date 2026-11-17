@@ -1,7 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {auditionEnvelope, envelopeGainAt, schedulePianoVoice} from '../src/music/piano-audition';
+import {auditionEnvelope, envelopeGainAt, grandPianoEnvelope, schedulePianoVoice} from '../src/music/piano-audition';
 import {velocityGain} from '../src/music/music-velocity';
+import {resolveAudibleNoteTiming, resolvePerformanceAudibleTimings} from '../src/music/piano-playback';
+import {keyTouchVelocity} from '../src/music/notation/KeyboardEditor';
 
 test('a long note remains audible near its end and releases at its declared duration', () => {
   const envelope = auditionEnvelope(6, 60, .6);
@@ -75,4 +77,60 @@ test('expired or invalid notes do not allocate a voice', () => {
   assert.equal(schedulePianoVoice(audio.context,audio.destination,{pitch:60,startTime:0,duration:1,elapsed:1}),null);
   assert.equal(schedulePianoVoice(audio.context,audio.destination,{pitch:128,startTime:0,duration:1}),null);
   assert.equal(audio.oscillators.length,0);
+});
+
+test('touch velocity follows the key strike position and meaningful pressure', () => {
+  assert.ok(keyTouchVelocity(0) < keyTouchVelocity(.5));
+  assert.ok(keyTouchVelocity(.5) < keyTouchVelocity(1));
+  assert.ok(keyTouchVelocity(0) >= .25 && keyTouchVelocity(1) <= .95);
+  assert.ok(keyTouchVelocity(.5, .9) > keyTouchVelocity(.5));
+  assert.equal(keyTouchVelocity(.5, .5), keyTouchVelocity(.5), 'neutral pressure is ignored');
+  assert.ok(keyTouchVelocity(-1) >= .25 && keyTouchVelocity(-1) <= .35);
+  assert.ok(keyTouchVelocity(2) <= .95 && keyTouchVelocity(2) >= .85);
+});
+
+test('sustain pedal extends audible ring while unpedaled staccato keeps a natural tail', () => {
+  const short = resolveAudibleNoteTiming({id: 'short', pitch: 60, onset: 1, duration: 0.08});
+  assert.equal(short.dampedByKey, true);
+  assert.ok(short.soundingDuration >= 0.22);
+  const pedaled = resolveAudibleNoteTiming({id: 'pedaled', pitch: 60, onset: 1, duration: 0.08},
+    [{onset: 0.5, offset: 3, type: 'sustain'}]);
+  assert.equal(pedaled.dampedByKey, false);
+  assert.ok(pedaled.soundingDuration > 1.9);
+  const capped = resolveAudibleNoteTiming({id: 'capped', pitch: 60, onset: 1, duration: 0.5},
+    [{onset: 0, offset: 4, type: 'sustain'}], 1.8);
+  assert.ok(Math.abs(capped.soundingDuration - 0.8) < 1e-9, 'same-pitch re-strike caps the old string');
+  const all = resolvePerformanceAudibleTimings([
+    {id: 'first', pitch: 60, onset: 1, duration: 0.2},
+    {id: 'second', pitch: 60, onset: 1.5, duration: 0.2},
+    {id: 'other', pitch: 64, onset: 1.2, duration: 0.2},
+  ], [{onset: 0, offset: 2}]);
+  assert.ok(all.get('first')!.soundingDuration <= 0.5);
+  assert.ok(all.get('other')!.dampedByKey === false);
+});
+
+test('grand piano envelope decays continuously without the old audition floor', () => {
+  const envelope = grandPianoEnvelope(6, 60, .65, false);
+  assert.ok(envelope.length >= 5);
+  for (let index = 1; index < envelope.length; index++) {
+    assert.ok(envelope[index].time > envelope[index - 1].time);
+    assert.ok(Number.isFinite(envelope[index].gain) && envelope[index].gain > 0);
+  }
+  const beforeRelease = envelopeGainAt(envelope, 5.2);
+  const late = envelopeGainAt(envelope, 5.6);
+  assert.ok(late < beforeRelease, 'string decay is continuous');
+  assert.ok(late < velocityGain(.65) * .18, 'there is no flat 18 percent sustain plateau');
+  const damped = grandPianoEnvelope(6, 60, .65, true);
+  assert.ok(damped.at(-1)!.time - damped.at(-2)!.time <= .17);
+});
+
+test('acoustic voice exposes a click-free re-strike release', () => {
+  const audio = fakeAudio();
+  const voice = schedulePianoVoice(audio.context, audio.destination,
+    {pitch: 60, velocity: .7, duration: 2, startTime: 1, acousticDecay: true});
+  assert.ok(voice?.releaseAt);
+  voice!.releaseAt!(1.5, .015);
+  assert.ok(audio.oscillators[0].stops.some(stop => Math.abs(stop - 1.52) < 1e-9));
+  assert.ok(audio.curves[0].some(point => point.time === 1.5 && point.value > 0));
+  assert.equal(audio.curves[0].at(-1)?.value, .0001);
 });

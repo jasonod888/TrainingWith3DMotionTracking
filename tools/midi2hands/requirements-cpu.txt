@@ -1,0 +1,6 @@
+# Optional CPU-only runtime for the pinned midi2hands adapter.
+# These are the exact versions validated by the independent Phase 2 CPU runs in the
+# project-local .venv-music environment. Keep this optional; the API discovers
+# .venv-music by default and the musical baseline remains available without it.
+numpy==2.5.4
+onnxruntime==1.31.1

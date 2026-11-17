@@ -11,6 +11,7 @@ import {
 import { refreshNotation } from './build';
 import { measureTicks } from './rhythm';
 import { keySignature, parseSpelling } from './spelling';
+import { parseHandAssignmentMetadata } from './hands';
 
 const STAFFS = ['treble', 'bass'] as const;
 
@@ -182,6 +183,8 @@ export function parseNotationDocument(value: unknown): NotationDocument {
   }
   const measures = parseMeasures(document.measures, signature);
   const split = integer(document.staff_split_pitch, 'staff split', 0, 127);
+  const handMetadata = parseHandAssignmentMetadata(document.hand_assignments,
+    document.hand_assignment_version, new Set(performance.map(note => note.id)));
   const notation: NotationDocument = {
     notation_version: 1,
     subject: 'piano',
@@ -198,6 +201,7 @@ export function parseNotationDocument(value: unknown): NotationDocument {
     performance,
     performance_map: {},
     created_from: document.created_from === 'saved' ? 'saved' : 'performance',
+    ...handMetadata,
   };
   return refreshNotation(notation);
 }

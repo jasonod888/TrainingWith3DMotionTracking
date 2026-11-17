@@ -1,0 +1,84 @@
+{
+  "manifest_sha256": "793724ad5cd4206069f1551f89a08bb4ef2d044a622f4f2da892dbda70d5f30b",
+  "sources": [
+    {
+      "id": "kong-piano-inference-package",
+      "kind": "model_code",
+      "title": "piano-transcription-inference 0.0.6 (author inference package)",
+      "licensor": "Qiuqiang Kong",
+      "license": "MIT",
+      "license_url": "https://pypi.org/project/piano-transcription-inference/0.0.6/",
+      "revision": "0.0.6",
+      "artifact": {
+        "wheel_sha256": "64348200b700a0ee792aa62386803fb2a638e378b3835b9a7ccff4701f0612f5",
+        "wheel_md5": "ffcacc2c645a7da4a7f7c768c637e9af",
+        "declared_classifier": "License :: OSI Approved :: MIT License"
+      },
+      "evidence": [
+        "https://pypi.org/pypi/piano-transcription-inference/0.0.6/json"
+      ],
+      "attribution_required": true,
+      "attribution": "piano-transcription-inference - Qiuqiang Kong, MIT.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "unresolved",
+        "calibration": "approved",
+        "hosted_inference": "approved",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Record the wheel digest above; a later release is a different artifact.",
+        "Report the declared dependencies (torchlibrosa, librosa, mido, matplotlib) as separate third-party notices."
+      ],
+      "notes": [
+        "This is the author's inference distribution, separate from the unlicensed training repository.",
+        "Do not describe the whole planning repository as MIT merely because this package is."
+      ]
+    },
+    {
+      "id": "kong-piano-checkpoint-4034264",
+      "kind": "model_checkpoint",
+      "title": "High-resolution piano transcription checkpoint (Zenodo 4034264)",
+      "licensor": "Qiuqiang Kong",
+      "license": "CC-BY-4.0",
+      "license_url": "https://zenodo.org/records/4034264",
+      "revision": "10.5281/zenodo.4034264",
+      "artifact": {
+        "filename": "CRNN_note_F1=0.9677_pedal_F1=0.9186.pth",
+        "md5": "22b961b77c1878239fec963362097045",
+        "sha256": "c3fa9730725bf4a762f1c14bc80cd5986eacda01b026f5a4a2525cd607876141",
+        "bytes": 171966578
+      },
+      "evidence": [
+        "https://zenodo.org/api/records/4034264",
+        "https://zenodo.org/records/4034264"
+      ],
+      "attribution_required": true,
+      "attribution": "High-resolution Piano Transcription with Pedals (Kong et al.), checkpoint Zenodo 4034264, CC BY 4.0.",
+      "decisions": {
+        "acquisition_storage": "approved",
+        "internal_evaluation": "approved",
+        "model_selection": "approved",
+        "training": "unresolved",
+        "calibration": "approved",
+        "hosted_inference": "approved",
+        "publication": "approved",
+        "redistribution_original": "approved",
+        "redistribution_derived": "approved"
+      },
+      "conditions": [
+        "Verify the artifact digest above before use; a mirror with a different label is not this artifact.",
+        "Record any conversion or quantization as a derived artifact with its own hash and transformation notes.",
+        "Retain the CC BY attribution wherever the model or its derived profile is distributed."
+      ],
+      "notes": [
+        "Training-data provenance is recorded separately. The published CC BY 4.0 grant on this checkpoint is the governing permission for its use; an unrelated corpus's noncommercial terms do not automatically replace it.",
+        "The locally inspected file .local/piano-diagnosis/reference-packages/piano.pth matches the digest above."
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
 import type {NotationDocument} from '../../../../../packages/music-notation/index.ts';
+import type {Hand} from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
 import {buildPianoGeometry, type PianoRange} from '../notation/piano-key-geometry';
 import {useClockTime, type ClockStore} from './clock';
@@ -11,7 +12,7 @@ const DEFAULT_WINDOW_SECONDS = 5;
 type Interval = {id: string; pitch: number; start: number; end: number};
 
 export function PianoWaterfall({
-  document, clock, intervals, range, selectedOccurrenceId, onSelect,
+  document, clock, intervals, range, selectedOccurrenceId, onSelect, hands,
 }: {
   document: NotationDocument;
   clock: ClockStore | null;
@@ -19,6 +20,7 @@ export function PianoWaterfall({
   range: PianoRange | null;
   selectedOccurrenceId: string | null;
   onSelect: (occurrenceId: string) => void;
+  hands?: Record<string, {hand: Hand}>;
 }) {
   const [hostRef, width] = useElementWidth<HTMLDivElement>();
   const live = useClockTime(clock, 0);
@@ -46,7 +48,7 @@ export function PianoWaterfall({
   const visible = useMemo(() => {
     if (!geometry) return [];
     const result: {id: string; pitch: number; x: number; width: number; y: number; height: number;
-      selected: boolean; active: boolean}[] = [];
+      selected: boolean; active: boolean; hand: Hand}[] = [];
     for (const interval of intervals) {
       if (interval.end <= now || interval.start >= now + windowSeconds) continue;
       const key = keyByPitch.get(interval.pitch);
@@ -62,10 +64,11 @@ export function PianoWaterfall({
         y: clippedTop, height: Math.max(2, clippedBottom - clippedTop),
         selected: interval.id === selectedOccurrenceId,
         active: now >= interval.start && now < interval.end,
+        hand: hands?.[interval.id]?.hand ?? 'unassigned',
       });
     }
     return result;
-  }, [geometry, intervals, keyByPitch, guideNow, now, pixelsPerSecond, selectedOccurrenceId, windowSeconds]);
+  }, [geometry, hands, intervals, keyByPitch, guideNow, now, pixelsPerSecond, selectedOccurrenceId, windowSeconds]);
   const outOfRange = useMemo(() => {
     if (!range) return {low: 0, high: 0};
     let low = 0;
@@ -87,14 +90,23 @@ export function PianoWaterfall({
       ? <svg className="ws-waterfall-svg" viewBox={`0 0 ${Math.max(1, width)} ${VIEW_HEIGHT}`}
           preserveAspectRatio="none" role="img"
           aria-label={`Falling piano guide for ${pitchName(range!.firstPitch)} to ${pitchName(range!.firstPitch + range!.semitones)}`}>
+          <defs>
+            <pattern id="hand-mixed-pattern" width="8" height="8" patternUnits="userSpaceOnUse">
+              <rect width="8" height="8" fill="#d9a45f"/>
+              <rect width="4" height="8" fill="#6f9fd8"/>
+            </pattern>
+          </defs>
           {geometry.whites.map(key => <rect key={`lane-${key.pitch}`} className="ws-waterfall-lane"
             x={key.x} y={0} width={key.width} height={VIEW_HEIGHT}/>)}
-          {visible.map(block => <rect key={block.id} className={`ws-waterfall-note${block.selected ? ' is-selected' : ''}${block.active ? ' is-active' : ''}`}
-            data-occurrence={block.id} data-pitch={block.pitch}
+          {visible.map(block => <rect key={block.id} className={`ws-waterfall-note hand-${block.hand}${block.selected ? ' is-selected' : ''}${block.active ? ' is-active' : ''}`}
+            data-occurrence={block.id} data-pitch={block.pitch} data-hand={block.hand}
             x={block.x} y={block.y} width={block.width} height={block.height} rx={Math.min(4, block.width / 3)}
-            role="button" tabIndex={-1} aria-label={`${pitchName(block.pitch)} guide note`}
+            role="button" tabIndex={-1}
+            aria-label={`${pitchName(block.pitch)} guide note, ${block.hand === 'left' ? 'left hand'
+              : block.hand === 'right' ? 'right hand' : 'unassigned/unknown hand'}`}
             onPointerDown={event => { event.preventDefault(); onSelect(block.id); }}>
-            <title>{pitchName(block.pitch)}</title>
+            <title>{`${pitchName(block.pitch)} · ${block.hand === 'left' ? 'Left hand'
+              : block.hand === 'right' ? 'Right hand' : 'Unknown hand'}`}</title>
           </rect>)}
           <line className="ws-waterfall-strike" x1={0} y1={VIEW_HEIGHT - 1}
             x2={Math.max(1, width)} y2={VIEW_HEIGHT - 1}/>

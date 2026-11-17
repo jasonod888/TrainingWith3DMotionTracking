@@ -9,15 +9,17 @@
  */
 import {
   refreshNotation,
-  type NotationDocument, type NotationEvent, type PerformanceNote,
+  type HandAssignment, type NotationDocument, type NotationEvent, type PerformanceNote,
 } from '../../../../../packages/music-notation/index.ts';
 
 export type PerformanceChange = { id: string; before: PerformanceNote; after: PerformanceNote };
 export type EventChange = { id: string; before: NotationEvent; after: NotationEvent };
+export type HandChange = { id: string; before: HandAssignment | null; after: HandAssignment | null };
 
 export type DocumentPatch = {
   performance: { added: PerformanceNote[]; removed: PerformanceNote[]; changed: PerformanceChange[] };
   events: { added: NotationEvent[]; removed: NotationEvent[]; changed: EventChange[] };
+  hands: { versionBefore?: 1; versionAfter?: 1; changed: HandChange[] };
 };
 
 const NOTE_FIELDS: (keyof PerformanceNote)[] = ['pitch', 'onset', 'duration', 'velocity', 'notation_duration', 'optional'];
@@ -37,6 +39,7 @@ export function diffDocuments(before: NotationDocument, after: NotationDocument)
   const patch: DocumentPatch = {
     performance: { added: [], removed: [], changed: [] },
     events: { added: [], removed: [], changed: [] },
+    hands: {changed: []},
   };
 
   const beforeNotes = new Map(before.performance.map(note => [note.id, note]));
@@ -57,6 +60,20 @@ export function diffDocuments(before: NotationDocument, after: NotationDocument)
   }
   for (const [id, event] of beforeEvents) if (!afterEvents.has(id)) patch.events.removed.push(event);
 
+  const beforeHands = before.hand_assignments ?? {};
+  const afterHands = after.hand_assignments ?? {};
+  for (const id of new Set([...Object.keys(beforeHands), ...Object.keys(afterHands)])) {
+    const previous = beforeHands[id] ?? null;
+    const nextHand = afterHands[id] ?? null;
+    if (JSON.stringify(previous) !== JSON.stringify(nextHand)) {
+      patch.hands.changed.push({id, before: previous, after: nextHand});
+    }
+  }
+  if (patch.hands.changed.length) {
+    patch.hands.versionBefore = before.hand_assignment_version;
+    patch.hands.versionAfter = after.hand_assignment_version;
+  }
+
   return patch;
 }
 
@@ -69,7 +86,8 @@ export function patchBytes(patch: DocumentPatch): number {
 export function isEmptyPatch(patch: DocumentPatch): boolean {
   return patch.performance.added.length === 0 && patch.performance.removed.length === 0
     && patch.performance.changed.length === 0 && patch.events.added.length === 0
-    && patch.events.removed.length === 0 && patch.events.changed.length === 0;
+    && patch.events.removed.length === 0 && patch.events.changed.length === 0
+    && patch.hands.changed.length === 0;
 }
 
 export function applyPatch(
@@ -108,6 +126,24 @@ export function applyPatch(
   }
   for (const event of addEvents) {
     if (!next.events.some(item => item.id === event.id)) next.events.push(structuredClone(event));
+  }
+
+  if (patch.hands.changed.length) {
+    const assignments = {...next.hand_assignments};
+    for (const change of patch.hands.changed) {
+      const value = change[restore];
+      if (value) assignments[change.id] = structuredClone(value);
+      else delete assignments[change.id];
+    }
+    const version = direction === 'before' ? patch.hands.versionBefore : patch.hands.versionAfter;
+    if (version === 1) {
+      next.hand_assignment_version = 1;
+      next.hand_assignments = assignments;
+    } else {
+      delete next.hand_assignment_version;
+      if (Object.keys(assignments).length) next.hand_assignments = assignments;
+      else delete next.hand_assignments;
+    }
   }
 
   return refreshNotation(next);

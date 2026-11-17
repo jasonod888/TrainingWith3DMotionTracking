@@ -33,8 +33,8 @@ test('waterfall maps authoritative source time and holds to shared key lanes', a
   assert.ok(Math.abs(Number(future.getAttribute('y')) - 88) < 0.01);
   assert.ok(Math.abs(Number(future.getAttribute('height')) - 44) < 0.01);
   assert.ok(future.classList.contains('is-selected'));
-  assert.equal(future.querySelector('title')?.textContent, pitchName(60),
-    'human-facing block title omits the internal occurrence id');
+  assert.equal(future.querySelector('title')?.textContent, `${pitchName(60)} · Unknown hand`,
+    'human-facing block title includes hand without the internal occurrence id');
   const held = view.container.querySelector('[data-occurrence="held"]') as SVGRectElement;
   assert.ok(Math.abs(Number(held.getAttribute('y')) - 44) < 0.01,
     'a note already sounding at the seek target keeps its full body');
@@ -137,6 +137,21 @@ test('narrow keyboard range controls pan within the full instrument boundaries',
   assert.equal((view.getByRole('button', {name: 'Next keyboard range'}) as HTMLButtonElement).disabled,
     true, 'C8 is a hard boundary');
   assert.match(view.container.querySelector('.keyboard-octave')?.textContent ?? '', /A0–C8/);
+});
+
+test('sounding keyboard keys use the same hand palette including mixed pitch', async () => {
+  const view = render(<KeyboardEditor document={documentDouble} selectedPitch={60}
+    activePitches={[60, 64]} soundingHands={{60: 'left', 64: 'mixed'}}
+    onKey={() => {}} width={900} range={{firstPitch: 48, semitones: 24}}/>);
+  const left = view.container.querySelector('.keyboard-white[data-pitch="60"]');
+  const mixed = view.container.querySelector('.keyboard-white[data-pitch="64"]');
+  assert.ok(left?.classList.contains('is-active'));
+  assert.ok(left?.classList.contains('is-selected'));
+  assert.ok(left?.classList.contains('hand-left'),
+    'a selected sounding key keeps its hand class');
+  assert.match(left?.getAttribute('aria-label') ?? '', /left hand/i);
+  assert.ok(mixed?.classList.contains('hand-mixed'));
+  assert.match(mixed?.getAttribute('aria-label') ?? '', /both hands/i);
 });
 
 test('editing and undo update the guide without remounting the source media', async () => {

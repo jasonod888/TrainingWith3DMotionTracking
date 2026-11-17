@@ -34,6 +34,24 @@ export type PerformanceNote = {
   fret: number | null;
 };
 
+export type Hand = 'left' | 'right' | 'unassigned';
+export type HandSource = 'manual' | 'baseline' | 'midi2hands' | 'hybrid';
+export type HandConfidence = 'clear' | 'ambiguous' | 'conflict';
+export type HandModelInfo = {name: string; version: string};
+
+/** Optional, versioned estimate metadata keyed by stable performance occurrence id. */
+export type HandAssignment = {
+  hand: Hand;
+  source: HandSource;
+  confidence: HandConfidence;
+  /** A manual choice is an explicit locked override, including manual unassigned. */
+  manual: boolean;
+  reason?: string;
+  /** Required for automatic assignments; identity of the performance context. */
+  fingerprint?: string;
+  model?: HandModelInfo;
+};
+
 export type Tempo = {
   bpm: number;
   /** Beat unit used by the displayed metronome mark. 4 = quarter-note beat. */
@@ -150,6 +168,9 @@ export type NotationDocument = {
   /** Performance event id -> logical notation note id. */
   performance_map: Record<string, string>;
   created_from: 'performance' | 'saved';
+  /** Optional hand-estimate metadata; absent in older documents. */
+  hand_assignment_version?: 1;
+  hand_assignments?: Record<string, HandAssignment>;
 };
 
 export type BuildOptions = {

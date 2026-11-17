@@ -17,9 +17,10 @@
 import {
   GRID, MAX_EVENTS, MAX_MEASURES,
   type NotationDocument, type NotationEvent, type NotationNote, type NotationStaff,
-  type NotationVoice, type PerformanceNote,
+  type NotationVoice, type PerformanceNote, type Hand,
 } from './types';
 import { refreshNotation } from './build';
+import { invalidateStaleHandAssignments, pruneHandAssignments } from './hands';
 import { snapTick, measureTicks } from './rhythm';
 import { accidentalName, displayAccidental, parseSpelling, spellPitch } from './spelling';
 
@@ -87,7 +88,9 @@ export type CorrectionCommand =
         optional?: boolean; string?: number | null; fret?: number | null; velocity?: number | null};
     }
   | { type: 'delete-occurrence'; occurrenceId: string }
-  | { type: 'delete-logical-note'; logicalNoteId: string };
+  | { type: 'delete-logical-note'; logicalNoteId: string }
+  | { type: 'set-occurrence-hand'; occurrenceId: string; hand: Hand }
+  | { type: 'reset-occurrence-hand'; occurrenceId: string };
 
 const EPSILON = 1e-6;
 
@@ -157,7 +160,8 @@ function rejection(code: RejectionCode, message: string): CommandOutcome {
 }
 
 function applied(document: NotationDocument, label: string, selection?: CorrectionSelection | null): Applied {
-  return { status: 'applied', document, label, selection };
+  return {status: 'applied',
+    document: invalidateStaleHandAssignments(pruneHandAssignments(document)), label, selection};
 }
 
 /* ------------------------------------------------------------- validation */
@@ -736,6 +740,33 @@ function removeLogicalNote(document: NotationDocument, logicalNoteId: string): C
   return finalise(next, 'Note and all its occurrences removed');
 }
 
+function setHand(document: NotationDocument, occurrenceId: string, hand: Hand): CommandOutcome {
+  if (!occurrenceById(document, occurrenceId)) {
+    return rejection('unknown-note', 'That note is no longer in the score.');
+  }
+  const existing = document.hand_assignments?.[occurrenceId];
+  if (existing?.manual && existing.hand === hand) return {status: 'unchanged', label: 'Hand unchanged'};
+  const next = clone(document);
+  next.hand_assignment_version = 1;
+  next.hand_assignments = {...next.hand_assignments, [occurrenceId]: {
+    hand, source: 'manual', confidence: hand === 'unassigned' ? 'ambiguous' : 'clear',
+    manual: true, reason: hand === 'unassigned' ? 'Manual unassigned' : 'Manual override',
+  }};
+  return applied(next, hand === 'unassigned' ? 'Hand set to unassigned' : `Hand set to ${hand}`);
+}
+
+function resetHand(document: NotationDocument, occurrenceId: string): CommandOutcome {
+  if (!occurrenceById(document, occurrenceId)) {
+    return rejection('unknown-note', 'That note is no longer in the score.');
+  }
+  if (!document.hand_assignments?.[occurrenceId]) return {status: 'unchanged', label: 'Hand already automatic'};
+  const next = clone(document);
+  next.hand_assignment_version = 1;
+  next.hand_assignments = {...next.hand_assignments};
+  delete next.hand_assignments[occurrenceId];
+  return applied(next, 'Hand reset to automatic');
+}
+
 /* ---------------------------------------------------------------- dispatch */
 
 export function applyCommand(document: NotationDocument, command: CorrectionCommand): CommandOutcome {
@@ -762,6 +793,10 @@ export function applyCommand(document: NotationDocument, command: CorrectionComm
       return removeOccurrence(document, command.occurrenceId);
     case 'delete-logical-note':
       return removeLogicalNote(document, command.logicalNoteId);
+    case 'set-occurrence-hand':
+      return setHand(document, command.occurrenceId, command.hand);
+    case 'reset-occurrence-hand':
+      return resetHand(document, command.occurrenceId);
     default:
       return rejection('invalid-scope', 'That edit is not available yet.');
   }

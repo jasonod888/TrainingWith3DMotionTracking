@@ -16,8 +16,8 @@ export type Account={id:string;email:string;platform_role:'member'|'admin'|'supe
 export type SessionInfo={account:Account;csrf:string};
 let csrf='';
 export class ApiError extends Error{constructor(message:string,public status:number){super(message);}}
-export async function request<T>(path:string,method='GET',body?:unknown,keepalive=false,extraHeaders:Record<string,string>={}):Promise<T>{
- const response=await fetch(`/api${path}`,{method,keepalive,credentials:'same-origin',headers:{...(method==='GET'?{}:{'Content-Type':'application/json','X-Form-Request':'1','X-CSRF-Token':csrf}),...extraHeaders},body:method==='GET'?undefined:JSON.stringify(body??{})});
+export async function request<T>(path:string,method='GET',body?:unknown,keepalive=false,extraHeaders:Record<string,string>={},signal?:AbortSignal):Promise<T>{
+ const response=await fetch(`/api${path}`,{method,keepalive,credentials:'same-origin',headers:{...(method==='GET'?{}:{'Content-Type':'application/json','X-Form-Request':'1','X-CSRF-Token':csrf}),...extraHeaders},body:method==='GET'?undefined:JSON.stringify(body??{}),...(signal?{signal}:{})});
  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(typeof data?.detail==='string'?data.detail:'Something went wrong. Please try again.',response.status);}
  return response.json();
 }

@@ -1,10 +1,17 @@
 /** Shared synthetic preview voice. Held notes remain audible through their displayed span.
  * This is a duration-monitoring audition, not a calibrated acoustic-piano renderer.
  */
-import {velocityCutoff, velocityDecay, velocityGain, velocityPartials} from './music-velocity';
+import {
+  grandPianoPartials, pitchVelocityCutoff, velocityDecay, velocityGain, velocityValue,
+} from './music-velocity';
 
 export type EnvelopePoint = {time: number; gain: number};
-export type PianoVoice = {oscillator: OscillatorNode; gain: GainNode};
+export type PianoVoice = {
+  oscillator: OscillatorNode;
+  gain: GainNode;
+  stop?: () => void;
+  releaseAt?: (time: number, fadeSeconds?: number) => void;
+};
 const SILENCE = 0.0001;
 const HELD_FRACTION = 0.18;
 
@@ -13,7 +20,8 @@ export function auditionEnvelope(duration: number, pitch: number, velocity?: num
   const level = velocityGain(velocity);
   const release = Math.min(.04, duration * .2);
   const heldUntil = duration - release;
-  const attack = Math.min(.008, heldUntil * .25);
+  // Harder strikes speak marginally faster; both remain safely inside the note.
+  const attack = Math.min(velocityValue(velocity) >= .75 ? .004 : .008, heldUntil * .25);
   const decayEnd = Math.min(velocityDecay(velocity), heldUntil * .6);
   const timeConstant = Math.max(1.5, Math.min(4, 2.8 + (60 - pitch) * .025));
   const floorAt = decayEnd + timeConstant * Math.log(.45 / HELD_FRACTION);
@@ -22,6 +30,41 @@ export function auditionEnvelope(duration: number, pitch: number, velocity?: num
     {time: decayEnd, gain: level * .45}];
   if (floorAt < heldUntil) points.push({time: floorAt, gain: level * HELD_FRACTION});
   points.push({time: heldUntil, gain: heldGain}, {time: duration, gain: SILENCE});
+  return points;
+}
+
+/** Continuous acoustic string decay with a felt-damper release, no HELD floor. */
+export function grandPianoEnvelope(duration: number, pitch: number, velocity?: number | null,
+  dampedByKey = true): EnvelopePoint[] {
+  if (!Number.isFinite(duration) || duration <= 0) return [];
+  const level = velocityGain(velocity);
+  const release = dampedByKey ? Math.min(0.16, duration * 0.35) : Math.min(0.28, duration * 0.4);
+  // Keep a minimum held body while preserving the full damper-release tail.
+  const heldUntil = Math.max(duration * 0.2, duration - release);
+  const attack = Math.min(velocityValue(velocity) >= 0.75 ? 0.0035 : 0.007, heldUntil * 0.2);
+  const bloomEnd = Math.min(velocityDecay(velocity) * 0.45, heldUntil * 0.45);
+  const f0 = 440 * Math.pow(2, (pitch - 69) / 12);
+  const tau = Math.max(0.55, Math.min(5.5, 3.8 * Math.pow(220 / Math.max(1, f0), 0.35)));
+  const heldGain = Math.max(SILENCE * 2,
+    level * 0.52 * Math.exp(-Math.max(0, heldUntil - bloomEnd) / tau));
+  const points: EnvelopePoint[] = [
+    {time: 0, gain: SILENCE},
+    {time: attack, gain: level},
+    {time: bloomEnd, gain: level * 0.52},
+  ];
+  if (heldUntil - bloomEnd > 0.25) {
+    const midTime = bloomEnd + (heldUntil - bloomEnd) * 0.5;
+    points.push({time: midTime,
+      gain: Math.max(SILENCE * 2, level * 0.52 * Math.exp(-(midTime - bloomEnd) / tau))});
+  }
+  points.push({time: heldUntil, gain: heldGain}, {time: duration, gain: SILENCE});
+  // Keep automation strictly ordered even for pathological tiny durations.
+  for (let index = 1; index < points.length; index += 1) {
+    if (!(points[index].time > points[index - 1].time)) {
+      points[index].time = points[index - 1].time + 1e-5;
+    }
+    points[index].gain = Math.max(SILENCE, Math.min(1, points[index].gain));
+  }
   return points;
 }
 
@@ -40,17 +83,23 @@ export function envelopeGainAt(points: EnvelopePoint[], time: number): number {
 
 export function schedulePianoVoice(context: BaseAudioContext, destination: AudioNode, note: {
   pitch: number; velocity?: number | null; duration: number; startTime: number;
-  elapsed?: number; windowSeconds?: number;
+  elapsed?: number; windowSeconds?: number; unison?: boolean;
+  acousticDecay?: boolean; dampedByKey?: boolean;
 }): PianoVoice | null {
   const elapsed = Math.max(0, note.elapsed ?? 0);
   const length = Math.min(note.duration - elapsed, note.windowSeconds ?? Infinity);
   if (!Number.isFinite(length) || length <= 0 || !Number.isInteger(note.pitch) || note.pitch < 0 || note.pitch > 127) return null;
-  const points = auditionEnvelope(note.duration, note.pitch, note.velocity);
+  const points = note.acousticDecay
+    ? grandPianoEnvelope(note.duration, note.pitch, note.velocity, note.dampedByKey ?? true)
+    : auditionEnvelope(note.duration, note.pitch, note.velocity);
   const oscillator = context.createOscillator(), gain = context.createGain(), filter = context.createBiquadFilter();
-  const partials = velocityPartials(note.velocity);
-  oscillator.setPeriodicWave(context.createPeriodicWave(new Float32Array([0, ...partials]), new Float32Array(partials.length + 1)));
+  const partials = grandPianoPartials(note.pitch, note.velocity);
+  const wave = context.createPeriodicWave(new Float32Array([0, ...partials]), new Float32Array(partials.length + 1));
+  oscillator.setPeriodicWave(wave);
   oscillator.frequency.value = 440 * 2 ** ((note.pitch - 69) / 12);
-  filter.type = 'lowpass'; filter.frequency.value = velocityCutoff(note.velocity); filter.Q.value = .7;
+  filter.type = 'lowpass';
+  filter.frequency.value = pitchVelocityCutoff(note.pitch, note.velocity);
+  filter.Q.value = .7;
   // Clip the same full-note envelope, preserving elapsed decay when a range starts mid-note.
   const clipped = elapsed + length < note.duration - 1e-9;
   const fadeStart = clipped ? length - Math.min(.04, length * .2) : length;
@@ -66,8 +115,70 @@ export function schedulePianoVoice(context: BaseAudioContext, destination: Audio
   }
   gain.gain.exponentialRampToValueAtTime(SILENCE, note.startTime + length);
   oscillator.connect(filter).connect(gain).connect(destination);
-  oscillator.onended = () => {oscillator.disconnect(); filter.disconnect(); gain.disconnect();};
+  const extraOscillators: OscillatorNode[] = [];
+  const extraGains: GainNode[] = [];
+  const stopped = {value: false};
+  const stopExtra = () => {
+    if (stopped.value) return;
+    stopped.value = true;
+    for (const node of extraOscillators) {
+      try { node.stop(); } catch { /* stopped */ }
+      try { node.disconnect(); } catch { /* disconnected */ }
+    }
+    for (const node of extraGains) { try { node.disconnect(); } catch { /* disconnected */ } }
+  };
+  // A full browser AudioContext gets a gently detuned unison string and a hammer
+  // transient. The minimal test doubles intentionally provide neither capability.
+  const fullSynthesis = typeof (context as AudioContext).createStereoPanner === 'function';
+  if (fullSynthesis && note.unison !== false) {
+    const secondary = context.createOscillator();
+    secondary.setPeriodicWave(wave);
+    secondary.frequency.value = oscillator.frequency.value;
+    if (secondary.detune) secondary.detune.value = 3.5;
+    const blend = context.createGain();
+    blend.gain.value = 0.16;
+    secondary.connect(blend).connect(gain);
+    secondary.start(note.startTime);
+    secondary.stop(note.startTime + length + .005);
+    extraOscillators.push(secondary);
+    extraGains.push(blend);
+  }
+  if (fullSynthesis && elapsed <= 1e-6) {
+    const hammer = context.createOscillator();
+    hammer.type = 'triangle';
+    hammer.frequency.value = Math.min(9000, oscillator.frequency.value * 4.2);
+    const hammerGain = context.createGain();
+    const level = Math.min(.045, .008 + velocityValue(note.velocity) * .045);
+    hammerGain.gain.setValueAtTime(Math.max(.0001, level), note.startTime);
+    hammerGain.gain.exponentialRampToValueAtTime(SILENCE, note.startTime + .045);
+    hammer.connect(hammerGain).connect(destination);
+    hammer.start(note.startTime);
+    hammer.stop(note.startTime + .05);
+    extraOscillators.push(hammer);
+    extraGains.push(hammerGain);
+  }
+  oscillator.onended = () => {
+    stopExtra();
+    try { oscillator.disconnect(); } catch { /* disconnected */ }
+    try { filter.disconnect(); } catch { /* disconnected */ }
+    try { gain.disconnect(); } catch { /* disconnected */ }
+  };
   oscillator.start(note.startTime);
   oscillator.stop(note.startTime + length + .005);
-  return {oscillator, gain};
+  return {oscillator, gain, stop: () => {
+    stopExtra();
+    try { oscillator.stop(); } catch { /* already stopped */ }
+    try { oscillator.disconnect(); } catch { /* disconnected */ }
+    try { filter.disconnect(); } catch { /* disconnected */ }
+    try { gain.disconnect(); } catch { /* disconnected */ }
+  }, releaseAt: (time, fadeSeconds = .015) => {
+    const at = Math.max(note.startTime, time);
+    const fade = Math.max(.003, fadeSeconds);
+    const relative = elapsed + Math.max(0, at - note.startTime);
+    const current = Math.max(SILENCE, envelopeGainAt(points, relative));
+    try { gain.gain.cancelScheduledValues(at); } catch { /* minimal test double */ }
+    try { gain.gain.setValueAtTime(current, at); } catch { /* already ended */ }
+    try { gain.gain.exponentialRampToValueAtTime(SILENCE, at + fade); } catch { /* already ended */ }
+    try { oscillator.stop(at + fade + .005); } catch { /* already stopping */ }
+  }};
 }

@@ -58,15 +58,31 @@ proposal.
   review keep their native behavior. Focus/target outside the workspace, other app
   chrome and hidden/inactive workspace are explicitly ignored. Listener is removed on
   unmount.
+- **Hands** — Settings → Playback & view shows blue Left, amber Right, grey-green
+  Unknown and the model/baseline status, with an explicit Refresh estimate control.
+  Estimates are applied as derived colours only; opening the lesson does not mark it
+  dirty. The note editor exposes Left/Right/Unknown manual overrides and Auto reset.
+  Manual overrides (including manual Unknown) are locked and undoable. A normal reviewed
+  save materialises current estimates into the saved notation; model results are accepted
+  only for the matching performance fingerprint and a failed request leaves the
+  canonical baseline usable.
 - Note-density overview — click seek, draggable visible window, keyboard range slider;
   endpoint labels removed because dock times own mm:ss.
 - Elapsed / total time — mm:ss.
 - Playback speed — compact visible value and accessible name.
-- Original / Piano source audio — Piano is shown only when a preview asset exists;
-  unavailable/stale preview state is explained in Sound.
+- Original / Piano source audio — both buttons are always present. Original remains the
+  safe default. In browsers with Web Audio, Piano defaults to the **Live grand piano**
+  synthesizer, using Kong performance notes, velocity, sustain-pedal spans and audible
+  string decay; when a verified WAV exists the Sound drawer also offers
+  **Live grand piano / Rendered WAV**. JSDOM/no-Web-Audio hosts retain the verified WAV
+  path. Live Piano mutes the video while active and restores its prior mute state on
+  Original; it follows the single source clock and rate and never free-runs when paused,
+  seeking, ended or stalled.
 - Resume follow when manual browsing suspended; direction indicator.
 - Video — bounded drawer preview; one persistent media element.
-- Sound — source audio options and verification/unavailable explanation.
+- Sound — always-available Original/Piano options, verified-WAV or live-grand-piano
+  explanation, and verification/unavailable status. Live synthesis never free-runs when
+  paused, seeking, ended or stalled; it follows the single source clock and rate.
 
 ## Keyboard
 
@@ -87,7 +103,11 @@ proposal.
 - Previous/Next range controls replace octave up/down in the focused workspace;
   standalone KeyboardEditor keeps compatible octave defaults unless a controlled range
   is supplied.
-- Visible keys audition; selection and sounding states are distinct.
+- Visible keys audition; selection and sounding states are distinct. Pointer/key strike
+  position and meaningful pointer pressure set touch velocity (soft upper edge, louder
+  front edge); keyboard activation uses 0.7. Sounding keys use the shared hand palette.
+- Note Editor Preview/Audition passes the selected occurrence's recorded/edited velocity
+  to the shared grand-piano voice.
 - Explicit Choose on keyboard / Replace mode suppresses the editor so every visible key
   and both range controls are physically usable; visible Cancel instruction;
   commit/Cancel/Escape restore the editor.

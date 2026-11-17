@@ -67,6 +67,17 @@ class Settings(BaseSettings):
     # the default instructor alignment. On by default; set
     # CAMERA_CALIBRATION_ENABLED=false to bypass height matching.
     camera_calibration_enabled: bool = True
+    # Optional CPU midi2hands operation. The baseline remains available when this is
+    # disabled/unavailable; no heavy import happens in the API process.
+    hands_model_enabled: bool = True
+    hands_model_python: str = ''  # explicit interpreter; otherwise .venv-music is discovered
+    hands_model_adapter: Path = ROOT / 'tools/midi2hands/adapter.py'
+    hands_model_artifact: Path = ROOT / 'tools/midi2hands/model.onnx'
+    hands_model_timeout_seconds: float = 45.0
+    hands_model_max_events: int = 20000
+    hands_model_cache_ttl_seconds: int = 300
+    hands_model_cache_entries: int = 64
+    hands_model_queue_wait_seconds: float = 5.0
 
     @model_validator(mode='after')
     def deployment_security(self):

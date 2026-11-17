@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "note": "Actual CPU runs on 2026-11-17 using the pinned in-memory ONNX bytes and existing project .venv-music. Times are single runs, not benchmarks. Raw scores are uncalibrated; agreement is not accuracy.",
+  "artifact": {
+    "upstream_commit": "78e546b520144b301de5e793ceb83be61356a65d",
+    "model_sha256": "6b7a7858a881e9e231bb3aeeecc1480c9b43a816f4ea2cac2182dc34b44e18dd",
+    "bytes": 252047,
+    "window_size": 64,
+    "features": 4,
+    "license": "MIT"
+  },
+  "runtime_used": {
+    "python": "3.12.2",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.1",
+    "provider": "CPUExecutionProvider",
+    "pinned_optional_requirements_prepared": {
+      "numpy": "2.5.4",
+      "onnxruntime": "1.31.1",
+      "not_installed_in_this_environment": false,
+      "note": "The project-local .venv-music already contains these validated versions; .venv-midi2hands is incomplete and unused."
+    }
+  },
+  "small_fixture": {
+    "input": "tools/midi2hands/small-events.json",
+    "events": 5,
+    "predicted": 5,
+    "out_of_domain": 0,
+    "invalid": 0,
+    "left": 2,
+    "right": 3,
+    "fingerprint": "ph1:ffca107c9a16e43eeb5d18b827671bc567c516309e96d326b38a3dc41744e72e",
+    "model_load_ms": 11.393,
+    "inference_ms": 2.855,
+    "baseline_comparison": {
+      "comparable": 4,
+      "agreement": 4,
+      "disagreement": 0,
+      "baseline_unassigned": 1
+    }
+  },
+  "long_fixture": {
+    "input": "docs/qualification/piano-workspace-phase-06/long-draft.json",
+    "events": 1338,
+    "predicted": 1338,
+    "out_of_domain": 0,
+    "invalid": 0,
+    "left": 615,
+    "right": 723,
+    "fingerprint": "ph1:cc327490dc1bb0d412ce0dbbdcf3a5f31eacd13655b83b00641983fcced4f80c",
+    "model_load_ms": 10.734,
+    "inference_ms": 492.268,
+    "baseline_comparison": {
+      "comparable": 1279,
+      "agreement": 1138,
+      "disagreement": 141,
+      "agreement_rate": 0.8897576231430805,
+      "baseline_unassigned": 59,
+      "model_unassigned": 0
+    }
+  }
+}
