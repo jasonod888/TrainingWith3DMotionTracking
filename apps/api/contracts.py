@@ -257,7 +257,7 @@ class MusicEvent(Contract):
     confidence: float | None = Field(default=None, ge=0, le=1)
     optional: bool = False
     string: int | None = Field(default=None, ge=1, le=6)
-    fret: int | None = Field(default=None, ge=0, le=12)
+    fret: int | None = Field(default=None, ge=0, le=24)
 
     @model_validator(mode='after')
     def positioned(self):
@@ -275,12 +275,12 @@ class GuitarChord(Contract):
     name: str = Field(min_length=1, max_length=40)
     start: float = Field(ge=0)
     frets: list[int] = Field(min_length=6, max_length=6)
-    position: int = Field(default=1, ge=1, le=9)
+    position: int = Field(default=1, ge=1, le=24)
 
     @model_validator(mode='after')
     def playable(self):
-        if any(fret < -1 or fret > 12 for fret in self.frets):
-            raise ValueError('Chord frets must be muted (-1), open (0) or 1-12.')
+        if any(fret < -1 or fret > 24 for fret in self.frets):
+            raise ValueError('Chord frets must be muted (-1), open (0) or 1-24.')
         if all(fret < 0 for fret in self.frets):
             raise ValueError('A chord needs at least one sounding string.')
         if any(fret > 0 and not (self.position <= fret <= self.position + 3) for fret in self.frets):

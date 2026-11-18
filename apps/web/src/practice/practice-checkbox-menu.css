@@ -1,0 +1,27 @@
+.practice-checkbox-menu { position: relative; flex: 0 0 auto; }
+.practice-checkbox-menu-trigger { cursor: pointer; }
+.practice-checkbox-menu-popup {
+  position: absolute;
+  z-index: 45;
+  left: 0;
+  bottom: calc(100% + 6px);
+  min-width: 176px;
+  padding: 6px;
+  border: 1px solid #ffffff24;
+  border-radius: 10px;
+  background: #10241d;
+  box-shadow: 0 10px 28px #0006;
+}
+.practice-checkbox-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: #eef4e9;
+  font: 12px/1.2 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  cursor: pointer;
+}
+.practice-checkbox-menu-row:hover { background: #ffffff0d; }
+.practice-checkbox-menu-row input { width: 16px; height: 16px; margin: 0; accent-color: #d8ed9b; }

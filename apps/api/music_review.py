@@ -46,6 +46,8 @@ class ReviewAssessment(Contract):
 
 class ReviewMusic(Contract):
     draft_id: str = Field(min_length=1,max_length=80)
+    # Optional: the shared music engine names its instrument, and older clients omit it.
+    subject: Literal['piano','guitar'] | None = None
     reference_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     title: str = Field(min_length=1,max_length=200)
     events: list[MusicEvent] = Field(max_length=20000)
@@ -61,6 +63,24 @@ class ReviewMusic(Contract):
     # Required whenever verification decisions exist; binds the save to the exact
     # working state the owner reviewed.
     verification_state_token: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
+
+
+GUITAR_TUNING_TEXT = {
+    'standard': 'E2 A2 D3 G3 B3 E4',
+    'drop_d': 'D2 A2 D3 G3 B3 E4',
+    'half_step_down': 'Eb2 Ab2 Db3 Gb3 Bb3 Eb4',
+    'dadgad': 'D2 A2 D3 G3 A3 D4',
+}
+
+
+def sync_guitar_instrument(proposal: MusicDraftDocument, notation: dict) -> None:
+    """Persist the authored tuning/capo so Watch and the manifest agree with TAB."""
+    if proposal.subject != 'guitar':
+        return
+    tuning = notation.get('guitar_tuning') or 'standard'
+    capo = notation.get('guitar_capo') or 0
+    proposal.instrument.tuning = GUITAR_TUNING_TEXT.get(tuning, GUITAR_TUNING_TEXT['standard'])
+    proposal.instrument.capo = int(capo) if isinstance(capo, int) and not isinstance(capo, bool) and capo > 0 else None
 
 
 def canonical(value):
@@ -89,6 +109,8 @@ def install_music_review(app,settings,identity,db):
         if newest.id!=row.id or row.status!='draft':raise HTTPException(409,'A newer draft is available. Reopen the review.')
         if body.assessment.assessment=='notes' and row.subject!='piano':
             raise HTTPException(422,'MIDI feedback is only available for piano lessons.')
+        if body.subject is not None and body.subject!=row.subject:
+            raise HTTPException(409,'The review subject does not match this draft.')
         if row.document['reference']['sha256']!=body.reference_sha256:
             raise HTTPException(409,'The draft changed. Reopen the review.')
         try:
@@ -128,6 +150,9 @@ def install_music_review(app,settings,identity,db):
                 notation=validate_notation(body.notation, proposal.events, proposal.duration)
             except ValueError as exc:
                 raise HTTPException(422, str(exc)) from exc
+            if notation.get('subject')!=proposal.subject:
+                raise HTTPException(422,'The notation instrument does not match this draft.')
+            sync_guitar_instrument(proposal, notation)
         alignment=None
         if body.alignment is not None:
             candidate=dict(body.alignment)

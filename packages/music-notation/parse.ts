@@ -12,6 +12,7 @@ import { refreshNotation } from './build';
 import { measureTicks } from './rhythm';
 import { keySignature, parseSpelling } from './spelling';
 import { parseHandAssignmentMetadata } from './hands';
+import { isGuitarTuningId, isPlayablePosition, type GuitarSetup } from './guitar';
 
 const STAFFS = ['treble', 'bass'] as const;
 
@@ -37,7 +38,7 @@ function number(value: unknown, name: string): number {
   return value;
 }
 
-function parsePerformance(value: unknown): PerformanceNote[] {
+function parsePerformance(value: unknown, setup: GuitarSetup = {}): PerformanceNote[] {
   if (!Array.isArray(value) || value.length > MAX_EVENTS) throw new Error('The notation has no valid performance events.');
   const ids = new Set<string>();
   return value.map((raw, index) => {
@@ -61,8 +62,11 @@ function parsePerformance(value: unknown): PerformanceNote[] {
     const string = item.string == null ? null : number(item.string, `performance string ${index + 1}`);
     const fret = item.fret == null ? null : number(item.fret, `performance fret ${index + 1}`);
     if ((string === null) !== (fret === null)) throw new Error('A performance position needs both string and fret.');
-    if (string !== null && (!Number.isInteger(string) || string < 1 || string > 6 || fret === null || !Number.isInteger(fret) || fret < 0 || fret > 12)) {
+    if (string !== null && (!Number.isInteger(string) || string < 1 || string > 6 || fret === null || !Number.isInteger(fret) || fret < 0 || fret > 24)) {
       throw new Error('A performance position is invalid.');
+    }
+    if (string !== null && !isPlayablePosition(pitch, string, fret, setup)) {
+      throw new Error('A performance position does not match the active tuning and capo.');
     }
     return { id, onset, duration, ...(notationDuration != null ? {notation_duration: notationDuration} : {}), pitch, velocity, confidence, optional: item.optional === true, string, fret };
   });
@@ -111,7 +115,7 @@ function parseMeasures(value: unknown, time: { numerator: number; denominator: 1
 export function parseNotationDocument(value: unknown): NotationDocument {
   const document = record(value);
   if (document.notation_version !== 1) throw new Error('This notation document has an unsupported version.');
-  if (document.subject !== 'piano') throw new Error('Notation editing is only available for piano lessons.');
+  if (document.subject !== 'piano' && document.subject !== 'guitar') throw new Error('The notation has an unknown instrument.');
   const duration = number(document.duration, 'duration');
   if (duration <= 0) throw new Error('The notation has no duration.');
   if (document.ppq !== PPQ) throw new Error('The notation uses an unsupported tick resolution.');
@@ -127,7 +131,22 @@ export function parseNotationDocument(value: unknown): NotationDocument {
   const signature = { numerator, denominator: denominator as 1 | 2 | 4 | 8 | 16 };
   const key = text(document.key_signature, 'key signature', 4);
   keySignature(key);
-  const performance = parsePerformance(document.performance);
+  const rawTuning = document.guitar_tuning;
+  if (rawTuning !== undefined && rawTuning !== null && !isGuitarTuningId(rawTuning)) {
+    throw new Error('The notation has an unknown guitar tuning.');
+  }
+  const rawCapo = document.guitar_capo;
+  if (rawCapo !== undefined && rawCapo !== null
+    && (typeof rawCapo !== 'number' || !Number.isInteger(rawCapo) || rawCapo < 0 || rawCapo > 12)) {
+    throw new Error('The notation has an invalid guitar capo.');
+  }
+  const guitarTuning = rawTuning === null ? undefined : rawTuning;
+  const guitarCapo = rawCapo === null ? undefined : rawCapo as number | undefined;
+  const guitarSetup: GuitarSetup = {
+    ...(guitarTuning !== undefined ? {tuning: guitarTuning} : {}),
+    ...(guitarCapo !== undefined ? {capo: guitarCapo} : {}),
+  };
+  const performance = parsePerformance(document.performance, guitarSetup);
   for (const note of performance) {
     if (note.duration != null && note.onset + note.duration > duration + 1e-6) {
       throw new Error('A notation performance note ends outside the clip.');
@@ -187,7 +206,7 @@ export function parseNotationDocument(value: unknown): NotationDocument {
     document.hand_assignment_version, new Set(performance.map(note => note.id)));
   const notation: NotationDocument = {
     notation_version: 1,
-    subject: 'piano',
+    subject: document.subject === 'guitar' ? 'guitar' : 'piano',
     duration,
     ppq: PPQ,
     tempo: { bpm, beat_unit: 4, mode: 'notation', source: tempo.source },
@@ -201,6 +220,8 @@ export function parseNotationDocument(value: unknown): NotationDocument {
     performance,
     performance_map: {},
     created_from: document.created_from === 'saved' ? 'saved' : 'performance',
+    ...(guitarTuning !== undefined ? {guitar_tuning: guitarTuning} : {}),
+    ...(guitarCapo !== undefined ? {guitar_capo: guitarCapo} : {}),
     ...handMetadata,
   };
   return refreshNotation(notation);

@@ -8,22 +8,25 @@ const FORMATS = {'X-Lesson-Formats': '1,2'};
 
 /**
  * One entry point for the normal music review route. It resolves the subject from the
- * saved music manifest first, so a saved-only piano revision opens even when no draft
- * exists, and only the guitar path mounts the legacy review form.
+ * saved music manifest first, so a saved-only revision opens even when no draft
+ * exists. Piano and guitar both use the shared workspace; the legacy guitar form is
+ * available only through an explicit opt-in.
  */
-export function MusicReviewRoute({lessonId, onBack, onReviewed, onDirty, onFocusedChange}: {
+export function MusicReviewRoute({lessonId, onBack, onReviewed, onDirty, onFocusedChange, legacyGuitarReview = false}: {
   lessonId: string;
   onBack: () => void;
   onReviewed: (lesson: MusicLessonManifest) => void;
   onDirty: (dirty: boolean) => void;
-  /** Lets the app shell hide global navigation only for the focused piano route. */
+  /** Lets the app shell hide global navigation only for the focused workspace route. */
   onFocusedChange?: (focused: boolean) => void;
+  /** Escape hatch for callers that still want the legacy guitar review form. */
+  legacyGuitarReview?: boolean;
 }) {
   const [mode, setMode] = useState<'loading' | 'piano' | 'guitar' | 'error'>('loading');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    onFocusedChange?.(mode === 'piano');
+    onFocusedChange?.(mode === 'piano' || mode === 'guitar');
   }, [mode, onFocusedChange]);
 
   useEffect(() => {
@@ -35,13 +38,9 @@ export function MusicReviewRoute({lessonId, onBack, onReviewed, onDirty, onFocus
       // Saved revision wins: a reviewed lesson has a manifest even without a draft.
       try {
         const manifest = await request<unknown>(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false, FORMATS);
-        if ((manifest as {schema_version?: number; subject?: string}).schema_version === 2
-          && (manifest as {subject?: string}).subject === 'piano') {
-          if (!stopped) setMode('piano');
-          return;
-        }
         if ((manifest as {schema_version?: number}).schema_version === 2) {
-          if (!stopped) setMode('guitar');
+          const subject = (manifest as {subject?: string}).subject;
+          if (!stopped) setMode(subject === 'guitar' ? 'guitar' : 'piano');
           return;
         }
       } catch {
@@ -63,13 +62,15 @@ export function MusicReviewRoute({lessonId, onBack, onReviewed, onDirty, onFocus
     return () => { stopped = true; };
   }, [lessonId]);
 
-  if (mode === 'piano') {
-    return <PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack} onDirty={onDirty}
-      onSaved={(_revisionId, current) => { if (current) onDirty(false); }}/>;
-  }
-  if (mode === 'guitar') {
+  // Both instruments use the unified workspace; only an explicit legacy opt-in mounts
+  // the old guitar-only review form.
+  if (mode === 'guitar' && legacyGuitarReview) {
     return <MusicDraftReview lessonId={lessonId} onBack={onBack} onDirty={onDirty}
       onCompare={() => {}} onReviewed={onReviewed}/>;
+  }
+  if (mode === 'piano' || mode === 'guitar') {
+    return <PianoWorkspaceHarness lessonId={lessonId} embedded mode="review" onBack={onBack} onDirty={onDirty}
+      onSaved={(_revisionId, current) => { if (current) onDirty(false); }}/>;
   }
   if (mode === 'error') {
     return <section className="music-home music-review" aria-label="Review music reference">

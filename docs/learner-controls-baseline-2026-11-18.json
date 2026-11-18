@@ -1,0 +1,114 @@
+{
+  "date": "2026-11-18",
+  "timezone": "Asia/Singapore",
+  "git_head": "fc4e33aee3e384aaba24aa181b4eb7549a7aa60b",
+  "basis": "Current working tree including uncommitted changes; source baseline only, no browser verification",
+  "local_archive": "D:\\3d_trainer\\developement\\.local\\dsh-practice-engine\\learner-controls-baseline-2026-11-18.zip",
+  "files": [
+    {
+      "path": "apps/web/src/style.css",
+      "sha256": "026ceb53762f5f1bb11c93682c9fd1329dd847bd0c7b7e6b5fb590d4996baf2b",
+      "bytes": 26550
+    },
+    {
+      "path": "apps/web/src/feed.css",
+      "sha256": "2e13df566d9508703a7df3f33eb0d3254261e246be0bf34ef3f4329e2159c2a5",
+      "bytes": 18267
+    },
+    {
+      "path": "apps/web/src/preview.css",
+      "sha256": "8ac2ab67bbc23ec11009a4cc9f94d12965d469672a6eeda99a25ed467468df8f",
+      "bytes": 6446
+    },
+    {
+      "path": "apps/web/src/practice.css",
+      "sha256": "6e8d3bd3d03acd6a1777b910dbf9333e83d89ebf15ae48c8d596dc04c1d1b2af",
+      "bytes": 52294
+    },
+    {
+      "path": "apps/web/src/practice-player.css",
+      "sha256": "1f5dc666b6bbb9e3d0e09fd7135cd442a50762ee95481e212fdcf494469df6b6",
+      "bytes": 13671
+    },
+    {
+      "path": "apps/web/src/practice-timeline.css",
+      "sha256": "5f97018848ebaf284f5b14659864cf5db03e8e72f803109e4bcd15f2f4a9fb63",
+      "bytes": 6458
+    },
+    {
+      "path": "apps/web/src/practice/practice-runtime.css",
+      "sha256": "a19cd604666e9d5ab8cd4f6306bb4cb2e0230906e9b028ff5139a9c4333b1cce",
+      "bytes": 4002
+    },
+    {
+      "path": "apps/web/src/practice/experience-mode.css",
+      "sha256": "7ffd5e106994c4753b8707a5e5c79896589210fad721fa770bde5f36b565b6ab",
+      "bytes": 1733
+    },
+    {
+      "path": "apps/web/src/practice/practice-checkbox-menu.css",
+      "sha256": "ade709370e360ad9e5ae97377fc5e5501051853430b97d27f4f2ae3499a9bf91",
+      "bytes": 796
+    },
+    {
+      "path": "apps/web/src/music/workspace/workspace.css",
+      "sha256": "fc5d0e268d98dab4d8bbd48d77a6c3aeb67337b853c3159e3b3c855b105dc252",
+      "bytes": 51912
+    },
+    {
+      "path": "apps/web/src/music/workspace/piano-practice-views.css",
+      "sha256": "92d6b33a1dab80c6aed16b35941876b16582d2177b4c1d551397c8fef4ac21a5",
+      "bytes": 554
+    },
+    {
+      "path": "apps/web/src/music/music.css",
+      "sha256": "b5ca9276270f5d08a8cd0c07274d4edc0acf5dfd76e2bb67bdd584808886ad25",
+      "bytes": 11637
+    },
+    {
+      "path": "apps/web/src/PracticePlayerDock.tsx",
+      "sha256": "1b315390ba55293afba40098d12cd80d8a0b1dd4e10071c0673547ff6cb65951",
+      "bytes": 3744
+    },
+    {
+      "path": "apps/web/src/PracticePreview.tsx",
+      "sha256": "d77c054cf5876fe0aa26074e04e85baa91a4c1057777008c62c7bb0b4e7ad3d7",
+      "bytes": 9064
+    },
+    {
+      "path": "apps/web/src/PracticeFeed.tsx",
+      "sha256": "1f05f9f341d346bdee2a7b8ee28cba11ab68b9bfaa5b8f55683446fc76ab8c9c",
+      "bytes": 10762
+    },
+    {
+      "path": "apps/web/src/FeedCard.tsx",
+      "sha256": "611c88066b094921b9a7021e3e2e9f3eb62a94b3510275f83f82add2598f1cdf",
+      "bytes": 3397
+    },
+    {
+      "path": "apps/web/src/PracticePanel.tsx",
+      "sha256": "5783241317bac4c116aeb148d7c7a32bff9d50b8448819517849ad56a63bcc2d",
+      "bytes": 2849
+    },
+    {
+      "path": "apps/web/src/practice/PracticeShell.tsx",
+      "sha256": "b6356a38229a9c0d8ae957db41a4cc6fd0c7a281166abe7572dd3f32cbb87e70",
+      "bytes": 9099
+    },
+    {
+      "path": "apps/web/src/practice/ExperienceModeSelector.tsx",
+      "sha256": "16793259a5499b89bdcba3209d47ea7bdac2875ffbb5f7ca701ecb6a20a32920",
+      "bytes": 1518
+    },
+    {
+      "path": "apps/web/src/practice/PracticeCheckboxMenu.tsx",
+      "sha256": "e5bcd4fb030a14b8ae370c202e771346320050387367e1f3c2dd1a7bd53ab691",
+      "bytes": 2331
+    },
+    {
+      "path": "apps/web/src/music/workspace/PianoPracticeWorkspace.tsx",
+      "sha256": "1ae26d3526618da83172408ebf8f26a9ebd95d6e82d2b13474f4e6be83629130",
+      "bytes": 25504
+    }
+  ]
+}

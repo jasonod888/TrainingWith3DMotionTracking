@@ -35,7 +35,9 @@ function UnsupportedScreen({onBack}: {onBack: () => void}) {
 
 export function LessonExperienceHost({document,pianoLibrary=false,guitarLibrary=false, ...body}: {document: LessonDocument} & BodyProps & LibraryGuideProps) {
   if (document.kind === 'music') {
-    if (document.value.subject === 'piano') {
+    // Piano and guitar share one workspace engine; the document subject selects the
+    // instrument-specific surfaces inside it.
+    if (document.value.subject === 'piano' || document.value.subject === 'guitar') {
       return <Suspense fallback={<MusicFallback onBack={body.onBack}/>}>
         <PianoWorkspaceHarness lessonId={document.value.lesson_id} lessonTitle={document.value.title} embedded mode="practice" onBack={body.onBack} onModeChange={body.onModeChange}/>
       </Suspense>;

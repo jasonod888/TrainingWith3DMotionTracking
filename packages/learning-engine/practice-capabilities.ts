@@ -97,7 +97,7 @@ export const MUSIC_CAPABILITIES: PracticeCapabilities = {
   repeat: 'supported',
   restartLesson: 'supported',
   progression: ['sections'],
-  speeds: [0.25, 0.5, 0.75, 1],
+  speeds: [0.25, 0.5, 0.75, 1, 1.25],
   countIn: {supported: true, value: 0, options: [0, 3, 5, 10].map(seconds => ({seconds, label: seconds ? `${seconds}s` : 'Off'}))},
   rest: {supported: true, value: 1.5, options: [0, 1.5, 3, 5]},
   repetitions: {supported: true, value: 0, options: [0, 2, 3, 5, 10]},

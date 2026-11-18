@@ -89,7 +89,7 @@
 .practice-player-actions { flex-wrap: wrap; }
 .practice-player-tools { margin-left: auto; gap: 2px; flex-shrink: 0; }
 
-.practice-player-dock .practice-player-actions > .practice-player-primary {
+.practice-player-dock .practice-player-actions > .practice-player-primary:not(.ui-btn) {
  display: inline-flex;
  align-items: center;
  justify-content: center;
@@ -106,13 +106,13 @@
  font-weight: 600;
 }
 
-.practice-player-dock .practice-player-actions > .practice-player-primary > svg,
-.practice-player-dock .practice-player-actions > .player-text-action > svg,
-.practice-player-dock .practice-player-tools > .player-text-action > svg { flex-shrink: 0; }
+.practice-player-dock .practice-player-actions > .practice-player-primary:not(.ui-btn) > svg,
+.practice-player-dock .practice-player-actions > .player-text-action:not(.ui-btn) > svg,
+.practice-player-dock .practice-player-tools > .player-text-action:not(.ui-btn) > svg { flex-shrink: 0; }
 
-.practice-player-dock .practice-player-actions > .player-text-action,
-.practice-player-dock .practice-player-tools > .player-text-action,
-.practice-player-dock .practice-player-tools > .player-tool {
+.practice-player-dock .practice-player-actions > .player-text-action:not(.ui-btn),
+.practice-player-dock .practice-player-tools > .player-text-action:not(.ui-btn),
+.practice-player-dock .practice-player-tools > .player-tool:not(.ui-btn) {
  display: inline-flex;
  align-items: center;
  justify-content: center;
@@ -129,14 +129,14 @@
  font-weight: 400;
 }
 
-.practice-player-dock .practice-player-tools > .player-tool { min-width: 44px; }
+.practice-player-dock .practice-player-tools > .player-tool:not(.ui-btn) { min-width: 44px; }
 
 /* One authoritative geometry for every select in the shared dock. Widths remain
    subject-specific (mode 124px, source smaller), but height/box/padding/type/radius
    cannot drift between mode and source controls or with host select rules. */
-.practice-player-dock .practice-player-tools select,
-.practice-player-dock .practice-player-tools .experience-mode-selector select,
-.practice-player-dock .practice-player-tools .ws-practice-source-select {
+.practice-player-dock .practice-player-tools select:not(.ui-select),
+.practice-player-dock .practice-player-tools .experience-mode-selector select:not(.ui-select),
+.practice-player-dock .practice-player-tools .ws-practice-source-select:not(.ui-select) {
  box-sizing: border-box;
  height: 34px;
  min-height: 34px;
@@ -146,22 +146,22 @@
  font: 12px/1.2 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
  vertical-align: middle;
 }
-.practice-player-dock .practice-player-actions > .practice-player-primary:hover:not(:disabled),
-.practice-player-dock .practice-player-tools > .player-tool:hover:not(:disabled),
-.practice-player-dock .practice-player-actions > .player-text-action:hover:not(:disabled),
-.practice-player-dock .practice-player-tools > .player-text-action:hover:not(:disabled) {
+.practice-player-dock .practice-player-actions > .practice-player-primary:not(.ui-btn):hover:not(:disabled),
+.practice-player-dock .practice-player-tools > .player-tool:not(.ui-btn):hover:not(:disabled),
+.practice-player-dock .practice-player-actions > .player-text-action:not(.ui-btn):hover:not(:disabled),
+.practice-player-dock .practice-player-tools > .player-text-action:not(.ui-btn):hover:not(:disabled) {
  background: #ffffff0a; color: #eff5e8;
 }
-.practice-player-dock .practice-player-actions > .practice-player-primary:focus-visible,
-.practice-player-dock .practice-player-tools > .player-tool:focus-visible,
-.practice-player-dock .practice-player-actions > .player-text-action:focus-visible,
-.practice-player-dock .practice-player-tools > .player-text-action:focus-visible {
+.practice-player-dock .practice-player-actions > .practice-player-primary:not(.ui-btn):focus-visible,
+.practice-player-dock .practice-player-tools > .player-tool:not(.ui-btn):focus-visible,
+.practice-player-dock .practice-player-actions > .player-text-action:not(.ui-btn):focus-visible,
+.practice-player-dock .practice-player-tools > .player-text-action:not(.ui-btn):focus-visible {
  outline: 2px solid #d8ed9b; outline-offset: 2px;
 }
-.practice-player-dock .practice-player-actions > .practice-player-primary:disabled,
-.practice-player-dock .practice-player-tools > .player-tool:disabled,
-.practice-player-dock .practice-player-actions > .player-text-action:disabled,
-.practice-player-dock .practice-player-tools > .player-text-action:disabled {
+.practice-player-dock .practice-player-actions > .practice-player-primary:not(.ui-btn):disabled,
+.practice-player-dock .practice-player-tools > .player-tool:not(.ui-btn):disabled,
+.practice-player-dock .practice-player-actions > .player-text-action:not(.ui-btn):disabled,
+.practice-player-dock .practice-player-tools > .player-text-action:not(.ui-btn):disabled {
  opacity: .5; cursor: not-allowed;
 }
 
@@ -232,11 +232,11 @@
  .practice-player-actions { gap: 2px; }
  .practice-player-tools { gap: 0; }
  .practice-player-dock .player-voice-label { display: none; }
- .practice-player-dock .practice-player-tools > .player-speed { display: none; }
- .practice-player-dock .practice-player-actions > .practice-player-primary { font-size: 12px; padding: 8px 10px; }
- .practice-player-dock .practice-player-actions > .player-text-action,
- .practice-player-dock .practice-player-tools > .player-text-action { padding: 8px 7px; font-size: 11px; }
- .practice-player-dock .practice-player-tools > .player-tool { padding: 8px; }
+ .practice-player-dock .practice-player-tools > .player-speed:not(.ui-btn) { display: none; }
+ .practice-player-dock .practice-player-actions > .practice-player-primary:not(.ui-btn) { font-size: 12px; padding: 8px 10px; }
+ .practice-player-dock .practice-player-actions > .player-text-action:not(.ui-btn),
+ .practice-player-dock .practice-player-tools > .player-text-action:not(.ui-btn) { padding: 8px 7px; font-size: 11px; }
+ .practice-player-dock .practice-player-tools > .player-tool:not(.ui-btn) { padding: 8px; }
 }
 
 @media(max-height: 500px) and (min-width: 600px) {

@@ -9,6 +9,7 @@ import {ExperienceModeSelector} from './practice/ExperienceModeSelector';
 import {experienceModeCapabilitiesFrom, experienceModeToLegacy} from '../../../packages/learning-engine/experience-mode';
 import {usePracticeFullscreen} from './practice/usePracticeFullscreen';
 import {practiceCommandForKey} from './practice/practice-input';
+import {Button, IconButton, Checkbox, Input} from './ui/controls';
 import {useVoiceStartCoordinator} from './practice/useVoiceStartCoordinator';
 import type {PracticeCommand} from '../../../packages/learning-engine/practice-commands';
 import type {LessonManifest} from '../../../packages/lesson-schema/index';
@@ -539,10 +540,10 @@ export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,not
  const voiceEnabled=voiceStatus==='starting'||voiceStatus==='listening'||voiceStatus==='reconnecting';
  const voiceLabel=voiceStatus==='listening'?'Voice on':voiceStatus==='starting'?'Voice starting':voiceStatus==='reconnecting'?'Voice reconnecting':'Voice off';
  const voiceControl=(
-  <button className="practice-voice-status player-tool" aria-label={voiceLabel} title={voiceLabel} aria-haspopup="dialog" onClick={()=>open('voice')}>
+  <Button variant="dock-tool" className="practice-voice-status player-tool" aria-label={voiceLabel} title={voiceLabel} aria-haspopup="dialog" onClick={()=>open('voice')}>
    {voiceEnabled?<Mic size={18} aria-hidden="true"/>:<MicOff size={18} aria-hidden="true"/>}
    <span className="player-voice-label">{voiceLabel}</span>
-  </button>
+  </Button>
  );
  const modeControl=onModeChange&&<ExperienceModeSelector compact current={compete?'challenge':'practice'}
   capabilities={experienceModeCapabilitiesFrom(practiceCapabilities)}
@@ -557,58 +558,58 @@ export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,not
   '--present-columns':`minmax(0,${presentLayout.cameraShare}fr) minmax(0,${presentLayout.instructorShare}fr)`,
   '--present-rows':`minmax(0,${presentLayout.cameraShare}fr) minmax(0,${presentLayout.instructorShare}fr)`,
  } as unknown as CSSProperties):undefined;
- return <PracticeSettingsProvider row={settingsRow} setRow={setSettingsRow}><section ref={shell} onPointerDownCapture={wakeControls} onFocusCapture={wakeControls} onKeyDown={event=>{
+ return <PracticeSettingsProvider row={settingsRow} setRow={setSettingsRow}><section ref={shell} data-ui-surface="practice" onPointerDownCapture={wakeControls} onFocusCapture={wakeControls} onKeyDown={event=>{
   if(event.key==='Escape'&&focusActive&&!panel&&!document.fullscreenElement)toggleInstructorFocus();
  }} data-present-axis={presenting?presentLayout.axis:undefined} style={presentStyle} className={`mimic-shell mimic-immersive ${panel==='settings'?'settings-open':''} ${focusActive?'instructor-focus':''} ${focusActive&&timelineHidden?'focus-timeline-hidden':''} ${presenting?'is-presenting':''} ${setupIntent?'is-setting-up':''} ${instructorOnly?'instructor-only':''} ${compete?'mode-compete':'mode-practice minimal-practice'} ${cameraState==='off'?'is-watching':'is-practising'} ${session.phase==='playing'?'is-playing':''} ${controlsVisible?'':'controls-resting'} ${large?'large-display':''}`} aria-label="Practice workspace">
-  <header className="mimic-header" inert={Boolean(setupIntent)||Boolean(panel)||voicePrompt==='fallback'||undefined}><button className="mimic-icon-button" aria-label="Exit" onClick={leavePractice}><ArrowLeft size={22}/></button><div><span className="mimic-eyebrow">MIMIC / {compete?'CHALLENGE':instructorOnly?'INSTRUCTOR ONLY':cameraState==='off'?'WATCH':'PRACTICE'}</span><strong>{lesson.title}</strong><span>{pair?pairStatus?.approved?pairStatus.receiver_online?'Display connected':'Display reconnecting':'Display awaiting approval':'Learn the movement. Make it yours.'}</span></div>{instructorOnly&&!compete&&<button className="mimic-icon-button instructor-focus-toggle" aria-label={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} title={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} disabled={voicePrompt==='requesting'} onClick={toggleInstructorFocus}>{focusActive?<Minimize size={20}/>:<Maximize size={20}/>}</button>}{focusActive&&<button className="focus-timeline-toggle" aria-controls="practice-section-timeline" aria-expanded={!timelineHidden} onClick={()=>setTimelineHidden(hidden=>!hidden)}>{timelineHidden?'Show controls':'Hide controls'}</button>}{focusActive&&offerNextSection&&<button className="focus-next-section" onClick={()=>action('next')}>Next section</button>}<button className="practice-settings-button" disabled={runActive} onClick={()=>openSettings()}><Settings2 size={18}/><span>Practice settings</span></button></header>
+  <header className="mimic-header" inert={Boolean(setupIntent)||Boolean(panel)||voicePrompt==='fallback'||undefined}><IconButton variant="icon-immersive" className="mimic-icon-button" aria-label="Exit" onClick={leavePractice}><ArrowLeft size={22}/></IconButton><div><span className="mimic-eyebrow">MIMIC / {compete?'CHALLENGE':instructorOnly?'INSTRUCTOR ONLY':cameraState==='off'?'WATCH':'PRACTICE'}</span><strong>{lesson.title}</strong><span>{pair?pairStatus?.approved?pairStatus.receiver_online?'Display connected':'Display reconnecting':'Display awaiting approval':'Learn the movement. Make it yours.'}</span></div>{instructorOnly&&!compete&&<IconButton variant="icon-immersive" className="mimic-icon-button instructor-focus-toggle" aria-label={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} title={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} disabled={voicePrompt==='requesting'} onClick={toggleInstructorFocus}>{focusActive?<Minimize size={20}/>:<Maximize size={20}/>}</IconButton>}{focusActive&&<Button variant="immersive-action" className="focus-timeline-toggle" aria-controls="practice-section-timeline" aria-expanded={!timelineHidden} onClick={()=>setTimelineHidden(hidden=>!hidden)}>{timelineHidden?'Show controls':'Hide controls'}</Button>}{focusActive&&offerNextSection&&<Button variant="immersive-action" className="focus-next-section" onClick={()=>action('next')}>Next section</Button>}<Button variant="settings-pill" className="practice-settings-button" disabled={runActive} onClick={()=>openSettings()}><Settings2 size={18}/><span>Practice settings</span></Button></header>
   {/* The settings drawer is a side panel on desktop, so the stage stays live: an
       angle change or preview is visible while the settings are being adjusted.
       Every other panel covers the stage and keeps it inert. */}
   <main className="mimic-stage" inert={Boolean(setupIntent)||(panel!==null&&panel!=='settings')||voicePrompt==='fallback'||undefined}><div className="live-practice-layer" hidden={replayMode}><MimicInterface ref={camera} lesson={lesson} player={player} onCommand={action} onVoiceStatus={receiveVoiceStatus} renderReference={reference} onClose={close} cameraEnabled={!instructorOnly} layout={instructorOnly||presenting||companion||(source&&!lesson.focused_video_alpha)?'separate':layout} angle={angle} onSummary={receiveSummary} onCameraState={receiveCameraState} competition={compete} setup={setupIntent?setupController:undefined} onRequestSetup={()=>startSetup('setup_only')}/></div>{replayMode&&recording.url&&<ReplayStage lesson={lesson} player={player} url={recording.url} start={recording.startTime.current} rate={recording.speed.current} onClose={()=>setReplayMode(false)}/>}
    {rhythm&&session.phase==='playing'&&<span className="practice-beat">Count {Math.floor(s.time*bpm/60)%8+1} / 8</span>}
-   {(session.phase==='countdown'||session.phase==='rest')&&<div className="practice-countdown" role="status"><strong>{Math.ceil(session.remaining)}</strong><span>{session.phase==='rest'?'Rest · next repetition':'Get ready'}</span><button onClick={()=>action('pause')}>Cancel</button></div>}
-   {!compete&&review&&session.phase==='paused'&&!panel&&<div className="practice-review"><strong>Section complete</strong><p>{reviewSummary.score===null?'No reliable comparison for this attempt.':`${reviewSummary.score}% approximate similarity. `}{reviewSummary.cue||'Try again or continue.'}</p><button onClick={()=>action('again')}>Repeat</button><button onClick={()=>action('next')}>Next</button><button onClick={()=>setReview(null)}>Dismiss</button></div>}
+   {(session.phase==='countdown'||session.phase==='rest')&&<div className="practice-countdown" role="status"><strong>{Math.ceil(session.remaining)}</strong><span>{session.phase==='rest'?'Rest · next repetition':'Get ready'}</span><Button variant="immersive-action" onClick={()=>action('pause')}>Cancel</Button></div>}
+   {!compete&&review&&session.phase==='paused'&&!panel&&<div className="practice-review"><strong>Section complete</strong><p>{reviewSummary.score===null?'No reliable comparison for this attempt.':`${reviewSummary.score}% approximate similarity. `}{reviewSummary.cue||'Try again or continue.'}</p><Button variant="immersive-action" onClick={()=>action('again')}>Repeat</Button><Button variant="immersive-action" onClick={()=>action('next')}>Next</Button><Button variant="immersive-action" onClick={()=>setReview(null)}>Dismiss</Button></div>}
   </main>
   {compete&&<div className="mimic-context" inert={Boolean(setupIntent)||Boolean(panel)||voicePrompt==='fallback'||undefined}><span className="compete-rule">FULL SEQUENCE · 1× · SCORED</span><h2>{runActive?current.label:'One complete performance'}</h2><div className="mimic-status" role="status">{runActive?session.phase==='countdown'?'Get into position. Your run starts after the countdown.':'Scored run in progress · Finish without stopping':cameraState==='off'?'Prepare your camera, then perform the full sequence without stopping.':cameraState==='starting'?'Starting camera…':cameraIssue||'Ready for a scored run. Your result appears after you finish.'}</div></div>}
-  {panel==='voice'&&<PracticePanel title="Voice commands" onClose={close}>
+  {panel==='voice'&&<PracticePanel title="Voice commands" onClose={close} portalRoot={shell.current}>
    <p>Say “Start,” “Pause,” “Next,” “Back,” “Repeat,” “Slower,” “Faster,” or “Loop.”</p>
    <p>Uses the app or browser speech service. The app does not save microphone audio.</p>
    <p role="status">{voiceLabel}</p>
    {voiceFailure&&<p role="alert">{voiceFailure}</p>}
    {voiceStatus==='unavailable'&&<p>Voice recognition is unavailable in this browser.</p>}
-   <button disabled={voiceStatus==='checking'||voiceStatus==='unavailable'} onClick={()=>{
+   <Button variant="immersive-action" disabled={voiceStatus==='checking'||voiceStatus==='unavailable'} onClick={()=>{
     if(voiceEnabled){voiceStart.markOff();camera.current?.stopVoice();}
     else camera.current?.startVoice();
-   }}>{voiceEnabled?'Turn off voice commands':'Enable voice commands'}</button>
+   }}>{voiceEnabled?'Turn off voice commands':'Enable voice commands'}</Button>
   </PracticePanel>}
-  {voiceStart.status==='asking'&&<PracticePanel title="Start with voice" onClose={cancelVoiceStart}>
+  {voiceStart.status==='asking'&&<PracticePanel title="Start with voice" onClose={cancelVoiceStart} portalRoot={shell.current}>
    <p>Start with voice commands, or continue without the microphone.</p>
-   <button onClick={()=>voiceStart.startWithVoice()}>Start with voice</button>
-   <button onClick={continueWithoutVoice}>Without voice</button>
+   <Button variant="immersive-action" onClick={()=>voiceStart.startWithVoice()}>Start with voice</Button>
+   <Button variant="immersive-action" onClick={continueWithoutVoice}>Without voice</Button>
   </PracticePanel>}
-  {voicePrompt==='fallback'&&<PracticePanel title="Practise with or without voice" onClose={cancelVoiceStart}>
+  {voicePrompt==='fallback'&&<PracticePanel title="Practise with or without voice" onClose={cancelVoiceStart} portalRoot={shell.current}>
    <p>Voice commands are off. Tap Next section after each section, or enable voice to advance from where you’re standing.</p>
    {voiceFailure&&<p role="status">{voiceFailure}</p>}
    {/permission|blocked/i.test(voiceFailure)&&<p>If the browser blocked access, allow Microphone in the site permissions beside the address bar, then try again.</p>}
-   <button onClick={continueWithoutVoice}>Continue without voice</button>
-   <button disabled={voiceStatus==='unavailable'} onClick={()=>voiceStart.retry()}>Enable voice</button>
+   <Button variant="immersive-action" onClick={continueWithoutVoice}>Continue without voice</Button>
+   <Button variant="immersive-action" disabled={voiceStatus==='unavailable'} onClick={()=>voiceStart.retry()}>Enable voice</Button>
   </PracticePanel>}
-  {takeOpen&&recording.url&&<PracticePanel title="Your take" onClose={()=>setTakeOpen(false)} className="take-panel">
+  {takeOpen&&recording.url&&<PracticePanel title="Your take" onClose={()=>setTakeOpen(false)} portalRoot={shell.current} className="take-panel">
     <video className="take-video" src={recording.url} controls playsInline aria-label="Your recorded take"/>
-    <div className="take-actions"><button className="primary" disabled={saveState==='preparing'} onClick={()=>void saveTake()}>{saveState==='preparing'?'Preparing…':'Save video'}</button><button className="secondary" disabled={saveState==='preparing'} onClick={()=>{setTakeOpen(false);setReplayMode(true);}}>Compare with instructor</button><button className="secondary" disabled={saveState==='preparing'||cameraState!=='live'||!!camera.current?.readiness(connection.current.wasOnline)} onClick={restartTake}>Record another</button><button className="secondary" disabled={saveState==='preparing'} onClick={discardTake}>Discard</button></div>
+    <div className="take-actions"><Button variant="app-primary" className="primary" disabled={saveState==='preparing'} onClick={()=>void saveTake()}>{saveState==='preparing'?'Preparing…':'Save video'}</Button><Button variant="app-secondary" className="secondary" disabled={saveState==='preparing'} onClick={()=>{setTakeOpen(false);setReplayMode(true);}}>Compare with instructor</Button><Button variant="app-secondary" className="secondary" disabled={saveState==='preparing'||cameraState!=='live'||!!camera.current?.readiness(connection.current.wasOnline)} onClick={restartTake}>Record another</Button><Button variant="app-secondary" className="secondary" disabled={saveState==='preparing'} onClick={discardTake}>Discard</Button></div>
     {saveState==='shared'&&<p role="status">Share sheet closed. Check that you kept a copy.</p>}
     {saveState==='downloaded'&&<p role="status">Download requested. Check your downloads for the video.</p>}
-    {(saveState==='shared'||saveState==='downloaded')&&!takeSaved&&<button onClick={()=>{savedTake.current=true;setTakeSaved(true);}}>I have saved a copy</button>}
+    {(saveState==='shared'||saveState==='downloaded')&&!takeSaved&&<Button variant="immersive-action" onClick={()=>{savedTake.current=true;setTakeSaved(true);}}>I have saved a copy</Button>}
     {recording.stopReason&&<p role="status">{recording.stopReason}</p>}
     {takeError&&<p role="alert">{takeError}</p>}
     <p className="small muted">Video only · no audio. Kept in this page until you leave. Nothing is uploaded.</p>
   </PracticePanel>}
   {compete?<footer className="mimic-dock compete-dock" inert={Boolean(setupIntent)||Boolean(panel)||voicePrompt==='fallback'||undefined}><div className="compete-preparation">{modeControl}<span>Personal challenge</span><p>Full sequence · 1× speed · Front view · Camera scoring · 5s preparation.</p></div>
-   {!runActive&&<div className="compete-setup-actions"><button onClick={()=>startSetup('setup_only')}>Camera setup</button><button onClick={()=>openSettings('instructor-type')}>Instructor</button><button onClick={()=>openSettings('tv-presentation')}>Connected display</button></div>}
+   {!runActive&&<div className="compete-setup-actions"><Button variant="immersive-action" onClick={()=>startSetup('setup_only')}>Camera setup</Button><Button variant="immersive-action" onClick={()=>openSettings('instructor-type')}>Instructor</Button><Button variant="immersive-action" onClick={()=>openSettings('tv-presentation')}>Connected display</Button></div>}
    {!runActive&&voiceControl}
-   {competition.result&&!runActive&&<button onClick={()=>setRunResultsOpen(true)}>Review result</button>}
-   <button className="practice-session-toggle" disabled={!runActive&&cameraState!=='off'&&!runReady} onClick={()=>{if(runActive)action('pause');else if(cameraState==='off')startSetup('start_compete');else action('play');}}><Camera size={16}/>{runActive?'Stop run':cameraState==='off'?'Prepare challenge':cameraState==='starting'?'Starting camera…':'Start scored run'}</button>
-   {cameraState!=='off'&&!runActive&&<button onClick={()=>camera.current?.stop()}>{cameraState==='starting'?'Cancel camera setup':'Turn camera off'}</button>}
+   {competition.result&&!runActive&&<Button variant="immersive-action" onClick={()=>setRunResultsOpen(true)}>Review result</Button>}
+   <Button variant="compete-primary" className="practice-session-toggle" disabled={!runActive&&cameraState!=='off'&&!runReady} onClick={()=>{if(runActive)action('pause');else if(cameraState==='off')startSetup('start_compete');else action('play');}}><Camera size={16}/>{runActive?'Stop run':cameraState==='off'?'Prepare challenge':cameraState==='starting'?'Starting camera…':'Start scored run'}</Button>
+   {cameraState!=='off'&&!runActive&&<Button variant="immersive-action" onClick={()=>camera.current?.stop()}>{cameraState==='starting'?'Cancel camera setup':'Turn camera off'}</Button>}
    <div className="compete-progress"><span>{stamp(s.time)}</span><progress aria-label="Run progress" value={s.time} max={lesson.duration}/><span>{stamp(lesson.duration)}</span></div>
   </footer>:
   <PracticePlayerDock
@@ -630,7 +631,8 @@ export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,not
    onCommand={instructorOnly?runSharedCommand:undefined}
    actionsDisabled={voicePrompt==='requesting'||(offerVoiceStart&&voiceStatus==='checking')}
    primaryAction={!instructorOnly?<>
-    <button
+    <Button
+     variant="dock-primary"
      className="practice-player-primary"
      disabled={voicePrompt==='requesting'}
      aria-pressed={cameraState!=='off'}
@@ -639,18 +641,18 @@ export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,not
     >
      <Camera size={18} aria-hidden="true"/>
      <span>{voicePrompt==='requesting'?'Connecting…':cameraState==='off'?'Start camera practice':cameraState==='starting'?'Cancel setup':'End practice'}</span>
-    </button>
+    </Button>
     {hasProgress&&session.phase==='paused'&&!sectionFinished&&(
-     <button className="player-text-action" disabled={voicePrompt==='requesting'} onClick={startOver}>
+     <Button variant="dock-quiet" className="player-text-action" disabled={voicePrompt==='requesting'} onClick={startOver}>
       <RotateCcw size={14} aria-hidden="true"/><span>Start over</span>
-     </button>
+     </Button>
     )}
     {offerVoiceStart&&(
-     <button className="player-text-action" onClick={continueWithoutVoice}>
+     <Button variant="dock-quiet" className="player-text-action" onClick={continueWithoutVoice}>
       {voicePrompt==='requesting'?'Continue without voice':'Without voice'}
-     </button>
+     </Button>
     )}
-    {offerNextSection&&<button className="player-text-action" onClick={()=>action('again')}>Repeat section</button>}
+    {offerNextSection&&<Button variant="dock-quiet" className="player-text-action" onClick={()=>action('again')}>Repeat section</Button>}
    </>:undefined}
    toolsBefore={<>{modeControl}{voiceControl}</>}
    speed={s.speed}
@@ -659,17 +661,17 @@ export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,not
    fullscreen={fullscreen}
    extra={!instructorOnly&&(
     <div className="practice-player-camera-actions">
-     {cameraState==='live'&&(recording.recording||recordNext.current?<button className="record-take active" onClick={stopTake}>{recording.recording?'Stop recording':'Cancel recording'}</button>:!recording.url&&<button className="record-take" disabled={!!camera.current?.readiness(connection.current.wasOnline)||replayMode} onClick={startTake}><Video size={16}/>Record practice</button>)}
-     {recording.url&&<button className="take-review-button" onClick={()=>{session.pause('review take');setTakeOpen(true);}}>Review take{takeSaved?'':' · not saved'}</button>}
-     <button className="player-text-action" onClick={()=>open('history')}>Practice history</button>
+     {cameraState==='live'&&(recording.recording||recordNext.current?<Button variant="record-action" className="record-take active" onClick={stopTake}>{recording.recording?'Stop recording':'Cancel recording'}</Button>:!recording.url&&<Button variant="record-action" className="record-take" disabled={!!camera.current?.readiness(connection.current.wasOnline)||replayMode} onClick={startTake}><Video size={16}/>Record practice</Button>)}
+     {recording.url&&<Button variant="record-action" className="take-review-button" onClick={()=>{session.pause('review take');setTakeOpen(true);}}>Review take{takeSaved?'':' · not saved'}</Button>}
+     <Button variant="dock-quiet" className="player-text-action" onClick={()=>open('history')}>Practice history</Button>
     </div>
    )}
    status={recording.error||(recording.recording?'Recording your practice':cameraState==='starting'?'Starting camera…':voicePrompt==='requesting'?'Allow microphone access to begin':/could not|unavailable|failed/i.test(notice||hint)?notice||hint:'')}
   />
   }
 
-  {compete&&runResultsOpen&&competition.result&&<CompetitionResults result={competition.result} revision={lesson.revision_id} onClose={()=>setRunResultsOpen(false)} onRetry={()=>{setRunResultsOpen(false);if(cameraState==='off')void camera.current?.start();else action('play');}} onPractice={()=>switchMode(false)} onSection={practiseSection}/>}
-  {panel==='settings'&&<PracticePanel title="Practice settings" onClose={close} drawer dismissOnBackdrop={false} modal={false} footer={<><span className="settings-footer-note">Changes apply immediately</span>{!compete&&<button className="settings-preview-toggle" onClick={()=>action(session.phase==='paused'?'play':'pause',true)}>{session.phase==='paused'?<Play size={15}/>:<Pause size={15}/>} {session.phase==='paused'?'Play preview':'Pause preview'}</button>}</>}>
+  {compete&&runResultsOpen&&competition.result&&<CompetitionResults result={competition.result} revision={lesson.revision_id} portalRoot={shell.current} onClose={()=>setRunResultsOpen(false)} onRetry={()=>{setRunResultsOpen(false);if(cameraState==='off')void camera.current?.start();else action('play');}} onPractice={()=>switchMode(false)} onSection={practiseSection}/>}
+  {panel==='settings'&&<PracticePanel title="Practice settings" onClose={close} portalRoot={shell.current} drawer dismissOnBackdrop={false} modal={false} footer={<><span className="settings-footer-note">Changes apply immediately</span>{!compete&&<Button variant="settings-preview" className="settings-preview-toggle" onClick={()=>action(session.phase==='paused'?'play':'pause',true)}>{session.phase==='paused'?<Play size={15}/>:<Pause size={15}/>} {session.phase==='paused'?'Play preview':'Pause preview'}</Button>}</>}>
    {compete&&<p className="settings-challenge-rules" role="status">Challenge rules: full sequence · 1× speed · front view · camera scoring · 5s preparation. Your practice preferences are kept separately.</p>}
    <SettingsGroup id="setup" title="Practice setup" summary={`${instructorName} · ${instructorOnly?'Camera off':cameraState==='live'?'Camera live':'Camera on'}`}>
     <SettingsRow id="practice-mode" label="Camera" value={instructorOnly?'Off':`${cameraName}${cameraState==='live'?' · live':''}`} disabledReason={compete?'Camera scoring is required in Challenge.':undefined} status={compete?'Fixed':undefined}>
@@ -682,27 +684,27 @@ export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,not
      {!lesson.source_video?<p>Real requires an instructor video for this lesson.</p>:instructorOnly&&<p>Real + 3D requires the camera.</p>}
     </SettingsRow>
     <SettingsRow id="instructor-emphasis" label="Emphasise instructor" value={layout==='instructor'?'On':'Off'} disabledReason={instructorOnly?'Turn the camera on above.':source||companion?'Requires the 3D instructor.':presenting?'Turn off TV presentation below.':layout==='combined'?'Choose Side by side on the stage.':runActive?'Stop the Challenge run before changing emphasis.':undefined}>
-     <label>Emphasise instructor<input type="checkbox" role="switch" checked={layout==='instructor'} onChange={event=>{setLayout(event.target.checked?'instructor':'separate');setSetupNotice('');}}/></label>
+     <label>Emphasise instructor<Checkbox variant="settings" role="switch" checked={layout==='instructor'} onChange={event=>{setLayout(event.target.checked?'instructor':'separate');setSetupNotice('');}}/></label>
      <p>Uses a smaller camera preview. Auto-frame is unavailable while emphasis is On.</p>
     </SettingsRow>
     {setupNotice&&<p className="settings-setup-notice" role="status">{setupNotice}</p>}
     <h4 className="settings-subheading">Practice & feedback</h4>
     <SettingsRow id="recording" label="Practice recording" value={recording.recording?'Recording':recording.url?'Take ready':'Off'}>
-     <button disabled={instructorOnly||compete||cameraState!=='live'||Boolean(cameraIssue)||recording.recording||Boolean(recording.url)} onClick={startTake}>Record practice</button>
-     {(recording.recording||recordNext.current)&&<button onClick={stopTake}>Stop recording</button>}
-     {recording.url&&<button onClick={()=>{close();setTakeOpen(true);}}>Review take</button>}
+     <Button variant="immersive-action" disabled={instructorOnly||compete||cameraState!=='live'||Boolean(cameraIssue)||recording.recording||Boolean(recording.url)} onClick={startTake}>Record practice</Button>
+     {(recording.recording||recordNext.current)&&<Button variant="immersive-action" onClick={stopTake}>Stop recording</Button>}
+     {recording.url&&<Button variant="immersive-action" onClick={()=>{close();setTakeOpen(true);}}>Review take</Button>}
      <p>{compete?'Practice recording is available in Practice mode.':instructorOnly?'Turn the camera on above to record.':cameraState!=='live'?'Start camera practice before recording.':cameraIssue||'Video only. Recordings stay on this device until you save them.'}</p>
     </SettingsRow>
     <SettingsRow id="save-summaries" label="Save practice summaries" value={saveHistory?'On':'Off'} disabledReason={compete?'Challenge results are separate from practice summaries.':instructorOnly?'Turn the camera on above to save movement summaries.':!lesson.animation.key.startsWith('lessons/')?'Saved summaries require an account lesson.':undefined}>
-     <label>Save summaries to my account<input type="checkbox" role="switch" checked={saveHistory} onChange={event=>setSaveHistory(event.target.checked)}/></label><p>Summaries only. This does not upload recordings.</p>
+     <label>Save summaries to my account<Checkbox variant="settings" role="switch" checked={saveHistory} onChange={event=>setSaveHistory(event.target.checked)}/></label><p>Summaries only. This does not upload recordings.</p>
     </SettingsRow>
     <h4 className="settings-subheading">Screen presentation & connection</h4>
     <SettingsRow id="tv-presentation" label="TV presentation" value={presenting?'On':'Off'} disabledReason={runActive?'Stop your Challenge run before changing presentation.':undefined}>
-     <button aria-pressed={presenting} onClick={togglePresentation}>{presenting?'Turn off TV presentation':'Enable TV presentation'}</button><p>Uses Side by side while On. Start Cast or screen mirroring on your device.</p>
+     <Button variant="immersive-action" aria-pressed={presenting} onClick={togglePresentation}>{presenting?'Turn off TV presentation':'Enable TV presentation'}</Button><p>Uses Side by side while On. Start Cast or screen mirroring on your device.</p>
     </SettingsRow>
     <SettingsRow id="pair-display" label="Pair another screen" value={pair?pairStatus?.approved?pairStatus.receiver_online?'Connected':'Reconnecting':'Awaiting approval':'Not connected'}>
-     {!pair?<button onClick={()=>{setConnectionError('');request<Pair>('/mimic-pairs','POST',{lesson_id:lesson.lesson_id,revision_id:lesson.revision_id}).then(setPair).catch(e=>setConnectionError(e.message));}}>Create connection code</button>:<><strong className="pair-code">{pair.code}</strong><p>Enter this code on your other screen. Expires in 10 minutes.</p>{pairStatus?.pending&&!pairStatus.approved&&<button onClick={()=>void pairRequest(pair,'/approve','POST').catch(e=>setConnectionError(e.message))}>Approve display controls</button>}<button onClick={()=>{stopSharingRef.current?.();setPair(null);setPairStatus(null);setVideoSharing(false);}}>Disconnect</button></>}
-     <button disabled={!videoSharing&&(instructorOnly||cameraState!=='live'||!pairStatus?.approved)} onClick={()=>void shareVideo()}>{videoSharing?'Stop sharing camera preview':'Share camera preview'}</button>
+     {!pair?<Button variant="immersive-action" onClick={()=>{setConnectionError('');request<Pair>('/mimic-pairs','POST',{lesson_id:lesson.lesson_id,revision_id:lesson.revision_id}).then(setPair).catch(e=>setConnectionError(e.message));}}>Create connection code</Button>:<><strong className="pair-code">{pair.code}</strong><p>Enter this code on your other screen. Expires in 10 minutes.</p>{pairStatus?.pending&&!pairStatus.approved&&<Button variant="immersive-action" onClick={()=>void pairRequest(pair,'/approve','POST').catch(e=>setConnectionError(e.message))}>Approve display controls</Button>}<Button variant="immersive-action" onClick={()=>{stopSharingRef.current?.();setPair(null);setPairStatus(null);setVideoSharing(false);}}>Disconnect</Button></>}
+     <Button variant="immersive-action" disabled={!videoSharing&&(instructorOnly||cameraState!=='live'||!pairStatus?.approved)} onClick={()=>void shareVideo()}>{videoSharing?'Stop sharing camera preview':'Share camera preview'}</Button>
      {!videoSharing&&(instructorOnly||cameraState!=='live'||!pairStatus?.approved)&&<p>Camera sharing requires a live camera and an approved screen connection.</p>}
      {connectionError&&<p role="alert">{connectionError}</p>}
     </SettingsRow>
@@ -713,25 +715,25 @@ export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,not
     status={compete?'Fixed':undefined}
     extra={<>
      <SettingsRow id="countdown" label="Countdown sound" value={countSound?'On':'Off'}>
-      <label>Countdown sound<input type="checkbox" role="switch" disabled={!session.countdownSeconds} checked={countSound} onChange={event=>{setCountSound(event.target.checked);enableAudio();}}/></label>
+      <label>Countdown sound<Checkbox variant="settings" role="switch" disabled={!session.countdownSeconds} checked={countSound} onChange={event=>{setCountSound(event.target.checked);enableAudio();}}/></label>
       {!session.countdownSeconds&&<p>Countdown sound is unavailable while the countdown is Off. Your sound preference is remembered.</p>}
      </SettingsRow>
      <SettingsRow id="metronome" label="Metronome & eight-count" value={rhythm?`${bpm} BPM`:'Off'}>
-      <label>Metronome & eight-count<input type="checkbox" role="switch" checked={rhythm} onChange={event=>{setRhythm(event.target.checked);enableAudio();}}/></label>
-      <label>Tempo (BPM)<input type="number" disabled={!rhythm} min={30} max={240} value={bpm} onChange={event=>setBpm(Math.max(30,Math.min(240,Number(event.target.value)||100)))}/></label>
+      <label>Metronome & eight-count<Checkbox variant="settings" role="switch" checked={rhythm} onChange={event=>{setRhythm(event.target.checked);enableAudio();}}/></label>
+      <label>Tempo (BPM)<Input variant="settings" type="number" disabled={!rhythm} min={30} max={240} value={bpm} onChange={event=>setBpm(Math.max(30,Math.min(240,Number(event.target.value)||100)))}/></label>
       <p>{rhythm?'Tempo is independent of playback speed.':'Enable the metronome to adjust tempo. Your tempo is remembered.'}</p>
      </SettingsRow>
     </>}/>
    <SettingsGroup id="display" title="Display" summary="Fullscreen & text size">
     <SettingsRow id="fullscreen" label="Fullscreen" value={fullscreen.active?'On':fullscreen.available?'Off':'Unavailable'}>
-    <button disabled={!fullscreen.available&&!fullscreen.active} onClick={()=>void fullscreen.toggle()}>{fullscreen.active?'Exit fullscreen':'Enter fullscreen'}</button>
+    <Button variant="immersive-action" disabled={!fullscreen.available&&!fullscreen.active} onClick={()=>void fullscreen.toggle()}>{fullscreen.active?'Exit fullscreen':'Enter fullscreen'}</Button>
     {fullscreen.error&&<p role="status">{fullscreen.error}</p>}
    </SettingsRow>
-    <SettingsRow id="large-text" label="Larger display text" value={large?'On':'Off'}><label>Larger display text<input type="checkbox" role="switch" checked={large} onChange={event=>setLarge(event.target.checked)}/></label></SettingsRow>
+    <SettingsRow id="large-text" label="Larger display text" value={large?'On':'Off'}><label>Larger display text<Checkbox variant="settings" role="switch" checked={large} onChange={event=>setLarge(event.target.checked)}/></label></SettingsRow>
    </SettingsGroup>
   </PracticePanel>}
-  {panel==='sections'&&<PracticePanel title="Sections" onClose={close}><input aria-label="Find section" placeholder="Find a section" value={query} onChange={e=>setQuery(e.target.value)}/><div className="practice-section-list">{sections.map(section=><button key={section.id} aria-current={section.id===current.id?'step':undefined} onClick={()=>{session.select(player.sections.indexOf(section));close();redraw(n=>n+1);}}>{section.label}</button>)}</div>{!sections.length&&<p>No matching sections.</p>}</PracticePanel>}
-  {panel==='history'&&<PracticePanel title="Practice history" onClose={close}><button disabled={!lesson.animation.key.startsWith('lessons/')} onClick={()=>void request<HistoryEntry[]>(`/lessons/${lesson.lesson_id}/attempts`).then(setHistory).catch(e=>setHistoryError(e.message))}>Refresh saved history</button>{historyError&&<p role="alert">{historyError}</p>}{history.length?history.map((entry,index)=><article className="practice-history-entry" key={`${entry.date}-${index}`}><strong>{entry.section}</strong><span>{new Date(entry.date).toLocaleString()} · {entry.score==null?'No reliable comparison':`${entry.score}% approximate similarity`}</span>{entry.revision_id!==lesson.revision_id&&<p>Different lesson revision · scores may not be comparable.</p>}</article>):<p>No attempts yet. Completed practice summaries appear here.</p>}{editable&&<button onClick={onEdit}>Edit lesson sections</button>}</PracticePanel>}
+  {panel==='sections'&&<PracticePanel title="Sections" onClose={close} portalRoot={shell.current}><Input variant="panel" aria-label="Find section" placeholder="Find a section" value={query} onChange={e=>setQuery(e.target.value)}/><div className="practice-section-list">{sections.map(section=><Button variant="immersive-action" key={section.id} aria-current={section.id===current.id?'step':undefined} onClick={()=>{session.select(player.sections.indexOf(section));close();redraw(n=>n+1);}}>{section.label}</Button>)}</div>{!sections.length&&<p>No matching sections.</p>}</PracticePanel>}
+  {panel==='history'&&<PracticePanel title="Practice history" onClose={close} portalRoot={shell.current}><Button variant="immersive-action" disabled={!lesson.animation.key.startsWith('lessons/')} onClick={()=>void request<HistoryEntry[]>(`/lessons/${lesson.lesson_id}/attempts`).then(setHistory).catch(e=>setHistoryError(e.message))}>Refresh saved history</Button>{historyError&&<p role="alert">{historyError}</p>}{history.length?history.map((entry,index)=><article className="practice-history-entry" key={`${entry.date}-${index}`}><strong>{entry.section}</strong><span>{new Date(entry.date).toLocaleString()} · {entry.score==null?'No reliable comparison':`${entry.score}% approximate similarity`}</span>{entry.revision_id!==lesson.revision_id&&<p>Different lesson revision · scores may not be comparable.</p>}</article>):<p>No attempts yet. Completed practice summaries appear here.</p>}{editable&&<button onClick={onEdit}>Edit lesson sections</button>}</PracticePanel>}
 
 {setupIntent&&<CameraSetup controller={setupController} getTransform={getSetupTransform} onBack={cancelSetup} onCancel={cancelSetup} onRetrySetup={()=>{setupController.dispatch({type:'retry_setup',now:performance.now()});redraw(n=>n+1);}} onRetryCamera={()=>{setupStartedCamera.current=true;setupController.dispatch({type:'retry_camera',now:performance.now()});void camera.current?.start();}} onConfirmControls={toggleControlsConfirmed} showControlsConfirmation={setupFacing==='environment'&&!pairStatus?.approved} cameraRequest={cameraRequest} cameras={cameraDevices} cameraNote={cameraNote} onSelectCamera={request=>void selectCamera(request)} onStartCamera={beginCameraSetup} onRefreshCameras={()=>void refreshCameraList()}/>}
  </section></PracticeSettingsProvider>;

@@ -3,6 +3,7 @@ import type {PracticeCommand} from '../../../../packages/learning-engine/practic
 import type {PracticeCapabilities} from '../../../../packages/learning-engine/practice-capabilities';
 import type {PracticeRuntimeSnapshot} from '../../../../packages/learning-engine/practice-runtime';
 import {SettingsChoices, SettingsGroup, SettingsRow} from '../PracticeSettings';
+import {Checkbox, Select} from '../ui/controls';
 
 /** The one common playback/timing settings surface used by body and music. */
 export function PracticeCommonSettings({snapshot, capabilities, onCommand, disabledReason, status, extra}: {
@@ -31,19 +32,19 @@ export function PracticeCommonSettings({snapshot, capabilities, onCommand, disab
     </SettingsRow>}
     {capabilities.repeat === 'supported' && <SettingsRow id="repeat" label="Repeat automatically"
       value={snapshot.loop ? 'On' : 'Off'} disabledReason={disabledReason} status={status}>
-      <label>Repeat automatically<input type="checkbox" role="switch" checked={snapshot.loop}
+      <label>Repeat automatically<Checkbox variant="settings" role="switch" checked={snapshot.loop}
         disabled={Boolean(disabledReason)}
         onChange={event => onCommand({type: 'set-loop', loop: event.currentTarget.checked})}/></label>
-      {capabilities.repetitions.supported && <label>Repetitions<select value={snapshot.repetitions}
+      {capabilities.repetitions.supported && <label>Repetitions<Select variant="settings" value={snapshot.repetitions}
         disabled={Boolean(disabledReason) || !snapshot.loop}
         onChange={event => onCommand({type: 'set-repetitions', repetitions: Number(event.currentTarget.value)})}>
         {capabilities.repetitions.options.map(value => <option key={value} value={value}>{value || 'Until stopped'}</option>)}
-      </select></label>}
-      {capabilities.rest.supported && <label>Rest between repeats<select value={snapshot.restSeconds}
+      </Select></label>}
+      {capabilities.rest.supported && <label>Rest between repeats<Select variant="settings" value={snapshot.restSeconds}
         disabled={Boolean(disabledReason) || !snapshot.loop}
         onChange={event => onCommand({type: 'set-rest', seconds: Number(event.currentTarget.value)})}>
         {capabilities.rest.options.map(value => <option key={value} value={value}>{value ? `${value} seconds` : 'None'}</option>)}
-      </select></label>}
+      </Select></label>}
     </SettingsRow>}
     {capabilities.countIn.supported && <SettingsRow id="countdown" label="Preparation countdown"
       value={snapshot.countdownSeconds ? `${snapshot.countdownSeconds}s` : 'Off'}

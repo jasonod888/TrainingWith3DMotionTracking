@@ -1,0 +1,25 @@
+:root {
+  --ui-font-app: Inter, "Segoe UI", Arial, sans-serif;
+  --ui-font-practice: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ui-ink: #242d26;
+  --ui-ink-soft: #31453a;
+  --ui-muted: #7a8078;
+  --ui-line: #dedfd6;
+  --ui-surface: #fffefa;
+  --ui-accent: #d8ed9b;
+  --ui-accent-ink: #203525;
+  --ui-dock: #10241d;
+  --ui-dock-control: #183328;
+  --ui-dock-border: #ffffff24;
+  --ui-dock-text: #eef4e9;
+  --ui-dock-quiet: #c6d4c9;
+  --ui-focus-app: 3px solid #738b35;
+  --ui-focus-watch: 2px solid #d8ed9b;
+  --ui-focus-dock: 2px solid #d8ed9b;
+  --ui-focus-shell: 3px solid #8ab59a;
+  --ui-disabled-app: .4;
+  --ui-disabled-dock: .5;
+  --ui-dock-control-height: 34px;
+  --ui-dock-control-padding: 0 24px 0 8px;
+  --ui-dock-control-radius: 8px;
+}

@@ -27,8 +27,28 @@ from .storage import storage_client
 from .music_preview import performance_changed, invalidate_preview
 
 
+GUITAR_TUNING_TEXT = {
+    'standard': 'E2 A2 D3 G3 B3 E4',
+    'drop_d': 'D2 A2 D3 G3 B3 E4',
+    'half_step_down': 'Eb2 Ab2 Db3 Gb3 Bb3 Eb4',
+    'dadgad': 'D2 A2 D3 G3 A3 D4',
+}
+
+
+def sync_guitar_instrument(proposal: MusicDraftDocument, notation: dict) -> None:
+    """Persist the authored tuning/capo so Watch and the manifest agree with TAB."""
+    if proposal.subject != 'guitar':
+        return
+    tuning = notation.get('guitar_tuning') or 'standard'
+    capo = notation.get('guitar_capo') or 0
+    proposal.instrument.tuning = GUITAR_TUNING_TEXT.get(tuning, GUITAR_TUNING_TEXT['standard'])
+    proposal.instrument.capo = int(capo) if isinstance(capo, int) and not isinstance(capo, bool) and capo > 0 else None
+
+
 class EditMusic(Contract):
     base_revision_id: str = Field(min_length=1, max_length=80)
+    # Optional instrument identity; the shared engine saves piano and guitar alike.
+    subject: Literal['piano', 'guitar'] | None = None
     title: str = Field(min_length=1, max_length=200)
     events: list[MusicEvent] = Field(max_length=20000)
     # Optional so existing clients and guitar references stay valid. The server
@@ -53,6 +73,8 @@ def install_music_edit(app, settings, identity, db):
         if (lesson.experience_family or 'body') != 'music':
             raise HTTPException(409, 'Only music lessons can be edited here.')
         request_hash = hashlib.sha256(canonical(body.model_dump())).hexdigest()
+        if body.subject is not None and body.subject != (lesson.instrument or lesson.subject):
+            raise HTTPException(409, 'The edit subject does not match this lesson.')
         previous = session.scalar(select(MusicRevisionEdit).where(
             MusicRevisionEdit.lesson_id == lesson_id, MusicRevisionEdit.base_revision_id == body.base_revision_id))
         if previous:
@@ -68,8 +90,7 @@ def install_music_edit(app, settings, identity, db):
             raise HTTPException(409, 'Save the reviewed reference before editing it.')
         if body.assessment.assessment == 'notes' and (lesson.instrument or lesson.subject) != 'piano':
             raise HTTPException(422, 'MIDI note feedback is only available for piano lessons.')
-        if body.notation is not None and (lesson.instrument or lesson.subject) != 'piano':
-            raise HTTPException(422, 'Piano notation is only available for piano lessons.')
+        # Notation is shared by piano and guitar; the document names its instrument.
 
         store = storage_client(settings)
         source = store.get_object(Bucket=settings.storage_bucket, Key=current.manifest['reference']['key'])['Body']
@@ -115,6 +136,10 @@ def install_music_edit(app, settings, identity, db):
             except ValueError as exc:
                 raise HTTPException(422, 'The saved notation no longer matches these notes. '
                                          'Update the notation explicitly before saving.') from exc
+        if notation is not None and notation.get('subject') != proposal.subject:
+            raise HTTPException(422, 'The notation instrument does not match this lesson.')
+        if notation is not None:
+            sync_guitar_instrument(proposal, notation)
         alignment = None
         if body.alignment is None and previous_reference.get('alignment') is not None:
             retained = dict(previous_reference['alignment'])
@@ -169,6 +194,7 @@ def install_music_edit(app, settings, identity, db):
         revision_id = uuid4().hex
         manifest = MusicLessonManifest.model_validate({
             **current.manifest, 'revision_id': revision_id, 'title': body.title.strip() or current.manifest['title'],
+            'instrument': proposal.instrument.model_dump(),
             'section_set': sections.model_dump(), 'reference': asset.model_dump(),
             'piano_preview': proposal.piano_preview.model_dump() if proposal.piano_preview else None,
             'preview_identity': proposal.preview_identity,

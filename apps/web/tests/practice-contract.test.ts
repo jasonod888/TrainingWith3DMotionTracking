@@ -78,7 +78,7 @@ test('the same completed state has the same next-section action in every subject
 test('capabilities hide Challenge and expose only available speeds', () => {
   assert.equal(MUSIC_CAPABILITIES.challenge, 'unsupported');
   assert.equal(BODY_CAPABILITIES.challenge, 'supported');
-  assert.deepEqual(MUSIC_CAPABILITIES.speeds, [0.25, 0.5, 0.75, 1]);
+  assert.deepEqual(MUSIC_CAPABILITIES.speeds, [0.25, 0.5, 0.75, 1, 1.25]);
 });
 
 test('beat count-in is converted to scheduler seconds and keeps explicit units', () => {

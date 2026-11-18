@@ -13,6 +13,7 @@ import {resolvePerformanceAudibleTimings, shiftOnset} from '../piano-playback';
  */
 export function usePianoPerformanceAudio({
   document, videoRef, clock, livePiano, offsetSeconds, pedalSpans, rate, volume, rawModelDraft = false,
+  guitarProgram = 25,
 }: {
   document: NotationDocument | null;
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -23,6 +24,8 @@ export function usePianoPerformanceAudio({
   rate: number;
   volume: number;
   rawModelDraft?: boolean;
+  /** General MIDI guitar program used when the document is a guitar lesson. */
+  guitarProgram?: number;
 }) {
   const liveAudio = useRef<NotationAudio | null>(null);
   const midiPlayer = useRef<MidiPlayerEngine | null>(null);
@@ -33,9 +36,12 @@ export function usePianoPerformanceAudio({
   const audibleTimings = useMemo(() => document
     ? resolvePerformanceAudibleTimings(document.performance, pedalSpans) : new Map(),
     [document, pedalSpans]);
+  const guitar = document?.subject === 'guitar';
   const midiBytes = useMemo(() => document
-    ? exportPerformanceToMidi(document.performance, pedalSpans) : null,
-    [document, pedalSpans]);
+    ? exportPerformanceToMidi(document.performance, pedalSpans, {
+        subject: document.subject, program: document.subject === 'guitar' ? guitarProgram : 0,
+      }) : null,
+    [document, pedalSpans, guitarProgram]);
 
   useEffect(() => {
     if (!livePiano) { midiPlayer.current?.stop(); return; }
@@ -117,9 +123,10 @@ export function usePianoPerformanceAudio({
   }, [volume, videoRef, livePiano]);
 
   // Live synthesis is source-clocked and only runs when the MIDI engine is not
-  // already providing playback, matching the review workspace.
+  // already providing playback, matching the review workspace. Guitar always uses
+  // the SoundFont engine so its string channels keep the chosen guitar tone.
   useEffect(() => {
-    if (!livePiano || !document || midiReady) return;
+    if (!livePiano || !document || midiReady || guitar) return;
     const media = videoRef.current;
     const audio = liveAudio.current ??= new NotationAudio(1.15);
     const triggered = new Set<string>();
@@ -223,7 +230,7 @@ export function usePianoPerformanceAudio({
       reset();
       if (media) for (const [name, handler] of listeners) media.removeEventListener(name, handler);
     };
-  }, [livePiano, midiReady, document, offsetSeconds, pedalSpans, audibleTimings, rate, rawModelDraft, videoRef, clock, volume]);
+  }, [livePiano, midiReady, document, offsetSeconds, pedalSpans, audibleTimings, rate, rawModelDraft, videoRef, clock, volume, guitar]);
 
   useEffect(() => () => {
     liveAudio.current?.dispose();

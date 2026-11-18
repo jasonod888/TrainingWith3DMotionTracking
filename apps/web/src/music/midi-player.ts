@@ -83,6 +83,17 @@ export class MidiPlayerEngine {
     }
   }
 
+  /** Select a General MIDI program on one channel (guitar strings use 0..5). */
+  setProgram(program: number, channel = 0): void {
+    const index = Math.max(0, Math.min(15, Math.trunc(channel)));
+    this.synth?.programChange(index, Math.max(0, Math.min(127, Math.trunc(program))));
+  }
+
+  /** Retune all six guitar string channels to the chosen guitar program. */
+  setGuitarProgram(program: number): void {
+    for (const channel of [0, 1, 2, 3, 4, 5]) this.setProgram(program, channel);
+  }
+
   loadMidi(bytes: Uint8Array, preserveTime?: number): void {
     if (this.ready && this.sequencer && bytes === this.loadedBytes) return;
     if (!this.ready || !this.sequencer) {

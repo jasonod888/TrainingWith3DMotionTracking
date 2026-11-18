@@ -6,6 +6,8 @@ type MidiNote = {
   onset: number;
   duration?: number | null;
   velocity?: number | null;
+  /** Guitar TAB string (1 = high E). Ignored for piano. */
+  string?: number | null;
 };
 
 type MidiPedal = {
@@ -37,10 +39,31 @@ const eventByte = (tick: number, priority: number, ...bytes: number[]): MidiEven
   tick: Math.max(0, Math.round(tick)), priority, bytes,
 });
 
+/** General MIDI programs the unified music export can name. */
+export const GUITAR_GM_PROGRAMS = {
+  nylon: 24, steel: 25, jazz: 26, cleanElectric: 27,
+} as const;
+
+export type MidiExportOptions = {
+  /** General MIDI program; piano defaults to 0, guitar to 25 (steel). */
+  program?: number;
+  subject?: 'piano' | 'guitar';
+};
+
 export function exportPerformanceToMidi(
   notes: ReadonlyArray<MidiNote>,
   pedalSpans?: ReadonlyArray<MidiPedal>,
+  options: MidiExportOptions = {},
 ): Uint8Array {
+  const guitar = options.subject === 'guitar';
+  const program = Math.max(0, Math.min(127, Math.round(options.program ?? (guitar ? GUITAR_GM_PROGRAMS.steel : 0))));
+  const channelFor = (note: MidiNote): number => {
+    // One channel per guitar string keeps TAB fingering audible and lets each string
+    // hold its own notes; piano keeps the whole performance on channel 0.
+    if (!guitar) return 0;
+    const string = note.string;
+    return Number.isInteger(string) && (string as number) >= 1 && (string as number) <= 6 ? (string as number) - 1 : 0;
+  };
   const normalized = notes
     .filter(note => Number.isFinite(note.pitch) && Number.isFinite(note.onset)
       && note.pitch >= 0 && note.pitch <= 127)
@@ -50,6 +73,7 @@ export function exportPerformanceToMidi(
       onset: Math.max(0, note.onset),
       duration: Math.max(0.001, note.duration ?? 0.25),
       velocity: Math.max(0, Math.min(1, note.velocity ?? 0.5)),
+      channel: channelFor(note),
     }))
     .filter(note => !isGhost(note.duration, note.velocity));
 
@@ -72,19 +96,25 @@ export function exportPerformanceToMidi(
     }
   }
 
+  const trackName = guitar ? 'Guitar' : 'Piano';
+  const nameBytes = [...trackName].map(character => character.charCodeAt(0) & 0x7f);
   const events: MidiEvent[] = [
-    eventByte(0, 0, 0xff, 0x03, 0x05, 0x50, 0x69, 0x61, 0x6e, 0x6f), // "Piano"
+    eventByte(0, 0, 0xff, 0x03, nameBytes.length, ...nameBytes),
     eventByte(0, 1, 0xff, 0x51, 0x03, (TEMPO_US >> 16) & 0xff,
       (TEMPO_US >> 8) & 0xff, TEMPO_US & 0xff),
-    eventByte(0, 2, 0xc0, 0x00),
   ];
+  // Guitar spans channels 0..5 (string 1..6), all carrying the chosen guitar program;
+  // piano keeps the single grand-piano channel.
+  for (const channel of guitar ? [0, 1, 2, 3, 4, 5] : [0]) {
+    events.push(eventByte(0, 2, 0xc0 | channel, program));
+  }
 
   for (const note of normalized) {
     const velocity = Math.max(1, Math.min(127, Math.round(note.velocity * 127)));
     const onTick = note.onset * TICKS_PER_SECOND;
     const offTick = (endById.get(note.id) ?? note.onset + note.duration) * TICKS_PER_SECOND;
-    events.push(eventByte(onTick, 5, 0x90, note.pitch, velocity));
-    events.push(eventByte(offTick, 4, 0x80, note.pitch, 0x40));
+    events.push(eventByte(onTick, 5, 0x90 | note.channel, note.pitch, velocity));
+    events.push(eventByte(offTick, 4, 0x80 | note.channel, note.pitch, 0x40));
   }
 
   for (const span of pedalSpans ?? []) {

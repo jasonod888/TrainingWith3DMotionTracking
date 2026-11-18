@@ -99,7 +99,7 @@ export function parseMusicReference(value: unknown, options: {includeNotation?: 
     const string = item.string == null ? null : finite(item.string, `note ${id} string`);
     const fret = item.fret == null ? null : finite(item.fret, `note ${id} fret`);
     if ((string === null) !== (fret === null)) throw new Error(`Note ${id} needs both string and fret.`);
-    if (string !== null && (!Number.isInteger(string) || string < 1 || string > 6 || !Number.isInteger(fret) || fret! < 0 || fret! > 12)) {
+    if (string !== null && (!Number.isInteger(string) || string < 1 || string > 6 || !Number.isInteger(fret) || fret! < 0 || fret! > 24)) {
       throw new Error(`Note ${id} has an invalid reviewed position.`);
     }
     if (string !== null && ({1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40} as Record<number, number>)[string] + fret! !== pitch) {
@@ -117,11 +117,11 @@ export function parseMusicReference(value: unknown, options: {includeNotation?: 
     if (start < 0 || start > duration + 1e-6) throw new Error('A reviewed chord starts outside the clip.');
     if (!Array.isArray(item.frets) || item.frets.length !== 6) throw new Error('A reviewed chord needs six string frets.');
     const frets = item.frets.map((value: unknown) => finite(value, `chord ${name} fret`));
-    if (frets.some(value => !Number.isInteger(value) || value < -1 || value > 12) || !frets.some(value => value >= 0)) {
+    if (frets.some(value => !Number.isInteger(value) || value < -1 || value > 24) || !frets.some(value => value >= 0)) {
       throw new Error('A reviewed chord has invalid frets.');
     }
     const position = item.position == null ? 1 : finite(item.position, `chord ${name} position`);
-    if (!Number.isInteger(position) || position < 1 || position > 9) throw new Error('A reviewed chord has an invalid base position.');
+    if (!Number.isInteger(position) || position < 1 || position > 24) throw new Error('A reviewed chord has an invalid base position.');
     if (frets.some(fret => fret > 0 && (fret < position || fret > position + 3))) throw new Error('A reviewed chord does not fit its base position.');
     return {id, name, start, frets, position};
   }) : [];
@@ -143,7 +143,8 @@ export function parseMusicReference(value: unknown, options: {includeNotation?: 
   else throw new Error('The reviewed reference has no review evidence.');
   if(!document.instrument||typeof document.instrument!=='object'||Array.isArray(document.instrument)||(document.instrument as Record<string,unknown>).instrument!==document.subject)throw new Error('The reference instrument does not match its subject.');
   return {reference_version: 1, subject: document.subject, instrument: {...document.instrument as Record<string, unknown>},
-    duration, events, spans, guitarChords, review, notation: options.includeNotation ? document.notation : undefined};
+    // Always retain the saved notation/setup so Watch can honour tuning and capo.
+    duration, events, spans, guitarChords, review, notation: document.notation};
 }
 
 export function eventDuration(event: MusicReferenceEvent): number {
@@ -187,15 +188,29 @@ export function pianoGeometry(events: MusicReferenceEvent[], padding = 2): Piano
 }
 
 export type GuitarPosition = {string: number; fret: number; label: string};
-/** Standard tuning, lowest fret wins; positions beyond the twelfth fret are not drawn. */
+/** Standard tuning, lowest fret wins; positions beyond the twenty-fourth fret are not drawn. */
 export function guitarPosition(pitch: number): GuitarPosition | null {
   let best: GuitarPosition | null = null;
   GUITAR_STRINGS.forEach((string, index) => {
     const fret = pitch - string.pitch;
-    if (fret < 0 || fret > 12) return;
+    if (fret < 0 || fret > 24) return;
     if (!best || fret < best.fret) best = {string: index + 1, fret, label: string.label};
   });
   return best;
+}
+
+/** Canonical contract positions: string 1 is the high E4, string 6 the low E2. */
+export const GUITAR_OPEN_STRINGS: Readonly<Record<number, number>> = Object.freeze({
+  1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40,
+});
+export const GUITAR_STANDARD_TUNING_LOW_TO_HIGH = ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'] as const;
+
+/** Canonical string number (1 = high E) for a pitch, or null outside E2..E6. */
+export function guitarStringForPitch(pitch: number): {string: number; fret: number; label: string} | null {
+  const legacy = guitarPosition(pitch);
+  if (!legacy) return null;
+  // guitarPosition numbers from the low string; contracts number from the high string.
+  return {string: 7 - legacy.string, fret: legacy.fret, label: legacy.label};
 }
 
 export const GUITAR_STRING_LABELS = GUITAR_STRINGS.map(string => string.label);

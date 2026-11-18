@@ -1,4 +1,4 @@
-"""Server-side integrity checks for the editable piano notation document.
+"""Server-side integrity checks for the editable shared music notation document.
 
 The browser owns the rich editor model, but the server must not persist a reference
 whose notation disagrees with its performance events or whose measures are malformed.
@@ -75,8 +75,61 @@ def _performance_matches(notation: dict[str, Any], events: list[Any], duration: 
             _fail('A notation performance velocity does not match the reviewed event.')
         if bool(item.get('optional')) != bool(event.optional):
             _fail('A notation performance optional flag does not match the reviewed event.')
+        # Non-standard tuning or a capo makes the top-level event unpositioned (the
+        # standard-tuning contract cannot express it); the notation keeps the exact
+        # string/fret and is validated against its own tuning/capo below. Older
+        # callers pass event-like objects without position attributes.
+        event_string = getattr(event, 'string', None)
+        event_fret = getattr(event, 'fret', None)
+        if event_string is not None and (item.get('string') != event_string or item.get('fret') != event_fret):
+            _fail('A notation performance position does not match the reviewed event.')
     if any(item.onset + (item.duration or 0) > duration + 1e-6 for item in events):
         _fail('The notation performance leaves the clip.')
+
+
+GUITAR_TUNINGS = {
+    'standard': {1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40},
+    'drop_d': {1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 38},
+    'half_step_down': {1: 63, 2: 58, 3: 54, 4: 49, 5: 44, 6: 39},
+    'dadgad': {1: 62, 2: 57, 3: 55, 4: 50, 5: 45, 6: 38},
+}
+
+
+def _validate_guitar_setup(notation: dict[str, Any]) -> tuple[dict[int, int], int]:
+    tuning = notation.get('guitar_tuning')
+    if tuning is None:
+        tuning = 'standard'
+    if not isinstance(tuning, str) or tuning not in GUITAR_TUNINGS:
+        _fail('The notation has an unknown guitar tuning.')
+    capo = notation.get('guitar_capo')
+    if capo is None:
+        capo = 0
+    if not isinstance(capo, int) or isinstance(capo, bool) or capo < 0 or capo > 12:
+        _fail('The notation has an invalid guitar capo.')
+    return GUITAR_TUNINGS[tuning], capo
+
+
+def _validate_guitar_performance(notation: dict[str, Any]) -> None:
+    open_string, capo = _validate_guitar_setup(notation)
+    performance = notation.get('performance')
+    if not isinstance(performance, list):
+        _fail('The notation has no valid performance events.')
+    for item in performance:
+        if not isinstance(item, dict):
+            continue
+        string = item.get('string')
+        fret = item.get('fret')
+        if string is None and fret is None:
+            continue
+        if (string is None) != (fret is None):
+            _fail('A guitar performance event needs both string and fret.')
+        if not isinstance(string, int) or isinstance(string, bool) or string < 1 or string > 6:
+            _fail('A guitar performance event has an invalid string.')
+        if not isinstance(fret, int) or isinstance(fret, bool) or fret < 0 or fret > 24:
+            _fail('A guitar performance event has an invalid fret.')
+        pitch = item.get('pitch')
+        if open_string[string] + capo + fret != pitch:
+            _fail('A guitar position does not match its tuning and capo.')
 
 
 def _validate_hand_metadata(value: dict[str, Any], performance_ids: set[str]) -> None:
@@ -125,8 +178,12 @@ def validate_notation(value: Any, events: list[Any], duration: float) -> dict[st
         _fail('The notation is not a document.')
     if value.get('notation_version') != 1:
         _fail('This notation version is unsupported.')
-    if value.get('subject') != 'piano':
-        _fail('Notation editing is only available for piano lessons.')
+    if value.get('subject') not in ('piano', 'guitar'):
+        _fail('The notation has an unknown instrument.')
+    _validate_guitar_setup(value)
+    if value.get('subject') != 'guitar' and (
+            value.get('guitar_tuning') is not None or value.get('guitar_capo') is not None):
+        _fail('Guitar tuning and capo are only valid on guitar notation.')
     performance = value.get('performance')
     occurrence_count = len(performance) if isinstance(performance, list) else -1
     if occurrence_count >= 0:
@@ -254,6 +311,8 @@ def validate_notation(value: Any, events: list[Any], duration: float) -> dict[st
             if current[0] < previous[1]:
                 _fail('Notation events overlap in the same voice.')
     _performance_matches(value, events, duration)
+    if value.get('subject') == 'guitar':
+        _validate_guitar_performance(value)
     # Every recorded occurrence must be owned by exactly one written note, and the
     # written pitch must agree with the performance pitch it is linked to. Written and
     # recorded durations are deliberately allowed to differ.

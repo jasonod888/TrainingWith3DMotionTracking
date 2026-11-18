@@ -5,6 +5,7 @@ import type {PracticeCommand} from '../../../packages/learning-engine/practice-c
 import type {PracticeFullscreenController} from './practice/usePracticeFullscreen';
 import {PracticeTimeline} from './PracticeTimeline';
 import {PracticePrimaryActions} from './practice/PracticePrimaryActions';
+import {Button} from './ui/controls';
 import {Maximize, Minimize, Settings2} from 'lucide-react';
 
 export function PracticePlayerDock({
@@ -46,7 +47,7 @@ export function PracticePlayerDock({
     ? <PracticePrimaryActions primary={view.primary} secondary={view.secondary}
         onCommand={onCommand} disabled={actionsDisabled}/>
     : primaryAction;
-  return <div ref={dockRef} id={id} className="practice-player-dock"
+  return <div ref={dockRef} id={id} className="practice-player-dock" data-ui-surface="practice"
     hidden={hidden} inert={inert || undefined}>
     <PracticeTimeline sections={sections} duration={duration} time={time}
       activeIndex={activeIndex} range={range} disabled={timelineDisabled}
@@ -55,12 +56,12 @@ export function PracticePlayerDock({
       <div className="practice-player-actions">{actions}</div>
       <div className="practice-player-tools">
         {toolsBefore}
-        <button className="player-tool player-speed" aria-label={`Playback speed ${speed}×`}
-          title="Playback speed" onClick={onSpeedClick}>{speed}×</button>
-        <button className="player-tool" aria-label="Practice settings" title="Practice settings"
-          onClick={onSettingsClick}><Settings2 size={19} aria-hidden="true"/></button>
+        <Button variant="dock-tool" className="player-tool player-speed" aria-label={`Playback speed ${speed}×`}
+          title="Playback speed" onClick={onSpeedClick}>{speed}×</Button>
+        <Button variant="dock-tool" className="player-tool" aria-label="Practice settings" title="Practice settings"
+          onClick={onSettingsClick}><Settings2 size={19} aria-hidden="true"/></Button>
         {toolsAfter}
-        {fullscreen && <button className="player-tool practice-fullscreen-button"
+        {fullscreen && <Button variant="dock-tool" className="player-tool practice-fullscreen-button"
           aria-label={fullscreen.active ? 'Exit fullscreen' : 'Enter fullscreen'}
           title={fullscreen.error || (fullscreen.available || fullscreen.active
             ? (fullscreen.active ? 'Exit fullscreen' : 'Enter fullscreen')
@@ -68,7 +69,7 @@ export function PracticePlayerDock({
           disabled={!fullscreen.available && !fullscreen.active}
           onClick={() => void fullscreen.toggle()}>
           {fullscreen.active ? <Minimize size={19} aria-hidden="true"/> : <Maximize size={19} aria-hidden="true"/>}
-        </button>}
+        </Button>}
       </div>
     </div>
     {extra}

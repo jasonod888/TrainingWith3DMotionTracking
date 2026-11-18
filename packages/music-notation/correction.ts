@@ -23,6 +23,11 @@ import { refreshNotation } from './build';
 import { invalidateStaleHandAssignments, pruneHandAssignments } from './hands';
 import { snapTick, measureTicks } from './rhythm';
 import { accidentalName, displayAccidental, parseSpelling, spellPitch } from './spelling';
+import {
+  GUITAR_TUNINGS, fretOnString, guitarFingering, isGuitarFret, isGuitarString, isGuitarTuningId,
+  isPlayablePosition, normalizeGuitarSetup, openStringPitch, resolveGuitarPosition,
+  type GuitarSetup, type GuitarTuningId,
+} from './guitar';
 
 export type CorrectionSelection = {
   occurrenceId: string;
@@ -39,6 +44,7 @@ export type RejectionCode =
   | 'invalid-ticks' | 'invalid-scope' | 'out-of-bounds' | 'written-overlap'
   | 'needs-third-voice' | 'duplicate-chord-pitch' | 'duplicate-occurrence'
   | 'ambiguous-insert' | 'unsupported-spelling' | 'too-many-occurrences'
+  | 'invalid-position'
   | 'document-invalid';
 
 export type CommandOutcome =
@@ -89,6 +95,12 @@ export type CorrectionCommand =
     }
   | { type: 'delete-occurrence'; occurrenceId: string }
   | { type: 'delete-logical-note'; logicalNoteId: string }
+  // Guitar TAB position: reassign the string while keeping the sounding pitch, or
+  // move the occurrence to an explicit string/fret (which changes the pitch).
+  | { type: 'shift-guitar-string'; occurrenceId: string; string: number }
+  | { type: 'set-guitar-position'; occurrenceId: string; string: number; fret: number }
+  /** Re-tune or capo the document, keeping every sounding pitch playable. */
+  | { type: 'set-guitar-setup'; tuning?: GuitarTuningId; capo?: number }
   | { type: 'set-occurrence-hand'; occurrenceId: string; hand: Hand }
   | { type: 'reset-occurrence-hand'; occurrenceId: string };
 
@@ -164,6 +176,26 @@ function applied(document: NotationDocument, label: string, selection?: Correcti
     document: invalidateStaleHandAssignments(pruneHandAssignments(document)), label, selection};
 }
 
+/** Active tuning/capo for a document; older documents mean standard, no capo. */
+function setupOf(document: NotationDocument): Required<GuitarSetup> {
+  return normalizeGuitarSetup({tuning: document.guitar_tuning, capo: document.guitar_capo});
+}
+
+/** Guitar occurrences always keep string/fret consistent with the sounding pitch. */
+function positionFields(
+  pitch: number, string: number | null | undefined, fret: number | null | undefined, setup: GuitarSetup,
+): {string: number | null; fret: number | null} {
+  const resolved = resolveGuitarPosition(pitch, string ?? null, fret ?? null, setup);
+  return resolved ? {string: resolved.string, fret: resolved.fret} : {string: null, fret: null};
+}
+
+function applyGuitarPosition(document: NotationDocument, occurrence: PerformanceNote): void {
+  if (document.subject !== 'guitar') return;
+  const position = positionFields(occurrence.pitch, occurrence.string, occurrence.fret, setupOf(document));
+  occurrence.string = position.string;
+  occurrence.fret = position.fret;
+}
+
 /* ------------------------------------------------------------- validation */
 
 /**
@@ -172,6 +204,14 @@ function applied(document: NotationDocument, label: string, selection?: Correcti
  * malformed document.
  */
 export function documentProblem(document: NotationDocument): string | null {
+  if (document.guitar_tuning !== undefined && !isGuitarTuningId(document.guitar_tuning)) {
+    return 'The document has an unknown guitar tuning.';
+  }
+  if (document.guitar_capo !== undefined
+    && (!Number.isInteger(document.guitar_capo) || document.guitar_capo < 0 || document.guitar_capo > 12)) {
+    return 'The document has an invalid guitar capo.';
+  }
+  const guitarSetup = setupOf(document);
   const occurrences = new Set<string>();
   for (const item of document.performance) {
     if (!item.id || item.id.length > 80) return 'An occurrence has no valid id.';
@@ -179,6 +219,9 @@ export function documentProblem(document: NotationDocument): string | null {
     occurrences.add(item.id);
     if (!Number.isFinite(item.onset) || item.onset < 0) return 'An occurrence has an invalid start.';
     if (item.duration !== null && (!Number.isFinite(item.duration) || item.duration <= 0)) return 'An occurrence has an invalid recorded length.';
+    if (document.subject === 'guitar' && item.string !== null && !isPlayablePosition(item.pitch, item.string, item.fret, guitarSetup)) {
+      return 'A guitar position does not match its pitch.';
+    }
   }
 
   const owned = new Map<string, string>();
@@ -358,6 +401,7 @@ function setPitch(document: NotationDocument, occurrenceId: string, pitch: numbe
   const linked = next.performance.find(item => item.id === occurrenceId);
   if (!linked) return rejection('unknown-occurrence', 'That note is no longer in the document.');
   linked.pitch = pitch;
+  applyGuitarPosition(next, linked);
 
   if (!needsDetach) {
     const parsedSpelling = parseSpelling(finalSpelling);
@@ -659,6 +703,9 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
   const next = clone(document);
   const occurrenceId = command.id ?? newId('authored');
   const spelling = spellPitch(pitch, next.key_signature);
+  const position = next.subject === 'guitar'
+    ? positionFields(pitch, command.restore?.string, command.restore?.fret, setupOf(next))
+    : {string: command.restore?.string ?? null, fret: command.restore?.fret ?? null};
   const same = next.events.find(event => !event.rest && event.staff === staff && event.voice === voice
     && event.start === start && event.duration === duration);
 
@@ -673,7 +720,7 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
           pitch, velocity: command.restore ? (command.restore.velocity ?? null) : (command.velocity ?? 0.7),
           confidence: command.restore?.confidence ?? null,
           optional: command.restore?.optional ?? false,
-          string: command.restore?.string ?? null, fret: command.restore?.fret ?? null,
+          string: position.string, fret: position.fret,
         });
         const mergedOutcome = finalise(next, `Restored ${spelling.spelling}`);
         if (mergedOutcome.status !== 'applied') return mergedOutcome;
@@ -703,7 +750,7 @@ function insertNote(document: NotationDocument, command: Extract<CorrectionComma
     pitch, velocity: command.restore ? (command.restore.velocity ?? null) : (command.velocity ?? 0.7),
     confidence: command.restore?.confidence ?? null,
     optional: command.restore?.optional ?? false,
-    string: command.restore?.string ?? null, fret: command.restore?.fret ?? null,
+    string: position.string, fret: position.fret,
   });
   const outcome = finalise(next, `Inserted ${spelling.spelling}`);
   if (outcome.status !== 'applied') return outcome;
@@ -767,8 +814,94 @@ function resetHand(document: NotationDocument, occurrenceId: string): CommandOut
   return applied(next, 'Hand reset to automatic');
 }
 
-/* ---------------------------------------------------------------- dispatch */
+function shiftGuitarString(document: NotationDocument, occurrenceId: string, string: number): CommandOutcome {
+  if (document.subject !== 'guitar') {
+    return rejection('invalid-position', 'Guitar positions are only available for guitar lessons.');
+  }
+  const occurrence = occurrenceById(document, occurrenceId);
+  if (!occurrence) return rejection('unknown-occurrence', 'That note is no longer in the document.');
+  if (!isGuitarString(string)) return rejection('invalid-position', 'A guitar string must be 1 to 6.');
+  const result = fretOnString(occurrence.pitch, string, setupOf(document));
+  if (!result.ok) return rejection('invalid-position', result.message);
+  if (occurrence.string === string && occurrence.fret === result.fret) {
+    return {status: 'unchanged', label: 'String unchanged'};
+  }
+  const next = clone(document);
+  const linked = next.performance.find(item => item.id === occurrenceId)!;
+  linked.string = string;
+  linked.fret = result.fret;
+  if (documentProblem(next)) return rejection('document-invalid', 'That position could not be represented.');
+  return applied(next, `String → ${string} (fret ${result.fret})`);
+}
 
+function setGuitarPosition(document: NotationDocument, occurrenceId: string, string: number, fret: number): CommandOutcome {
+  if (document.subject !== 'guitar') {
+    return rejection('invalid-position', 'Guitar positions are only available for guitar lessons.');
+  }
+  const occurrence = occurrenceById(document, occurrenceId);
+  if (!occurrence) return rejection('unknown-occurrence', 'That note is no longer in the document.');
+  if (!isGuitarString(string)) return rejection('invalid-position', 'A guitar string must be 1 to 6.');
+  if (!isGuitarFret(fret)) return rejection('invalid-position', 'A guitar fret must be between 0 and 24.');
+  const open = openStringPitch(string, setupOf(document));
+  if (open === null) return rejection('invalid-position', 'That guitar string is not available in this tuning.');
+  const pitch = open + fret;
+  if (pitch < 0 || pitch > 127) return rejection('invalid-pitch', 'That position would leave the MIDI range.');
+  if (occurrence.pitch === pitch && occurrence.string === string && occurrence.fret === fret) {
+    return {status: 'unchanged', label: 'Position unchanged'};
+  }
+  // Reuse the pitch command so spelling, ties and voice splitting stay consistent,
+  // then pin the exact string/fret the player chose.
+  const outcome = setPitch(document, occurrenceId, pitch);
+  if (outcome.status === 'rejected') return outcome;
+  const base = outcome.status === 'applied' ? outcome.document : document;
+  const next = clone(base);
+  const linked = next.performance.find(item => item.id === occurrenceId);
+  if (!linked) return rejection('unknown-occurrence', 'That note is no longer in the document.');
+  linked.string = string;
+  linked.fret = fret;
+  if (documentProblem(next)) return rejection('document-invalid', 'That position could not be represented.');
+  return applied(next, `Position → string ${string}, fret ${fret}`,
+    outcome.status === 'applied' ? outcome.selection : undefined);
+}
+
+function setGuitarSetup(
+  document: NotationDocument, tuningInput?: GuitarTuningId, capoInput?: number,
+): CommandOutcome {
+  if (document.subject !== 'guitar') {
+    return rejection('invalid-position', 'Guitar setups are only available for guitar lessons.');
+  }
+  const tuning = tuningInput ?? document.guitar_tuning ?? 'standard';
+  if (!isGuitarTuningId(tuning)) return rejection('invalid-position', 'Unknown guitar tuning.');
+  const capo = capoInput ?? document.guitar_capo ?? 0;
+  if (!Number.isInteger(capo) || capo < 0 || capo > 12) {
+    return rejection('invalid-position', 'A guitar capo must be a whole number between 0 and 12.');
+  }
+  if (tuning === (document.guitar_tuning ?? 'standard') && capo === (document.guitar_capo ?? 0)) {
+    return {status: 'unchanged', label: 'Guitar setup unchanged'};
+  }
+  const setup: GuitarSetup = {tuning, capo};
+  const next = clone(document);
+  next.guitar_tuning = tuning;
+  next.guitar_capo = capo;
+  for (const note of next.performance) {
+    // Keeping the sounding pitch invariant: retain the current string when the new
+    // setup can still reach the pitch, otherwise re-finger it ergonomically.
+    const open = note.string !== null ? openStringPitch(note.string, setup) : null;
+    const fret = open !== null ? note.pitch - open : Number.NaN;
+    if (open !== null && fret >= 0 && fret <= 24) {
+      note.fret = fret;
+      continue;
+    }
+    const position = guitarFingering(note.pitch, setup);
+    note.string = position ? position.string : null;
+    note.fret = position ? position.fret : null;
+  }
+  const problem = documentProblem(next);
+  if (problem) return rejection('document-invalid', `${problem} Nothing was changed.`);
+  return applied(next, `Guitar setup → ${GUITAR_TUNINGS[tuning].label}${capo ? ` · capo ${capo}` : ''}`);
+}
+
+/* ---------------------------------------------------------------- dispatch */
 export function applyCommand(document: NotationDocument, command: CorrectionCommand): CommandOutcome {
   switch (command.type) {
     case 'set-occurrence-pitch':
@@ -793,6 +926,12 @@ export function applyCommand(document: NotationDocument, command: CorrectionComm
       return removeOccurrence(document, command.occurrenceId);
     case 'delete-logical-note':
       return removeLogicalNote(document, command.logicalNoteId);
+    case 'shift-guitar-string':
+      return shiftGuitarString(document, command.occurrenceId, command.string);
+    case 'set-guitar-position':
+      return setGuitarPosition(document, command.occurrenceId, command.string, command.fret);
+    case 'set-guitar-setup':
+      return setGuitarSetup(document, command.tuning, command.capo);
     case 'set-occurrence-hand':
       return setHand(document, command.occurrenceId, command.hand);
     case 'reset-occurrence-hand':

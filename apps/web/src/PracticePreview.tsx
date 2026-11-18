@@ -4,8 +4,7 @@ import type {LessonManifest,LessonSummary,MusicLessonManifest,Section} from '../
 import {assetUrl,loadPublicMoves,type PublicMove} from './api';
 import {PracticeTimeline} from './PracticeTimeline';
 import {timelineSectionAt} from './practice-timeline';
-import {ExperienceModeSelector} from './practice/ExperienceModeSelector';
-import {BODY_EXPERIENCE_CAPABILITIES, MUSIC_EXPERIENCE_CAPABILITIES} from '../../../packages/learning-engine/experience-mode';
+import {Button} from './ui/controls';
 import './preview.css';
 
 export type WatchLesson={lesson:LessonSummary;owned:boolean};
@@ -38,16 +37,11 @@ export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBac
  const remember=(absolute:number)=>{lastPosition.current=Math.max(start,Math.min(absolute,end));setTime(lastPosition.current-start);};
  const seek=(relative:number)=>{const v=video.current;if(!v)return;v.currentTime=Math.max(start,Math.min(start+relative,Math.min(end,v.duration)));remember(v.currentTime);};
  const toggle=()=>{const v=video.current;if(!v)return;if(v.paused){if(v.currentTime<start||v.currentTime>=Math.min(end,v.duration)-.05)seek(0);void v.play().catch(()=>setPaused(true));}else v.pause();};
- const choose=(mode:'practice'|'challenge')=>{video.current?.pause();position.current(lastPosition.current);onChoose(mode);};
- const modeCapabilities='experience_family' in lesson&&lesson.experience_family==='music'
-  ?MUSIC_EXPERIENCE_CAPABILITIES:BODY_EXPERIENCE_CAPABILITIES;
+ const choose=()=>{video.current?.pause();position.current(lastPosition.current);onChoose('practice');};
  const poster=(thumbnail:string|null)=>(thumbnail?<img src={thumbnail} alt="" loading="lazy" onError={event=>{event.currentTarget.hidden=true;}}/>:<Rotate3D size={30}/>);
  const duration=(value:number)=>`${Math.floor(value/60)}:${Math.floor(value%60).toString().padStart(2,'0')}`;
- return <section className="lesson-watch" aria-label="Watch lesson">
-  <div className="watch-header"><button onClick={onBack}><ArrowLeft size={18}/>Back to feed</button>
-  <ExperienceModeSelector compact current="watch" capabilities={modeCapabilities} onSelect={mode=>{
-   if(mode==='practice'||mode==='challenge')choose(mode);
-  }}/></div>
+ return <section className="lesson-watch" aria-label="Watch lesson" data-ui-surface="watch">
+  <div className="watch-header"><Button variant="watch-control" onClick={onBack}><ArrowLeft size={18}/>Back to feed</Button></div>
   <div className="watch-layout">
    <div className="watch-main">
     <div className="watch-player" ref={player}>
@@ -55,20 +49,20 @@ export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBac
       onLoadedMetadata={()=>{const v=video.current;if(!v)return;if(!Number.isFinite(v.duration)||v.duration<=start){setUnavailable(true);return;}v.currentTime=Math.min(initial,Math.min(end,v.duration)-.05);remember(v.currentTime);setReady(true);void v.play().catch(()=>setPaused(true));}}
       onTimeUpdate={()=>{const v=video.current;if(!v)return;if(v.currentTime>=end){v.pause();if(v.currentTime>end+.05)v.currentTime=end;remember(end);}else remember(v.currentTime);}}
       onPlay={()=>setPaused(false)} onPause={()=>setPaused(true)} onEnded={()=>{setPaused(true);remember(Math.min(end,video.current?.duration??end));}} onError={()=>setUnavailable(true)}/>:meta.thumbnail?<img src={assetUrl(meta.thumbnail.key)} alt="Lesson thumbnail"/>:null}</div>
-     {!unavailable&&<button className="watch-video-toggle" aria-label="Toggle video playback" onClick={toggle}>{paused&&<Play size={38} fill="currentColor"/>}</button>}
+     {!unavailable&&<Button variant="watch-overlay" className="watch-video-toggle" aria-label="Toggle video playback" onClick={toggle}>{paused&&<Play size={38} fill="currentColor"/>}</Button>}
      {unavailable&&<div className="watch-unavailable" role="status"><VideoOff size={27}/><strong>Original video unavailable</strong><span>You can still practise with the 3D instructor.</span></div>}
      <div className="watch-controls">
       <PracticeTimeline sections={lesson.section_set.sections} duration={lesson.duration} time={time} activeIndex={timelineSectionAt(lesson.section_set.sections,time+.001)} range={null} disabled={unavailable||!ready} onScrubStart={()=>{}} onSeek={seek} onSelect={index=>seek(lesson.section_set.sections[index].start)} onBrowse={()=>setBrowse(value=>!value)}/>
-      <div className="watch-control-row"><button aria-label={paused?'Play video':'Pause video'} disabled={unavailable||!ready} onClick={toggle}>{paused?<Play size={21} fill="currentColor"/>:<Pause size={21} fill="currentColor"/>}</button><button aria-label={muted?'Unmute video':'Mute video'} disabled={unavailable} onClick={()=>setMuted(value=>!value)}>{muted?<VolumeX size={20}/>:<Volume2 size={20}/>}</button><span className="watch-continuous">Full video</span><button aria-label="Fullscreen video" onClick={()=>{void player.current?.requestFullscreen?.().catch(()=>{});}}><Maximize size={20}/></button></div>
+      <div className="watch-control-row"><Button variant="watch-control" aria-label={paused?'Play video':'Pause video'} disabled={unavailable||!ready} onClick={toggle}>{paused?<Play size={21} fill="currentColor"/>:<Pause size={21} fill="currentColor"/>}</Button><Button variant="watch-control" aria-label={muted?'Unmute video':'Mute video'} disabled={unavailable} onClick={()=>setMuted(value=>!value)}>{muted?<VolumeX size={20}/>:<Volume2 size={20}/>}</Button><span className="watch-continuous">Full video</span><Button variant="watch-cta" className="watch-practice" onClick={choose}>Practice</Button><Button variant="watch-control" aria-label="Fullscreen video" onClick={()=>{void player.current?.requestFullscreen?.().catch(()=>{});}}><Maximize size={20}/></Button></div>
      </div>
     </div>
-    {browse&&<div className="watch-sections" aria-label="Video sections">{lesson.section_set.sections.map((section,index)=><button key={section.id} onClick={()=>{seek(section.start);setBrowse(false);}}><span>{String(index+1).padStart(2,'0')}</span><strong>{section.label}</strong><small>{duration(section.start)}</small></button>)}</div>}
+    {browse&&<div className="watch-sections" aria-label="Video sections">{lesson.section_set.sections.map((section,index)=><Button variant="watch-section" key={section.id} onClick={()=>{seek(section.start);setBrowse(false);}}><span>{String(index+1).padStart(2,'0')}</span><strong>{section.label}</strong><small>{duration(section.start)}</small></Button>)}</div>}
     <div className="watch-description"><h1>{lesson.title}</h1><p>{creator} <span>· {duration(lesson.duration)} · {lesson.section_set.sections.length} sections</span></p>{meta.description&&<p>{meta.description}</p>}</div>
    </div>
    <aside className="watch-related" aria-label="Other lessons"><h2>More lessons</h2>
-    {available.map(item=><button className="watch-lesson" key={item.lesson.lesson_id} onClick={()=>onOpen(item)}><span className="watch-thumbnail">{poster(item.lesson.poster?assetUrl(item.lesson.poster.key):null)}<small>{duration(item.lesson.duration)}</small></span><span className="watch-lesson-copy"><strong>{item.lesson.title}</strong><span>{item.owned?'Your lesson':'Available lesson'}</span><span>{item.lesson.section_count} sections</span></span></button>)}
-    {related.map(item=><button className="watch-lesson" key={item.lesson_id} onClick={()=>onPublic(item.lesson_id)}><span className="watch-thumbnail">{poster(item.thumbnail_url)}<small>{duration(item.duration)}</small></span><span className="watch-lesson-copy"><strong>{item.title}</strong><span>{item.creator_name}</span></span></button>)}
-    {recommendationsError&&<p className="watch-related-note">More lessons couldn’t load. <button onClick={()=>setRetry(value=>value+1)}>Retry</button></p>}
+    {available.map(item=><Button variant="watch-related" className="watch-lesson" key={item.lesson.lesson_id} onClick={()=>onOpen(item)}><span className="watch-thumbnail">{poster(item.lesson.poster?assetUrl(item.lesson.poster.key):null)}<small>{duration(item.lesson.duration)}</small></span><span className="watch-lesson-copy"><strong>{item.lesson.title}</strong><span>{item.owned?'Your lesson':'Available lesson'}</span><span>{item.lesson.section_count} sections</span></span></Button>)}
+    {related.map(item=><Button variant="watch-related" className="watch-lesson" key={item.lesson_id} onClick={()=>onPublic(item.lesson_id)}><span className="watch-thumbnail">{poster(item.thumbnail_url)}<small>{duration(item.duration)}</small></span><span className="watch-lesson-copy"><strong>{item.title}</strong><span>{item.creator_name}</span></span></Button>)}
+    {recommendationsError&&<p className="watch-related-note">More lessons couldn’t load. <Button variant="watch-inline" onClick={()=>setRetry(value=>value+1)}>Retry</Button></p>}
     {!available.length&&!related.length&&!recommendationsError&&<p className="watch-related-note">{recommendationsLoading?'Loading more lessons…':'Other available lessons will appear here.'}</p>}
    </aside>
   </div>

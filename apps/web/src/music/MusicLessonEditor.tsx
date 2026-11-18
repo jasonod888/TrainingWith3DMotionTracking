@@ -55,8 +55,8 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
       const parsed = parseMusicLessonManifest(value);
       if (!parsed.ok) throw new Error(parsed.message);
       if (parsed.value.schema_version !== 2) throw new Error('Only reviewed music lessons can be edited here.');
-      if (parsed.value.subject === 'piano') {
-        // The shared workspace owns the piano load; do not fetch/parse a second copy.
+      if (parsed.value.subject === 'piano' || parsed.value.subject === 'guitar') {
+        // The shared workspace owns the instrument load; do not fetch/parse a second copy.
         if (!stopped) setManifest(parsed.value);
         return;
       }
@@ -152,9 +152,9 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
     return null;
   })();
 
-  if (manifest?.subject === 'piano') {
+  if (manifest?.subject === 'piano' || manifest?.subject === 'guitar') {
     const trackDirty = (dirty: boolean) => { liveDirty.current = dirty; onDirty?.(dirty); };
-    return <><PianoWorkspaceHarness lessonId={lessonId} embedded onBack={onBack} onDirty={trackDirty}
+    return <><PianoWorkspaceHarness lessonId={lessonId} embedded mode="review" onBack={onBack} onDirty={trackDirty}
       onSaved={(_revisionId, current) => {
         if (!current) return;
         // The saved snapshot is clean; only edits made during the refresh block exit.

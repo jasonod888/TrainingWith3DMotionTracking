@@ -19,7 +19,22 @@ import wave
 import sys
 from pathlib import Path
 
+try:  # Package import in tests and the worker.
+    from .guitar_tab_solver import assign_guitar_tab, detect_guitar_chords_and_strums
+except ImportError:  # Direct script execution.
+    from guitar_tab_solver import assign_guitar_tab, detect_guitar_chords_and_strums
+
 CODE_VERSION = 'music-transcription-v1'
+
+
+def guitar_postprocess(document: dict) -> dict:
+    """Give every guitar draft playable TAB positions and validated chord shapes."""
+    if document.get('subject') != 'guitar':
+        return document
+    events = assign_guitar_tab(document.get('events') or [])
+    document['events'] = events
+    document['guitar_chords'] = detect_guitar_chords_and_strums(events, float(document['duration']))
+    return document
 
 
 def audio_digest(path: Path) -> str:
@@ -56,7 +71,7 @@ def fixture_document(job: dict, audio: Path) -> dict:
     instrument = job['instrument']
     events = fixture_events(duration, instrument)
     reference = {'key': 'reference.json', 'mime': 'application/json', 'bytes': 0, 'sha256': '0' * 64}
-    return {
+    return guitar_postprocess({
         'draft_version': 1,
         'subject': job['subject'],
         'instrument': {'instrument': instrument},
@@ -73,7 +88,7 @@ def fixture_document(job: dict, audio: Path) -> dict:
             'audio_sha256': audio_digest(audio),
         },
         'warnings': ['Fixture transcription for tests; it is not a model result.'],
-    }
+    })
 
 
 def adapter_profile(audio: Path) -> tuple[dict, Path]:
@@ -133,7 +148,7 @@ def basic_pitch_document(job: dict, audio: Path) -> dict:
             'confidence': None,
             'optional': False,
         })
-    return {
+    return guitar_postprocess({
         'draft_version': 1,
         'subject': job['subject'],
         'instrument': {'instrument': instrument},
@@ -151,7 +166,7 @@ def basic_pitch_document(job: dict, audio: Path) -> dict:
             'audio_sha256': audio_digest(audio),
         },
         'warnings': ['Transcription proposal only; every assessed passage needs instructor review.'],
-    }
+    })
 
 
 def main() -> int:

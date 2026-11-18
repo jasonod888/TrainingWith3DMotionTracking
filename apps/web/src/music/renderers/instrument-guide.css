@@ -2,6 +2,9 @@
 .library-piano {height:150px;width:100%;pointer-events:none;}
 .library-piano .ReactPiano__Key--active {background:#849b63;}
 .library-neck {min-width:520px;width:100%;pointer-events:none;}
+.library-neck.is-interactive {pointer-events:auto;cursor:crosshair;}
+.library-neck.is-left-handed {transform:scaleX(-1);}
+.library-neck.is-left-handed text {transform:scaleX(-1);transform-box:fill-box;transform-origin:center;}
 .library-neck svg {display:block;max-width:100%;}
 @media(prefers-reduced-motion:reduce){.library-guide-scroll *{transition:none!important;animation:none!important;}}
 
@@ -13,3 +16,22 @@
 .guitar-chord-list figure.is-active { border-color: #2563eb; background: #eff6ff; }
 .guitar-chord-list figcaption { font-size: .78rem; font-weight: 600; }
 .guitar-chord-list svg { display: block; width: 100px; height: 124px; }
+
+.guitar-hud {display:grid;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;}
+.guitar-hud-head {display:flex;gap:14px;align-items:flex-start;overflow-x:auto;}
+.guitar-hud-chord {margin:0;min-width:96px;text-align:center;color:#334155;}
+.guitar-hud-chord figcaption {display:flex;flex-direction:column;font-size:.8rem;}
+.guitar-hud-chord small {color:#64748b;font-size:.67rem;}
+.guitar-hud-chord svg {width:84px;height:104px;}
+.guitar-hud-list {display:flex;gap:6px;margin:0;padding:0;list-style:none;}
+.guitar-hud-list button {display:flex;flex-direction:column;min-width:58px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;font-size:.75rem;cursor:pointer;}
+.guitar-hud-list button[aria-pressed="true"] {border-color:#2563eb;background:#eff6ff;}
+.guitar-strum-bar {display:flex;gap:2px;justify-content:space-between;}
+.guitar-strum-slot {display:flex;flex:1;flex-direction:column;align-items:center;padding:2px 0;border-radius:6px;background:#f1f5f9;font-size:.7rem;}
+.guitar-strum-slot small {color:#64748b;line-height:1;}
+.guitar-strum-slot strong {font-size:1rem;line-height:1.15;color:#2563eb;}
+.guitar-strum-slot.is-down strong {color:#15803d;}
+.guitar-strum-slot.is-up strong {color:#b45309;}
+.guitar-finger-legend {display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 0;font-size:.72rem;}
+.guitar-finger-legend span {display:inline-flex;align-items:center;gap:4px;color:#475569;}
+.guitar-finger-legend i {display:inline-block;width:10px;height:10px;border-radius:50%;}

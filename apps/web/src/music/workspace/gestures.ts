@@ -60,4 +60,6 @@ export function pitchNameFor(pitch: number, key: string): string {
 export type GestureEdit =
   | { kind: 'pitch'; occurrenceId: string; pitch: number; spelling?: string }
   | { kind: 'time'; occurrenceId: string; seconds: number }
-  | { kind: 'resize'; occurrenceId: string; durationSeconds: number };
+  | { kind: 'resize'; occurrenceId: string; durationSeconds: number }
+  /** Guitar 6-string roll: a vertical drag commits a playable string/fret position. */
+  | { kind: 'position'; occurrenceId: string; string: number; fret: number };

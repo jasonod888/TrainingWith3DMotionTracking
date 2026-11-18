@@ -12,6 +12,7 @@ import {
 
 export type SavedSpan = { start: number; end: number; kind: 'playing' | 'explanation' };
 export type AnchorPointSaved = { seconds: number; tick: number };
+export type SavedGuitarChord = { id: string; name: string; start: number; frets: number[]; position: number };
 
 export type SavedPassage =
   | { kind: 'timed'; source_seconds: [number, number]; ticks: [number, number] }
@@ -31,6 +32,8 @@ export type RestoredReference = {
   alignment: SavedAlignment | null;
   offsetSeconds: number;
   spans: SavedSpan[];
+  /** Guitar chord shapes travel with the reference; piano always has none. */
+  guitarChords: SavedGuitarChord[];
   /** `notation` means authored work was restored verbatim; `performance` means legacy. */
   source: 'notation' | 'performance';
   title: string | null;
@@ -66,10 +69,17 @@ export function serializeAlignment(
 }
 
 export function performanceOf(document: NotationDocument): PerformanceNote[] {
+  // Top-level MusicEvent only understands standard tuning. Alternate tunings and a
+  // capo keep their exact string/fret inside `notation` and leave the event
+  // unpositioned so the API cannot reject a correct non-standard open pitch.
+  const nonStandardSetup = document.subject === 'guitar'
+    && ((document.guitar_tuning ?? 'standard') !== 'standard' || (document.guitar_capo ?? 0) > 0);
   return document.performance.map(note => ({
     id: note.id, onset: note.onset, duration: note.duration, pitch: note.pitch,
     velocity: note.velocity, confidence: note.confidence, optional: note.optional,
-    string: note.string, fret: note.fret, notation_duration: note.notation_duration ?? null,
+    string: nonStandardSetup ? null : note.string,
+    fret: nonStandardSetup ? null : note.fret,
+    notation_duration: note.notation_duration ?? null,
   }));
 }
 
@@ -97,9 +107,15 @@ export function buildSaveBody(input: {
   verificationStateToken?: string | null;
   sections?: { id: string; label: string; start: number; end: number }[];
   assessment?: unknown;
+  /** Reviewed guitar chord shapes; ignored for piano documents. */
+  guitarChords?: SavedGuitarChord[];
 }) {
   const duration = input.document.duration;
+  const guitar = input.document.subject === 'guitar';
   return {
+    // The music engine is shared, but the saved body names its instrument so a guitar
+    // reference can never be reopened as a piano document.
+    subject: input.document.subject,
     // The review contract names the draft; the revision contract names its base.
     // Sending both would be rejected, so each payload carries only its own identity.
     ...(input.baseRevisionId
@@ -109,9 +125,10 @@ export function buildSaveBody(input: {
           ...(input.referenceSha256 ? {reference_sha256: input.referenceSha256} : {}),
           ...(input.verificationStateToken ? {verification_state_token: input.verificationStateToken} : {}),
         }),
-    title: input.title || 'Piano correction',
+    title: input.title || (guitar ? 'Guitar correction' : 'Piano correction'),
     events: performanceOf(input.document),
     spans: input.spans,
+    ...(guitar ? {guitar_chords: input.guitarChords ?? []} : {}),
     sections: input.sections?.length ? input.sections : [{id: 'whole', label: 'Whole lesson', start: 0, end: duration}],
     assessment: input.assessment ?? {assessment: 'none', input_modes: ['none'], dimensions: [], rubric_version: 'music-watch-v1'},
     confirm_reviewed: true as const,
@@ -163,9 +180,32 @@ function savedAlignment(value: unknown, fallbackOffset: number): SavedAlignment 
   return {alignment_version: 1, mode, basis, offset_seconds: offset, anchors, passages};
 }
 
+function parseGuitarChords(value: unknown): SavedGuitarChord[] {
+  if (!Array.isArray(value)) return [];
+  const chords: SavedGuitarChord[] = [];
+  const ids = new Set<string>();
+  for (const raw of value) {
+    if (!isRecord(raw)) continue;
+    const id = typeof raw.id === 'string' ? raw.id : '';
+    const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+    const start = Number(raw.start);
+    if (!id || ids.has(id) || !name || !Number.isFinite(start)
+      || !Array.isArray(raw.frets) || raw.frets.length !== 6) continue;
+    const frets = raw.frets.map(Number);
+    if (frets.some(fret => !Number.isInteger(fret) || fret < -1 || fret > 24) || !frets.some(fret => fret >= 0)) continue;
+    const position = raw.position == null ? 1 : Number(raw.position);
+    if (!Number.isInteger(position) || position < 1 || position > 24) continue;
+    ids.add(id);
+    chords.push({id, name: name.slice(0, 40), start, frets, position});
+  }
+  return chords.sort((left, right) => left.start - right.start);
+}
+
 export function restoreFromReference(value: unknown): RestoreResult {
   if (!isRecord(value)) return {ok: false, message: 'The saved reference is not an object.'};
   const duration = Number(value.duration);
+  const referenceSubject = value.subject === 'guitar' ? 'guitar' : 'piano';
+  const guitarChords = parseGuitarChords(value.guitar_chords);
   const spans: SavedSpan[] = Array.isArray(value.spans)
     ? value.spans.filter(isRecord).map(span => ({
         start: Number(span.start), end: Number(span.end),
@@ -184,6 +224,9 @@ export function restoreFromReference(value: unknown): RestoreResult {
   if (value.notation !== undefined && value.notation !== null) {
     try {
       const document = parseNotationDocument(value.notation);
+      if (document.subject !== referenceSubject) {
+        return {ok: false, message: 'The saved notation disagrees with its reference instrument.'};
+      }
       if (Number.isFinite(duration) && Math.abs(document.duration - duration) > 1e-6) {
         return {ok: false, message: 'The saved notation duration does not match its reference.'};
       }
@@ -217,7 +260,7 @@ export function restoreFromReference(value: unknown): RestoreResult {
           return {ok: false, message: 'The saved reference leaves an occurrence unmapped.'};
         }
       }
-      return {ok: true, value: {document, alignment, offsetSeconds, spans, source: 'notation', title: typeof value.title === 'string' ? value.title : null}};
+      return {ok: true, value: {document, alignment, offsetSeconds, spans, guitarChords, source: 'notation', title: typeof value.title === 'string' ? value.title : null}};
     } catch (cause) {
       return {ok: false, message: `The saved notation could not be read: ${cause instanceof Error ? cause.message : 'invalid document'}`};
     }
@@ -232,11 +275,18 @@ export function restoreFromReference(value: unknown): RestoreResult {
       onset: Number(event.onset), duration: event.duration === null ? null : Number(event.duration),
       pitch: Number(event.pitch), velocity: event.velocity === null ? null : Number(event.velocity),
       confidence: event.confidence === null ? null : Number(event.confidence),
-      optional: Boolean(event.optional), string: null, fret: null,
+      optional: Boolean(event.optional),
+      string: referenceSubject === 'guitar' && Number.isInteger(event.string) ? Number(event.string) : null,
+      fret: referenceSubject === 'guitar' && Number.isInteger(event.fret) ? Number(event.fret) : null,
       notation_duration: event.notation_duration === null || event.notation_duration === undefined ? null : Number(event.notation_duration),
     }));
-    const document = buildNotation(performance, {duration: Number.isFinite(duration) ? duration : undefined});
-    return {ok: true, value: {document, alignment, offsetSeconds, spans, source: 'performance', title: typeof value.title === 'string' ? value.title : null}};
+    // A guitar draft or legacy reference may predate saved notation. Rebuild the shared
+    // document from its events so every guitar reference opens in the unified editor.
+    const document = buildNotation(performance, {
+      duration: Number.isFinite(duration) ? duration : undefined,
+      subject: referenceSubject,
+    });
+    return {ok: true, value: {document, alignment, offsetSeconds, spans, guitarChords, source: 'performance', title: typeof value.title === 'string' ? value.title : null}};
   } catch (cause) {
     return {ok: false, message: `The saved performance could not be read: ${cause instanceof Error ? cause.message : 'invalid events'}`};
   }

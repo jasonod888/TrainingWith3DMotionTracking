@@ -9,7 +9,7 @@
  */
 import {
   refreshNotation,
-  type HandAssignment, type NotationDocument, type NotationEvent, type PerformanceNote,
+  type GuitarTuningId, type HandAssignment, type NotationDocument, type NotationEvent, type PerformanceNote,
 } from '../../../../../packages/music-notation/index.ts';
 
 export type PerformanceChange = { id: string; before: PerformanceNote; after: PerformanceNote };
@@ -20,9 +20,16 @@ export type DocumentPatch = {
   performance: { added: PerformanceNote[]; removed: PerformanceNote[]; changed: PerformanceChange[] };
   events: { added: NotationEvent[]; removed: NotationEvent[]; changed: EventChange[] };
   hands: { versionBefore?: 1; versionAfter?: 1; changed: HandChange[] };
+  /** Guitar tuning/capo change so set-guitar-setup participates in Undo/Redo. */
+  guitar?: {
+    tuningBefore?: GuitarTuningId;
+    tuningAfter?: GuitarTuningId;
+    capoBefore?: number;
+    capoAfter?: number;
+  };
 };
 
-const NOTE_FIELDS: (keyof PerformanceNote)[] = ['pitch', 'onset', 'duration', 'velocity', 'notation_duration', 'optional'];
+const NOTE_FIELDS: (keyof PerformanceNote)[] = ['pitch', 'onset', 'duration', 'velocity', 'notation_duration', 'optional', 'string', 'fret'];
 
 function noteKey(note: PerformanceNote): string {
   return NOTE_FIELDS.map(field => String(note[field] ?? '')).join('|');
@@ -73,6 +80,14 @@ export function diffDocuments(before: NotationDocument, after: NotationDocument)
     patch.hands.versionBefore = before.hand_assignment_version;
     patch.hands.versionAfter = after.hand_assignment_version;
   }
+  if (before.guitar_tuning !== after.guitar_tuning || before.guitar_capo !== after.guitar_capo) {
+    patch.guitar = {
+      ...(before.guitar_tuning !== undefined ? {tuningBefore: before.guitar_tuning} : {}),
+      ...(after.guitar_tuning !== undefined ? {tuningAfter: after.guitar_tuning} : {}),
+      ...(before.guitar_capo !== undefined ? {capoBefore: before.guitar_capo} : {}),
+      ...(after.guitar_capo !== undefined ? {capoAfter: after.guitar_capo} : {}),
+    };
+  }
 
   return patch;
 }
@@ -87,7 +102,7 @@ export function isEmptyPatch(patch: DocumentPatch): boolean {
   return patch.performance.added.length === 0 && patch.performance.removed.length === 0
     && patch.performance.changed.length === 0 && patch.events.added.length === 0
     && patch.events.removed.length === 0 && patch.events.changed.length === 0
-    && patch.hands.changed.length === 0;
+    && patch.hands.changed.length === 0 && patch.guitar === undefined;
 }
 
 export function applyPatch(
@@ -126,6 +141,15 @@ export function applyPatch(
   }
   for (const event of addEvents) {
     if (!next.events.some(item => item.id === event.id)) next.events.push(structuredClone(event));
+  }
+
+  if (patch.guitar) {
+    const tuning = direction === 'before' ? patch.guitar.tuningBefore : patch.guitar.tuningAfter;
+    const capo = direction === 'before' ? patch.guitar.capoBefore : patch.guitar.capoAfter;
+    if (tuning !== undefined) next.guitar_tuning = tuning;
+    else delete next.guitar_tuning;
+    if (capo !== undefined) next.guitar_capo = capo;
+    else delete next.guitar_capo;
   }
 
   if (patch.hands.changed.length) {

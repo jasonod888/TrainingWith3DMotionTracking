@@ -1,0 +1,12 @@
+.piano-practice-stage .ws-notes-practice { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.piano-practice-stage.has-combined-panels .ws-instrument { flex: 1 1 58%; min-height: 180px; }
+.piano-practice-stage.has-combined-panels .ws-notes-practice { flex: 1 1 42%; min-height: 160px; }
+.piano-practice-stage .ws-keys-view { justify-content: flex-end; }
+.piano-practice-empty {
+  margin: auto;
+  max-width: 360px;
+  padding: 18px;
+  color: #aebcb0;
+  font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  text-align: center;
+}

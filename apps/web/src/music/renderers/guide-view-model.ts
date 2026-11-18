@@ -1,4 +1,5 @@
 import {guitarPosition, supportsGuitarDiagram, pitchName, type MusicReference, type MusicReferenceEvent} from '../music-reference';
+import {resolveGuitarPosition, type GuitarSetup} from '../../../../../packages/music-notation/guitar.ts';
 
 /** Application convention: string 1 high E, string 6 low E. Vendor options stay local. */
 export function guitarGuide(instrument:MusicReference['instrument'], events:MusicReferenceEvent[]){
@@ -23,4 +24,14 @@ export function guitarGuide(instrument:MusicReference['instrument'], events:Musi
   :explicit.length?"Markers show the instructor's reviewed positions."
   :'Markers show one possible position, not confirmed instructor fingering.'};
 }
+/** Resolve reviewed positions for the saved tuning/capo, regardless of diagram support. */
+export function guitarPositionsForSetup(
+  events: MusicReferenceEvent[], setup?: GuitarSetup,
+): {pitch: number; string: number; fret: number; label: string}[] {
+  return events.flatMap(event => {
+    const position = resolveGuitarPosition(event.pitch, event.string, event.fret, setup);
+    return position ? [{pitch: event.pitch, ...position, label: pitchName(event.pitch)}] : [];
+  });
+}
+
 export type GuitarGuideModel=ReturnType<typeof guitarGuide>;

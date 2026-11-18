@@ -20,6 +20,11 @@ import {useElementWidth} from './useElementWidth';
 import {useClockTime, type ClockStore} from './clock';
 import type {Alignment} from '../../../../../packages/music-notation/index.ts';
 import {diatonicStep, type GestureEdit} from './gestures';
+import {
+  GUITAR_TUNINGS, normalizeGuitarSetup, openStringPitch, resolveGuitarPosition,
+  type GuitarTuningId,
+} from '../../../../../packages/music-notation/guitar.ts';
+import {strumPatternFor} from './GuitarChordStrumHud';
 
 const RULER_HEIGHT = 22;
 const LINE = 10;
@@ -91,6 +96,12 @@ type Props = {
   onAuditionPitch?: (pitch: number) => void;
   /** Replace/Add modes disable direct manipulation in this surface. */
   editingEnabled?: boolean;
+  /** Guitar renders a 6-line TAB staff instead of (or beside) the grand staff. */
+  staffMode?: 'grand' | 'guitar-tab' | 'guitar-both';
+  /** Reviewed chord shapes drawn above the measure with their strum arrows. */
+  guitarChords?: {id: string; name: string; start: number}[];
+  tuning?: GuitarTuningId;
+  capo?: number;
 };
 
 function ScoreCursorLine({clock, fallback, cursorX, playheadTick, layout, alignment}: {
@@ -136,8 +147,39 @@ export function ContinuousScore({
   scrollTarget = null, onSelect, onAmbiguous, onSeekTick, onUserScroll,
   clock = null, alignment = null, offsetSeconds = 0, intervals,
   onGestureCommit, onAuditionPitch, editingEnabled = true, layout, sharedScrollLeft = 0, cursorX = null,
-  cursorFallbackSeconds = null,
+  cursorFallbackSeconds = null, staffMode = 'grand', guitarChords = [], tuning, capo = 0,
 }: Props) {
+  const setup = normalizeGuitarSetup({tuning, capo});
+  const stringLabels = GUITAR_TUNINGS[setup.tuning].stringLabels;
+  const tab = staffMode !== 'grand';
+  const tabOnly = staffMode === 'guitar-tab';
+  // Guitar-both keeps the treble staff and fits a compact TAB below it; TAB-only
+  // centres the six lines in the same measure boxes.
+  const tabTop = tabOnly ? 62 : 104;
+  const tabSpacing = tabOnly ? 16 : 8;
+  const tabBottom = tabTop + 5 * tabSpacing;
+  const staffTopFor = (segment: NotationSegment) => tab
+    ? tabTop
+    : segment.staff === 'treble' ? TREBLE_TOP : BASS_TOP;
+  const staffBottomFor = (segment: NotationSegment) => tab
+    ? tabBottom
+    : segment.staff === 'treble' ? TREBLE_BOTTOM : BASS_BOTTOM;
+  const tabY = (string: number) => tabTop + (string - 1) * tabSpacing;
+  const secondsPerTick = document.tempo.bpm > 0 ? 60 / (document.tempo.bpm * document.ppq) : 0.0625;
+  const stringFor = (pitch: number, occurrenceIds: string[]): {string: number; fret: number} | null => {
+    let storedString: number | null = null;
+    let storedFret: number | null = null;
+    for (const id of occurrenceIds) {
+      const occurrence = document.performance.find(note => note.id === id);
+      if (occurrence && occurrence.string != null && occurrence.fret != null
+        && (openStringPitch(occurrence.string, setup) ?? Number.NaN) + occurrence.fret === pitch) {
+        storedString = occurrence.string;
+        storedFret = occurrence.fret;
+        break;
+      }
+    }
+    return resolveGuitarPosition(pitch, storedString, storedFret, setup);
+  };
   const liveTick = playheadTick;
   const liveActive = activeOccurrenceIds;
   const [hostRef, width] = useElementWidth<HTMLDivElement>();
@@ -339,7 +381,8 @@ export function ContinuousScore({
   return <div className="ws-score" ref={hostRef} style={{maxWidth: '100%', overflow: 'hidden', minWidth: 0}}>
     <div className="ws-score-viewport" ref={scrollRef} style={{maxWidth: '100%', width: '100%', overflowX: 'auto', minWidth: 0}}>
       <svg className="ws-score-svg" width={canvasWidth} height={HEIGHT} role="img"
-        aria-label={`Continuous grand staff, ${document.measures.length} measures, showing measures ${first + 1}-${Math.max(first + 1, last + 1)}`}
+        data-staff-mode={staffMode} data-tuning={setup.tuning} data-capo={setup.capo}
+        aria-label={`Continuous ${tab ? 'guitar TAB' : 'grand'} staff, ${document.measures.length} measures, showing measures ${first + 1}-${Math.max(first + 1, last + 1)}`}
         data-rendered-measures={last >= first ? last - first + 1 : 0} data-total-measures={document.measures.length}
         data-rendered-notes={visibleSegments.reduce((total, segment) => total + segment.notes.length, 0)}
         data-rendered-values={JSON.stringify([...new Set(visibleSegments.map(segment => segment.value))])}>
@@ -359,28 +402,92 @@ export function ContinuousScore({
         {liveTick !== null && !layout ? <line className="ws-score-playhead" data-playhead-tick={liveTick}
           x1={xForSharedTick(liveTick)} y1={RULER_HEIGHT}
           x2={xForSharedTick(liveTick)} y2={HEIGHT - 10}/> : null}
-        {[0, 1, 2, 3, 4].map(line => <g key={`staff-${line}`}>
+        {tab ? <>
+          {!tabOnly && [0, 1, 2, 3, 4].map(line => <line key={`treble-${line}`} className="ws-score-staff"
+            x1={CONTEXT_WIDTH} y1={TREBLE_TOP + line * LINE} x2={CONTEXT_WIDTH + activeTotalWidth} y2={TREBLE_TOP + line * LINE}/>)}
+          {stringLabels.map((_, index) => <line key={`tab-${index + 1}`} className="ws-score-staff ws-score-tab-line"
+            data-tab-string={index + 1} x1={CONTEXT_WIDTH} y1={tabY(index + 1)} x2={CONTEXT_WIDTH + activeTotalWidth} y2={tabY(index + 1)}/>)}
+        </> : [0, 1, 2, 3, 4].map(line => <g key={`staff-${line}`}>
           <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={TREBLE_TOP + line * LINE} x2={CONTEXT_WIDTH + activeTotalWidth} y2={TREBLE_TOP + line * LINE}/>
           <line className="ws-score-staff" x1={CONTEXT_WIDTH} y1={BASS_TOP + line * LINE} x2={CONTEXT_WIDTH + activeTotalWidth} y2={BASS_TOP + line * LINE}/>
         </g>)}
         {(layout ? sharedBoxes : boxes.slice(first, last + 1)).map(box => <g key={`measure-${box.index}`} data-measure={box.index} className="ws-score-measure">
-          <line className="ws-score-barline" x1={CONTEXT_WIDTH + box.x} y1={TREBLE_TOP} x2={CONTEXT_WIDTH + box.x} y2={BASS_BOTTOM}/>
+          <line className="ws-score-barline" x1={CONTEXT_WIDTH + box.x} y1={tab ? tabTop : TREBLE_TOP}
+            x2={CONTEXT_WIDTH + box.x} y2={tab ? tabBottom : BASS_BOTTOM}/>
           <text className="ws-score-measure-number" x={CONTEXT_WIDTH + box.x + 6} y={RULER_HEIGHT - 6}>{box.index + 1}</text>
+          {tab ? (() => {
+            const measure = document.measures[box.index];
+            const from = measure.start * secondsPerTick;
+            const to = (measure.start + measure.duration) * secondsPerTick;
+            const chords = guitarChords.filter(chord => chord.start >= from - 1e-6 && chord.start < to);
+            const slots = strumPatternFor(document.performance.map(note => ({
+              onset: note.onset, pitch: note.pitch, string: note.string,
+            })), from, to, document.time_signature.numerator);
+            const arrows = slots.map(slot => slot.direction === 'down' ? '↓' : slot.direction === 'up' ? '↑' : '').join(' ');
+            return <>
+              {chords.length ? <text className="ws-score-chord" x={CONTEXT_WIDTH + box.x + 6} y={Math.max(14, tabTop - 26)}>
+                {chords.map(chord => chord.name).join(' · ')}
+              </text> : null}
+              <text className="ws-score-strum" x={CONTEXT_WIDTH + box.x + 6} y={Math.max(24, tabTop - 12)} data-strum={arrows}>{arrows}</text>
+            </>;
+          })() : null}
         </g>)}
-        <line className="ws-score-barline" x1={CONTEXT_WIDTH + totalWidth} y1={TREBLE_TOP} x2={CONTEXT_WIDTH + activeTotalWidth} y2={BASS_BOTTOM}/>
+        <line className="ws-score-barline" x1={CONTEXT_WIDTH + totalWidth} y1={tab ? tabTop : TREBLE_TOP}
+          x2={CONTEXT_WIDTH + activeTotalWidth} y2={tab ? tabBottom : BASS_BOTTOM}/>
         {visibleSegments.map(segment => {
           const box = boxes[segment.measure_index];
           if (!box) return null;
           const measure = document.measures[segment.measure_index];
           const local = (segment.start - measure.start) / measure.duration;
           const x = xForSegment(segment);
-          const staffTop = segment.staff === 'treble' ? TREBLE_TOP : BASS_TOP;
-          const staffBottom = segment.staff === 'treble' ? TREBLE_BOTTOM : BASS_BOTTOM;
+          const staffTop = staffTopFor(segment);
+          const staffBottom = staffBottomFor(segment);
           if (segment.rest) {
             const center = staffTop + LINE * 2;
             return <g key={segment.id} className="ws-score-rest" data-rest-value={segment.value}>
               <text className="ws-score-rest-glyph" x={x} y={center + 5} textAnchor="middle">{REST_GLYPHS[segment.value] ?? '𝄽'}</text>
               {segment.dotted ? <circle className="ws-score-dot" cx={x + 10} cy={center - 1} r={1.8}/> : null}
+            </g>;
+          }
+          if (tab) {
+            // TAB keeps the same segment x coordinates and selection semantics; only the
+            // vertical mapping changes from pitch spelling to string/fret.
+            return <g key={segment.id} className="ws-score-event" data-value={segment.value} data-tab-event="true">
+              {segment.notes.map(note => {
+                const occurrence = occurrenceFor(note);
+                const position = stringFor(note.pitch, note.performance_ids);
+                const selected = selectedOccurrenceId !== null && note.performance_ids.includes(selectedOccurrenceId);
+                const active = liveActive.some(id => note.performance_ids.includes(id));
+                const className = `ws-score-tab-fret${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}`;
+                const handlers = {
+                  onPointerDown: (event: React.PointerEvent) => beginSheetDrag(note, event),
+                  onPointerMove: moveSheetDrag,
+                  onPointerUp: commitSheetDrag,
+                  onPointerCancel: cancelSheetDrag,
+                  onKeyDown: (event: React.KeyboardEvent) => {
+                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(note); }
+                  },
+                };
+                if (!position) {
+                  // Unplayable under this tuning/capo: never fake an open first string.
+                  return <text key={note.id} className={`${className} is-unplayable`}
+                    x={x} y={tabY(6) + 4} textAnchor="middle"
+                    data-string={6} data-unplayable="true"
+                    data-occurrence={occurrence ?? ''} data-occurrences={note.performance_ids.join(',')}
+                    role="button" tabIndex={0}
+                    aria-label={`Unplayable ${note.spelling} under this tuning and capo`}
+                    {...handlers}>✕</text>;
+                }
+                return <text key={note.id} className={className}
+                  x={x} y={tabY(position.string) + 4} textAnchor="middle"
+                  data-string={position.string} data-fret={position.fret}
+                  data-occurrence={occurrence ?? ''} data-occurrences={note.performance_ids.join(',')}
+                  role="button" tabIndex={0}
+                  aria-label={`String ${position.string}, fret ${position.fret}, ${segment.value}${selected ? ', selected' : ''}`}
+                  {...handlers}>
+                  {position.fret}
+                </text>;
+              })}
             </g>;
           }
           const ys = segment.notes.map(note => {
@@ -442,7 +549,7 @@ export function ContinuousScore({
             </> : null}
           </g>;
         })}
-        {document.ties.map(tie => {
+        {!tab && document.ties.map(tie => {
           const from = positions.get(tie.from_segment_note_id);
           const to = positions.get(tie.to_segment_note_id);
           if (!from || !to) return null;
@@ -453,6 +560,15 @@ export function ContinuousScore({
     </div>
     <div className="ws-score-context" aria-hidden="true" style={{height: HEIGHT}}>
       <svg width={CONTEXT_WIDTH} height={HEIGHT}>
+        {tab ? <>
+          <text className="ws-score-tab-label" x={10} y={tabTop + 4}>TAB</text>
+          <text className="ws-score-capo-badge" data-capo-badge={setup.capo} x={CONTEXT_WIDTH - 8} y={10}
+            textAnchor="end">
+            {setup.capo > 0 ? `Capo ${setup.capo}` : 'Standard'} · {setup.tuning.replaceAll('_', ' ')}
+          </text>
+          {stringLabels.map((label, index) => <text key={index + 1} className="ws-score-tab-string"
+            x={CONTEXT_WIDTH - 16} y={tabY(index + 1) + 4} textAnchor="end">{label}</text>)}
+        </> : <>
         {[0, 1, 2, 3, 4].map(line => <g key={`ctx-${line}`}>
           <line className="ws-score-staff" x1={0} y1={TREBLE_TOP + line * LINE} x2={CONTEXT_WIDTH} y2={TREBLE_TOP + line * LINE}/>
           <line className="ws-score-staff" x1={0} y1={BASS_TOP + line * LINE} x2={CONTEXT_WIDTH} y2={BASS_TOP + line * LINE}/>
@@ -468,6 +584,7 @@ export function ContinuousScore({
         <text className="ws-score-time" x={CONTEXT_WIDTH - 14} y={TREBLE_TOP + 30}>{document.time_signature.denominator}</text>
         <text className="ws-score-time" x={CONTEXT_WIDTH - 14} y={BASS_TOP + 14}>{document.time_signature.numerator}</text>
         <text className="ws-score-time" x={CONTEXT_WIDTH - 14} y={BASS_TOP + 30}>{document.time_signature.denominator}</text>
+        </>}
       </svg>
     </div>
   </div>;

@@ -9,6 +9,7 @@ import {useElementWidth} from './useElementWidth';
 import {useClockTime, type ClockStore} from './clock';
 import {FULL_PIANO_MIN_WIDTH, STANDARD_PIANO_RANGE, resolveKeyboardRange, type PianoRange} from '../notation/piano-key-geometry';
 import {shiftOnset} from '../piano-playback';
+import {Button} from '../../ui/controls';
 
 type PracticeViewProps = {
   document: NotationDocument;
@@ -23,7 +24,7 @@ type PracticeViewProps = {
   onSeek: (seconds: number) => void;
 };
 
-export type PracticeViewKind = 'notes' | 'waterfall' | 'keys';
+export type PracticePanel = 'notes' | 'waterfall' | 'keys';
 
 /** Notes only: score layout, follow subscription and shared scrollbar mount here. */
 export function PianoPracticeNotesView(props: PracticeViewProps) {
@@ -43,9 +44,9 @@ export function PianoPracticeNotesView(props: PracticeViewProps) {
     }
   }, [clockTime, follow, followSuspended, layout, alignment, offsetSeconds, sharedWidth, sharedScrollLeft]);
   return <div className="ws-shared-stage ws-notes-practice" ref={sharedRef}>
-    {followSuspended && <button type="button" className="player-tool ws-notes-follow"
+    {followSuspended && <Button variant="dock-tool" type="button" className="player-tool ws-notes-follow"
       aria-label="Resume follow" title="Return to the playhead"
-      onClick={() => { setFollow(true); setFollowSuspended(false); }}>Resume follow</button>}
+      onClick={() => { setFollow(true); setFollowSuspended(false); }}>Resume follow</Button>}
     <section className="ws-score-surface" aria-label="Score">
       <ContinuousScore document={document} boxes={boxes} selectedOccurrenceId={null} reveal={null}
         playheadTick={null} clock={clock} alignment={alignment} offsetSeconds={offsetSeconds}
@@ -62,17 +63,19 @@ export function PianoPracticeNotesView(props: PracticeViewProps) {
   </div>;
 }
 
-function useKeyboardRange(document: NotationDocument) {
+function usePracticePanels(document: NotationDocument, showKeys: boolean) {
   const pitches = useMemo(() => document.performance.map(note => note.pitch), [document]);
   const [keyboardRef, keyboardWidth] = useElementWidth<HTMLDivElement>();
+  const [instrumentRef, instrumentWidth] = useElementWidth<HTMLElement>();
   const [range, setRange] = useState<PianoRange | null>(null);
+  const width = showKeys ? keyboardWidth : instrumentWidth;
   useEffect(() => {
-    if (keyboardWidth <= 0) return;
-    setRange(keyboardWidth >= FULL_PIANO_MIN_WIDTH
+    if (width <= 0) return;
+    setRange(width >= FULL_PIANO_MIN_WIDTH
       ? STANDARD_PIANO_RANGE
-      : resolveKeyboardRange(pitches, keyboardWidth));
-  }, [keyboardWidth, pitches]);
-  return {keyboardRef, keyboardWidth, range, setRange};
+      : resolveKeyboardRange(pitches, width));
+  }, [width, pitches]);
+  return {keyboardRef, keyboardWidth, instrumentRef, range, setRange};
 }
 
 function PracticeKeyboard({document, activeIds, playhead, offsetSeconds, hands, onSeek, range, setRange, keyboardWidth, keyboardRef}: {
@@ -113,27 +116,20 @@ function PracticeKeyboard({document, activeIds, playhead, offsetSeconds, hands, 
   </section>;
 }
 
-/** Waterfall plus its keyboard reference. */
-export function PianoPracticeWaterfallView(props: PracticeViewProps) {
+/** One instrument group: optional waterfall and one shared keyboard, never duplicate keyboards. */
+export function PianoPracticeInstrumentView(props: PracticeViewProps & {showWaterfall: boolean; showKeys: boolean}) {
+  const {showWaterfall, showKeys} = props;
   const {document, clock, offsetSeconds, intervals, activeIds, playhead, hands, onSeekOccurrence, onSeek} = props;
-  const {keyboardRef, keyboardWidth, range, setRange} = useKeyboardRange(document);
-  return <section className="ws-instrument" id="piano-instrument" aria-label="Piano instrument">
-    <div className="ws-waterfall-slot"><PianoWaterfall document={document} clock={clock}
+  const {keyboardRef, keyboardWidth, instrumentRef, range, setRange} = usePracticePanels(document, showKeys);
+  const width = showKeys ? keyboardWidth : 0;
+  return <section ref={instrumentRef}
+    className={`ws-instrument ${showKeys && !showWaterfall ? 'ws-keys-view' : ''} ${showWaterfall && showKeys ? 'ws-waterfall-keys' : ''}`}
+    id="piano-instrument" aria-label="Piano instrument">
+    {showWaterfall && <div className="ws-waterfall-slot"><PianoWaterfall document={document} clock={clock}
       intervals={intervals} range={range} selectedOccurrenceId={null}
-      hands={hands} onSelect={onSeekOccurrence}/></div>
-    <PracticeKeyboard document={document} activeIds={activeIds} playhead={playhead}
+      hands={hands} onSelect={onSeekOccurrence}/></div>}
+    {showKeys && <PracticeKeyboard document={document} activeIds={activeIds} playhead={playhead}
       offsetSeconds={offsetSeconds} hands={hands} onSeek={onSeek} range={range}
-      setRange={setRange} keyboardWidth={keyboardWidth} keyboardRef={keyboardRef}/>
-  </section>;
-}
-
-/** Keyboard alone; no waterfall or score work is mounted. */
-export function PianoPracticeKeysView(props: PracticeViewProps) {
-  const {document, offsetSeconds, activeIds, playhead, hands, onSeek} = props;
-  const {keyboardRef, keyboardWidth, range, setRange} = useKeyboardRange(document);
-  return <section className="ws-instrument ws-keys-view" id="piano-instrument" aria-label="Piano instrument">
-    <PracticeKeyboard document={document} activeIds={activeIds} playhead={playhead}
-      offsetSeconds={offsetSeconds} hands={hands} onSeek={onSeek} range={range}
-      setRange={setRange} keyboardWidth={keyboardWidth} keyboardRef={keyboardRef}/>
+      setRange={setRange} keyboardWidth={width} keyboardRef={keyboardRef}/>}
   </section>;
 }

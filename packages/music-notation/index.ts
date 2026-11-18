@@ -1,4 +1,5 @@
 export * from './types';
+export * from './guitar';
 export * from './spelling';
 export * from './rhythm';
 export * from './build';

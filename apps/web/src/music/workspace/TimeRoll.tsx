@@ -7,9 +7,13 @@
  * Revealing is an explicit request (a changed selection or an explicit Reveal), not
  * a reaction to the viewport, so manual panning is never reversed.
  */
-import {useEffect, useLayoutEffect, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {NotationDocument} from '../../../../../packages/music-notation/index.ts';
 import {pitchName} from '../music-reference';
+import {
+  GUITAR_FINGER_PALETTE, GUITAR_TUNINGS, assignGuitarFingers, guitarStringForPitch,
+  normalizeGuitarSetup, openStringPitch, resolveGuitarPosition, type GuitarFinger, type GuitarTuningId,
+} from '../../../../../packages/music-notation/guitar.ts';
 import {
   clampTimeWindow, clamp, pixelsPerSecond, pitchScrollTop, revealWindow, rulerTicks, visibleTimeRange,
   type TimeWindow,
@@ -70,6 +74,10 @@ type Props = {
   /** Replace/Add modes disable direct manipulation in this surface. */
   editingEnabled?: boolean;
   onGhostPlace?: (seconds: number, pitch: number) => void;
+  /** `strings` draws six guitar lanes and commits string/fret edits on vertical drags. */
+  rowMode?: 'pitch' | 'strings';
+  tuning?: GuitarTuningId;
+  capo?: number;
 };
 
 function RollCursorLine({clock, fallback, cursorX, layout, alignment, gutter, pitchHeight}: {
@@ -94,8 +102,11 @@ export function TimeRoll({
   cursorFallbackSeconds = null,
   activeOccurrenceIds = [], onSelect, onSeek, onWindowChangeOrigin, clock = null, intervals,
   onGestureCommit, onAuditionPitch, snapSeconds = null, addMode = false, ghost = null, onGhostPlace,
-  editingEnabled = true,
+  editingEnabled = true, rowMode = 'pitch', tuning, capo = 0,
 }: Props) {
+  const setup = normalizeGuitarSetup({tuning, capo});
+  const tuningConfig = GUITAR_TUNINGS[setup.tuning];
+  const stringLabels = tuningConfig.stringLabels;
   const liveActive = activeOccurrenceIds;
   const [viewportRef, measuredWidth, element] = useElementWidth<HTMLDivElement>();
   const [labelOffset, setLabelOffset] = useState(0);
@@ -114,17 +125,30 @@ export function TimeRoll({
   const width = Math.max(120, measuredWidth);
   const pps = pixelsPerSecond(width, window);
 
+  const stringsMode = rowMode === 'strings';
+  const STRING_ROW = PLOT_HEIGHT / 6;
   const pitches = document.performance.map(note => note.pitch);
   const low = Math.max(0, (pitches.length ? Math.min(...pitches) : 48) - 2);
   const high = Math.min(127, (pitches.length ? Math.max(...pitches) : 72) + 2);
-  const rows = Math.max(1, high - low + 1);
+  const rows = stringsMode ? 6 : Math.max(1, high - low + 1);
   // Fit the clip's usual range when it stays readable; wider ranges scroll instead
   // of shrinking rows into unreadable slivers.
-  const rowHeight = rows * FIT_ROW_MIN <= PLOT_HEIGHT ? PLOT_HEIGHT / rows : SCROLL_ROW;
-  const pitchHeight = rows * rowHeight;
-  const scrollable = pitchHeight > PLOT_HEIGHT + 0.5;
+  const rowHeight = stringsMode ? STRING_ROW : rows * FIT_ROW_MIN <= PLOT_HEIGHT ? PLOT_HEIGHT / rows : SCROLL_ROW;
+  const pitchHeight = stringsMode ? PLOT_HEIGHT : rows * rowHeight;
+  const scrollable = stringsMode ? false : pitchHeight > PLOT_HEIGHT + 0.5;
 
-  const y = (pitch: number) => (high - pitch) * rowHeight + rowHeight / 2;
+  /** Canonical contract string (1 = highest); falls back to the active setup. */
+  const stringOf = (note: {pitch: number; string?: number | null}): number => {
+    if (note.string != null && Number.isInteger(note.string) && note.string >= 1 && note.string <= 6) return note.string;
+    const fallback = guitarStringForPitch(note.pitch, setup);
+    return fallback ? fallback.string : 1;
+  };
+  const fingerMap = useMemo(() => assignGuitarFingers(document.performance, setup),
+    [document.performance, setup.tuning, setup.capo]);
+  const yString = (string: number) => (string - 1) * rowHeight + rowHeight / 2;
+  const y = (pitch: number) => stringsMode
+    ? yString(stringOf({pitch}))
+    : (high - pitch) * rowHeight + rowHeight / 2;
   const totalWidth = shared && layout ? gutter + layout.contentWidth
     : Math.max(width, Math.ceil(document.duration * pps));
   const ticks = shared && layout && alignment
@@ -180,7 +204,7 @@ export function TimeRoll({
     }
     const node = element;
     if (!node) return;
-    const targetY = (high - note.pitch) * rowHeight + rowHeight / 2;
+    const targetY = stringsMode ? yString(stringOf(note)) : (high - note.pitch) * rowHeight + rowHeight / 2;
     node.scrollTop = pitchScrollTop(targetY, node.scrollTop, RULER_HEIGHT, PLOT_HEIGHT);
     // Deliberately keyed on the token only: panning must not re-run this.
   }, [reveal?.token]);
@@ -189,11 +213,12 @@ export function TimeRoll({
     note: NotationDocument['performance'][number];
     startX: number; startY: number; forced: GestureAxis | null; pointerId: number;
     capture: Element | null; axis: GestureAxis | null; pitch: number; onset: number; duration: number;
+    string: number;
   };
   const dragRef = useRef<DragState | null>(null);
   const dragCleanup = useRef<(() => void) | null>(null);
   const auditionAt = useRef(0);
-  const [dragPreview, setDragPreview] = useState<{id: string; pitch: number; onset: number; duration: number; axis: GestureAxis} | null>(null);
+  const [dragPreview, setDragPreview] = useState<{id: string; pitch: number; onset: number; duration: number; axis: GestureAxis; string: number} | null>(null);
 
   const teardownDrag = () => {
     dragCleanup.current?.();
@@ -231,6 +256,7 @@ export function TimeRoll({
     dragRef.current = {
       note, startX: event.clientX, startY: event.clientY, forced, pointerId: event.pointerId,
       capture, axis: null, pitch: note.pitch, onset: note.onset, duration: note.duration ?? 0.25,
+      string: stringOf(note),
     };
     onSelect(note.id);
 
@@ -260,11 +286,25 @@ export function TimeRoll({
     if (!axis) return;
     drag.axis = axis;
     if (axis === 'pitch') {
-      const pitch = pitchFromDrag(drag.note.pitch, dy, rowHeight);
-      if (pitch !== drag.pitch) {
-        drag.pitch = pitch;
-        const now = Date.now();
-        if (now - auditionAt.current > 120) { auditionAt.current = now; onAuditionPitch?.(pitch); }
+      if (stringsMode) {
+        // Vertical motion between the six lanes reassigns the string, keeping pitch.
+        const nextString = Math.max(1, Math.min(6, drag.string + Math.round(dy / rowHeight)));
+        if (nextString !== drag.string) {
+          drag.string = nextString;
+          const fret = drag.note.pitch - (openStringPitch(nextString, setup) ?? drag.note.pitch);
+          const now = Date.now();
+          if (fret >= 0 && fret <= 24 && now - auditionAt.current > 120) {
+            auditionAt.current = now;
+            onAuditionPitch?.(drag.note.pitch);
+          }
+        }
+      } else {
+        const pitch = pitchFromDrag(drag.note.pitch, dy, rowHeight);
+        if (pitch !== drag.pitch) {
+          drag.pitch = pitch;
+          const now = Date.now();
+          if (now - auditionAt.current > 120) { auditionAt.current = now; onAuditionPitch?.(pitch); }
+        }
       }
     } else if (axis === 'time' && layout && alignment) {
       const originalX = xAtEffective(drag.note.onset + effectiveOffset);
@@ -286,7 +326,7 @@ export function TimeRoll({
     } else {
       drag.duration = Math.max(0.02, (drag.note.duration ?? 0.25) + dx / pps);
     }
-    setDragPreview({id: drag.note.id, pitch: drag.pitch, onset: drag.onset, duration: drag.duration, axis});
+    setDragPreview({id: drag.note.id, pitch: drag.pitch, onset: drag.onset, duration: drag.duration, axis, string: drag.string});
   };
 
   const commitDrag = (event: React.PointerEvent) => {
@@ -299,7 +339,12 @@ export function TimeRoll({
     try { drag?.capture?.releasePointerCapture?.(event.pointerId); } catch { /* jsdom */ }
     onGestureEnd?.();
     if (!drag || !drag.axis) return;
-    if (drag.axis === 'pitch' && drag.pitch !== drag.note.pitch) {
+    if (stringsMode && drag.axis === 'pitch') {
+      if (drag.string === stringOf(drag.note)) return;
+      const fret = drag.note.pitch - (openStringPitch(drag.string, setup) ?? drag.note.pitch);
+      if (fret < 0 || fret > 24) return;
+      onGestureCommit?.({kind: 'position', occurrenceId: drag.note.id, string: drag.string, fret});
+    } else if (drag.axis === 'pitch' && drag.pitch !== drag.note.pitch) {
       onGestureCommit?.({kind: 'pitch', occurrenceId: drag.note.id, pitch: drag.pitch});
     } else if (drag.axis === 'time' && Math.abs(drag.onset - drag.note.onset) > 1e-9) {
       onGestureCommit?.({kind: 'time', occurrenceId: drag.note.id, seconds: drag.onset});
@@ -324,7 +369,9 @@ export function TimeRoll({
       ? Math.max(0, Math.min(document.duration,
         layout.xToSourceSeconds(Math.max(0, x - gutter), alignment, 0) - effectiveOffset))
       : Math.max(0, Math.min(document.duration, x / pps));
-    const pitch = Math.max(0, Math.min(127, high - Math.floor(py / rowHeight)));
+    const pitch = stringsMode
+      ? (openStringPitch(Math.max(1, Math.min(6, 1 + Math.floor(py / rowHeight))), setup) ?? 60)
+      : Math.max(0, Math.min(127, high - Math.floor(py / rowHeight)));
     onGhostPlace?.(Math.round(seconds * 1e3) / 1e3, pitch);
   };
 
@@ -345,18 +392,26 @@ export function TimeRoll({
 
   return <div className="ws-roll">
     <div className="ws-roll-gutter" style={{width: LABEL_WIDTH}}>
-      <div className="ws-roll-corner" style={{height: RULER_HEIGHT}}/>
+      <div className="ws-roll-corner" style={{height: RULER_HEIGHT}}>
+        {stringsMode && <span className="ws-roll-capo-badge" data-capo-badge={setup.capo}>
+          {setup.capo > 0 ? `Capo ${setup.capo}` : 'No capo'}
+        </span>}
+      </div>
       <div className="ws-roll-label-viewport" style={{height: PLOT_HEIGHT}}>
         <div className="ws-roll-label-canvas" style={{height: pitchHeight, transform: `translateY(${-labelOffset}px)`}}>
-          {Array.from({length: rows}, (_, index) => high - index)
-            .filter(pitch => pitch % 12 === 0)
-            .map(pitch => <span key={pitch} style={{top: y(pitch) - 7}}>{pitchName(pitch)}</span>)}
+          {stringsMode
+            ? stringLabels.map((label, index) => <span key={index + 1} style={{top: yString(index + 1) - 7}}
+                data-string-lane={index + 1}>{index + 1}: {label}</span>)
+            : Array.from({length: rows}, (_, index) => high - index)
+              .filter(pitch => pitch % 12 === 0)
+              .map(pitch => <span key={pitch} style={{top: y(pitch) - 7}}>{pitchName(pitch)}</span>)}
         </div>
       </div>
     </div>
     <div className="ws-roll-viewport" ref={viewportRef} onScroll={handleScroll}
       style={{height: RULER_HEIGHT + PLOT_HEIGHT}} tabIndex={0}
-      aria-label={`Piano roll, ${window.span.toFixed(0)} seconds from ${window.start.toFixed(1)} seconds${scrollable ? ', scrollable pitch range' : ''}`}>
+      data-row-mode={rowMode} data-tuning={setup.tuning} data-capo={setup.capo}
+      aria-label={`${stringsMode ? 'Guitar 6-string roll' : 'Piano roll'}, ${window.span.toFixed(0)} seconds from ${window.start.toFixed(1)} seconds${scrollable ? ', scrollable pitch range' : ''}`}>
       <div className="ws-roll-content" style={{width: totalWidth}}>
         <div className="ws-roll-ruler" style={{height: RULER_HEIGHT}} onClick={seekFromEvent}>
           {ticks.map(tick => <span key={tick} className="ws-roll-tick-label" style={{left: xForTick(tick) + 4}}>{shared && layout && alignment ? formatSeconds(layout.xToSourceSeconds(xForTick(tick) - gutter, alignment, 0)) : formatSeconds(tick)}</span>)}
@@ -369,8 +424,11 @@ export function TimeRoll({
           {addMode ? <rect className="ws-roll-add-layer" x={0} y={0} width={totalWidth} height={pitchHeight}
             onPointerDown={placeGhost} aria-label="Add note position"/> : null}
           {ticks.map(tick => <line key={tick} className="ws-roll-grid" x1={xForTick(tick)} y1={0} x2={xForTick(tick)} y2={pitchHeight}/>)}
-          {Array.from({length: rows}, (_, index) => high - index).filter(pitch => pitch % 12 === 0).map(pitch =>
-            <line key={`row-${pitch}`} className="ws-roll-octave" x1={0} y1={y(pitch)} x2={totalWidth} y2={y(pitch)}/>)}
+          {stringsMode
+            ? stringLabels.map((_, index) => <line key={`string-${index + 1}`} className="ws-roll-string"
+                data-string-line={index + 1} x1={0} y1={yString(index + 1)} x2={totalWidth} y2={yString(index + 1)}/>)
+            : Array.from({length: rows}, (_, index) => high - index).filter(pitch => pitch % 12 === 0).map(pitch =>
+              <line key={`row-${pitch}`} className="ws-roll-octave" x1={0} y1={y(pitch)} x2={totalWidth} y2={y(pitch)}/>)}
           {visibleNotes.map(note => {
             const preview = dragPreview?.id === note.id ? dragPreview : null;
             const pitch = preview?.pitch ?? note.pitch;
@@ -387,26 +445,67 @@ export function TimeRoll({
             const active = liveActive.includes(note.id);
             const dragging = preview !== null;
             const invalid = dragging && (preview!.axis === 'resize' && seconds < 0.02 || pitch < 0 || pitch > 127);
+            const previewString = preview?.string ?? null;
+            const storedString = previewString ?? note.string;
+            const storedFret = previewString !== null
+              ? pitch - (openStringPitch(previewString, setup) ?? pitch)
+              : note.fret;
+            const position = stringsMode
+              ? resolveGuitarPosition(pitch, storedString ?? null, storedFret ?? null, setup)
+              : null;
+            const unplayable = stringsMode && position === null;
+            const noteString = position?.string ?? 6;
+            const fret = position?.fret ?? null;
+            const top = stringsMode ? yString(noteString) - rowHeight / 2 : y(pitch) - rowHeight / 2;
+            const finger: GuitarFinger = position ? (fingerMap[note.id] ?? 0) : 0;
+            const fingerColor = GUITAR_FINGER_PALETTE[finger].color;
+            const fingerLabel = GUITAR_FINGER_PALETTE[finger].label;
+            const fingerText = finger === 0 ? 'Open' : `F${finger}`;
             return <g key={note.id}>
-              <rect className={`ws-roll-note${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}${dragging ? ' is-dragging' : ''}${invalid ? ' is-invalid' : ''}`}
-                x={left} y={y(pitch) - rowHeight / 2} width={noteWidth} height={Math.max(3, rowHeight - 1)} rx={2}
+              <rect className={`ws-roll-note${selected ? ' is-selected' : ''}${active ? ' is-active' : ''}${dragging ? ' is-dragging' : ''}${invalid ? ' is-invalid' : ''}${stringsMode ? ` ws-roll-bar-finger-${finger}` : ''}${unplayable ? ' ws-roll-bar-unplayable' : ''}`}
+                x={left} y={top} width={noteWidth} height={Math.max(3, rowHeight - 1)} rx={2}
                 data-occurrence={note.id} data-pitch={note.pitch} data-preview-pitch={preview?.pitch ?? undefined}
+                data-guitar-string={stringsMode ? noteString : undefined}
+                data-finger={stringsMode && position ? String(finger) : undefined}
+                data-finger-color={stringsMode && position ? fingerColor : undefined}
+                data-unplayable={unplayable ? 'true' : undefined}
+                style={stringsMode ? {fill: unplayable ? '#94a3b8' : fingerColor} : undefined}
+                data-fret={stringsMode && position ? position.fret : undefined}
                 data-drag-axis={preview?.axis ?? undefined} role="button" tabIndex={0}
-                aria-label={`${pitchName(pitch)} at ${onset.toFixed(2)} seconds${selected ? ', selected' : ''}`}
+                aria-label={stringsMode
+                  ? (unplayable
+                    ? `Unplayable ${pitchName(pitch)} under this tuning and capo, at ${onset.toFixed(2)} seconds`
+                    : `String ${noteString}, fret ${fret}, finger ${finger} (${fingerLabel}), at ${onset.toFixed(2)} seconds${selected ? ', selected' : ''}`)
+                  : `${pitchName(pitch)} at ${onset.toFixed(2)} seconds${selected ? ', selected' : ''}`}
                 onPointerDown={event => beginDrag(note, event, null)}
                 onPointerMove={moveDrag}
                 onPointerUp={commitDrag}
                 onPointerCancel={cancelDrag}
                 onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(note.id); } }}>
-                <title>{`${pitchName(pitch)} · ${onset.toFixed(2)} s · ${seconds.toFixed(2)} s`}</title>
+                <title>{stringsMode
+                  ? (unplayable
+                    ? `${pitchName(pitch)} · unplayable under this tuning/capo · ${onset.toFixed(2)} s`
+                    : `${pitchName(pitch)} · string ${noteString}, fret ${fret} · finger ${finger} (${fingerLabel}) · ${onset.toFixed(2)} s`)
+                  : `${pitchName(pitch)} · ${onset.toFixed(2)} s · ${seconds.toFixed(2)} s`}</title>
               </rect>
+              {stringsMode && position
+                ? <text className="ws-roll-fret" data-fret-label={position.fret}
+                    data-finger-label={`${finger}:${fingerLabel}`}
+                    x={left + 4} y={top + rowHeight / 2 + 4} pointerEvents="none">
+                    {position.fret} · {fingerText}
+                  </text>
+                : null}
+              {stringsMode && unplayable
+                ? <text className="ws-roll-fret is-unplayable" data-unplayable-label="true"
+                    x={left + 4} y={top + rowHeight / 2 + 4} pointerEvents="none">✕</text>
+                : null}
               {selected ? <>
-                <rect className="ws-roll-handle" data-handle="time" x={left - 3} y={y(pitch) - rowHeight / 2} width={6}
+                <rect className="ws-roll-handle" data-handle="time" x={left - 3} y={top} width={6}
                   height={Math.max(3, rowHeight - 1)} rx={1}
                   aria-label="Move start"
                   onPointerDown={event => { event.stopPropagation(); beginDrag(note, event, 'time'); }}
                   onPointerMove={moveDrag} onPointerUp={commitDrag} onPointerCancel={cancelDrag}/>
-                <rect className="ws-roll-handle" data-handle="resize" x={left + noteWidth - 3} y={y(pitch) - rowHeight / 2} width={6}
+                <rect className="ws-roll-handle" data-handle="resize" x={left + noteWidth - 3} y={top} width={6}
                   height={Math.max(3, rowHeight - 1)} rx={1}
                   aria-label="Resize recorded length"
                   onPointerDown={event => { event.stopPropagation(); beginDrag(note, event, 'resize'); }}

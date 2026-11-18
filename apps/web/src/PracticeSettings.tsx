@@ -1,6 +1,7 @@
 import {createContext,useCallback,useContext,useEffect,useId,useRef,useState,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {ChevronDown} from 'lucide-react';
+import {Button} from './ui/controls';
 
 type Slot='instructor'|'layout'|'camera';
 type Family='setup'|'playback'|'display';
@@ -13,7 +14,7 @@ const SettingsContext=createContext<{
 
 export function PracticeSettingsProvider({row,children}:{row:string|null;setRow:(row:string|null)=>void;children:ReactNode}){
  const [slots,setSlots]=useState<Partial<Record<Slot,HTMLElement>>>({});
- const [groups,setGroups]=useState<ReadonlySet<Family>>(()=>new Set(['setup']));
+ const [groups,setGroups]=useState<ReadonlySet<Family>>(()=>new Set<Family>(['setup','playback']));
  const openGroup=useCallback((id:Family)=>setGroups(previous=>previous.has(id)?previous:new Set([...previous,id])),[]);
  const toggleGroup=useCallback((id:Family)=>setGroups(previous=>{const next=new Set(previous);if(next.has(id))next.delete(id);else next.add(id);return next;}),[]);
  const register=useCallback((slot:Slot,node:HTMLElement|null)=>setSlots(previous=>previous[slot]===(node??undefined)?previous:{...previous,[slot]:node??undefined}),[]);
@@ -25,7 +26,7 @@ export function SettingsGroup({id,title,summary,children,disabledReason,status}:
  const context=useContext(SettingsContext)!,contentId=useId(),expanded=context.groups.has(id),openGroup=context.openGroup;
  useEffect(()=>{if(context.row&&familyFor(context.row)===id)openGroup(id);},[context.row,id,openGroup]);
  return <section className="settings-group settings-family" aria-label={title}>
-  <h3><button type="button" className="settings-family-trigger" aria-expanded={expanded} aria-controls={contentId} onClick={()=>context.toggleGroup(id)}><span>{title}{summary&&<small>{summary}</small>}</span><ChevronDown size={17} aria-hidden="true"/></button></h3>
+  <h3><Button type="button" variant="settings-group" className="settings-family-trigger" aria-expanded={expanded} aria-controls={contentId} onClick={()=>context.toggleGroup(id)}><span>{title}{summary&&<small>{summary}</small>}</span><ChevronDown size={17} aria-hidden="true"/></Button></h3>
   <div id={contentId} className="settings-family-content" hidden={!expanded}><Availability.Provider value={{reason:disabledReason,status}}>{children}</Availability.Provider></div>
  </section>;
 }
@@ -53,5 +54,5 @@ export function SettingsRow({id,label,value,children,disabledReason,status}:{id:
 }
 
 export function SettingsChoices<T extends string|number>({label,value,options,onChange,disabled=false}:{label:string;value:T;options:readonly {value:T;label:string;disabled?:boolean}[];onChange:(value:T)=>void;disabled?:boolean}){
- return <div className="settings-choices" role="group" aria-label={label}>{options.map(option=><button type="button" key={option.value} aria-pressed={value===option.value} disabled={disabled||option.disabled} onClick={()=>onChange(option.value)}>{option.label}</button>)}</div>;
+ return <div className="settings-choices" role="group" aria-label={label}>{options.map(option=><Button type="button" variant="settings-choice" key={option.value} aria-pressed={value===option.value} disabled={disabled||option.disabled} onClick={()=>onChange(option.value)}>{option.label}</Button>)}</div>;
 }

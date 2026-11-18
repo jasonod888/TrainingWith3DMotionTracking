@@ -70,10 +70,18 @@ import {createClock, useClockTime, type ClockStore} from './clock';
 import type {GestureEdit} from './gestures';
 import {
   buildSaveBody, canonicalAnchors, insertionPlacement, performanceChanged, restoreFromReference, serializeAlignment,
-  type SavedSpan,
+  type SavedGuitarChord, type SavedSpan,
 } from './save-payload';
+import {GuitarChordStrumHud} from './GuitarChordStrumHud';
+import GuitarNeckGuide from '../renderers/GuitarNeckGuide';
+import {detectGuitarChords} from './guitar-chords';
 import {
-  clearRecovery, peekRecovery, readRecovery, writeRecovery, type RecoveryCheckpoint, type RecoveryIdentity,
+  GUITAR_TUNINGS, assignGuitarFingers, normalizeGuitarSetup,
+  openStringPitch, resolveGuitarPosition, type GuitarFinger, type GuitarTuningId,
+} from '../../../../../packages/music-notation/guitar.ts';
+import {
+  clearRecovery, peekRecovery, readRecovery, salvageGuitarChords, sanitizeGuitarChords, writeRecovery,
+  type RecoveryCheckpoint, type RecoveryIdentity,
 } from './recovery';
 
 /** Stable default order; a future layout descriptor may reorder these modules only. */
@@ -340,6 +348,19 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
   const [notePeekPosition, setNotePeekPosition] = useState<'top' | 'bottom'>('bottom');
   const [settingsTab, setSettingsTab] = useState<'view' | 'editing' | 'lesson' | 'timing' | 'more'>('view');
   const [pitchPickMode, setPitchPickMode] = useState<{occurrenceId: string; pitch: number} | null>(null);
+  // Guitar uses the same document/state/transport; only these instrument-specific
+  // surfaces and preferences are additional.
+  const [guitarChords, setGuitarChords] = useState<SavedGuitarChord[]>([]);
+  /** Serialized chord baseline for the explicit chords-dirty flag and recovery. */
+  const savedChordsRef = useRef('[]');
+  /** Last collection that passed sanitization, used to salvage recovery writes. */
+  const lastValidChordsRef = useRef<SavedGuitarChord[]>([]);
+  const [guitarTone, setGuitarTone] = useState(25);
+  const [guitarHandedness, setGuitarHandedness] = useState<'right' | 'left'>('right');
+  const [rollMode, setRollMode] = useState<'pitch' | 'strings'>('pitch');
+  const [staffMode, setStaffMode] = useState<'grand' | 'guitar-tab' | 'guitar-both'>('grand');
+  const [fretPickMode, setFretPickMode] = useState<string | null>(null);
+  const [fretDraft, setFretDraft] = useState('');
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [saveAttempted, setSaveAttempted] = useState(false);
@@ -549,6 +570,20 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
   }, []);
 
   const document = state?.document ?? null;
+  const guitar = document?.subject === 'guitar';
+  const activeSetup = normalizeGuitarSetup({tuning: document?.guitar_tuning, capo: document?.guitar_capo});
+  useEffect(() => {
+    if (!document) return;
+    setRollMode(document.subject === 'guitar' ? 'strings' : 'pitch');
+    setStaffMode(document.subject === 'guitar' ? 'guitar-both' : 'grand');
+  }, [document?.subject, documentEpoch]);
+  const guitarFingers = useMemo<Record<string, GuitarFinger>>(() => document?.subject === 'guitar'
+    ? assignGuitarFingers(document.performance, activeSetup) : {},
+    [document, activeSetup.tuning, activeSetup.capo]);
+  /** Playable position for an occurrence, or null when the tuning/capo cannot reach it. */
+  const positionOf = (note: {pitch: number; string: number | null; fret: number | null}) => {
+    return resolveGuitarPosition(note.pitch, note.string, note.fret, activeSetup);
+  };
   const previewStale = Boolean(previewBaseline && document && performanceChanged(previewBaseline, document));
   const verifyingPreview = Boolean(previewAsset && !preview.url && !preview.error);
   const verifiedPreview = Boolean(previewAsset && preview.url && !previewStale);
@@ -562,8 +597,10 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
     : previewStale ? 'Notes changed since the WAV preview; Piano now plays live synthesized notes from the edited score'
     : 'Piano plays live synthesized grand piano notes from the score';
   const liveMidiBytes = useMemo(
-    () => document ? exportPerformanceToMidi(document.performance, pedalSpans) : null,
-    [document, pedalSpans]);
+    () => document ? exportPerformanceToMidi(document.performance, pedalSpans, {
+      subject: document.subject, program: document.subject === 'guitar' ? guitarTone : 0,
+    }) : null,
+    [document, pedalSpans, guitarTone]);
   const interactionPolicy = document
     ? resolveInteractionPolicy(document.performance.length, interactiveLimitApproved())
     : {mode: 'read-only' as const, reason: 'The score is not ready.'};
@@ -754,7 +791,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
   // volume, onset timing and seek/buffer reset for review and practice alike.
   usePianoPerformanceAudio({
     document, videoRef, clock: clockRef.current, livePiano, offsetSeconds,
-    pedalSpans, rate, volume, rawModelDraft,
+    pedalSpans, rate, volume, rawModelDraft, guitarProgram: guitarTone,
   });
 
   const seek = useCallback((seconds: number) => {
@@ -828,6 +865,9 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
     } else if (edit.kind === 'time') {
       dispatch({type: 'command', command: {type: 'set-occurrence-onset', occurrenceId: edit.occurrenceId,
         seconds: edit.seconds}});
+    } else if (edit.kind === 'position') {
+      dispatch({type: 'command', command: {type: 'set-guitar-position', occurrenceId: edit.occurrenceId,
+        string: edit.string, fret: edit.fret}});
     } else {
       dispatch({type: 'command', command: {type: 'set-occurrence-duration', occurrenceId: edit.occurrenceId,
         seconds: edit.durationSeconds}});
@@ -936,6 +976,33 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
 
   const selection = state?.selection ?? null;
   const selected = selection && document ? noteFacts(document, selection) : null;
+
+  // Guitar editor shortcut: with a note selected and focus outside a field, digits
+  // 0-9 type the fret directly on the note's current string.
+  useEffect(() => {
+    if (!guitar || readOnly || !selection || !document) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey
+        || event.defaultPrevented || event.isComposing) return;
+      if (!/^[0-9]$/.test(event.key)) return;
+      const target = event.target as Element | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (globalThis.document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      const occurrence = document.performance.find(item => item.id === selection.occurrenceId);
+      if (!occurrence) return;
+      const position = positionOf(occurrence);
+      if (!position) {
+        setNotice('This note has no playable position under the current tuning and capo.');
+        return;
+      }
+      event.preventDefault();
+      dispatch({type: 'command', command: {type: 'set-guitar-position',
+        occurrenceId: selection.occurrenceId, string: position.string, fret: Number(event.key)}});
+      setNotice(`Fret ${event.key} on string ${position.string}.`);
+    };
+    globalThis.window.addEventListener('keydown', onKey);
+    return () => globalThis.window.removeEventListener('keydown', onKey);
+  }, [guitar, readOnly, selection?.occurrenceId, document, dispatch]);
   const editorSuppressed = Boolean(pitchPickMode || replaceMode || addMode);
   useEffect(() => {
     const inside = (target: EventTarget | null) => {
@@ -1152,14 +1219,19 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
   // avoids serializing the whole document on every edit.
   const metaSignature = useMemo(() => JSON.stringify({
     alignment: serializeAlignment(alignment, anchors, offsetSeconds),
-    anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy,
-  }), [alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy]);
+    anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy, guitarChords,
+  }), [alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy, guitarChords]);
   const workspaceSignature = document && state
     ? `${documentEpoch}:${historyIdentity(state)}:${metaSignature}` : '';
   workspaceSignatureRef.current = workspaceSignature;
-  const dirty = savedSignature !== null
+  useEffect(() => {
+    const valid = sanitizeGuitarChords(guitarChords);
+    if (valid !== null) lastValidChordsRef.current = valid;
+  }, [guitarChords]);
+  const chordsDirty = JSON.stringify(guitarChords) !== savedChordsRef.current;
+  const dirty = (savedSignature !== null
     ? workspaceSignature !== savedSignature
-    : workspaceSignature !== (serverSignature ?? '') || Boolean(state?.dirty);
+    : workspaceSignature !== (serverSignature ?? '') || Boolean(state?.dirty)) || chordsDirty;
   useEffect(() => { onDirty?.(dirty); }, [dirty, onDirty]);
   const recoveryIdentity = useMemo<RecoveryIdentity>(
     () => ({accountId, lessonId: lessonId ?? '', draftId, sourceSha256,
@@ -1178,6 +1250,9 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
     setDocumentEpoch(value => value + 1);
     setState(createWorkspaceState(restored.document));
     setSpans(restored.spans);
+    setGuitarChords(restored.guitarChords);
+    lastValidChordsRef.current = sanitizeGuitarChords(restored.guitarChords) ?? [];
+    savedChordsRef.current = JSON.stringify(restored.guitarChords);
     setPedalSpans(manifest?.pedal ?? []);
     setRawModelDraft(false);
     setOffsetSeconds(restored.offsetSeconds);
@@ -1286,6 +1361,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
           string: event.string, fret: event.fret, notation_duration: event.notation_duration ?? null,
         })), {
           duration: draft.duration,
+          subject: draft.subject === 'guitar' ? 'guitar' : 'piano',
           scoreSeconds: note => clock.toScore(note.onset),
           scoreDuration: clock.scoreDuration,
         });
@@ -1295,6 +1371,12 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
         setState(createWorkspaceState(document));
         setTitle(draft.title);
         setSpans(draftSpans);
+        const draftChords = (draft.guitar_chords ?? []).map(chord => ({
+          id: chord.id, name: chord.name, start: chord.start, frets: [...chord.frets], position: chord.position,
+        }));
+        setGuitarChords(draftChords);
+        lastValidChordsRef.current = sanitizeGuitarChords(draftChords) ?? [];
+        savedChordsRef.current = JSON.stringify(draftChords);
         setPedalSpans(draft.pedal ?? []);
         setRawModelDraft(Boolean(draft.raw_model || draft.provenance?.model === 'kong'));
         setOffsetSeconds(draft.playback?.sync_offset_seconds ?? 0);
@@ -1443,11 +1525,16 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
         durationSeconds: document.duration,
         authoredSpellings: authoredSpellings.current,
         acceptedBaselines: acceptedBaselines.current,
+        // An in-progress chord edit (blank name, unsorted position) must never make
+        // the only recovery checkpoint unreadable.
+        guitarChords: guitarChords.length
+          ? salvageGuitarChords(guitarChords, lastValidChordsRef.current)
+          : undefined,
       });
     }, 600);
     return () => clearTimeout(timer);
   }, [workspaceSignature, dirty, accountId, draftId, sourceSha256, title, alignment, anchors, offsetSeconds,
-      spans, recoveryIdentity, savedRevisionId, verificationToken, sectionsDraft, assessmentPolicy]);
+      spans, recoveryIdentity, savedRevisionId, verificationToken, sectionsDraft, assessmentPolicy, guitarChords]);
 
   snapshotRef.current = {
     document, selection, dirty, past: state?.past.length ?? 0, future: state?.future.length ?? 0,
@@ -1780,6 +1867,12 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       return;
     }
     if (!document || !lessonId || !confirmReviewed || saving) return;
+    const validatedChords = document.subject === 'guitar' ? sanitizeGuitarChords(guitarChords) : [];
+    if (validatedChords === null) {
+      setSaveError('Guitar chord shapes are invalid or exceed the 100-shape limit. '
+        + 'Fix or remove invalid shapes before saving.');
+      return;
+    }
     const snapshot = workspaceSignature;
     setSaving(true); setSaveError(''); setSaveMessage(''); setSaveConflict(false);
     const base = baseOverride ?? savedRevisionId;
@@ -1787,9 +1880,10 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       title, document: withHandAssignments(document, hands.assignments), spans, alignment, anchors, offsetSeconds, baseRevisionId: base,
       draftId, referenceSha256: sourceSha256, verificationStateToken: verificationToken || null,
       sections: sectionsDraft.length ? sectionsDraft : (savedSections ?? undefined),
-      assessment: assessmentPolicy === 'notes'
-        ? {assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch', 'timing'], rubric_version: 'piano-midi-v1'}
-        : {assessment: 'none', input_modes: ['none'], dimensions: [], rubric_version: 'music-watch-v1'},
+      guitarChords: validatedChords,
+      assessment: guitar || assessmentPolicy !== 'notes'
+        ? {assessment: 'none', input_modes: ['none'], dimensions: [], rubric_version: 'music-watch-v1'}
+        : {assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch', 'timing'], rubric_version: 'piano-midi-v1'},
     });
     try {
       const manifest = await request<{ revision_id: string }>(
@@ -1797,6 +1891,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
         'POST', body);
       setSavedRevisionId(manifest.revision_id);
       setSavedSignature(snapshot);
+      lastValidChordsRef.current = validatedChords;
+      savedChordsRef.current = JSON.stringify(validatedChords);
       const current = snapshot === workspaceSignatureRef.current;
       onSaved?.(manifest.revision_id, current);
       setSaveConflict(false);
@@ -1834,7 +1930,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
     }
   }, [document, lessonId, confirmReviewed, saving, title, spans, alignment, anchors, offsetSeconds,
       savedRevisionId, workspaceSignature, draftId, sourceSha256, verificationToken, savedSections, savedAssessment, onSaved,
-      hands.assignments]);
+      hands.assignments, guitarChords]);
 
   const saveOnLatestRevision = useCallback(async () => {
     if (!lessonId) return;
@@ -1877,6 +1973,9 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       setDocumentEpoch(value => value + 1);
       setState(createWorkspaceState(restored));
       setSpans(staleCheckpoint.spans);
+      setGuitarChords(staleCheckpoint.guitarChords ?? []);
+      lastValidChordsRef.current = sanitizeGuitarChords(staleCheckpoint.guitarChords ?? []) ?? [];
+      savedChordsRef.current = JSON.stringify(staleCheckpoint.guitarChords ?? []);
       setOffsetSeconds(staleCheckpoint.offsetSeconds);
       setAnchors(canonicalAnchors(staleCheckpoint.alignment?.anchors ?? []));
       if (staleCheckpoint.sections?.length) setSectionsDraft(staleCheckpoint.sections);
@@ -1906,6 +2005,9 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       setDocumentEpoch(value => value + 1);
       setState(createWorkspaceState(restored));
       setSpans(recoveryOffer.spans);
+      setGuitarChords(recoveryOffer.guitarChords ?? []);
+      lastValidChordsRef.current = sanitizeGuitarChords(recoveryOffer.guitarChords ?? []) ?? [];
+      savedChordsRef.current = JSON.stringify(recoveryOffer.guitarChords ?? []);
       setOffsetSeconds(recoveryOffer.offsetSeconds);
       setAnchors(canonicalAnchors(recoveryOffer.alignment?.anchors ?? []));
       if (recoveryOffer.sections?.length) setSectionsDraft(recoveryOffer.sections);
@@ -2211,8 +2313,61 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       data-compact-view={stageView} data-compact-preference={compactPreference}
       data-compact-limited={limitedHeight ? 'true' : 'false'} data-roll-open={rollOpen ? 'true' : 'false'}>
       <section className="ws-instrument" id="piano-instrument" data-stage-module="instrument"
-        aria-label="Piano instrument">
-        <div className="ws-waterfall-slot" id="piano-waterfall-slot" data-waterfall-slot="true"
+        aria-label={guitar ? 'Guitar instrument' : 'Piano instrument'}>
+        {guitar ? <div className="ws-guitar-instrument" data-stage-slot="guitar">
+          <div className="ws-guitar-setup" role="group" aria-label="Guitar setup" data-guitar-setup="true">
+            <label className="ws-field ws-inline"><span>Tuning</span>
+              <select aria-label="Guitar tuning" value={activeSetup.tuning}
+                onChange={event => dispatch({type: 'command', command: {type: 'set-guitar-setup',
+                  tuning: event.target.value as GuitarTuningId}})}>
+                {Object.values(GUITAR_TUNINGS).map(tuning => <option key={tuning.id} value={tuning.id}>{tuning.label}</option>)}
+              </select>
+            </label>
+            <label className="ws-field ws-inline"><span>Capo</span>
+              <input aria-label="Guitar capo" type="number" min={0} max={12} step={1}
+                value={activeSetup.capo}
+                onChange={event => {
+                  const capo = Number(event.target.value);
+                  if (!Number.isInteger(capo) || capo < 0 || capo > 12) return;
+                  dispatch({type: 'command', command: {type: 'set-guitar-setup', capo}});
+                }}/>
+            </label>
+          </div>
+          <GuitarChordStrumHud chords={guitarChords} time={playhead}
+            events={document.performance.map(note => ({onset: note.onset, pitch: note.pitch,
+              string: note.string ?? positionOf(note)?.string ?? null}))}
+            beatsPerBar={document.time_signature.numerator}
+            onSelectChord={chord => seek(chord.start)}/>
+          <GuitarNeckGuide
+            tuning={activeSetup.tuning} capo={activeSetup.capo}
+            positions={document.performance.filter(note => activeIds.includes(note.id))
+              .flatMap(note => {
+                const position = positionOf(note);
+                return position ? [{pitch: note.pitch, ...position, label: pitchName(note.pitch),
+                  finger: guitarFingers[note.id]}] : [];
+              })}
+            fretCount={24}
+            handedness={guitarHandedness}
+            upcomingPositions={document.performance
+              .filter(note => note.onset > playhead && note.onset <= playhead + 0.5)
+              .flatMap(note => {
+                const position = positionOf(note);
+                return position ? [{pitch: note.pitch, ...position}] : [];
+              })}
+            candidatePositions={selected && guitar ? Array.from({length: 6}, (_, index) => index + 1)
+              .map(string => ({string, fret: selected.pitch - (openStringPitch(string, activeSetup) ?? selected.pitch)}))
+              .filter(item => item.fret >= 0 && item.fret <= 24)
+              .map(item => ({string: item.string, fret: item.fret, pitch: selected.pitch})) : []}
+            onPositionSelect={(string, fret) => {
+              const target = fretPickMode ?? selection?.occurrenceId ?? null;
+              if (!target) { setNotice('Select a note before choosing a fretboard position.'); return; }
+              dispatch({type: 'command', command: {type: 'set-guitar-position',
+                occurrenceId: target, string, fret}});
+              setFretPickMode(null);
+              setNotice(`Position set to string ${string}, fret ${fret}.`);
+            }}/>
+        </div> : null}
+        <div className="ws-waterfall-slot" hidden={guitar} id="piano-waterfall-slot" data-waterfall-slot="true"
           data-stage-slot="waterfall">
           <PianoWaterfall document={document} clock={clockRef.current} intervals={intervals}
             range={keyboardRange}
@@ -2220,7 +2375,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
             hands={hands.assignments}
             onSelect={select}/>
         </div>
-        <section className="ws-keyboard-surface" id="piano-keyboard" aria-label="Keyboard">
+        <section className="ws-keyboard-surface" id="piano-keyboard" aria-label="Keyboard" hidden={guitar}>
           <div className="ws-surface-head"><span>Piano keys</span><span className="ws-surface-note">Tap to audition</span></div>
           <div ref={keyboardRef}>
             <LiveKeyboard document={document} clock={clockRef.current} intervals={intervals}
@@ -2261,8 +2416,13 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
             aria-expanded={rollVisible} aria-controls="piano-roll-body"
             disabled={limitedHeight && Boolean(addMode)}
             onClick={() => setRollOpen(open => !open)}>
-            <span>Piano roll</span><span className="ws-accordion-state">{rollVisible ? 'Hide' : 'Show'}</span>
+            <span>{guitar ? (rollMode === 'strings' ? '6-String Roll' : 'Pitch Roll') : 'Piano roll'}</span><span className="ws-accordion-state">{rollVisible ? 'Hide' : 'Show'}</span>
           </button>
+          {guitar && <button type="button" className="ws-quiet-button" data-roll-mode-toggle="true"
+            aria-label="Toggle roll rows"
+            onClick={() => setRollMode(mode => mode === 'strings' ? 'pitch' : 'strings')}>
+            {rollMode === 'strings' ? 'Pitch Roll' : '6-String Roll'}
+          </button>}
           {!isPractice && <button type="button" className="ws-quiet-button ws-add-trigger" data-add-menu-toggle="true"
             aria-expanded={addMenuOpen} aria-label="Add note" title="Add note"
             onClick={() => addMenuOpen ? setAddMenuOpen(false) : openAddMenu()}>+ Add note</button>}
@@ -2289,14 +2449,22 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
               seconds: seconds - offsetSeconds, pitch,
               ticks: mode?.ticks ?? lastWrittenTicks.current,
               durationSeconds: mode?.durationSeconds ?? lastRecordedSeconds.current}))}
-            playhead={playhead} onSelect={select} onSeek={seek}/>
+            playhead={playhead} onSelect={select} onSeek={seek} rowMode={guitar ? rollMode : 'pitch'}
+            tuning={activeSetup.tuning} capo={activeSetup.capo}/>
           </div>
         </section>
 
         <section className="ws-score-surface" id="piano-score" data-stage-module="sheet" aria-label="Score">
           <p className="ws-score-meta" data-score-key>Key: {keyLabel(document.key_signature || 'C')} · {document.time_signature.numerator}/{document.time_signature.denominator}</p>
+          {guitar && <button type="button" className="ws-quiet-button" data-staff-mode-toggle="true"
+            aria-label="Toggle score staff" onClick={() => setStaffMode(mode =>
+              mode === 'guitar-both' ? 'guitar-tab' : 'guitar-both')}>
+            {staffMode === 'guitar-both' ? 'TAB only' : 'TAB + Sheet'}
+          </button>}
           <ContinuousScore document={document} boxes={boxes} selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={null} onSelect={select}
+            staffMode={guitar ? staffMode : 'grand'} guitarChords={guitar ? guitarChords : []}
+            tuning={activeSetup.tuning} capo={activeSetup.capo}
             playheadTick={playheadTick} activeOccurrenceIds={activeIds}
             clock={clockRef.current} alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals}
             layout={timelineLayout ?? undefined} sharedScrollLeft={sharedScrollLeft}
@@ -2416,7 +2584,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
               className={audioMode === 'piano' ? 'is-active' : ''}
               disabled={pianoDisabled}
               title={pianoTitle}
-              onClick={() => setAudioMode('piano')}>Piano</button>
+              onClick={() => setAudioMode('piano')}>{guitar ? 'Guitar' : 'Piano'}</button>
           </div>
           <button type="button" className="ws-icon-button" aria-pressed={pipOpen}
             aria-label="Video" title={pipOpen ? 'Hide video' : 'Show video'}
@@ -2432,11 +2600,11 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
         drawer modal={false} onClose={() => setPracticePanel(null)}>
         <PracticeSettingsProvider row={settingsRow} setRow={setSettingsRow}>
           <SettingsGroup id="setup" title="Audio & Practice"
-            summary={audioMode === 'piano' ? 'Piano' : 'Original'}>
-            <SettingsRow id="audio" label="Sound" value={audioMode === 'piano' ? 'Piano' : 'Original'}>
+            summary={audioMode === 'piano' ? (guitar ? 'Guitar' : 'Piano') : 'Original'}>
+            <SettingsRow id="audio" label="Sound" value={audioMode === 'piano' ? (guitar ? 'Guitar' : 'Piano') : 'Original'}>
               <SettingsChoices label="Sound" value={audioMode}
                 options={[{value: 'original', label: 'Original'},
-                  {value: 'piano', label: 'Piano', disabled: pianoDisabled}]}
+                  {value: 'piano', label: guitar ? 'Guitar' : 'Piano', disabled: pianoDisabled}]}
                 onChange={value => setAudioMode(value === 'piano' ? 'piano' : 'original')}/>
             </SettingsRow>
             <SettingsRow id="stops" label="Practice stops"
@@ -2656,6 +2824,35 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
           </div>
           {diff && <p className="ws-hint">Your changes: {diff.changed} changed · {diff.added} added · {diff.removed} removed</p>}
         </section>
+        {guitar && <section className="ws-drawer-section" data-ws-section="settings" data-settings-section="guitar"
+          aria-label="Guitar settings">
+          <h3>Guitar</h3>
+          <label className="ws-field">Guitar sound
+            <select aria-label="Guitar sound" value={guitarTone}
+              onChange={event => setGuitarTone(Number(event.target.value))}>
+              <option value={25}>Acoustic Steel</option>
+              <option value={24}>Classical Nylon</option>
+              <option value={27}>Clean Electric</option>
+              <option value={26}>Jazz</option>
+            </select>
+          </label>
+          <label className="ws-field">Fretboard orientation
+            <select aria-label="Fretboard orientation" value={guitarHandedness}
+              onChange={event => setGuitarHandedness(event.target.value === 'left' ? 'left' : 'right')}>
+              <option value="right">Right-handed</option>
+              <option value="left">Left-handed</option>
+            </select>
+          </label>
+          <div className="ws-row" role="group" aria-label="Guitar stage">
+            <button type="button" aria-pressed={rollMode === 'strings'} data-stage-roll="strings"
+              onClick={() => { setRollMode('strings'); setRollOpen(true); }}>Roll</button>
+            <button type="button" aria-pressed={staffMode === 'guitar-tab'} data-stage-compact="tab"
+              onClick={() => setStaffMode(staffMode === 'guitar-tab' ? 'guitar-both' : 'guitar-tab')}>
+              {staffMode === 'guitar-tab' ? 'TAB + Sheet' : 'Compact TAB'}
+            </button>
+          </div>
+          <p className="ws-hint">Guitar notes use the same score, transport and practice engine as piano.</p>
+        </section>}
         <section className="ws-drawer-section" data-ws-section="sound" aria-label="Sound">
           <h3>Sound</h3>
           <div className="ws-row" role="group" aria-label="Source audio options">
@@ -2666,7 +2863,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
               className={audioMode === 'piano' ? 'is-active' : ''}
               disabled={pianoDisabled}
               title={pianoTitle}
-              onClick={() => setAudioMode('piano')}>Piano</button>
+              onClick={() => setAudioMode('piano')}>{guitar ? 'Guitar' : 'Piano'}</button>
           </div>
           {verifiedPreview && hasWebAudio && <div className="ws-row" role="group"
             aria-label="Piano synthesis source" data-piano-source="true">
@@ -2693,15 +2890,17 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
             : <p className="ws-hint">This draft has no source video.</p>}
           <span className="ws-hint" data-preview-state={verifyingPreview ? 'verifying'
             : previewAsset && !preview.url ? 'unavailable' : useWavPreview ? 'verified' : 'live'}>
-            {previewStale
-              ? 'Piano preview is stale: the notes changed. Piano plays live synthesized grand piano notes from the edited score, with velocity dynamics and sustain pedal.'
-              : verifyingPreview
-                ? 'Verifying piano audio… Original plays until it is verified.'
-                : previewAsset && !preview.url
-                  ? `Piano unavailable as a verified WAV: ${preview.error ?? 'the audio could not be verified'} Original audio remains active.`
-                  : useWavPreview
-                    ? 'Verified piano preview follows the video clock; it never free-runs. Choose Live grand piano above for the synthesized performance.'
-                    : 'Piano plays live synthesized grand piano notes from the score and performance, with velocity dynamics and sustain pedal; Original keeps the video sound.'}
+            {guitar
+              ? 'Guitar plays live synthesized notes from the score, with the chosen guitar tone across all six strings; Original keeps the video sound.'
+              : previewStale
+                ? 'Piano preview is stale: the notes changed. Piano plays live synthesized grand piano notes from the edited score, with velocity dynamics and sustain pedal.'
+                : verifyingPreview
+                  ? 'Verifying piano audio… Original plays until it is verified.'
+                  : previewAsset && !preview.url
+                    ? `Piano unavailable as a verified WAV: ${preview.error ?? 'the audio could not be verified'} Original audio remains active.`
+                    : useWavPreview
+                      ? 'Verified piano preview follows the video clock; it never free-runs. Choose Live grand piano above for the synthesized performance.'
+                      : 'Piano plays live synthesized grand piano notes from the score and performance, with velocity dynamics and sustain pedal; Original keeps the video sound.'}
           </span>
         </section>
 
@@ -2744,6 +2943,71 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
                   <button type="button" disabled={readOnly} onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch - 1}})}>− semitone</button>
                   <button type="button" disabled={readOnly} onClick={() => dispatch({type: 'command', command: {type: 'set-occurrence-pitch', occurrenceId: selection.occurrenceId, pitch: selected.pitch + 1}})}>+ semitone</button>
                 </div>
+                {guitar ? (() => {
+                  const occurrence = document.performance.find(item => item.id === selection.occurrenceId);
+                  if (!occurrence) return null;
+                  const position = positionOf(occurrence);
+                  if (!position) return <p className="ws-hint" data-unplayable-note="true" role="status">
+                    {pitchName(occurrence.pitch)} has no playable position under the current tuning and capo.
+                  </p>;
+                  return <div className="ws-guitar-note-editor" data-guitar-note-editor="true"
+                    data-guitar-current={`${position.string}:${position.fret}`}>
+                    <div className="ws-row" role="group" aria-label="Guitar string and fret">
+                      <label className="ws-field ws-inline"><span>String</span>
+                        <select aria-label="Guitar string" value={position.string} disabled={readOnly}
+                          onChange={event => {
+                            const string = Number(event.target.value);
+                            const fret = position.fret;
+                            const outcome = applyCommand(document, {type: 'set-guitar-position',
+                              occurrenceId: selection.occurrenceId, string, fret});
+                            if (outcome.status === 'rejected') { setNotice(outcome.message); return; }
+                            dispatch({type: 'command', command: {type: 'set-guitar-position',
+                              occurrenceId: selection.occurrenceId, string, fret}});
+                          }}>
+                          {[1, 2, 3, 4, 5, 6].map(string => <option key={string} value={string}>{string}</option>)}
+                        </select>
+                      </label>
+                      <label className="ws-field ws-inline"><span>Fret</span>
+                        <input aria-label="Guitar fret" type="number" min={0} max={24} data-guitar-fret-input="true"
+                          value={fretDraft} placeholder={String(position.fret)} disabled={readOnly}
+                          onChange={event => setFretDraft(event.target.value)}/>
+                      </label>
+                      <button type="button" data-guitar-fret-apply="true" disabled={readOnly || !fretDraft.trim()}
+                        onClick={() => {
+                          const fret = Number(fretDraft);
+                          if (!Number.isInteger(fret) || fret < 0 || fret > 24) { setNotice('A fret must be a whole number between 0 and 24.'); return; }
+                          const outcome = applyCommand(document, {type: 'set-guitar-position',
+                            occurrenceId: selection.occurrenceId, string: position.string, fret});
+                          if (outcome.status === 'rejected') { setNotice(outcome.message); return; }
+                          dispatch({type: 'command', command: {type: 'set-guitar-position',
+                            occurrenceId: selection.occurrenceId, string: position.string, fret}});
+                          setFretDraft('');
+                        }}>Set position</button>
+                    </div>
+                    <div className="ws-row" role="group" aria-label="Shift string keeping pitch">
+                      <span className="ws-hint">Shift string (keep pitch)</span>
+                      {[1, 2, 3, 4, 5, 6].map(string => <button key={string} type="button"
+                        data-shift-string={string} disabled={readOnly || string === position.string}
+                        onClick={() => {
+                          const outcome = applyCommand(document, {type: 'shift-guitar-string',
+                            occurrenceId: selection.occurrenceId, string});
+                          if (outcome.status === 'rejected') { setNotice(outcome.message); return; }
+                          dispatch({type: 'command', command: {type: 'shift-guitar-string',
+                            occurrenceId: selection.occurrenceId, string}});
+                        }}>{string}</button>)}
+                    </div>
+                    <div className="ws-row" role="group" aria-label="Choose on fretboard">
+                      <button type="button" data-guitar-fret-pick="true"
+                        aria-pressed={fretPickMode === selection.occurrenceId}
+                        disabled={readOnly}
+                        onClick={() => { setFretPickMode(fretPickMode === selection.occurrenceId ? null : selection.occurrenceId);
+                          setNotice(fretPickMode === selection.occurrenceId ? 'Fretboard pick cancelled.'
+                            : 'Click a string and fret on the guitar neck.'); }}>
+                        Choose on fretboard
+                      </button>
+                    </div>
+                  </div>;
+                })() : null}
                 <div className="ws-row ws-hand-picker" role="group" aria-label="Hand assignment"
                   data-hand-assignment="true" data-hand-current={hands.assignments[selection.occurrenceId]?.hand ?? 'unassigned'}>
                   <span className="ws-hint">Hand</span>
@@ -2874,6 +3138,72 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
               </div>}
             </>}
         </section>
+
+        {guitar && <section className="ws-drawer-section" data-ws-section="chords" aria-label="Guitar chord shapes">
+          <h2>Chord shapes</h2>
+          <div className="ws-row" role="group" aria-label="Chord shape actions">
+            <button type="button" data-chord-detect="true" disabled={readOnly}
+              onClick={() => {
+                const detected = detectGuitarChords(document.performance.map(note => ({
+                  id: note.id, onset: note.onset, pitch: note.pitch,
+                  string: positionOf(note)?.string ?? null,
+                  fret: positionOf(note)?.fret ?? null,
+                }))).slice(0, 100);
+                setGuitarChords(detected);
+                setNotice(detected.length
+                  ? `Detected ${detected.length} chord shape${detected.length === 1 ? '' : 's'} from the notes; review them before saving.`
+                  : 'No strummed chord clusters were detected in this performance.');
+              }}>Auto-detect from notes</button>
+            <button type="button" data-chord-add="true" disabled={readOnly || guitarChords.length >= 100}
+              onClick={() => {
+                if (readOnly || guitarChords.length >= 100) return;
+                const id = `chord-${Date.now().toString(36)}`;
+                setGuitarChords(chords => [...chords, {
+                  id, name: 'C', start: Math.max(0, playhead), frets: [0, 0, 0, 0, 0, 0], position: 1,
+                }].sort((left, right) => left.start - right.start));
+              }}>Add shape</button>
+          </div>
+          {guitarChords.length === 0
+            ? <p className="ws-hint">No reviewed chord shapes yet. Detect them from the notes or add one at the playhead.</p>
+            : <ul className="ws-chord-shape-list" aria-label="Reviewed chord shapes">
+              {guitarChords.map(chord => <li key={chord.id} data-chord-shape={chord.id}>
+                <label className="ws-field ws-inline"><span>Name</span>
+                  <input value={chord.name} maxLength={40} disabled={readOnly} aria-label={`Chord ${chord.id} name`}
+                    onChange={event => setGuitarChords(chords => chords.map(item => item.id === chord.id
+                      ? {...item, name: event.target.value} : item))}
+                    onBlur={() => setGuitarChords(chords => chords.map(item => item.id === chord.id
+                      ? {...item, name: item.name.trim() || 'Chord'} : item))}/>
+                </label>
+                <label className="ws-field ws-inline"><span>At (s)</span>
+                  <input type="number" min={0} step={0.01} value={chord.start} disabled={readOnly}
+                    aria-label={`Chord ${chord.id} start`}
+                    onChange={event => setGuitarChords(chords => chords.map(item => item.id === chord.id
+                      ? {...item, start: Math.max(0, Number(event.target.value))} : item))}/>
+                </label>
+                <span className="ws-hint" data-chord-frets="true">{chord.frets.map(fret => fret < 0 ? 'x' : fret).join(' ')}</span>
+                <label className="ws-field ws-inline"><span>Frets</span>
+                  <input defaultValue={chord.frets.join(' ')} disabled={readOnly}
+                    aria-label={`Chord ${chord.id} frets`} data-chord-frets-input="true"
+                    onBlur={event => {
+                      const parts = event.target.value.trim().split(/\s+/).map(Number);
+                      const positive = parts.filter(fret => fret > 0);
+                      if (parts.length === 6 && parts.every(fret => Number.isInteger(fret) && fret >= -1 && fret <= 24)
+                        && parts.some(fret => fret >= 0)
+                        && (!positive.length || Math.max(...positive) - Math.min(...positive) <= 3)) {
+                        setGuitarChords(chords => chords.map(item => item.id === chord.id
+                          ? {...item, frets: parts, position: positive.length ? Math.max(1, Math.min(...positive)) : 1} : item));
+                      } else {
+                        event.target.value = chord.frets.join(' ');
+                        setNotice('Enter six frets (-1 muted, 0 open, 1-24) inside a four-fret span.');
+                      }
+                    }}/>
+                </label>
+                <button type="button" disabled={readOnly} aria-label={`Remove chord ${chord.name}`}
+                  onClick={() => setGuitarChords(chords => chords.filter(item => item.id !== chord.id))}>Remove</button>
+              </li>)}
+            </ul>}
+          <p className="ws-hint">Chord shapes are suggestions authored in this editor; they are saved with the guitar reference.</p>
+        </section>}
 
         <section className="ws-drawer-section" data-ws-section="insert" data-settings-section="editing" aria-label="Insert">
           <h2>Insert</h2>
@@ -3018,12 +3348,13 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
             </fieldset>)}
             <h2>Assessment</h2>
             <label className="ws-field ws-inline"><span>Policy</span>
-              <select value={assessmentPolicy} data-assessment-policy
+              <select value={guitar ? 'none' : assessmentPolicy} data-assessment-policy disabled={readOnly || guitar}
                 onChange={event => { if (readOnlyRef.current) return; setAssessmentPolicy(event.target.value === 'notes' ? 'notes' : 'none'); setConfirmReviewed(false); }}>
                 <option value="none">Watch only (no note scoring)</option>
                 <option value="notes">Pitch and timing from MIDI</option>
               </select>
             </label>
+            {guitar && <p className="ws-hint">Guitar lessons stay watch-only; MIDI note feedback is piano-only in this engine.</p>}
             <h2>Verification diagnostics</h2>
             {!verification ? <p className="ws-hint">No verification report is available for this proposal.</p> : <>
               <p className="ws-hint" data-verification-status>

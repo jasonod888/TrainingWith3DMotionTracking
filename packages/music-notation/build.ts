@@ -14,6 +14,7 @@ import {
 } from './types';
 import { decomposeTicks, measureCount, measureTicks, snapTick, splitAtMeasures } from './rhythm';
 import { accidentalName, displayAccidental, keySignature, parseSpelling, spellPitch } from './spelling';
+import { normalizeGuitarSetup, resolveGuitarPosition } from './guitar';
 
 const spellingCache = new Map<string, ReturnType<typeof parseSpelling>>();
 function cachedParseSpelling(spelling: string): ReturnType<typeof parseSpelling> {
@@ -78,7 +79,7 @@ type AssignedGroup = Group & { voice: 1 | 2; skipped?: boolean };
 
 function groupPerformance(
   performance: PerformanceNote[], secondsPerTick: number, splitPitch: number,
-  scoreSeconds: (note: PerformanceNote) => number,
+  scoreSeconds: (note: PerformanceNote) => number, subject: 'piano' | 'guitar' = 'piano',
 ): Group[] {
   const groups = new Map<string, Group>();
   for (const source of performance) {
@@ -89,7 +90,10 @@ function groupPerformance(
       : source.duration && source.duration > 0 ? source.duration : 0.25;
     const end = snapTick((scoreOnset + sourceLength) / secondsPerTick);
     const duration = Math.max(GRID, end - start);
-    const staff = source.pitch >= splitPitch ? 'treble' : 'bass';
+    // Guitar is written on the treble staff with the conventional 8vb reading;
+    // the split pitch only decides piano hands.
+    const staff: 'treble' | 'bass' = subject === 'guitar' ? 'treble'
+      : source.pitch >= splitPitch ? 'treble' : 'bass';
     const key = `${staff}:${start}:${duration}`;
     const current = groups.get(key);
     if (current) current.notes.push(source);
@@ -148,9 +152,11 @@ function buildLogicalNote(note: PerformanceNote, key: string): NotationNote {
   };
 }
 
-/** Interpret a performance transcription as a piano grand-staff document. */
+/** Interpret a performance transcription as a piano grand-staff or guitar TAB document. */
 export function buildNotation(performance: PerformanceNote[], options: BuildOptions = {}): NotationDocument {
   if (!Array.isArray(performance) || performance.length > MAX_EVENTS) throw new Error('The transcription has too many notes.');
+  const subject = options.subject === 'guitar' ? 'guitar' : 'piano';
+  const guitarSetup = normalizeGuitarSetup({tuning: options.guitar_tuning, capo: options.guitar_capo});
   const source = performance.map(copyPerformance);
   const seen = new Set<string>();
   for (const note of source) {
@@ -158,17 +164,25 @@ export function buildNotation(performance: PerformanceNote[], options: BuildOpti
     seen.add(note.id);
     if (!Number.isFinite(note.onset) || note.onset < 0) throw new Error('A performance note has an invalid onset.');
     if (!Number.isInteger(note.pitch) || note.pitch < 0 || note.pitch > 127) throw new Error('A performance note has an invalid pitch.');
+    if (subject === 'guitar') {
+      // Every guitar note must carry a playable position. A transcription that only
+      // produced pitches is mapped deterministically; an out-of-range pitch stays
+      // unpositioned rather than crashing the guide.
+      const position = resolveGuitarPosition(note.pitch, note.string, note.fret, guitarSetup);
+      note.string = position ? position.string : null;
+      note.fret = position ? position.fret : null;
+    }
   }
   const bpm = Math.max(20, Math.min(300, options.bpm ?? estimateTempo(source)));
   const time = options.time_signature ?? DEFAULT_TIME;
   const key = options.key_signature ?? 'C';
   keySignature(key);
   const duration = options.duration ?? Math.max(0.05, ...source.map(note => note.onset + (note.duration && note.duration > 0 ? note.duration : 0.25)));
-  const splitPitch = Math.max(0, Math.min(127, options.staff_split_pitch ?? 60));
+  const splitPitch = subject === 'guitar' ? 0 : Math.max(0, Math.min(127, options.staff_split_pitch ?? 60));
   const secondsPerTick = 60 / (bpm * PPQ);
   const scoreSeconds = options.scoreSeconds ?? ((note: PerformanceNote) => note.onset);
   const measures = makeMeasures(options.scoreDuration ?? duration, bpm, time);
-  const groups = assignVoices(groupPerformance(source, secondsPerTick, splitPitch, scoreSeconds));
+  const groups = assignVoices(groupPerformance(source, secondsPerTick, splitPitch, scoreSeconds, subject));
   const events: NotationEvent[] = groups.map((group, index) => {
     const notes: NotationNote[] = [];
     // Several recorded notes can quantise to the same written pitch and position. They
@@ -207,7 +221,7 @@ export function buildNotation(performance: PerformanceNote[], options: BuildOpti
   }
   return refreshNotation({
     notation_version: 1,
-    subject: 'piano',
+    subject,
     duration,
     ppq: PPQ,
     tempo: { bpm, beat_unit: 4, mode: 'notation', source: options.bpm ? 'instructor' : 'estimated' },
@@ -221,6 +235,9 @@ export function buildNotation(performance: PerformanceNote[], options: BuildOpti
     performance: source,
     performance_map: performanceMap,
     created_from: 'performance',
+    ...(subject === 'guitar'
+      ? {guitar_tuning: guitarSetup.tuning, guitar_capo: guitarSetup.capo}
+      : {}),
   });
 }
 

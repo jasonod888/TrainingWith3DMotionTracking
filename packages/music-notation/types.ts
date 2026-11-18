@@ -1,3 +1,5 @@
+import type {GuitarTuningId} from './guitar';
+
 /**
  * Shared piano-notation document.
  *
@@ -151,7 +153,8 @@ export type Tie = {
 
 export type NotationDocument = {
   notation_version: 1;
-  subject: 'piano';
+  /** One shared music engine; the subject selects the instrument-specific surfaces. */
+  subject: 'piano' | 'guitar';
   /** Original video length in seconds. */
   duration: number;
   ppq: 480;
@@ -168,6 +171,9 @@ export type NotationDocument = {
   /** Performance event id -> logical notation note id. */
   performance_map: Record<string, string>;
   created_from: 'performance' | 'saved';
+  /** Guitar only: active tuning and capo; absent means standard, no capo. */
+  guitar_tuning?: GuitarTuningId;
+  guitar_capo?: number;
   /** Optional hand-estimate metadata; absent in older documents. */
   hand_assignment_version?: 1;
   hand_assignments?: Record<string, HandAssignment>;
@@ -176,8 +182,13 @@ export type NotationDocument = {
 export type BuildOptions = {
   bpm?: number;
   time_signature?: TimeSignature;
+  /** Guitar only: written tuning/capo used to resolve performance positions. */
+  guitar_tuning?: GuitarTuningId;
+  guitar_capo?: number;
   key_signature?: string;
   staff_split_pitch?: number;
+  /** Written instrument; guitar writes every event on the treble staff (8vb). */
+  subject?: 'piano' | 'guitar';
   ppq?: 480;
   grid?: number;
   /** Use the reviewed source duration even when the last event ends earlier. */
