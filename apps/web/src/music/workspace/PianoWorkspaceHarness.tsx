@@ -11,6 +11,7 @@ import {
   ArrowLeft, ChevronRight, Mic, MicOff, MoreHorizontal, Pause, Play, Redo2, RotateCcw, Settings as SettingsIcon, Undo2, Video, Volume2, X,
 } from 'lucide-react';
 import {PracticePlayerDock} from '../../PracticePlayerDock';
+import {PianoPracticeWorkspace} from './PianoPracticeWorkspace';
 import {PracticePanel} from '../../PracticePanel';
 import {
   PracticeSettingsProvider, SettingsChoices, SettingsGroup, SettingsRow,
@@ -29,19 +30,18 @@ import {
 import {useHandAssignments} from './useHandAssignments';
 import {pitchName} from '../music-reference';
 import {buildTimelineLayout, clampScroll, heldPassageAt, type TimelineLayout} from './timeline-layout';
-import {KeyboardEditor} from '../notation/KeyboardEditor';
-import {
+import {KeyboardEditor} from '../notation/KeyboardEditor';import {
   clampStandardPianoWindow, FULL_PIANO_MIN_WIDTH, isStandardPianoRange,
   narrowSemitonesForWidth, resolveKeyboardRange, STANDARD_PIANO_RANGE, type PianoRange,
 } from '../notation/piano-key-geometry';
 import {NotationAudio} from '../notation/notation-audio';
 import {downloadMidiFile, exportPerformanceToMidi} from '../midi-export';
-import {MidiPlayerEngine} from '../midi-player';
 import {
   buildPracticeChunks, chunkAtTime, parseVoiceCommand,
   type ChunkBarsOption, type PracticeChunk, type PracticeVoiceCommand,
 } from '../practice-chunks';
 import {usePianoSourcePlayer} from '../usePianoSourcePlayer';
+import {usePianoPerformanceAudio} from './usePianoPerformanceAudio';
 import {usePianoPreviewAsset} from '../usePianoPreviewAsset';
 import {
   decideVerification, findingDecision, loadVerification, parseVerificationState,
@@ -51,7 +51,6 @@ import {
   invertFinding, prepareFinding, type AcceptedBaseline,
 } from './verification-transaction';
 import type {Asset, MusicPedalSpan} from '../../../../../packages/lesson-schema/index';
-import {resolvePerformanceAudibleTimings, shiftOnset} from '../piano-playback';
 import {ClipOverview} from './ClipOverview';
 import {ContinuousScore} from './ContinuousScore';
 import {PianoWaterfall} from './PianoWaterfall';
@@ -193,7 +192,27 @@ function NumberField({label, value, min, max, step, disabled, onCommit}: {
   </label>;
 }
 
-export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false, mode = 'review', lessonTitle, onBack, onDirty, onSaved}: {
+export function PianoWorkspaceHarness(props: {
+  lessonId?: string;
+  /** Normal review route: hide harness-only labels and demo affordances. */
+  embedded?: boolean;
+  mode?: 'review' | 'practice';
+  onModeChange?: (mode: 'watch' | 'practice' | 'compete') => void;
+  lessonTitle?: string;
+  onBack?: () => void;
+  /** Mirrors workspace dirty state to the app router/navigation guards. */
+  onDirty?: (dirty: boolean) => void;
+  /** Receives the revision and whether it represents the current work. */
+  onSaved?: (revisionId: string, current: boolean) => void;
+} = {}) {
+  if ((props.mode ?? 'review') === 'practice') {
+    return <PianoPracticeWorkspace lessonId={props.lessonId} lessonTitle={props.lessonTitle}
+      embedded={props.embedded} onBack={props.onBack} onModeChange={props.onModeChange}/>;
+  }
+  return <PianoReviewWorkspace {...props} mode="review"/>;
+}
+
+function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 'review', lessonTitle, onBack, onDirty, onSaved}: {
   lessonId?: string;
   /** Normal review route: hide harness-only labels and demo affordances. */
   embedded?: boolean;
@@ -257,14 +276,9 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const videoRef = useRef<HTMLVideoElement>(null);
   const pianoRef = useRef<HTMLAudioElement>(null);
   const emptyPianoRef = useRef<HTMLAudioElement | null>(null);
-  const liveAudioRef = useRef<NotationAudio | null>(null);
-  const midiPlayerRef = useRef<MidiPlayerEngine | null>(null);
-  const [midiReady, setMidiReady] = useState(false);
-  const liveMutedRef = useRef<boolean | null>(null);
-  const userVideoMutedRef = useRef<boolean | null>(null);
+  const audioRef = useRef<NotationAudio | null>(null);
   /** Latest render's "playback started" handler, used by the native media event. */
   const playbackStart = useRef<() => void>(() => {});
-  const audioRef = useRef<NotationAudio | null>(null);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
   const [pedalSpans, setPedalSpans] = useState<MusicPedalSpan[]>([]);
   const [rawModelDraft, setRawModelDraft] = useState(false);
@@ -547,13 +561,6 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     : useWavPreview ? 'Rendered piano preview WAV'
     : previewStale ? 'Notes changed since the WAV preview; Piano now plays live synthesized notes from the edited score'
     : 'Piano plays live synthesized grand piano notes from the score';
-  const livePerformanceKey = useMemo(
-    () => document ? JSON.stringify(document.performance.map(note =>
-      [note.id, note.pitch, note.onset, note.duration, note.velocity])) : '',
-    [document]);
-  const audibleTimings = useMemo(
-    () => document ? resolvePerformanceAudibleTimings(document.performance, pedalSpans) : new Map(),
-    [document, pedalSpans]);
   const liveMidiBytes = useMemo(
     () => document ? exportPerformanceToMidi(document.performance, pedalSpans) : null,
     [document, pedalSpans]);
@@ -718,64 +725,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   useEffect(() => () => {
     audioRef.current?.dispose();
-    liveAudioRef.current?.dispose();
-    midiPlayerRef.current?.dispose();
-    midiPlayerRef.current = null;
   }, []);
-
-  useEffect(() => {
-    if (!livePiano) { midiPlayerRef.current?.stop(); return; }
-    if (!MidiPlayerEngine.isSupported()) { setMidiReady(false); return; }
-    let disposed = false;
-    const player = midiPlayerRef.current ??= new MidiPlayerEngine();
-    void player.init().then(ok => { if (!disposed && ok) setMidiReady(true); });
-    return () => { disposed = true; };
-  }, [livePiano]);
-
-  useEffect(() => {
-    if (!liveMidiBytes || !midiPlayerRef.current) return;
-    midiPlayerRef.current.loadMidi(liveMidiBytes, Math.max(0,
-      (videoRef.current?.currentTime ?? clockRef.current.get()) - offsetSeconds));
-  }, [liveMidiBytes, midiReady]);
-
-  useEffect(() => {
-    if (!midiReady) return;
-    liveAudioRef.current?.stop();
-  }, [midiReady]);
-
-  useEffect(() => {
-    if (!livePiano || !midiReady) return;
-    const player = midiPlayerRef.current;
-    const media = videoRef.current;
-    if (!player || !media) return;
-    const sync = (forceSeek: boolean) => {
-      player.setVolume(media.volume);
-      player.syncTransport({
-        playing: !media.paused && !media.ended && !media.seeking && media.readyState >= 2,
-        currentTime: media.currentTime,
-        rate: media.playbackRate || rate,
-        offsetSeconds,
-        forceSeek,
-      });
-    };
-    const handlers: [string, () => void][] = [
-      ['play', () => sync(false)],
-      ['pause', () => sync(false)],
-      ['seeking', () => sync(true)],
-      ['seeked', () => sync(true)],
-      ['ratechange', () => sync(false)],
-      ['volumechange', () => sync(false)],
-      ['waiting', () => sync(false)],
-      ['playing', () => sync(false)],
-    ];
-    for (const [name, handler] of handlers) media.addEventListener(name, handler);
-    sync(false);
-    const timer = globalThis.setInterval(() => sync(false), 250);
-    return () => {
-      globalThis.clearInterval(timer);
-      for (const [name, handler] of handlers) media.removeEventListener(name, handler);
-    };
-  }, [livePiano, midiReady, offsetSeconds, rate, videoUrl]);
 
   // The existing source-driven controller for a verified WAV preview. Live synthesis has
   // its own source-clock scheduler and must not bind an empty/stale audio element.
@@ -800,159 +750,12 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     audioRef.current.play(pitches, Math.max(0.12, Math.min(2, seconds)), velocity ?? 0.7);
   }, []);
 
-  // Track the user's own mute choice while Original owns the video element, so a
-  // verified-preview-to-live transition cannot mistake the controller's mute for it.
-  useEffect(() => {
-    if (audioMode !== 'original' || livePiano) return;
-    const media = videoRef.current;
-    if (!media) return;
-    userVideoMutedRef.current = media.muted;
-    const update = () => { userVideoMutedRef.current = media.muted; };
-    media.addEventListener('volumechange', update);
-    return () => media.removeEventListener('volumechange', update);
-  }, [audioMode, livePiano, videoUrl]);
-
-  // Live synthesis is source-clocked. The video stays unmuted only in Original mode.
-  useEffect(() => {
-    if (!livePiano) return;
-    const media = videoRef.current;
-    if (!media) return;
-    if (liveMutedRef.current === null) {
-      liveMutedRef.current = userVideoMutedRef.current ?? media.muted;
-    }
-    media.muted = true;
-    return () => {
-      if (liveMutedRef.current !== null) media.muted = liveMutedRef.current;
-      liveMutedRef.current = null;
-    };
-  }, [livePiano, videoUrl]);
-
-  useEffect(() => {
-    if (!livePiano || !document || midiReady) return;
-    const media = videoRef.current;
-    const audio = liveAudioRef.current ??= new NotationAudio(1.15);
-    const triggered = new Set<string>();
-    let frame = 0;
-    let initialPass = true;
-    const sourceTime = () => media && Number.isFinite(media.currentTime)
-      ? media.currentTime : clockRef.current.get();
-    let lastTime = sourceTime();
-    const syncVolume = () => audio.setVolume(media ? media.volume : 1);
-    syncVolume();
-    const isKongGhostBlip = (duration: number, velocity: number | null | undefined) =>
-      duration < 0.035 || (duration < 0.06 && (velocity ?? 0.5) < 0.35);
-    const stopVoices = () => {
-      audio.stop();
-      triggered.clear();
-      initialPass = true;
-      lastTime = sourceTime();
-    };
-    const nextRawOnset = new Map<string, number>();
-    if (rawModelDraft) {
-      const byPitch = new Map<number, {id: string; onset: number}[]>();
-      for (const note of document.performance) {
-        const rawDuration = note.duration ?? 0.25;
-        // Sub-frame and quiet overtone ghost blips must not cap surrounding real notes.
-        if (isKongGhostBlip(rawDuration, note.velocity)) continue;
-        const list = byPitch.get(note.pitch) ?? [];
-        list.push({id: note.id, onset: note.onset});
-        byPitch.set(note.pitch, list);
-      }
-      for (const list of byPitch.values()) {
-        list.sort((left, right) => left.onset - right.onset || left.id.localeCompare(right.id));
-        for (let index = 0; index + 1 < list.length; index += 1) {
-          nextRawOnset.set(list[index].id, list[index + 1].onset);
-        }
-      }
-    }
-    const scheduleAt = () => {
-      const now = sourceTime();
-      const windowFrom = initialPass ? now - 0.04 : Math.min(lastTime, now) - 0.04;
-      const windowTo = now + 0.12;
-      for (const note of document.performance) {
-        if (triggered.has(note.id)) continue;
-        const rawDuration = note.duration ?? 0.25;
-        if (rawModelDraft && isKongGhostBlip(rawDuration, note.velocity)) continue;
-        let duration = rawDuration;
-        let dampedByKey = true;
-        if (!rawModelDraft && pedalSpans.length > 0) {
-          const timing = audibleTimings.get(note.id);
-          duration = timing?.soundingDuration ?? rawDuration;
-          dampedByKey = timing?.dampedByKey ?? true;
-        } else if (rawModelDraft) {
-          const nextOnset = nextRawOnset.get(note.id);
-          if (nextOnset !== undefined && nextOnset > note.onset
-            && nextOnset < note.onset + rawDuration) {
-            duration = nextOnset - note.onset;
-          }
-          const pedaled = pedalSpans.some(span => {
-            const start = (span as MusicPedalSpan & {start?: number}).start ?? span.onset;
-            const end = (span as MusicPedalSpan & {end?: number}).end ?? span.offset;
-            return start <= note.onset && note.onset <= end;
-          });
-          dampedByKey = pedalSpans.length > 0 ? !pedaled && rawDuration < 1.2 : rawDuration < 1.2;
-        }
-        const start = shiftOnset(note.onset, offsetSeconds);
-        const end = start + duration;
-        if (initialPass) {
-          if (start < now - 0.04 && now < end) {
-            triggered.add(note.id);
-            audio.playScheduledNote({
-              pitch: note.pitch, velocity: note.velocity, duration: duration / rate,
-              elapsed: (now - start) / rate, windowSeconds: (end - now) / rate,
-              dampedByKey,
-            });
-          } else if (start >= now - 0.04 && start <= windowTo) {
-            triggered.add(note.id);
-            audio.playScheduledNote({
-              pitch: note.pitch, velocity: note.velocity, duration: duration / rate,
-              delaySeconds: Math.max(0, (start - now) / rate),
-              dampedByKey,
-            });
-          }
-        } else if (start >= windowFrom && start <= windowTo) {
-          // Even when a frame arrives just after the onset, schedule a fresh hammer
-          // strike rather than a mid-note seek.
-          triggered.add(note.id);
-          audio.playScheduledNote({
-            pitch: note.pitch, velocity: note.velocity, duration: duration / rate,
-            delaySeconds: Math.max(0, (start - now) / rate),
-            dampedByKey,
-          });
-        }
-      }
-      initialPass = false;
-      lastTime = now;
-    };
-    const tick = () => {
-      if (frame) return;
-      if (!media || media.paused || media.ended || media.seeking || media.readyState < 2) {
-        stopVoices();
-        return;
-      }
-      scheduleAt();
-      frame = requestAnimationFrame(() => { frame = 0; tick(); });
-    };
-    const reset = () => {
-      if (frame) cancelAnimationFrame(frame);
-      frame = 0;
-      stopVoices();
-    };
-    const onSeeked = () => { reset(); if (media && !media.paused && !media.ended) tick(); };
-    const onRate = () => reset();
-    const onEnded = () => reset();
-    const listeners: [string, () => void][] = [
-      ['play', tick], ['playing', tick], ['timeupdate', tick], ['seeking', reset],
-      ['seeked', onSeeked], ['pause', reset], ['ended', onEnded], ['ratechange', onRate],
-      ['volumechange', syncVolume],
-    ];
-    if (media) for (const [name, handler] of listeners) media.addEventListener(name, handler);
-    if (media && !media.paused && !media.ended) tick();
-    return () => {
-      reset();
-      if (media) for (const [name, handler] of listeners) media.removeEventListener(name, handler);
-    };
-  }, [audibleTimings, livePiano, livePerformanceKey, midiReady, offsetSeconds, pedalSpans.length, rate, rawModelDraft, videoUrl]);
+  // The proven performance-audio hook owns live grand/MIDI playback, source mute,
+  // volume, onset timing and seek/buffer reset for review and practice alike.
+  usePianoPerformanceAudio({
+    document, videoRef, clock: clockRef.current, livePiano, offsetSeconds,
+    pedalSpans, rate, volume, rawModelDraft,
+  });
 
   const seek = useCallback((seconds: number) => {
     const media = videoRef.current;
@@ -1256,7 +1059,6 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       paused = true;
       autoPausedChunk.current = activeChunkIndex;
       videoRef.current?.pause();
-      midiPlayerRef.current?.syncTransport({playing: false, currentTime: chunk.end, rate, offsetSeconds});
       seek(chunk.end);
     });
   }, [isPractice, playing, chunks, activeChunkIndex, rate, offsetSeconds, seek]);

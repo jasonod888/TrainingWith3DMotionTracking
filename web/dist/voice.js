@@ -5,7 +5,9 @@ export function parseCommand(text){
 export function parsePracticeCommand(text){
  const word=String(text).toLowerCase().replace(/[.,!?]/g,'').trim().replace(/\s+/g,' ');
  return parseCommand(word)??({start:'resume',play:'resume',resume:'resume',stop:'pause',repeat:'again',
-  'next section':'next','go back':'back','slow down':'slower','speed up':'faster',slower:'slower',faster:'faster',loop:'loop'}[word]??null);
+  'next section':'next','previous section':'back','go back':'back','repeat section':'repeat-section',
+  'start over':'restart-lesson','restart lesson':'restart-lesson','restart section':'repeat-section',
+  'slow down':'slower','speed up':'faster',slower:'slower',faster:'faster',loop:'loop'}[word]??null);
 }
 export class VoiceCommands{
   constructor({Recognition,onCommand,onState,onError,now=()=>Date.now(),schedule=setTimeout,cancel=clearTimeout,extended=false}){

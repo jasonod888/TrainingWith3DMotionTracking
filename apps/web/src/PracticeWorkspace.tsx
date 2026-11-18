@@ -1,6 +1,16 @@
-import {useCallback,useEffect,useRef,useState,type CSSProperties} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
 import {Playback} from '../../../packages/learning-engine/playback';
 import {PracticeSession,type PracticeAction,type Attempt} from '../../../packages/learning-engine/practice-session';
+import type {PracticePlan} from '../../../packages/learning-engine/practice-plan';
+import {BODY_CAPABILITIES, voiceControl as deriveVoiceControl} from '../../../packages/learning-engine/practice-capabilities';
+import {derivePracticeView} from '../../../packages/learning-engine/practice-view';
+import {PracticeCommonSettings} from './practice/PracticeCommonSettings';
+import {ExperienceModeSelector} from './practice/ExperienceModeSelector';
+import {experienceModeCapabilitiesFrom, experienceModeToLegacy} from '../../../packages/learning-engine/experience-mode';
+import {usePracticeFullscreen} from './practice/usePracticeFullscreen';
+import {practiceCommandForKey} from './practice/practice-input';
+import {useVoiceStartCoordinator} from './practice/useVoiceStartCoordinator';
+import type {PracticeCommand} from '../../../packages/learning-engine/practice-commands';
 import type {LessonManifest} from '../../../packages/lesson-schema/index';
 import {MimicInterface,type MimicHandle,type CameraState} from './MimicInterface';
 import {browserPreferenceStore,describeCamera,facingAvailability,loadPreference,normalizeDevices,protocolFacing,type CameraDevice,type CameraRequest,type FacingAvailability} from './camera-policy';
@@ -31,38 +41,32 @@ type Summary={score:number|null;cue:string;coverage:number};
 type HistoryEntry={date:string;section:string;score:number|null;revision_id?:string;configuration?:string;start?:number;end?:number};
 const stamp=(t:number)=>`${Math.floor(t/60)}:${Math.floor(t%60).toString().padStart(2,'0')}`;
 const clamp01=(value:number)=>Number.isFinite(value)?Math.max(0,Math.min(1,value)):0;
-export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,onDirty,initialMode='practice',onModeChange,onPracticeSection,initialSettings,onSettings,restoredAt}:{restoredAt?:number|null;initialSettings?:PracticePreferences;onSettings?:(value:PracticePreferences)=>void;initialMode?:'practice'|'compete';onModeChange?:(mode:'watch'|'practice'|'compete')=>void;onPracticeSection?:(index:number)=>void;lesson:LessonManifest;player:Playback;onBack:()=>void;onEdit:()=>void;editable:boolean;notice:string;onDirty?:(value:boolean)=>void}){
- const [session]=useState(()=>{const value=new PracticeSession(player);if(initialMode==='practice'&&initialSettings){value.loop=initialSettings.loop;value.countdownSeconds=initialSettings.countdown;value.repetitions=initialSettings.repetitions;value.restSeconds=initialSettings.rest;}return value;});
+export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,notice,onDirty,initialMode='practice',onModeChange,onPracticeSection,initialSettings,onSettings,restoredAt,restoredUnitId}:{restoredAt?:number|null;restoredUnitId?:string|null;plan:PracticePlan;initialSettings?:PracticePreferences;onSettings?:(value:PracticePreferences)=>void;initialMode?:'practice'|'compete';onModeChange?:(mode:'watch'|'practice'|'compete')=>void;onPracticeSection?:(index:number)=>void;lesson:LessonManifest;player:Playback;onBack:()=>void;onEdit:()=>void;editable:boolean;notice:string;onDirty?:(value:boolean)=>void}){
+ const [session]=useState(()=>{const value=new PracticeSession(player,plan);if(initialMode==='practice'&&initialSettings){value.loop=initialSettings.loop;value.countdownSeconds=initialSettings.countdown;value.repetitions=initialSettings.repetitions;value.restSeconds=initialSettings.rest;}return value;});
  const camera=useRef<MimicHandle>(null),shell=useRef<HTMLElement>(null);
  const practiceDock=useRef<HTMLDivElement>(null);
- const [positionIntent,setPositionIntent]=useState<'initial'|'saved'|'selected'|'position'|'started'>(
-  restoredAt ? 'saved' : 'initial'
- );
  useEffect(()=>{
-  if(restoredAt)setPositionIntent(intent=>intent==='initial'?'saved':intent);
- },[restoredAt]);
-
- const positionIntentRef=useRef(positionIntent);
- positionIntentRef.current=positionIntent;
+  if(restoredAt===null||restoredAt===undefined||restoredAt<=0)return;
+  session.runtime.restore({unitId:restoredUnitId??null,time:restoredAt});
+ },[restoredAt,restoredUnitId,session]);
  const [voiceStatus,setVoiceStatus]=useState('checking');
- const [voiceChoiceMade,setVoiceChoiceMade]=useState(false);
- const [voicePrompt,setVoicePrompt]=useState<'idle'|'requesting'|'fallback'>('idle');
  const [voiceFailure,setVoiceFailure]=useState('');
- const pendingVoiceStart=useRef<(()=>void)|null>(null);
+ const practiceCapabilities=useMemo(()=>({...BODY_CAPABILITIES,
+  voice:deriveVoiceControl(voiceStatus,voiceFailure,voiceStatus!=='unavailable')}),[voiceStatus,voiceFailure]);
+ const practiceUi=derivePracticeView(session.snapshot,practiceCapabilities);
+ const voiceApi={supported:voiceStatus!=='unavailable',
+  status:voiceStatus as 'checking'|'off'|'starting'|'listening'|'reconnecting'|'unavailable',
+  error:voiceFailure,listening:voiceStatus==='listening',control:practiceCapabilities.voice,
+  start:()=>{camera.current?.startVoice();return true;},
+  stop:()=>camera.current?.stopVoice(),toggle:()=>{}};
+ const voiceStart=useVoiceStartCoordinator(voiceApi);
+ const voiceChoiceMade=voiceStart.decided;
+ const voicePrompt: 'idle'|'requesting'|'fallback'=voiceStart.status==='fallback'?'fallback'
+  :voiceStart.status==='asking'||voiceStart.status==='requesting'?'requesting':'idle';
  const receiveVoiceStatus=(state:string,error?:string)=>{
   setVoiceStatus(state);
   if(error)setVoiceFailure(error);
   else if(state==='starting'||state==='listening')setVoiceFailure('');
-  if(!pendingVoiceStart.current)return;
-  if(state==='listening'){
-   const begin=pendingVoiceStart.current;
-   pendingVoiceStart.current=null;
-   setVoiceChoiceMade(true);
-   setVoicePrompt('idle');
-   begin();
-  }else if(error){
-   setVoicePrompt('fallback');
-  }
  };
  const [competition]=useState(()=>{const value=new CompetitionSession(session);if(initialMode==='compete')value.enter();return value;});
  const [instructorOnly,setInstructorOnly]=useState(initialMode==='practice'&&(initialSettings?.instructorOnly??true));
@@ -260,42 +264,32 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
  const panelRef=useRef(panel);panelRef.current=panel;const takeOpenRef=useRef(takeOpen);takeOpenRef.current=takeOpen;
  const [settingsRow,setSettingsRow]=useState<string|null>(null);
  const [historyError,setHistoryError]=useState('');
- const [fullscreen,setFullscreen]=useState(false);
  const [instructorFocus,setInstructorFocus]=useState(false);
  const [timelineHidden,setTimelineHidden]=useState(false);
  const focusFullscreen=useRef(false);
- useEffect(()=>{
-  const update=()=>{
-   setFullscreen(Boolean(document.fullscreenElement));
-   if(!document.fullscreenElement&&focusFullscreen.current){
-    focusFullscreen.current=false;
-    setInstructorFocus(false);
-   }
-  };
-  document.addEventListener('fullscreenchange',update);
-  return()=>document.removeEventListener('fullscreenchange',update);
- },[]);
+ const fullscreen=usePracticeFullscreen(shell,{onExit:()=>{
+  if(focusFullscreen.current){focusFullscreen.current=false;setInstructorFocus(false);}
+ }});
  const toggleInstructorFocus=()=>{
   if(instructorFocus){
    setInstructorFocus(false);
-   if(focusFullscreen.current&&document.fullscreenElement===shell.current){
+   if(focusFullscreen.current){
     focusFullscreen.current=false;
-    void document.exitFullscreen().catch(()=>{});
+    void fullscreen.exit();
    }
    return;
   }
   setTimelineHidden(false);
   setInstructorFocus(true);
-  const stage=shell.current;
-  if(!document.fullscreenElement&&stage?.requestFullscreen){
+  if(!fullscreen.active&&fullscreen.available){
    focusFullscreen.current=true;
-   void stage.requestFullscreen().catch(()=>{focusFullscreen.current=false;});
+   void fullscreen.enter().then(ok=>{if(!ok)focusFullscreen.current=false;});
   }
  };
  const [controlsVisible,setControlsVisible]=useState(true),[interaction,setInteraction]=useState(0);
  const wakeControls=()=>{setControlsVisible(true);setInteraction(n=>n+1);};
  useEffect(()=>{setControlsVisible(true);if(session.phase!=='playing'||panel||takeOpen)return;const timer=window.setTimeout(()=>setControlsVisible(false),3500);return()=>window.clearTimeout(timer);},[session.phase,panel,takeOpen,interaction]);
- const action=useCallback((c:PracticeAction,fromSettings=false)=>{if(pendingVoiceStart.current||(panelRef.current&&!fromSettings)||takeOpenRef.current||setupIntentRef.current)return;if(competition.enabled){
+ const action=useCallback((c:PracticeAction,fromSettings=false)=>{if(voiceStart.status==='asking'||voiceStart.status==='requesting'||(panelRef.current&&!fromSettings)||takeOpenRef.current||setupIntentRef.current)return;if(competition.enabled){
    if(c==='pause'||(c==='play'&&competition.running)){session.pause('stopped');redraw(n=>n+1);return;}
    if(c!=='play'&&c!=='resume'&&c!=='again')return;
    if(competition.running)return;
@@ -304,13 +298,9 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
    setRunResultsOpen(false);competition.start();redraw(n=>n+1);return;
   }if(['play','resume','again','next','back'].includes(c)){const issue=camera.current?.readiness(connection.current.wasOnline);if(issue){setHint(issue);if(recordNext.current){recordNext.current=false;}return;}}if(c==='slower'||c==='faster'){if(takeActive.current){takeActive.current=false;takePending.current=true;}recordingRef.current.stop();}setReplayMode(false);setReview(null);
   if((c==='play'||c==='resume')&&session.phase==='paused'){
-   if(positionIntentRef.current==='saved'&&!session.range){
-    session.select(Math.max(0,player.state.index));
-   }else if(player.state.index<0){
-    player.seek(session.bounds.start);
-   }
+   if(player.state.index<0) player.seek(session.bounds.start);
   }
-  session.action(c);redraw(n=>n+1);},[session,competition]);
+  session.action(c);redraw(n=>n+1);},[session,competition,voiceStart.status]);
  actionRef.current=action;
  useEffect(()=>{if(!pair)return;let disposed=false,timer=0;connection.current={sequence:0,ack:0,wasOnline:false,recovering:false};const poll=async()=>{try{
    const status=await pairRequest<PairStatus>(pair);if(disposed)return;setPairStatus(status);
@@ -356,7 +346,7 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
    if(stream)void publishOffer(stream).catch(()=>setConnectionError('The camera changed, but the display could not be updated. Share the preview again.'));
   });
  },[cameraState,videoSharing,publishOffer]);
- const open=(next:Panel)=>{if(pendingVoiceStart.current||competition.running||setupIntentRef.current)return;if(competition.enabled&&next!=='settings'&&next!=='voice')return;session.pause('settings');setReview(null);setPanel(next);redraw(n=>n+1);};
+ const open=(next:Panel)=>{if(voiceStart.status==='asking'||voiceStart.status==='requesting'||competition.running||setupIntentRef.current)return;if(competition.enabled&&next!=='settings'&&next!=='voice')return;session.pause('settings');setReview(null);setPanel(next);redraw(n=>n+1);};
  const openSettings=(row:string|null=null)=>{setSettingsRow(row);open('settings');};
  const close=()=>{setPanel(null);setHint(competition.enabled?'Perform the full sequence without stopping.':'Paused. Choose Play when you are ready.');};
  const switchMode=(compete:boolean)=>{if(onModeChange){if(competition.running||recording.recording||recordNext.current)return;onModeChange(compete?'compete':'practice');return;}if(!compete&&onPracticeSection){onPracticeSection(-1);return;}if(compete===competition.enabled||competition.running||recording.recording||recordNext.current)return;setReview(null);setRunResultsOpen(false);setReplayMode(false);setPanel(null);recordNext.current=false;if(compete){instructorOnlyRef.current=false;setInstructorOnly(false);practiceView.current={angle,source,companion,rhythm};competition.enter();setAngle(0);setSource(false);setCompanion(false);setRhythm(false);setViewReset(n=>n+1);setHint('Full sequence · Normal speed · Scored');}else{competition.leave();setAngle(practiceView.current.angle);setSource(practiceView.current.source);setCompanion(practiceView.current.companion);setRhythm(practiceView.current.rhythm);setHint('Practice settings restored. Choose Play when ready.');}redraw(n=>n+1);};
@@ -407,7 +397,11 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
  };
  const beginPractice=()=>{
   if(instructorOnlyRef.current){
-   action(offerNextSection?'next':'play');
+   const actionId=practiceUi.primary.id;
+   if(actionId==='next')action('next');
+   else if(actionId==='pause')action('pause');
+   else if(actionId==='restart-lesson')session.runtime.restartLesson();
+   else action(session.intent==='restored'?'resume':'play');
    return;
   }
 
@@ -458,8 +452,8 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
  useEffect(()=>{const warn=(e:BeforeUnloadEvent)=>{if(recording.url&&!savedTake.current){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[recording.url]);
  useEffect(()=>{document.body.classList.add('in-practice');return()=>{document.body.classList.remove('in-practice');session.pause('exit');};},[session]);
  useEffect(()=>{let frame=0,last=performance.now(),draw=last;const tick=(now:number)=>{competition.tick((now-last)/1000);last=now;if(now-draw>80){redraw(n=>n+1);draw=now;}frame=requestAnimationFrame(tick);};frame=requestAnimationFrame(tick);const hide=()=>{if(document.hidden)session.pause('background');};document.addEventListener('visibilitychange',hide);return()=>{cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',hide);};},[session]);
- useEffect(()=>{session.onPause=reason=>{recordNext.current=false;if(competition.interrupt(reason))setRunResultsOpen(true);};session.onAttemptStart=time=>{setPositionIntent('started');attemptFeedback.reset();if(recordNext.current){recordNext.current=false;takeActive.current=true;if(!recordingRef.current.begin(camera.current?.stream()??null,time,player.state.speed)){takeActive.current=false;}}};session.onAttempt=a=>{if(competition.enabled){competition.finish(a);if(competition.result)setRunResultsOpen(true);return;}if(takeActive.current){takeActive.current=false;recordingRef.current.stop();takePending.current=true;}if(a.completed&&!instructorOnlyRef.current){const result=attemptFeedback.result(),entry={date:new Date().toISOString(),section:player.current?.label??lesson.title,score:result.score,revision_id:lesson.revision_id,configuration:camera.current?.configuration()??'watch',start:a.start,end:a.end};setReviewSummary(result);setReview(a);setHistory(values=>[entry,...values].slice(0,100));if(saveHistoryRef.current)void request(`/lessons/${lesson.lesson_id}/attempts`,'POST',{id:a.id,scoring_version:'pose-v1',...entry,...result}).catch(()=>setHint('Attempt could not save. Your practice still works.'));}};return()=>{recordNext.current=false;session.onPause=undefined;session.onAttempt=undefined;session.onAttemptStart=undefined;};},[session,lesson,player,attemptFeedback,competition]);
- useEffect(()=>{const key=(e:KeyboardEvent)=>{if(panelRef.current||takeOpen||setupIntentRef.current||e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.target instanceof HTMLTextAreaElement||e.target instanceof HTMLButtonElement||e.metaKey||e.ctrlKey||e.altKey)return;const commands:Record<string,PracticeAction>={' ':'play',ArrowRight:'next',ArrowLeft:'back',r:'again',p:'pause'};if(commands[e.key]){e.preventDefault();action(commands[e.key]);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[action,takeOpen]);
+ useEffect(()=>{session.onPause=reason=>{recordNext.current=false;if(competition.interrupt(reason))setRunResultsOpen(true);};session.onAttemptStart=time=>{attemptFeedback.reset();if(recordNext.current){recordNext.current=false;takeActive.current=true;if(!recordingRef.current.begin(camera.current?.stream()??null,time,player.state.speed)){takeActive.current=false;}}};session.onAttempt=a=>{if(competition.enabled){competition.finish(a);if(competition.result)setRunResultsOpen(true);return;}if(takeActive.current){takeActive.current=false;recordingRef.current.stop();takePending.current=true;}if(a.completed&&!instructorOnlyRef.current){const result=attemptFeedback.result(),entry={date:new Date().toISOString(),section:player.current?.label??lesson.title,score:result.score,revision_id:lesson.revision_id,configuration:camera.current?.configuration()??'watch',start:a.start,end:a.end};setReviewSummary(result);setReview(a);setHistory(values=>[entry,...values].slice(0,100));if(saveHistoryRef.current)void request(`/lessons/${lesson.lesson_id}/attempts`,'POST',{id:a.id,scoring_version:'pose-v1',...entry,...result}).catch(()=>setHint('Attempt could not save. Your practice still works.'));}};return()=>{recordNext.current=false;session.onPause=undefined;session.onAttempt=undefined;session.onAttemptStart=undefined;};},[session,lesson,player,attemptFeedback,competition]);
+ useEffect(()=>{const key=(e:KeyboardEvent)=>{if(voiceStart.status==='asking'||voiceStart.status==='requesting'||voiceStart.status==='fallback'||panelRef.current||takeOpen||setupIntentRef.current)return;const command=practiceCommandForKey(e);if(!command||command.type!=='action')return;const mapped:Record<string,PracticeAction>={toggle:'play',next:'next',previous:'back','repeat-section':'again',pause:'pause',play:'play',resume:'resume',start:'play','restart-lesson':'restart-lesson'};const next=mapped[command.action];if(next){e.preventDefault();action(next);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[action,takeOpen,voiceStart.status]);
  useEffect(()=>{
   if(!presenting)return;
   const element=shell.current;
@@ -487,53 +481,35 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
  const sectionFinished=instructorOnly&&session.phase==='paused'&&!session.range
   &&s.mode==='sections'&&s.index>=0&&s.time>=current.end-1e-6;
  const offerNextSection=sectionFinished&&s.index<player.sections.length-1;
- const offerVoiceStart=!voiceChoiceMade&&voiceStatus!=='listening'&&session.phase==='paused'&&cameraState==='off'&&!offerNextSection&&!sectionFinished;
- const requestVoiceStart=(begin=pendingVoiceStart.current??beginPractice)=>{
-  pendingVoiceStart.current=begin;
-  setVoicePrompt('requesting');
-  camera.current?.startVoice();
- };
- const continueWithoutVoice=()=>{
-  const begin=pendingVoiceStart.current??beginPractice;
-  pendingVoiceStart.current=null;
-  camera.current?.stopVoice();
-  setVoiceChoiceMade(true);
-  setVoicePrompt('idle');
-  begin();
- };
- const cancelVoiceStart=()=>{
-  pendingVoiceStart.current=null;
-  camera.current?.stopVoice();
-  setVoicePrompt('idle');
- };
+ const offerVoiceStart=!voiceChoiceMade&&voiceStatus!=='listening'&&voiceStatus!=='unavailable'&&session.phase==='paused'&&cameraState==='off'&&!offerNextSection&&!sectionFinished;
+ const requestVoiceStart=(begin=()=>beginPractice())=>{voiceStart.requestStart(begin);};
+ const continueWithoutVoice=()=>{voiceStart.requestStart(()=>beginPractice());voiceStart.chooseWithoutVoice();};
+ const cancelVoiceStart=()=>{voiceStart.cancel();};
  const togglePractice=()=>{
   if(voicePrompt==='requesting')return;
   if(offerVoiceStart)requestVoiceStart(beginPractice);
-  else {setVoiceChoiceMade(true);beginPractice();}
+  else beginPractice();
  };
  const hasProgress=s.time>0.05;
- const sequenceFinished=instructorOnly&&session.phase==='paused'&&!session.range&&s.time>=lesson.duration-1e-6;
- const practiceFinished=sequenceFinished||(sectionFinished&&!offerNextSection);
- const instructorAction=offerNextSection?'Next section'
-  :practiceFinished?'Practise again'
-  :session.phase!=='paused'?'Pause practice'
-  :positionIntent==='saved'?`Resume section ${Math.max(1,s.index+1)}`
-  :positionIntent==='selected'?`Start section ${Math.max(1,s.index+1)}`
-  :positionIntent==='started'||positionIntent==='position'||hasProgress?'Resume practice'
-  :'Start practice';
  const beginFromStart=()=>{
-  session.select(0);
-  setPositionIntent('selected');
-  if(instructorOnlyRef.current||cameraLifecycle.current==='live')action('play');
-  else beginPractice();
+  session.runtime.restartLesson();
+  if(!instructorOnlyRef.current&&cameraLifecycle.current!=='live'){session.pause('starting practice');beginPractice();}
  };
  const startOver=()=>{
   if(offerVoiceStart)requestVoiceStart(beginFromStart);
   else beginFromStart();
  };
  const runPrimaryAction=()=>{
-  if(instructorOnly&&practiceFinished){startOver();return;}
   togglePractice();
+ };
+ const runSharedCommand=(command:PracticeCommand)=>{
+  if(command.type!=='action')return;
+  if(command.action==='start'||command.action==='play'||command.action==='resume'){togglePractice();return;}
+  if(command.action==='pause'){action('pause');return;}
+  if(command.action==='next'){action('next');return;}
+  if(command.action==='previous'){action('back');return;}
+  if(command.action==='repeat-section'){action('again');return;}
+  if(command.action==='restart-lesson'){startOver();}
  };
 
  const sections=player.sections.filter(section=>section.label.toLowerCase().includes(query.toLowerCase()));
@@ -568,7 +544,13 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
    <span className="player-voice-label">{voiceLabel}</span>
   </button>
  );
- const modeControl=onModeChange&&<label className="lesson-mode-control"><span className="feed-sr-only">Lesson mode</span><select aria-label="Lesson mode" value={compete?'compete':'practice'} disabled={runActive||recording.recording||Boolean(setupIntent)||voicePrompt==='requesting'} onChange={event=>onModeChange(event.target.value as 'watch'|'practice'|'compete')}><option value="watch">Watch</option><option value="practice">Practice</option><option value="compete">Challenge</option></select></label>;
+ const modeControl=onModeChange&&<ExperienceModeSelector compact current={compete?'challenge':'practice'}
+  capabilities={experienceModeCapabilitiesFrom(practiceCapabilities)}
+  disabledReason={runActive?'Finish or stop the current attempt before changing mode.'
+   :recording.recording?'Stop recording before changing mode.'
+   :setupIntent?'Finish camera setup before changing mode.'
+   :voicePrompt==='requesting'?'Finish choosing the voice option before changing mode.':undefined}
+  onSelect={mode=>onModeChange(experienceModeToLegacy(mode))}/>;
  const focusActive=instructorFocus&&instructorOnly&&!compete;
  const presentLayout=compareLayout(presentSize.width,presentSize.height);
  const presentStyle=presenting?({
@@ -595,16 +577,21 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
    {voiceFailure&&<p role="alert">{voiceFailure}</p>}
    {voiceStatus==='unavailable'&&<p>Voice recognition is unavailable in this browser.</p>}
    <button disabled={voiceStatus==='checking'||voiceStatus==='unavailable'} onClick={()=>{
-    if(voiceEnabled)camera.current?.stopVoice();
+    if(voiceEnabled){voiceStart.markOff();camera.current?.stopVoice();}
     else camera.current?.startVoice();
    }}>{voiceEnabled?'Turn off voice commands':'Enable voice commands'}</button>
+  </PracticePanel>}
+  {voiceStart.status==='asking'&&<PracticePanel title="Start with voice" onClose={cancelVoiceStart}>
+   <p>Start with voice commands, or continue without the microphone.</p>
+   <button onClick={()=>voiceStart.startWithVoice()}>Start with voice</button>
+   <button onClick={continueWithoutVoice}>Without voice</button>
   </PracticePanel>}
   {voicePrompt==='fallback'&&<PracticePanel title="Practise with or without voice" onClose={cancelVoiceStart}>
    <p>Voice commands are off. Tap Next section after each section, or enable voice to advance from where you’re standing.</p>
    {voiceFailure&&<p role="status">{voiceFailure}</p>}
    {/permission|blocked/i.test(voiceFailure)&&<p>If the browser blocked access, allow Microphone in the site permissions beside the address bar, then try again.</p>}
    <button onClick={continueWithoutVoice}>Continue without voice</button>
-   <button disabled={voiceStatus==='unavailable'} onClick={()=>requestVoiceStart()}>Enable voice</button>
+   <button disabled={voiceStatus==='unavailable'} onClick={()=>voiceStart.retry()}>Enable voice</button>
   </PracticePanel>}
   {takeOpen&&recording.url&&<PracticePanel title="Your take" onClose={()=>setTakeOpen(false)} className="take-panel">
     <video className="take-video" src={recording.url} controls playsInline aria-label="Your recorded take"/>
@@ -617,7 +604,7 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
     <p className="small muted">Video only · no audio. Kept in this page until you leave. Nothing is uploaded.</p>
   </PracticePanel>}
   {compete?<footer className="mimic-dock compete-dock" inert={Boolean(setupIntent)||Boolean(panel)||voicePrompt==='fallback'||undefined}><div className="compete-preparation">{modeControl}<span>Personal challenge</span><p>Full sequence · 1× speed · Front view · Camera scoring · 5s preparation.</p></div>
-   {!runActive&&<div className="compete-setup-actions"><button onClick={()=>startSetup('setup_only')}>Camera setup</button><button onClick={()=>openSettings('instructor-type')}>Instructor</button><button onClick={()=>openSettings('tv-presentation')}>Connected display</button><button onClick={()=>switchMode(false)}>Back to practice</button></div>}
+   {!runActive&&<div className="compete-setup-actions"><button onClick={()=>startSetup('setup_only')}>Camera setup</button><button onClick={()=>openSettings('instructor-type')}>Instructor</button><button onClick={()=>openSettings('tv-presentation')}>Connected display</button></div>}
    {!runActive&&voiceControl}
    {competition.result&&!runActive&&<button onClick={()=>setRunResultsOpen(true)}>Review result</button>}
    <button className="practice-session-toggle" disabled={!runActive&&cameraState!=='off'&&!runReady} onClick={()=>{if(runActive)action('pause');else if(cameraState==='off')startSetup('start_compete');else action('play');}}><Camera size={16}/>{runActive?'Stop run':cameraState==='off'?'Prepare challenge':cameraState==='starting'?'Starting camera…':'Start scored run'}</button>
@@ -636,21 +623,24 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
    range={session.range}
    timelineDisabled={Boolean(setupIntent)||Boolean(panel)||voicePrompt!=='idle'||s.calibrating}
    onScrubStart={()=>{session.pause('scrubbing');setReview(null);redraw(n=>n+1);}}
-   onSeek={time=>{session.seek(time);setPositionIntent('position');setReview(null);redraw(n=>n+1);}}
-   onSelect={index=>{session.select(index);setPositionIntent('selected');setReview(null);redraw(n=>n+1);}}
+   onSeek={time=>{session.seek(time);setReview(null);redraw(n=>n+1);}}
+   onSelect={index=>{session.select(index);setReview(null);redraw(n=>n+1);}}
    onBrowse={()=>open('sections')}
-   primaryAction={<>
+   view={instructorOnly?practiceUi:undefined}
+   onCommand={instructorOnly?runSharedCommand:undefined}
+   actionsDisabled={voicePrompt==='requesting'||(offerVoiceStart&&voiceStatus==='checking')}
+   primaryAction={!instructorOnly?<>
     <button
      className="practice-player-primary"
-     disabled={voicePrompt==='requesting'||(offerVoiceStart&&voiceStatus==='checking')}
-     aria-pressed={instructorOnly?session.phase!=='paused':cameraState!=='off'}
+     disabled={voicePrompt==='requesting'}
+     aria-pressed={cameraState!=='off'}
      onClick={runPrimaryAction}
      title={offerVoiceStart?'Start with voice commands':''}
     >
-     {session.phase!=='paused'&&instructorOnly?<Pause size={18} aria-hidden="true"/>:offerNextSection?<ChevronRight size={18} aria-hidden="true"/>:!instructorOnly?<Camera size={18} aria-hidden="true"/>:<Play size={18} aria-hidden="true"/>}
-     <span>{voicePrompt==='requesting'?'Connecting…':instructorOnly?instructorAction:cameraState==='off'?'Start camera practice':cameraState==='starting'?'Cancel setup':'End practice'}</span>
+     <Camera size={18} aria-hidden="true"/>
+     <span>{voicePrompt==='requesting'?'Connecting…':cameraState==='off'?'Start camera practice':cameraState==='starting'?'Cancel setup':'End practice'}</span>
     </button>
-    {instructorOnly&&hasProgress&&session.phase==='paused'&&!sectionFinished&&(
+    {hasProgress&&session.phase==='paused'&&!sectionFinished&&(
      <button className="player-text-action" disabled={voicePrompt==='requesting'} onClick={startOver}>
       <RotateCcw size={14} aria-hidden="true"/><span>Start over</span>
      </button>
@@ -661,12 +651,12 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
      </button>
     )}
     {offerNextSection&&<button className="player-text-action" onClick={()=>action('again')}>Repeat section</button>}
-   </>}
+   </>:undefined}
    toolsBefore={<>{modeControl}{voiceControl}</>}
    speed={s.speed}
    onSpeedClick={()=>openSettings('speed')}
    onSettingsClick={()=>openSettings()}
-   toolsAfter={instructorOnly&&<button className="player-tool" aria-label={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} title={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} disabled={voicePrompt==='requesting'} onClick={toggleInstructorFocus}>{focusActive?<Minimize size={19}/>:<Maximize size={19}/>}</button>}
+   fullscreen={fullscreen}
    extra={!instructorOnly&&(
     <div className="practice-player-camera-actions">
      {cameraState==='live'&&(recording.recording||recordNext.current?<button className="record-take active" onClick={stopTake}>{recording.recording?'Stop recording':'Cancel recording'}</button>:!recording.url&&<button className="record-take" disabled={!!camera.current?.readiness(connection.current.wasOnline)||replayMode} onClick={startTake}><Video size={16}/>Record practice</button>)}
@@ -717,27 +707,26 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
      {connectionError&&<p role="alert">{connectionError}</p>}
     </SettingsRow>
    </SettingsGroup>
-   <SettingsGroup id="playback" title="Playback & timing" summary={compete?'Fixed for Challenge':`${s.speed}× · ${session.loop?'Repeat on':'Repeat off'}`} disabledReason={compete?'Fixed by Challenge rules above. Switch to Practice to edit.':undefined} status={compete?'Fixed':undefined}>
-    <SettingsRow id="speed" label="Playback speed" value={`${s.speed}×`}><SettingsChoices label="Playback speed" value={s.speed} options={[.25,.5,.75,1].map(value=>({value,label:`${value}×`}))} onChange={value=>{player.speed(value);redraw(n=>n+1);}}/></SettingsRow>
-    <SettingsRow id="repeat" label="Repeat automatically" value={session.loop?'On':'Off'}>
-     <label>Repeat automatically<input type="checkbox" role="switch" checked={session.loop} onChange={event=>{session.loop=event.target.checked;redraw(n=>n+1);}}/></label>
-     <label>Repetitions<select disabled={!session.loop} value={session.repetitions} onChange={event=>{session.repetitions=Number(event.target.value);session.completed=0;redraw(n=>n+1);}}>{[0,2,3,5,10].map(value=><option key={value} value={value}>{value||'Until stopped'}</option>)}</select></label>
-     <label>Rest between repeats<select disabled={!session.loop} value={session.restSeconds} onChange={event=>{session.restSeconds=Number(event.target.value);redraw(n=>n+1);}}>{[0,2,5,10].map(value=><option key={value} value={value}>{value} seconds</option>)}</select></label>
-     <p>{session.loop?'Repeats the current section.':'Enable Repeat automatically to adjust repetitions and rest. Your choices are remembered.'}</p>
-    </SettingsRow>
-    <SettingsRow id="countdown" label="Preparation countdown" value={session.countdownSeconds?`${session.countdownSeconds}s`:'Off'}>
-     <SettingsChoices label="Preparation countdown" value={session.countdownSeconds} options={[0,3,5,10].map(value=>({value,label:value?`${value}s`:'Off'}))} onChange={value=>{session.countdownSeconds=value;redraw(n=>n+1);}}/>
-     <label>Countdown sound<input type="checkbox" role="switch" disabled={!session.countdownSeconds} checked={countSound} onChange={event=>{setCountSound(event.target.checked);enableAudio();}}/></label>
-     {!session.countdownSeconds&&<p>Countdown sound is unavailable while the countdown is Off. Your sound preference is remembered.</p>}
-    </SettingsRow>
-    <SettingsRow id="metronome" label="Metronome & eight-count" value={rhythm?`${bpm} BPM`:'Off'}>
-     <label>Metronome & eight-count<input type="checkbox" role="switch" checked={rhythm} onChange={event=>{setRhythm(event.target.checked);enableAudio();}}/></label>
-     <label>Tempo (BPM)<input type="number" disabled={!rhythm} min={30} max={240} value={bpm} onChange={event=>setBpm(Math.max(30,Math.min(240,Number(event.target.value)||100)))}/></label>
-     <p>{rhythm?'Tempo is independent of playback speed.':'Enable the metronome to adjust tempo. Your tempo is remembered.'}</p>
-    </SettingsRow>
-   </SettingsGroup>
+   <PracticeCommonSettings snapshot={session.runtime.snapshot} capabilities={practiceCapabilities}
+    onCommand={command=>{session.runtime.dispatch(command);redraw(n=>n+1);}}
+    disabledReason={compete?'Challenge fixes speed, progression, repeat and preparation. Switch to Practice to edit.':undefined}
+    status={compete?'Fixed':undefined}
+    extra={<>
+     <SettingsRow id="countdown" label="Countdown sound" value={countSound?'On':'Off'}>
+      <label>Countdown sound<input type="checkbox" role="switch" disabled={!session.countdownSeconds} checked={countSound} onChange={event=>{setCountSound(event.target.checked);enableAudio();}}/></label>
+      {!session.countdownSeconds&&<p>Countdown sound is unavailable while the countdown is Off. Your sound preference is remembered.</p>}
+     </SettingsRow>
+     <SettingsRow id="metronome" label="Metronome & eight-count" value={rhythm?`${bpm} BPM`:'Off'}>
+      <label>Metronome & eight-count<input type="checkbox" role="switch" checked={rhythm} onChange={event=>{setRhythm(event.target.checked);enableAudio();}}/></label>
+      <label>Tempo (BPM)<input type="number" disabled={!rhythm} min={30} max={240} value={bpm} onChange={event=>setBpm(Math.max(30,Math.min(240,Number(event.target.value)||100)))}/></label>
+      <p>{rhythm?'Tempo is independent of playback speed.':'Enable the metronome to adjust tempo. Your tempo is remembered.'}</p>
+     </SettingsRow>
+    </>}/>
    <SettingsGroup id="display" title="Display" summary="Fullscreen & text size">
-    <SettingsRow id="fullscreen" label="Fullscreen" value={fullscreen?'On':'Off'}><button onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen().catch(()=>setHint('Could not exit fullscreen.'));else void shell.current?.requestFullscreen?.().catch(()=>setHint('Fullscreen unavailable.'));}}>{fullscreen?'Exit fullscreen':'Enter fullscreen'}</button></SettingsRow>
+    <SettingsRow id="fullscreen" label="Fullscreen" value={fullscreen.active?'On':fullscreen.available?'Off':'Unavailable'}>
+    <button disabled={!fullscreen.available&&!fullscreen.active} onClick={()=>void fullscreen.toggle()}>{fullscreen.active?'Exit fullscreen':'Enter fullscreen'}</button>
+    {fullscreen.error&&<p role="status">{fullscreen.error}</p>}
+   </SettingsRow>
     <SettingsRow id="large-text" label="Larger display text" value={large?'On':'Off'}><label>Larger display text<input type="checkbox" role="switch" checked={large} onChange={event=>setLarge(event.target.checked)}/></label></SettingsRow>
    </SettingsGroup>
   </PracticePanel>}

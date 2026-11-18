@@ -1,3 +1,8 @@
+/**
+ * @deprecated Legacy guitar timed-practice controller, retained only for its historical
+ * unit test. The application uses `packages/learning-engine/practice-runtime.ts` through
+ * `apps/web/src/practice/useMusicPractice.ts`. Do not add new callers.
+ */
 /** Pure timed-practice controller for reviewed music lessons. No scoring or persistence. */
 export const PRACTICE_SPEEDS = [0.5, 0.75, 1, 1.25] as const;
 export type PracticeSpeed = (typeof PRACTICE_SPEEDS)[number];

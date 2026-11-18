@@ -13,9 +13,13 @@ SpeechRecognition remains the fallback if local recognition is unavailable.
 Unsupported browsers show an explanation next to the disabled enable button.
 
 Supported phrases: next, back, again, pause, start/resume/play, stop, repeat,
-next section, go back, slower/slow down, faster/speed up, loop. Commands must be
-explicit phrases, not arbitrary substring matches in background speech. Existing
-competition, setup and other open-panel command restrictions are retained.
+next section, repeat section, start over/restart lesson, go back, slower/slow down,
+faster/speed up, loop. Commands must be explicit phrases, not arbitrary substring
+matches in background speech. Existing competition, setup and other open-panel command
+restrictions are retained. The shared practice runtime
+(`docs/practice-runtime-architecture.md`) makes voice, buttons, keyboard and remote
+display controls dispatch the same normalized command; voice pause works during
+playback in piano/guitar practice.
 
 ## Local service
 

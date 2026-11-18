@@ -37,11 +37,11 @@ export function LessonExperienceHost({document,pianoLibrary=false,guitarLibrary=
   if (document.kind === 'music') {
     if (document.value.subject === 'piano') {
       return <Suspense fallback={<MusicFallback onBack={body.onBack}/>}>
-        <PianoWorkspaceHarness lessonId={document.value.lesson_id} lessonTitle={document.value.title} embedded mode="practice" onBack={body.onBack}/>
+        <PianoWorkspaceHarness lessonId={document.value.lesson_id} lessonTitle={document.value.title} embedded mode="practice" onBack={body.onBack} onModeChange={body.onModeChange}/>
       </Suspense>;
     }
     return <Suspense fallback={<MusicFallback onBack={body.onBack}/>}>
-      <MusicLessonHome lesson={document.value} onBack={body.onBack} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>
+      <MusicLessonHome lesson={document.value} onBack={body.onBack} onModeChange={body.onModeChange} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>
     </Suspense>;
   }
   if (document.kind === 'summary') return <UnsupportedScreen onBack={body.onBack}/>;

@@ -1,7 +1,6 @@
 import {lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {Music2, Pause, Play} from 'lucide-react';
 import type {MusicLessonManifest} from '../../../../packages/lesson-schema/index';
-import {assetUrl, request} from '../api';
+import { assetUrl, request} from '../api';
 import {
   activeEvents, currentSpan, parseMusicReference,
   bindMusicReference, pitchName, type MusicReference,
@@ -11,7 +10,6 @@ import '../practice.css';
 import '../practice-player.css';
 import {InstrumentGuideStage} from './renderers/InstrumentGuideStage';
 import {PianoNoteRoll} from './PianoNoteRoll';
-import {PracticeTimeline} from '../PracticeTimeline';
 import {shiftOnset,clampOffsetSeconds} from './piano-playback';
 import {usePianoSourcePlayer} from './usePianoSourcePlayer';
 import {usePianoPreferences} from './piano-preferences';
@@ -20,12 +18,21 @@ import {MidiKeyboardCheck} from './MidiKeyboardCheck';
 const MusicHistoryPanel=lazy(()=>import('./MusicHistoryPanel').then(module=>({default:module.MusicHistoryPanel})));
 import {attackSourceTime} from '../../../../packages/music-engine/onsets';
 import {buildRunFeedback, calibrateLatency, feedbackEligibility, invalidFeedback, type Attack, type MusicFeedback, type RunClock} from './music-feedback';
-import {
-  advancePractice, practiceLabel, practiceSourceTime, PRACTICE_SPEEDS, startPractice,
-  type PracticeOptions, type PracticeSpeed, type PracticeState,
-} from './music-practice';
+import {MUSIC_CAPABILITIES, countInFromBeats, countInOptionsFromBeats, voiceControl, type PracticeCapabilities} from '../../../../packages/learning-engine/practice-capabilities';
+import {emptyPracticeSnapshot} from '../../../../packages/learning-engine/practice-runtime';
+import {musicPracticePlan} from '../practice/practice-plans';
+import {createLocalPracticeStore} from '../practice/practice-store';
+import {useMusicPractice} from '../practice/useMusicPractice';
+import {usePracticeVoice} from '../practice/usePracticeVoice';
+import {voiceCommandToPractice} from '../practice/practice-input';
+import {PracticeShell} from '../practice/PracticeShell';
+import {ExperienceModeSelector} from '../practice/ExperienceModeSelector';
+import {experienceModeCapabilitiesFrom, experienceModeToLegacy} from '../../../../packages/learning-engine/experience-mode';
 
 const label = (lesson: MusicLessonManifest) => lesson.subject === 'piano' ? 'Piano' : 'Guitar';
+const mediaKeyHint = (source: string) => source ? 'Preparing practice…' : 'Practice needs a playable lesson source.';
+const PRACTICE_SPEEDS = [0.5, 0.75, 1, 1.25] as const;
+type PracticeSpeed = (typeof PRACTICE_SPEEDS)[number];
 type SaveState = {id:string;state:'saving'|'saved'|'error';message?:string};
 
 function timeLabel(seconds: number): string {
@@ -38,7 +45,7 @@ function timeLabel(seconds: number): string {
  * The reviewed reference is read and validated at runtime. It requests no camera,
  * microphone or MIDI access, offers no scoring, and keeps the original instructor audio.
  */
-export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHistoryEnabled=false,pianoLibrary=false,guitarLibrary=false}: {lesson: MusicLessonManifest; onBack: () => void;midiSetupEnabled?:boolean;musicHistoryEnabled?:boolean;pianoLibrary?:boolean;guitarLibrary?:boolean}) {
+export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=false,musicHistoryEnabled=false,pianoLibrary=false,guitarLibrary=false}: {lesson: MusicLessonManifest; onBack: () => void;onModeChange?:(mode:'watch'|'practice'|'compete')=>void;midiSetupEnabled?:boolean;musicHistoryEnabled?:boolean;pianoLibrary?:boolean;guitarLibrary?:boolean}) {
   const [loaded,setLoaded]=useState<{identity:string;value:MusicReference}|null>(null);
   const identity=`${lesson.revision_id}:${lesson.reference.key}:${lesson.reference.sha256}`;
   const reference=loaded?.identity===identity?loaded.value:null;
@@ -55,15 +62,9 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   const [loopStart,setLoopStart]=useState(0);
   const [loopEnd,setLoopEnd]=useState(0);
   const clock = useRef(0);
-  const [practice,setPractice]=useState<PracticeState|null>(null);
-  const [practiceOptions,setPracticeOptions]=useState<PracticeOptions|null>(null);
   const [captured,setCaptured]=useState(0);
   const [keyboardConnected,setKeyboardConnected]=useState(false);
   const [practiceSection,setPracticeSection]=useState('all');
-  const [countIn,setCountIn]=useState(4);
-  const [repeats,setRepeats]=useState(1);
-  const [speed,setSpeed]=useState<PracticeSpeed>(1);
-  const practiceRef=useRef<PracticeState|null>(null),optionsRef=useRef<PracticeOptions|null>(null);
   const [latency,setLatency]=useState<number|null>(null);
   const [calibration,setCalibration]=useState<{pulse:number;samples:number}|null>(null);
   const [feedback,setFeedback]=useState<MusicFeedback[]>([]);
@@ -77,7 +78,6 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   useEffect(()=>{saveAlive.current=true;return()=>{saveAlive.current=false;saveSession.current++;};},[identity]);
   const runs=useRef<{run:number;attacks:Attack[];clock:RunClock;complete:boolean}[]>([]);
   const runClock=useRef<RunClock|null>(null);
-  const practiceStarted=useRef(0);
   const referenceRef=useRef<MusicReference|null>(null);referenceRef.current=reference;
   const latencyRef=useRef<number|null>(null);latencyRef.current=latency;
   const calibrationRef=useRef<{active:boolean;expected:number[];samples:number[]}>({active:false,expected:[],samples:[]});
@@ -93,11 +93,28 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
     referenceReviewed:lesson.reference_reviewed===true,inputSelected:keyboardConnected,latencyMeasured:latency!==null});
   const eligibilityRef=useRef(eligibility);eligibilityRef.current=eligibility;
   const source = lesson.source_video && !videoFailed ? assetUrl(lesson.source_video.key) : '';
+  const plan=useMemo(()=>musicPracticePlan(lesson),[lesson]);
+  const practiceStore=useMemo(()=>createLocalPracticeStore(),[]);
+  const countInSeconds=countInFromBeats(4,120);
+  const capabilities=useMemo<PracticeCapabilities>(()=>({...MUSIC_CAPABILITIES,
+    speeds:[0.5,0.75,1,1.25],
+    countIn:{supported:true,value:countInSeconds,options:countInOptionsFromBeats([0,2,4],120)},
+    rest:{supported:true,value:1.5,options:[0,1.5,3,5]},
+  }),[countInSeconds]);
+  const practice=useMusicPractice({plan,mediaRef:video,transportKey:source,capabilities,store:practiceStore});
+  const snapshot=practice.snapshot;
+  const practiceActive=Boolean(snapshot&&['countdown','playing','resting','buffering'].includes(snapshot.status));
+  const voice=usePracticeVoice(command=>{
+    const mapped=voiceCommandToPractice(command,{rates:PRACTICE_SPEEDS,rate:snapshot?.rate??1,loop:snapshot?.loop??false});
+    if(mapped)practice.dispatch(mapped);
+  });
+  const liveCapabilities=useMemo<PracticeCapabilities>(()=>({...capabilities,
+    voice:voiceControl(voice.status,voice.error,voice.supported)}),[capabilities,voice.status,voice.error,voice.supported]);
 
   useEffect(() => {
     let stopped = false;const abort=new AbortController();
     setLoaded(null);setError('');setTime(0);clock.current=0;setPlaying(false);setVideoFailed(false);
-    practiceRef.current=null;optionsRef.current=null;setPractice(null);setPracticeOptions(null);setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;resetSaves();cancelCalibration();setLatency(null);
+    setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;resetSaves();cancelCalibration();setLatency(null);
     void fetch(assetUrl(lesson.reference.key), {signal:abort.signal,credentials:'same-origin',headers: {'Accept': 'application/json'}})
       .then(async response => {
         if (!response.ok) throw new Error('The reviewed reference could not be loaded.');
@@ -127,53 +144,17 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
     return () => cancelAnimationFrame(frame);
   }, [playing, source, reference]);
 
-  const practiceActive=Boolean(practice&&practice.phase!=='done');
-  useEffect(()=>{
-    if(!practiceOptions||!practiceActive)return;
-    let frame=0,last=practiceStarted.current;
-    const tick=(now:number)=>{
-      const current=practiceRef.current,options=optionsRef.current;
-      if(!current||!options||current.phase==='done')return;
-      const delta=(now-last)/1000;last=now;
-      if(delta>0.25){
-        const run=current.run;stopPractice(false);
-        setFeedback([invalidFeedback('Practice timing was interrupted. Try this run again.',run,options.sectionId)]);return;
-      }
-      const next=advancePractice(current,delta,options);
-      practiceRef.current=next;setPractice(next);
-      const value=next.phase==='done'?options.end:practiceSourceTime(next,options);
-      clock.current=value;setTime(value);if(video.current)video.current.currentTime=value;
-      if(next.phase==='playing'&&(current.phase!=='playing'||next.run!==current.run||!runClock.current)){
-        const measured={wallStartMs:now-next.elapsed*1000,sourceStart:options.start,sourceEnd:options.end,speed:options.speed,inputLatencyMs:latencyRef.current??0};
-        runClock.current=measured;runs.current.push({run:next.run,attacks:[],clock:measured,complete:false});
-      }
-      if(current.phase==='playing'&&next.phase!=='playing'){
-        const run=runs.current.find(item=>item.run===current.run);
-        if(run){run.complete=true;const gate=eligibilityRef.current;
-          if(gate.eligible&&referenceRef.current){
-            setFeedback(previous=>[...previous,buildRunFeedback({reference:referenceRef.current!,sectionId:options.sectionId,
-              start:options.start,end:options.end,speed:options.speed,run:run.run,attacks:run.attacks,
-              latencyMs:latencyRef.current??0,latencyMeasured:latencyRef.current!==null})]);
-          }else{setFeedbackNotice(gate.reasons[0]??'Feedback is unavailable for this lesson.');}
-        }
-      }
-      if(next.phase==='done'){setPlaying(false);return;}
-      frame=requestAnimationFrame(tick);
-    };
-    frame=requestAnimationFrame(tick);
-    return()=>cancelAnimationFrame(frame);
-  },[practiceOptions,practiceActive]);
-
   useEffect(()=>()=>{
     if(calibrationTimer.current!==null)window.clearInterval(calibrationTimer.current);
     if(calibrationFinish.current!==null)window.clearTimeout(calibrationFinish.current);
     calibrationRef.current.active=false;
   },[]);
 
-  useEffect(()=>{const media=video.current;const pause=()=>{cancelCalibration();media?.pause();setPlaying(false);if(practiceRef.current)stopPractice(false);};const hide=()=>{if(document.hidden)pause();};document.addEventListener('visibilitychange',hide);window.addEventListener('pagehide',pause);return()=>{media?.pause();document.removeEventListener('visibilitychange',hide);window.removeEventListener('pagehide',pause);};},[source,lesson.revision_id,reference]);
+  useEffect(()=>{const media=video.current;const pause=()=>{cancelCalibration();media?.pause();setPlaying(false);practice.dispatch({type:'action',action:'pause'});void practice.saveNow();};const hide=()=>{if(document.hidden)pause();};document.addEventListener('visibilitychange',hide);window.addEventListener('pagehide',pause);return()=>{media?.pause();document.removeEventListener('visibilitychange',hide);window.removeEventListener('pagehide',pause);};},[source,lesson.revision_id,reference,practice.dispatch,practice.saveNow]);
 
+  const selectedUnit=plan.units.find(unit=>unit.id===practiceSection)??null;
   const seek = (value: number) => {
-    if(practiceRef.current)stopPractice(false);
+    if(practice.runtime)practice.dispatch({type:'seek',time:value});
     const next = Math.max(0, Math.min(reference?.duration ?? lesson.duration, value));
     clock.current = next;
     setTime(next);
@@ -182,7 +163,7 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
 
   const toggle = async () => {
     setError('');
-    if(practiceRef.current)stopPractice(false);
+    if(practiceActive)practice.dispatch({type:'action',action:'pause'});
     if (!playing&&clock.current>=(reference?.duration??lesson.duration)-.01)seek(0);
     if (!video.current) { setPlaying(value => !value); return; }
     if (video.current.paused) {
@@ -193,26 +174,75 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   };
 
   const stopPractice=(returnToStart=true)=>{
-    const current=optionsRef.current;
-    practiceRef.current=null;optionsRef.current=null;setPractice(null);setPracticeOptions(null);setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;resetSaves();setPlaying(false);
-    if(returnToStart&&current){clock.current=current.start;setTime(current.start);if(video.current)video.current.currentTime=current.start;}
+    practice.dispatch({type:'action',action:'pause'});
+    setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;resetSaves();setPlaying(false);
+    const unit=selectedUnit??plan.units[0];
+    if(returnToStart&&unit){clock.current=unit.start;setTime(unit.start);if(video.current)video.current.currentTime=unit.start;}
   };
 
-  const beginPractice=()=>{
-    if(!reference||calibrationRef.current.active)return;
-    const section=lesson.section_set.sections.find(item=>item.id===practiceSection);
-    const start=section?section.start:0,end=section?section.end:reference.duration;
-    if(end-start<0.2)return;
-    const options:PracticeOptions={sectionId:practiceSection,start,end,repeats,countInBeats:countIn,speed};
-    const state=startPractice(options);
-    practiceStarted.current=performance.now();
-    setPracticeOptions(options);optionsRef.current=options;practiceRef.current=state;setPractice(state);setCaptured(0);setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;resetSaves();
-    if(state.phase==='playing'){
-      const measured={wallStartMs:practiceStarted.current,sourceStart:start,sourceEnd:end,speed,inputLatencyMs:latencyRef.current??0};
-      runClock.current=measured;runs.current.push({run:0,attacks:[],clock:measured,complete:false});
-    }
-    setPlaying(false);video.current?.pause();clock.current=start;setTime(start);if(video.current)video.current.currentTime=start;
+  const initializedPlan=useRef<string|null>(null);
+  useEffect(()=>{initializedPlan.current=null;},[plan.id]);
+  const selectPracticeUnit=(id:string)=>{
+    setPracticeSection(id);
+    const index=id==='all'?0:plan.units.findIndex(unit=>unit.id===id);
+    if(index>=0)practice.dispatch({type:'select',index});
   };
+  const startFresh=()=>{
+    if(!reference||calibrationRef.current.active)return;
+    if(!source){setError('Practice needs the lesson video or audio source. Playback is unavailable for this lesson.');return;}
+    if(initializedPlan.current!==plan.id){
+      selectPracticeUnit(practiceSection);
+      practice.dispatch({type:'set-mode',mode:practiceSection==='all'?'continuous':'sections'});
+      initializedPlan.current=plan.id;
+    }
+    setFeedback([]);setFeedbackNotice('');runs.current=[];runClock.current=null;resetSaves();setCaptured(0);
+    practice.dispatch({type:'action',action:'start'});
+  };
+
+  const dispatchPractice=(command:Parameters<typeof practice.dispatch>[0])=>{
+    if(command.type==='action'&&command.action==='restart-lesson'){
+      practice.dispatch({type:'set-mode',mode:'continuous'});
+      practice.dispatch({type:'action',action:'restart-lesson'});
+      return;
+    }
+    if(command.type==='action'&&(command.action==='start'||command.action==='play'||command.action==='resume')){
+      if(snapshot?.status==='paused'&&snapshot.hasProgress){
+        practice.dispatch({type:'action',action:snapshot.intent==='restored'?'resume':'play'});
+        return;
+      }
+      startFresh();
+      return;
+    }
+    practice.dispatch(command);
+  };
+
+  useEffect(()=>{
+    if(snapshot?.status==='buffering')return;
+    if(snapshot?.status!=='playing'){runClock.current=null;return;}
+    if(runClock.current)return;
+    const unit=plan.units[snapshot.unitIndex];if(!unit)return;
+    const measured={wallStartMs:performance.now()-(snapshot.time-unit.start)*1000/Math.max(snapshot.rate,.01),
+      sourceStart:unit.start,sourceEnd:unit.end,speed:snapshot.rate,inputLatencyMs:latencyRef.current??0};
+    runClock.current=measured;
+    runs.current.push({run:snapshot.run,attacks:[],clock:measured,complete:false});
+    setCaptured(0);
+  },[snapshot?.status,snapshot?.unitIndex,snapshot?.run,snapshot?.time,snapshot?.rate,plan]);
+
+  useEffect(()=>{
+    const attempt=practice.lastAttempt;if(!attempt)return;
+    const run=runs.current.find(item=>item.run===snapshot?.run&&!item.complete)??runs.current.find(item=>!item.complete);
+    if(!run)return;
+    run.complete=true;
+    const unit=plan.units[snapshot?.unitIndex??0];
+    const gate=eligibilityRef.current;
+    if(!attempt.completed){runClock.current=null;setFeedbackNotice('Practice was interrupted. This run is not scored.');return;}
+    if(gate.eligible&&referenceRef.current&&unit){
+      setFeedback(previous=>[...previous,buildRunFeedback({reference:referenceRef.current!,sectionId:unit.id,
+        start:unit.start,end:unit.end,speed:snapshot?.rate??1,run:run.run,attacks:run.attacks,
+        latencyMs:latencyRef.current??0,latencyMeasured:latencyRef.current!==null})]);
+    }else{setFeedbackNotice(gate.reasons[0]??'Feedback is unavailable for this lesson.');}
+    runClock.current=null;
+  },[practice.lastAttempt]);
 
   const handleAttack=useCallback(({pitch,timeStamp}:{pitch:number;timeStamp:number})=>{
     const calibrationState=calibrationRef.current;
@@ -227,17 +257,17 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
       }
       return;
     }
-    const current=practiceRef.current,measured=runClock.current;
-    if(document.hidden||current?.phase!=='playing'||!measured)return;
+    const measured=runClock.current;
+    if(document.hidden||snapshot?.status!=='playing'||!measured)return;
     if(!Number.isInteger(pitch)||pitch<0||pitch>127||!Number.isFinite(timeStamp))return;
     const sourceTime=attackSourceTime(timeStamp,measured);
     if(sourceTime==null)return;
-    const run=runs.current.find(item=>item.run===current.run&&!item.complete);
+    const run=runs.current.find(item=>item.run===snapshot.run&&!item.complete);
     if(!run)return;
-    if(run.attacks.length>=20000){stopPractice(false);setFeedback([invalidFeedback('Too much input to analyse this run.',current.run,optionsRef.current?.sectionId??'all')]);return;}
-    run.attacks.push({id:`run-${current.run}-${run.attacks.length}`,pitch,sourceTime});
+    if(run.attacks.length>=20000){stopPractice(false);setFeedback([invalidFeedback('Too much input to analyse this run.',snapshot.run,plan.units[snapshot.unitIndex]?.id??'all')]);return;}
+    run.attacks.push({id:`run-${snapshot.run}-${run.attacks.length}`,pitch,sourceTime});
     setCaptured(value=>value+1);
-  },[]);
+  },[snapshot?.status,snapshot?.run,snapshot?.unitIndex,plan]);
 
   const startCalibration=()=>{
     stopPractice(false);cancelCalibration();setLatency(null);
@@ -309,47 +339,61 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   const span = shiftedReference ? currentSpan(shiftedReference, time) : null;
   const sections = lesson.section_set.sections;
 
-  return <section className="practice-shell music-practice-shell" aria-label="Music lesson">
-    <header className="practice-topbar music-practice-topbar">
-      <button className="back-link" onClick={onBack}>Back</button>
-      <div className="music-practice-heading">
-        <p className="eyebrow"><Music2 size={14} aria-hidden="true"/> {label(lesson).toUpperCase()} LESSON</p>
-        <h1>{lesson.title}</h1>
-        <span className="music-active-pill">{sectionIndex>=0?sections[sectionIndex]?.label:'All sections'}</span>
-      </div>
-      <div className="music-practice-topbar-actions">
-        <button type="button" aria-expanded={drawer==='sections'} aria-controls="music-practice-drawer"
-          onClick={()=>setDrawer(value=>value==='sections'?null:'sections')}>Sections</button>
-        <button type="button" aria-expanded={drawer==='settings'} aria-controls="music-practice-drawer"
-          onClick={()=>setDrawer(value=>value==='settings'?null:'settings')}>Settings</button>
-        {midiSetupEnabled&&lesson.subject==='piano'&&<button type="button" aria-expanded={drawer==='midi'} aria-controls="music-practice-drawer"
-          onClick={()=>setDrawer(value=>value==='midi'?null:'midi')}>MIDI</button>}
-      </div>
-    </header>
-
-    <main className="practice-stage music-practice-stage">
+  const displaySnapshot=snapshot??emptyPracticeSnapshot(plan, mediaKeyHint(source));
+  return <PracticeShell className="practice-runtime-music music-practice-shell" stageClassName="music-practice-stage"
+    title={lesson.title} eyebrow={`${label(lesson).toUpperCase()} LESSON`} onBack={onBack}
+    modeControl={onModeChange&&<ExperienceModeSelector compact current="practice"
+      capabilities={experienceModeCapabilitiesFrom(liveCapabilities)}
+      onSelect={mode=>onModeChange(experienceModeToLegacy(mode))}/>}
+    plan={plan} snapshot={displaySnapshot} capabilities={liveCapabilities} voice={voice}
+    onCommand={dispatchPractice} onSeek={value=>dispatchPractice({type:'seek',time:value})}
+    onSelect={index=>dispatchPractice({type:'select',index})} onBrowse={()=>setDrawer('sections')}
+    disabled={!snapshot} autoStartVoice
+    status={!snapshot?(source?'starting':'Practice source unavailable'):practice.transportError||(practice.restoring?'Restoring your place…':undefined)}
+    headerActions={<div className="music-practice-topbar-actions">
+      <button type="button" aria-expanded={drawer==='sections'} aria-controls="music-practice-drawer"
+        onClick={()=>setDrawer(value=>value==='sections'?null:'sections')}>Sections</button>
+      <button type="button" aria-expanded={drawer==='settings'} aria-controls="music-practice-drawer"
+        onClick={()=>setDrawer(value=>value==='settings'?null:'settings')}>Settings</button>
+      {midiSetupEnabled&&lesson.subject==='piano'&&<button type="button" aria-expanded={drawer==='midi'} aria-controls="music-practice-drawer"
+        onClick={()=>setDrawer(value=>value==='midi'?null:'midi')}>MIDI</button>}
+    </div>}
+    toolsBefore={<div className="music-audio-modes" role="group" aria-label="Playback audio">
+      <button className={audioMode==='original'?'secondary active':'secondary'} aria-pressed={audioMode==='original'} onClick={()=>setAudioMode('original')}>Original</button>
+      <button className={audioMode==='piano'?'secondary active':'secondary'} aria-pressed={audioMode==='piano'} disabled={!preview.url||!player.ready} onClick={()=>setAudioMode('piano')}>Piano</button>
+    </div>}
+    settingsExtra={<>
+      <label>Practice section<select aria-label="Practice section" value={practiceSection}
+        onChange={event=>selectPracticeUnit(event.target.value)}><option value="all">Whole lesson</option>
+        {plan.units.map(section=><option key={section.id} value={section.id}>{section.label}</option>)}</select></label>
+      <label>Listening volume<input aria-label="Listening volume" type="range" min={0} max={1} step={.01}
+        value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
+      <button type="button" onClick={()=>setDrawer('settings')}>All lesson settings</button>
+      <p className="small muted">Practice is unscored. Count-in labels state beats at the lesson tempo; the scheduler uses seconds.</p>
+    </>}
+    stage={<>
       {error && <p className="inline-notice error-notice" role="alert">{error}<button onClick={()=>setRetry(value=>value+1)}>Retry reference</button></p>}
       {!reference && !error && <p role="status">Loading the reviewed reference…</p>}
       {reference && <>
         <div className="music-video music-stage-video">
           {source
-            ? <video ref={video} src={source} controls={!practiceActive} playsInline preload="metadata"
+            ? <video ref={video} src={source} playsInline preload="metadata"
                 onVolumeChange={event=>setVolume(event.currentTarget.volume)}
                 onLoadedMetadata={event=>{if(loopEnd===0)setLoopEnd(event.currentTarget.duration);}}
                 onTimeUpdate={event => { const current=event.currentTarget.currentTime;
                   if(loop&&loopEnd>loopStart&&current>=loopEnd){event.currentTarget.currentTime=loopStart;clock.current=loopStart;setTime(loopStart);return;}
                   clock.current=current;setTime(current); }}
-                onPlay={() => {if(practiceRef.current)stopPractice(false);setPlaying(true);}} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)}
+                onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)}
                 onError={() => {setVideoFailed(true);setPlaying(false);}}/>
             : <div className="music-no-video">The original video is unavailable. The guide can still play on its own.</div>}
           <audio ref={piano} src={preview.url||undefined} preload="auto" hidden/>
         </div>
-        {(practice?.phase==='count-in'||active.length>0||span||practice?.phase==='playing')&&<div className="music-stage-overlay">
-          {practice?.phase==='count-in'&&<div className="practice-count" role="status"><strong>{practice?.beat}</strong><span>Get ready</span></div>}
+        {(displaySnapshot.status==='countdown'||active.length>0||span||displaySnapshot.status==='playing')&&<div className="music-stage-overlay">
+          {displaySnapshot.status==='countdown'&&<div className="practice-count" role="status"><strong>{Math.max(1,Math.ceil(displaySnapshot.remaining))}</strong><span>Get ready</span></div>}
           <p className="music-now" role="status">
             {active.length ? active.map(event => pitchName(event.pitch)).join(' · ') : 'No note sounding'}
             {span && <span className="music-span"> · {span.start.toFixed(1)}–{span.end.toFixed(1)}s</span>}
-            {practice && practice.phase==='playing'&&practiceOptions?<span className="music-time"> · {practiceSourceTime(practice,practiceOptions).toFixed(1)}s</span>:null}
+            {displaySnapshot.status==='playing'?<span className="music-time"> · {displaySnapshot.time.toFixed(1)}s</span>:null}
           </p>
         </div>}
         <div className="music-stage-guide">
@@ -359,38 +403,7 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
         </div>
         {(lesson.pedal?.length??0)>0&&<p className="small muted music-stage-note" data-pedal-active={lesson.pedal!.some(span=>time>=span.onset+syncOffset&&time<span.offset+syncOffset)}>Sustain pedal: {lesson.pedal!.some(span=>time>=span.onset+syncOffset&&time<span.offset+syncOffset)?'on':'off'} (estimated)</p>}
       </>}
-    </main>
-
-    <div className="practice-player music-practice-player">
-      {reference ? <PracticeTimeline sections={sections} duration={reference.duration} time={time}
-        activeIndex={sectionIndex} range={loop&&loopEnd>loopStart?{start:loopStart,end:loopEnd}:null}
-        disabled={false} onScrubStart={()=>{}} onSeek={seek}
-        onSelect={index=>seek(sections[index].start)} onBrowse={()=>setDrawer('sections')}/> : null}
-      <div className="practice-player-toolbar">
-        <div className="practice-player-actions">
-          <button className="primary practice-player-primary" aria-label={playing ? 'Pause guide' : 'Play guide'}
-            disabled={!reference} onClick={() => void toggle()}>
-            {playing ? <Pause size={16} aria-hidden="true"/> : <Play size={16} aria-hidden="true"/>}
-            {playing ? 'Pause' : 'Play'}
-          </button>
-          <label className="music-sync">Speed
-            <select aria-label="Playback speed" value={speed} onChange={event=>setSpeed(Number(event.target.value) as PracticeSpeed)} disabled={!reference}>
-              {[0.5,0.75,1].map(value=><option key={value} value={value}>{value}×</option>)}
-              {![0.5,0.75,1].includes(speed)&&<option value={speed}>{speed}×</option>}
-            </select>
-          </label>
-          <div className="music-audio-modes" role="group" aria-label="Playback audio">
-            <button className={audioMode==='original'?'secondary active':'secondary'} aria-pressed={audioMode==='original'} onClick={()=>setAudioMode('original')}>Original</button>
-            <button className={audioMode==='piano'?'secondary active':'secondary'} aria-pressed={audioMode==='piano'} disabled={!preview.url||!player.ready} onClick={()=>setAudioMode('piano')}>Piano</button>
-          </div>
-          <button className={practiceActive?'secondary':'primary'} disabled={!reference||(!practiceActive&&Boolean(calibration))}
-            onClick={()=>practiceActive?stopPractice():beginPractice()}>
-            {practiceActive?'Stop practice':practice?.phase==='done'?'Practice again':'Start practice'}
-          </button>
-        </div>
-      </div>
-    </div>
-
+    </>}>
     {reference&&<aside id="music-practice-drawer" className="practice-drawer music-practice-drawer" hidden={!drawer}
       aria-label="Lesson controls">
       <div className="music-drawer-head">
@@ -426,16 +439,17 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
             value={Math.min(time, reference.duration)} onChange={event => seek(Number(event.target.value))}/>
           <span className="music-time">{timeLabel(time)} / {timeLabel(reference.duration)}</span>
         </div>
-        {practice===null?<div className="practice-setup" role="group" aria-label="Timed practice">
-          <label>Practice section<select aria-label="Practice section" value={practiceSection} onChange={event=>setPracticeSection(event.target.value)}><option value="all">Whole lesson</option>{sections.map(section=><option key={section.id} value={section.id}>{section.label}</option>)}</select></label>
-          <p className="small muted">Silent guide practice: use your instrument’s sound. Count-in is visual at 120 beats per minute.</p>
-          <label>Count-in<select aria-label="Count-in" value={countIn} onChange={event=>setCountIn(Number(event.target.value))}><option value={0}>Off</option><option value={2}>2 beats</option><option value={4}>4 beats</option></select></label>
-          <label>Repeats<select aria-label="Repeats" value={repeats} onChange={event=>setRepeats(Number(event.target.value))}>{[1,2,3,5].map(value=><option key={value} value={value}>{value}</option>)}</select></label>
-          <label>Speed<select aria-label="Practice speed" value={speed} onChange={event=>setSpeed(Number(event.target.value) as PracticeSpeed)}>{PRACTICE_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select></label>
-        </div>:<section className="music-practice" aria-label="Timed practice" role="status">
-          <p className="practice-status">{practiceLabel(practice,practiceOptions??{sectionId:'all',start:0,end:reference.duration,repeats,countInBeats:countIn,speed})}
-            {practice.phase==='playing'&&practiceOptions?<span className="music-time"> · {practiceSourceTime(practice,practiceOptions).toFixed(1)}s</span>:null}</p>
-          {practice.phase==='done'&&<><p><strong>Practice complete</strong> · {keyboardConnected?`${captured} MIDI ${captured===1?'attack':'attacks'} counted locally`:'No keyboard input was measured'}. This run is unscored.{eligibility.eligible?' Local feedback appears below.':' This lesson stays ungraded.'}</p><button className="back-link" onClick={()=>stopPractice()}>Close practice</button></>}
+        {!snapshot?<div className="practice-setup" role="group" aria-label="Timed practice">
+          <p className="small muted">Practice needs the reviewed lesson video or audio source. This lesson has no playable source in practice.</p>
+        </div>:<div className="practice-setup" role="group" aria-label="Timed practice">
+          <label>Practice section<select aria-label="Practice section" value={practiceSection} onChange={event=>selectPracticeUnit(event.target.value)}><option value="all">Whole lesson</option>{plan.units.map(section=><option key={section.id} value={section.id}>{section.label}</option>)}</select></label>
+          <p className="small muted">Silent guide practice: use your instrument’s sound. Core speed, count-in and repeat controls live in Practice settings; count-in is measured at 120 beats per minute.</p>
+        </div>}
+        {snapshot&&<section className="music-practice" aria-label="Timed practice" role="status">
+          <p className="practice-status">{snapshot.status==='playing'?'Practice in progress':snapshot.status==='countdown'?'Count-in':snapshot.status==='resting'?'Rest':snapshot.status==='buffering'?'Video buffering · practice time paused':snapshot.status==='section-complete'?'Section complete':snapshot.status==='lesson-complete'||practice.lastAttempt?.completed?'Practice complete':'Ready when you are'}
+            {snapshot.status==='playing'?<span className="music-time"> · {snapshot.time.toFixed(1)}s</span>:null}</p>
+          {snapshot.status==='buffering'&&<p className="small muted">Practice resumes from the same source position when the video is ready.</p>}
+          {(snapshot.status==='lesson-complete'||practice.lastAttempt?.completed)&&<><p><strong>Practice complete</strong> · {keyboardConnected?`${captured} MIDI ${captured===1?'attack':'attacks'} counted locally`:'No keyboard input was measured'}. This run is unscored.{eligibility.eligible?' Local feedback appears below.':' This lesson stays ungraded.'}</p><button className="back-link" onClick={()=>stopPractice()}>Close practice</button></>}
         </section>}
         {feedback.length>0&&<section className="music-feedback" aria-label="Practice feedback">
           <h2>Local feedback · unscored</h2>
@@ -484,11 +498,11 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
           {calibration?<div className="calibration-pulse" role="status"><strong>{calibration.pulse}</strong><span>Play one note with each pulse</span><small>{calibration.samples} taps measured</small></div>:<p className="small muted">Play one note with each of eight visual pulses. This estimates your alignment, including reaction time; it does not measure hardware latency.</p>}
           {feedbackNotice&&<p className="small muted" role="status">{feedbackNotice}</p>}
         </section>}
-        {midiSetupEnabled&&lesson.subject==='piano'&&<MidiKeyboardCheck key={lesson.revision_id} onAttack={handleAttack} onInputChange={id=>{setKeyboardConnected(Boolean(id));cancelCalibration();setLatency(null);if(practiceRef.current)stopPractice();}}/>}
+        {midiSetupEnabled&&lesson.subject==='piano'&&<MidiKeyboardCheck key={lesson.revision_id} onAttack={handleAttack} onInputChange={id=>{setKeyboardConnected(Boolean(id));cancelCalibration();setLatency(null);if(practice.runtime)stopPractice();}}/>}
         {(!midiSetupEnabled||lesson.subject!=='piano')&&<p className="small muted">MIDI keyboard input is not enabled for this lesson.</p>}
       </div></div>
     </aside>}
-  </section>;
+  </PracticeShell>;
 }
 
 export default MusicLessonHome;

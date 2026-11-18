@@ -1,0 +1,71 @@
+.experience-mode-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  box-sizing: border-box;
+  color: #2d4034;
+  font: inherit;
+  font-size: 12px;
+}
+.experience-mode-selector-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.experience-mode-selector select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 30px;
+  padding: 0 22px 0 8px;
+  border: 1px solid #d3d0c4;
+  border-radius: 8px;
+  background: #fff;
+  color: #2d4034;
+  font: inherit;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+.experience-mode-selector select:disabled {
+  opacity: .62;
+  cursor: not-allowed;
+}
+.experience-mode-selector select:focus-visible {
+  outline: 2px solid #4c7a5b;
+  outline-offset: 2px;
+}
+.experience-mode-selector.is-compact {
+  width: 124px;
+  min-width: 124px;
+  max-width: 124px;
+}
+.experience-mode-selector.is-compact select {
+  min-height: 28px;
+  padding: 0 20px 0 7px;
+  font-size: 11px;
+}
+.mimic-shell .experience-mode-selector,
+.mimic-immersive .experience-mode-selector,
+.practice-runtime-shell .experience-mode-selector { color: #dde7de; }
+.mimic-shell .experience-mode-selector select,
+.mimic-immersive .experience-mode-selector select,
+.practice-runtime-shell .experience-mode-selector select {
+  background: #183328;
+  color: #eef4e9;
+  border-color: #ffffff26;
+}
+@media (max-width: 420px) {
+  .experience-mode-selector { width: 118px; min-width: 118px; max-width: 118px; }
+  .experience-mode-selector.is-compact { width: 112px; min-width: 112px; max-width: 112px; }
+}

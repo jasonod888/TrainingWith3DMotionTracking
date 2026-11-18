@@ -5,7 +5,8 @@ import {placeHandLabels} from '../../../web/dist/hand-labels.js';
 import {CameraFramingController,FRAMING_DEFAULTS,handPositionsForTransform,mapSourcePoint,type DisplayTransform} from './camera-framing';
 import {suggestedAvatarPosition} from '../../../web/dist/composite.js';
 import {videoFit} from '../../../web/dist/pose.js';
-import {VoiceCommands} from '../../../web/dist/voice.js';
+import {PracticeVoice} from './practice/practice-voice';
+import {voiceCommandToBodyAction} from './practice/practice-input';
 import type {CameraSetupController,SetupFailure,SetupSourceIdentity} from './camera-setup-controller';
 import {DEFAULT_CALIBRATION,calibrationEnabled} from './camera-setup-policy';
 import type {Playback} from '../../../packages/learning-engine/playback';
@@ -13,8 +14,7 @@ import type {PracticeAction} from '../../../packages/learning-engine/practice-se
 import {SourceSession} from '../../../packages/learning-engine/source-session';
 import type {LessonManifest} from '../../../packages/lesson-schema/index';
 import type {PracticeFraming} from './practice-types';
-import {assetUrl,request} from './api';
-import {localRecognition} from './local-voice';
+import {assetUrl} from './api';
 import {CameraFailure,acquireCamera,cameraIO,listCameras,stopStream,watchCameras,type AcquiredCamera} from './camera-acquisition';
 import {
   applyRequest,describeCamera,deviceLabel,facingModeFor,loadPreference,savePreference,
@@ -50,8 +50,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
  const messageRef=useRef('');messageRef.current=message;
  const framingHint=useRef('');
  const [framing,setFraming]=useState<PracticeFraming>({active:false,calibrating:false,calibration:null,videoWidth:16,videoHeight:9,mirrored:true,mirrorReference:false,composite:matchMedia('(max-width:700px)').matches,position:.23,opacity:.85,display:displayHandle.current});
- const voice=useRef<VoiceCommands|null>(null);
- const [voiceSupported,setVoiceSupported]=useState(false);
+ const voice=useRef<PracticeVoice|null>(null);
  const voiceCallbacks=useRef({onCommand,onVoiceStatus,stop:()=>{},clear:()=>{}});
  const currentFacing=()=>{const actual=resources.current.selection?.actualFacing;return (actual&&actual!=='unknown'?actual:facingModeFor(options.current.request.facing))==='environment'?'environment':'user';};
  const setupSource=():SetupSourceIdentity=>{const r=resources.current,v=video.current,s=r.selection;return {generation:r.epoch,deviceId:s?.actualDeviceId||options.current.request.deviceId||options.current.request.facing,width:v?.videoWidth??0,height:v?.videoHeight??0};};
@@ -196,50 +195,42 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
 
  const startVoice=()=>{
   setVoiceError('');
-  if(voiceSupported&&voice.current)voice.current.start();
-  else voiceCallbacks.current.onVoiceStatus?.('unavailable','Voice recognition is unavailable. Try again or continue without voice.');
+  if(voice.current?.start())return;
+  voiceCallbacks.current.onVoiceStatus?.('unavailable','Voice recognition is unavailable. Try again or continue without voice.');
  };
  voiceCallbacks.current={onCommand,onVoiceStatus,stop,clear};
  useEffect(()=>{
-  const Speech=(window as unknown as {SpeechRecognition?:unknown;webkitSpeechRecognition?:unknown}).SpeechRecognition??(window as unknown as {webkitSpeechRecognition?:unknown}).webkitSpeechRecognition;
-  let disposed=false;
-  let hasListened=false;
-  let resumeVoice=false;
-  const initialize=async()=>{
-   const local=await request<{available:boolean}>('/voice/capability').catch(()=>({available:false}));
-   if(disposed)return;
-   const Recognition=local.available&&typeof navigator.mediaDevices?.getUserMedia==='function'&&typeof AudioWorkletNode!=='undefined'
-    ?localRecognition(pcm=>request('/voice/recognize','POST',{pcm})):Speech;
-   setVoiceSupported(!!Recognition);
-   voice.current=new VoiceCommands({Recognition,extended:true,onCommand:c=>{voiceCallbacks.current.clear();setLastCommand(c);voiceCallbacks.current.onCommand(c);},onState:state=>{
-    if(disposed)return;
-    if(state==='listening')hasListened=true;
-    if(state==='off')hasListened=false;
-    setVoiceState(state);
-    voiceCallbacks.current.onVoiceStatus?.(state);
-   },onError:error=>{setVoiceError(error);voiceCallbacks.current.onVoiceStatus?.('off',error);}});
-   voiceCallbacks.current.onVoiceStatus?.(Recognition?'off':'unavailable');
-  };void initialize();
+  let disposed=false,resumeVoice=false;
+  const controller=new PracticeVoice({
+   onCommand:command=>{voiceCallbacks.current.clear();setLastCommand(command);const mapped=voiceCommandToBodyAction(command,{rates:[.25,.5,.75,1],rate:player.state.speed,loop:false});if(mapped)voiceCallbacks.current.onCommand(mapped);},
+   onStatus:state=>{if(disposed)return;setVoiceState(state);voiceCallbacks.current.onVoiceStatus?.(state);},
+   onError:error=>{setVoiceError(error);voiceCallbacks.current.onVoiceStatus?.('off',error);},
+  });
+  voice.current=controller;
+  void controller.initialize().then(()=>{
+   if(disposed||voice.current!==controller)return;
+   voiceCallbacks.current.onVoiceStatus?.(controller.status);
+  });
   const handleVisibility=()=>{
    if(!document.hidden){
     if(resumeVoice){
      resumeVoice=false;
      setVoiceError('');
-     voice.current?.start();
+     controller.start();
     }
     return;
    }
-   if(voice.current?.enabled){
-    resumeVoice=hasListened;
-    voice.current.stop();
+   if(controller.listening||controller.status==='starting'||controller.status==='reconnecting'){
+    resumeVoice=controller.listening;
+    controller.stop();
     if(!resumeVoice)voiceCallbacks.current.onVoiceStatus?.('off','Voice setup was interrupted.');
    }
    voiceCallbacks.current.stop();
    setMessage('Practice paused. Enable your camera again when ready.');
   };
-  const leave=()=>{voice.current?.stop();voiceCallbacks.current.stop();};
+  const leave=()=>{controller.stop();voiceCallbacks.current.stop();};
   document.addEventListener('visibilitychange',handleVisibility);window.addEventListener('pagehide',leave);
-  return()=>{disposed=true;document.removeEventListener('visibilitychange',handleVisibility);window.removeEventListener('pagehide',leave);voice.current?.stop();voiceCallbacks.current.stop();};
+  return()=>{disposed=true;document.removeEventListener('visibilitychange',handleVisibility);window.removeEventListener('pagehide',leave);controller.destroy();voice.current=null;voiceCallbacks.current.stop();};
  },[]);
 
  // Warm the pose tracker while the person is still on the practice screen. The
@@ -473,7 +464,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
     <label>I can see the instructor and operate controls<input type="checkbox" disabled={currentFacing()!=='environment'} checked={controlsConfirmed} onChange={event=>setControlsConfirmed(event.target.checked)}/></label>
     <p>{currentFacing()==='environment'?'Rear camera requires confirmation that controls are reachable.':'Control-reach confirmation is only required for Rear camera.'}</p>
     {!calibrationEnabled()&&<p>Height matching is unavailable. Default alignment is used.</p>}
-    {!competition&&import.meta.env.DEV&&new URLSearchParams(location.search).get('diagnostics')==='1'&&lesson.source_video&&<button onClick={()=>{void start('recorded');close();}}>Recorded source test</button>}
+    {!competition&&(import.meta as ImportMeta&{env?:{DEV?:boolean}}).env?.DEV&&new URLSearchParams(location.search).get('diagnostics')==='1'&&lesson.source_video&&<button onClick={()=>{void start('recorded');close();}}>Recorded source test</button>}
    </SettingsRow>}
    <SettingsRow id="feedback" label="Similarity & cues" value={feedback?'On':'Off'} disabledReason={competition?'Challenge requires camera scoring.':angle!==0?'Comparison is paused at this angle. Choose Front above to resume.':undefined} status={competition?'Fixed':angle!==0?'Paused':undefined}>
     <label>Show similarity and cues<input type="checkbox" role="switch" checked={feedback} onChange={event=>setFeedback(event.target.checked)}/></label><p>Approximate movement similarity, not technique correctness.</p>

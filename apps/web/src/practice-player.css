@@ -52,6 +52,7 @@
  padding: 10px max(28px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(28px, env(safe-area-inset-left));
  background: #10241d;
  border-top: 1px solid #ffffff0a;
+ font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 .practice-player-dock .practice-timeline {
@@ -88,48 +89,123 @@
 .practice-player-actions { flex-wrap: wrap; }
 .practice-player-tools { margin-left: auto; gap: 2px; flex-shrink: 0; }
 
-.mimic-shell.mimic-immersive .practice-player-primary {
+.practice-player-dock .practice-player-actions > .practice-player-primary {
  display: inline-flex;
  align-items: center;
  justify-content: center;
  gap: 8px;
  min-height: 40px;
  padding: 8px 14px;
- border: 0;
+ border: 1px solid transparent;
  border-radius: 9px;
  background: #d8ed9b;
  color: #203525;
+ font-family: inherit;
  font-size: 13px;
+ line-height: 1.2;
  font-weight: 600;
 }
 
-.practice-player-primary > svg,
-.player-text-action > svg { flex-shrink: 0; }
+.practice-player-dock .practice-player-actions > .practice-player-primary > svg,
+.practice-player-dock .practice-player-actions > .player-text-action > svg,
+.practice-player-dock .practice-player-tools > .player-text-action > svg { flex-shrink: 0; }
 
-.mimic-shell.mimic-immersive .player-tool,
-.mimic-shell.mimic-immersive .player-text-action {
+.practice-player-dock .practice-player-actions > .player-text-action,
+.practice-player-dock .practice-player-tools > .player-text-action,
+.practice-player-dock .practice-player-tools > .player-tool {
  display: inline-flex;
  align-items: center;
  justify-content: center;
  gap: 6px;
  min-height: 44px;
  padding: 8px 10px;
- border: 0;
+ border: 1px solid transparent;
  border-radius: 8px;
  background: transparent;
  color: #c6d4c9;
+ font-family: inherit;
  font-size: 12px;
+ line-height: 1.2;
  font-weight: 400;
 }
 
-.mimic-shell.mimic-immersive .player-tool { min-width: 44px; }
-.mimic-shell.mimic-immersive .player-tool:hover,
-.mimic-shell.mimic-immersive .player-text-action:hover { background: #ffffff0a; color: #eff5e8; }
+.practice-player-dock .practice-player-tools > .player-tool { min-width: 44px; }
+
+/* One authoritative geometry for every select in the shared dock. Widths remain
+   subject-specific (mode 124px, source smaller), but height/box/padding/type/radius
+   cannot drift between mode and source controls or with host select rules. */
+.practice-player-dock .practice-player-tools select,
+.practice-player-dock .practice-player-tools .experience-mode-selector select,
+.practice-player-dock .practice-player-tools .ws-practice-source-select {
+ box-sizing: border-box;
+ height: 34px;
+ min-height: 34px;
+ max-height: 34px;
+ padding: 0 24px 0 8px;
+ border-radius: 8px;
+ font: 12px/1.2 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+ vertical-align: middle;
+}
+.practice-player-dock .practice-player-actions > .practice-player-primary:hover:not(:disabled),
+.practice-player-dock .practice-player-tools > .player-tool:hover:not(:disabled),
+.practice-player-dock .practice-player-actions > .player-text-action:hover:not(:disabled),
+.practice-player-dock .practice-player-tools > .player-text-action:hover:not(:disabled) {
+ background: #ffffff0a; color: #eff5e8;
+}
+.practice-player-dock .practice-player-actions > .practice-player-primary:focus-visible,
+.practice-player-dock .practice-player-tools > .player-tool:focus-visible,
+.practice-player-dock .practice-player-actions > .player-text-action:focus-visible,
+.practice-player-dock .practice-player-tools > .player-text-action:focus-visible {
+ outline: 2px solid #d8ed9b; outline-offset: 2px;
+}
+.practice-player-dock .practice-player-actions > .practice-player-primary:disabled,
+.practice-player-dock .practice-player-tools > .player-tool:disabled,
+.practice-player-dock .practice-player-actions > .player-text-action:disabled,
+.practice-player-dock .practice-player-tools > .player-text-action:disabled {
+ opacity: .5; cursor: not-allowed;
+}
+
+/* Host `.mimic-shell.mimic-immersive button` is (0,2,1). Dock scopes above are
+   (0,3,0)+ so canonical transport geometry wins regardless of stylesheet order. */
+.practice-player-dock .practice-timeline-heading .practice-timeline-browse {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ min-width: 0;
+ min-height: 44px;
+ padding: 0 2px;
+ border: 0;
+ border-radius: 8px;
+ background: transparent;
+ color: #c4d2c6;
+ font-family: inherit;
+ font-size: 12px;
+ line-height: 1.2;
+ text-align: left;
+ white-space: nowrap;
+ overflow: hidden;
+}
+.practice-player-dock .practice-timeline-heading .practice-timeline-browse:hover:not(:disabled) {
+ background: #ffffff0a; color: #eff5e8;
+}
+.practice-player-dock .practice-timeline-heading .practice-timeline-browse:focus-visible {
+ outline: 2px solid #d8ed9b; outline-offset: 2px;
+}
+.practice-player-dock .practice-timeline-heading .practice-timeline-browse:disabled {
+ opacity: .5; cursor: not-allowed;
+}
+.practice-player-dock .practice-timeline-heading .practice-timeline-count { color: #d8ed9b; }
+.practice-player-dock .practice-timeline-heading .practice-timeline-count > span { color: #a9bcae; }
+.practice-player-dock .practice-timeline-heading .practice-timeline-name { color: #c4d2c6; }
+.practice-player-dock .practice-timeline-heading .practice-timeline-times { color: #9eafa3; }
+.practice-player-dock .practice-timeline-heading .practice-timeline-times strong { color: #eff5e9; }
 .practice-player-dock .practice-voice-status { margin: 0; }
 .practice-player-dock .practice-voice-status > svg { color: #a6baac; }
 .practice-player-camera-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
 .practice-player-status { font-size: 11px; line-height: 1.5; color: #adbeaf; margin: 4px 0 0 2px; }
 .practice-player-status:empty { display: none; }
+.practice-player-fullscreen-error { margin: 4px 0 0 2px; font-size: 11px; line-height: 1.5; color: #f0c9a0; }
+.practice-player-fullscreen-error:empty { display: none; }
 .mimic-shell.is-setting-up .practice-player-dock,
 .mimic-shell.settings-open .practice-player-dock { visibility: hidden; pointer-events: none; }
 .practice-player-dock[hidden] { display: none; }
@@ -152,14 +228,15 @@
  .mimic-shell.minimal-practice .mimic-header { left: 12px; right: 12px; top: max(8px, env(safe-area-inset-top)); }
  .minimal-practice .mimic-header strong { font-size: 12px; }
  .practice-player-dock .practice-timeline-name { display: none; }
- .practice-player-dock .practice-timeline-browse { font-size: 11px; gap: 6px; }
+ .practice-player-dock .practice-timeline-heading .practice-timeline-browse { font-size: 11px; gap: 6px; }
  .practice-player-actions { gap: 2px; }
  .practice-player-tools { gap: 0; }
  .practice-player-dock .player-voice-label { display: none; }
- .mimic-shell.mimic-immersive .practice-player-dock .player-speed { display: none; }
- .mimic-shell.mimic-immersive .practice-player-primary { font-size: 12px; padding: 8px 10px; }
- .mimic-shell.mimic-immersive .player-text-action { padding: 8px 7px; font-size: 11px; }
- .mimic-shell.mimic-immersive .player-tool { padding: 8px; }
+ .practice-player-dock .practice-player-tools > .player-speed { display: none; }
+ .practice-player-dock .practice-player-actions > .practice-player-primary { font-size: 12px; padding: 8px 10px; }
+ .practice-player-dock .practice-player-actions > .player-text-action,
+ .practice-player-dock .practice-player-tools > .player-text-action { padding: 8px 7px; font-size: 11px; }
+ .practice-player-dock .practice-player-tools > .player-tool { padding: 8px; }
 }
 
 @media(max-height: 500px) and (min-width: 600px) {

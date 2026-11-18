@@ -4,6 +4,8 @@ import type {LessonManifest,LessonSummary,MusicLessonManifest,Section} from '../
 import {assetUrl,loadPublicMoves,type PublicMove} from './api';
 import {PracticeTimeline} from './PracticeTimeline';
 import {timelineSectionAt} from './practice-timeline';
+import {ExperienceModeSelector} from './practice/ExperienceModeSelector';
+import {BODY_EXPERIENCE_CAPABILITIES, MUSIC_EXPERIENCE_CAPABILITIES} from '../../../packages/learning-engine/experience-mode';
 import './preview.css';
 
 export type WatchLesson={lesson:LessonSummary;owned:boolean};
@@ -12,7 +14,7 @@ export type PreviewLesson={
  source_video?:{key:string}|null;thumbnail?:{key:string}|null;
  section_set:{sections:Section[]};animation?:{key:string};creator_name?:string;description?:string;subject?:string;
 };
-export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBack,lessons=[],onOpen,onPublic}:{lesson:LessonManifest|MusicLessonManifest;owned:boolean;resumeAt:number;onPosition:(time:number)=>void;onChoose:(mode:'practice'|'compete')=>void;onBack:()=>void;lessons?:WatchLesson[];onOpen:(item:WatchLesson)=>void;onPublic:(id:string)=>void}){
+export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBack,lessons=[],onOpen,onPublic}:{lesson:LessonManifest|MusicLessonManifest;owned:boolean;resumeAt:number;onPosition:(time:number)=>void;onChoose:(mode:'practice'|'challenge')=>void;onBack:()=>void;lessons?:WatchLesson[];onOpen:(item:WatchLesson)=>void;onPublic:(id:string)=>void}){
  const video=useRef<HTMLVideoElement>(null),player=useRef<HTMLDivElement>(null),position=useRef(onPosition);position.current=onPosition;
  const meta=lesson as PreviewLesson;
  const start=meta.source_start??0,end=start+lesson.duration;
@@ -36,11 +38,16 @@ export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBac
  const remember=(absolute:number)=>{lastPosition.current=Math.max(start,Math.min(absolute,end));setTime(lastPosition.current-start);};
  const seek=(relative:number)=>{const v=video.current;if(!v)return;v.currentTime=Math.max(start,Math.min(start+relative,Math.min(end,v.duration)));remember(v.currentTime);};
  const toggle=()=>{const v=video.current;if(!v)return;if(v.paused){if(v.currentTime<start||v.currentTime>=Math.min(end,v.duration)-.05)seek(0);void v.play().catch(()=>setPaused(true));}else v.pause();};
- const choose=()=>{video.current?.pause();position.current(lastPosition.current);onChoose('practice');};
+ const choose=(mode:'practice'|'challenge')=>{video.current?.pause();position.current(lastPosition.current);onChoose(mode);};
+ const modeCapabilities='experience_family' in lesson&&lesson.experience_family==='music'
+  ?MUSIC_EXPERIENCE_CAPABILITIES:BODY_EXPERIENCE_CAPABILITIES;
  const poster=(thumbnail:string|null)=>(thumbnail?<img src={thumbnail} alt="" loading="lazy" onError={event=>{event.currentTarget.hidden=true;}}/>:<Rotate3D size={30}/>);
  const duration=(value:number)=>`${Math.floor(value/60)}:${Math.floor(value%60).toString().padStart(2,'0')}`;
  return <section className="lesson-watch" aria-label="Watch lesson">
-  <div className="watch-header"><button onClick={onBack}><ArrowLeft size={18}/>Back to feed</button></div>
+  <div className="watch-header"><button onClick={onBack}><ArrowLeft size={18}/>Back to feed</button>
+  <ExperienceModeSelector compact current="watch" capabilities={modeCapabilities} onSelect={mode=>{
+   if(mode==='practice'||mode==='challenge')choose(mode);
+  }}/></div>
   <div className="watch-layout">
    <div className="watch-main">
     <div className="watch-player" ref={player}>
@@ -52,7 +59,7 @@ export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBac
      {unavailable&&<div className="watch-unavailable" role="status"><VideoOff size={27}/><strong>Original video unavailable</strong><span>You can still practise with the 3D instructor.</span></div>}
      <div className="watch-controls">
       <PracticeTimeline sections={lesson.section_set.sections} duration={lesson.duration} time={time} activeIndex={timelineSectionAt(lesson.section_set.sections,time+.001)} range={null} disabled={unavailable||!ready} onScrubStart={()=>{}} onSeek={seek} onSelect={index=>seek(lesson.section_set.sections[index].start)} onBrowse={()=>setBrowse(value=>!value)}/>
-      <div className="watch-control-row"><button aria-label={paused?'Play video':'Pause video'} disabled={unavailable||!ready} onClick={toggle}>{paused?<Play size={21} fill="currentColor"/>:<Pause size={21} fill="currentColor"/>}</button><button aria-label={muted?'Unmute video':'Mute video'} disabled={unavailable} onClick={()=>setMuted(value=>!value)}>{muted?<VolumeX size={20}/>:<Volume2 size={20}/>}</button><span className="watch-continuous">Full video</span><button className="watch-practice" onClick={choose}>Practice</button><button aria-label="Fullscreen video" onClick={()=>{void player.current?.requestFullscreen?.().catch(()=>{});}}><Maximize size={20}/></button></div>
+      <div className="watch-control-row"><button aria-label={paused?'Play video':'Pause video'} disabled={unavailable||!ready} onClick={toggle}>{paused?<Play size={21} fill="currentColor"/>:<Pause size={21} fill="currentColor"/>}</button><button aria-label={muted?'Unmute video':'Mute video'} disabled={unavailable} onClick={()=>setMuted(value=>!value)}>{muted?<VolumeX size={20}/>:<Volume2 size={20}/>}</button><span className="watch-continuous">Full video</span><button aria-label="Fullscreen video" onClick={()=>{void player.current?.requestFullscreen?.().catch(()=>{});}}><Maximize size={20}/></button></div>
      </div>
     </div>
     {browse&&<div className="watch-sections" aria-label="Video sections">{lesson.section_set.sections.map((section,index)=><button key={section.id} onClick={()=>{seek(section.start);setBrowse(false);}}><span>{String(index+1).padStart(2,'0')}</span><strong>{section.label}</strong><small>{duration(section.start)}</small></button>)}</div>}

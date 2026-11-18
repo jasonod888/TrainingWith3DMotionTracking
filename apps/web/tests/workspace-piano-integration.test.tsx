@@ -4,6 +4,7 @@
  * source controller; no services, no writes.
  */
 import {test, after, afterEach} from 'node:test';
+import {clearPracticeStoreMemory} from '../src/practice/practice-store';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
@@ -24,6 +25,7 @@ Object.assign(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: true,
 });
 Object.defineProperty(globalThis, 'navigator', {value: window.navigator, configurable: true});
+Object.defineProperty(globalThis, 'localStorage', {value: window.localStorage, configurable: true});
 if (!window.matchMedia) {
   window.matchMedia = () => ({matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}});
 }
@@ -100,7 +102,10 @@ const draft: Record<string, any> = {...fixture,
   source_video: {key: 'lessons/fixture/video.mp4', mime: 'video/mp4', bytes: 3, sha256: '0'.repeat(64)},
   piano_preview: {key: 'lessons/fixture/preview.wav', mime: 'audio/wav', bytes: previewBytes.length, sha256: previewHash},
   preview_identity: previewHash};
-
+const servedReference = JSON.stringify({...draft});
+const servedReferenceBytes = Buffer.byteLength(servedReference);
+draft.reference = {...draft.reference, bytes: servedReferenceBytes,
+  sha256: createHash('sha256').update(servedReference).digest('hex')};
 let holdPreview: (() => void) | null = null;
 let previewGate: Promise<void> = Promise.resolve();
 globalThis.fetch = (async (input: RequestInfo | URL) => {
@@ -108,6 +113,9 @@ globalThis.fetch = (async (input: RequestInfo | URL) => {
   if (url.includes('preview.wav')) {
     await previewGate;
     return new Response(previewBytes);
+  }
+  if (url.includes('phase1-draft-fixture.json')) {
+    return new Response(servedReference, {headers: {'Content-Type': 'application/json'}});
   }
   return new Response(JSON.stringify(draft), {headers: {'Content-Type': 'application/json'}});
 }) as typeof fetch;
@@ -121,7 +129,11 @@ const {render, fireEvent, cleanup, waitFor} = await import('@testing-library/rea
 const {PianoWorkspaceHarness} = await import('../src/music/workspace/PianoWorkspaceHarness.tsx');
 const {NotationAudio} = await import('../src/music/notation/notation-audio.ts');
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  clearPracticeStoreMemory();
+  window.localStorage.clear();
+});
 after(() => {
   for (const handle of pendingFrames.values()) clearTimeout(handle);
   pendingFrames.clear();
@@ -152,6 +164,11 @@ test('piano practice reserves space for playback outside the scrolling stage', a
   assert.equal(dock.parentElement, shell, 'playback must not scroll or clip with the editor');
   assert.equal(stage.parentElement, shell);
   assert.ok(stage.compareDocumentPosition(dock) & window.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.ok(shell.classList.contains('mimic-shell'), 'the real practice shell keeps the shared immersive control styles');
+  assert.ok(shell.classList.contains('ws-shell-focused'));
+  assert.equal(shell.querySelector('[data-settings-drawer]'), null, 'practice must not mount the editor drawer');
+  assert.equal(view.container.querySelector('video')?.hasAttribute('controls'), false,
+    'practice transport is owned by the runtime, not native video controls');
 
   const styles = ['music/workspace/workspace.css', 'practice.css', 'practice-player.css']
     .map(path => readFileSync(resolve('src', path), 'utf8'));
@@ -329,6 +346,203 @@ test('a Web Audio host defaults to live grand piano and exposes the WAV source c
     await waitFor(() => assert.equal(
       view.getByRole('button', {name: 'Rendered WAV'}).getAttribute('aria-pressed'), 'true'));
   } finally {
+    if (previous === undefined) delete webAudio.AudioContext;
+    else webAudio.AudioContext = previous;
+  }
+});
+
+test('the dedicated piano practice route starts through the shared runtime and observes voice listening', async () => {
+  const w = window as unknown as {SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown};
+  const previous = w.SpeechRecognition;
+  let started = 0;
+  class RecognitionDouble {
+    continuous = false;
+    interimResults = false;
+    lang = '';
+    maxAlternatives = 1;
+    onstart?: () => void;
+    onend?: () => void;
+    onerror?: (event: {error: string}) => void;
+    onresult?: (event: unknown) => void;
+    start() { started += 1; this.onstart?.(); }
+    abort() { this.onend?.(); }
+  }
+  w.SpeechRecognition = RecognitionDouble;
+  previewGate = Promise.resolve();
+  try {
+    const view = render(<PianoWorkspaceHarness mode="practice"/>);
+    await waitFor(() => assert.ok(view.container.querySelector('#piano-practice-player')));
+    const primary = () => view.container.querySelector('#piano-practice-player .practice-player-primary') as HTMLButtonElement;
+    await waitFor(() => assert.match(primary().textContent ?? '', /Start practice/));
+    fireEvent.click(primary());
+    assert.equal(started, 0, 'the first Start asks before opening the microphone');
+    await waitFor(() => assert.ok(view.getByRole('button', {name: 'Start with voice'})));
+    fireEvent.click(view.getByRole('button', {name: 'Start with voice'}));
+    await waitFor(() => assert.match(primary().textContent ?? '', /Pause practice/));
+    await waitFor(() => assert.ok(view.getByRole('button', {name: 'Voice on'})));
+    assert.ok(started >= 1, 'Start with voice actually requests listening');
+    assert.equal(view.container.querySelector('.ws-shell')?.getAttribute('data-practice-mode'), 'true');
+    view.unmount();
+  } finally {
+    if (previous === undefined) delete w.SpeechRecognition;
+    else w.SpeechRecognition = previous;
+  }
+});
+
+test('piano Without voice never starts recognition and resume does not re-enable it', async () => {
+  const w = window as unknown as {SpeechRecognition?: unknown};
+  const previous = w.SpeechRecognition;
+  let starts = 0;
+  class RecognitionDouble {
+    continuous = false;
+    interimResults = false;
+    lang = '';
+    maxAlternatives = 1;
+    onstart?: () => void;
+    onend?: () => void;
+    onerror?: (event: {error: string}) => void;
+    onresult?: (event: unknown) => void;
+    start() { starts += 1; this.onstart?.(); }
+    abort() { this.onend?.(); }
+  }
+  w.SpeechRecognition = RecognitionDouble;
+  previewGate = Promise.resolve();
+  clearPracticeStoreMemory();
+  window.localStorage.clear();
+  try {
+    const view = render(<PianoWorkspaceHarness mode="practice"/>);
+    await waitFor(() => assert.ok(view.container.querySelector('#piano-practice-player')));
+    const primary = () => view.container.querySelector('#piano-practice-player .practice-player-primary') as HTMLButtonElement;
+    await waitFor(() => assert.match(primary().textContent ?? '', /Start practice/));
+    fireEvent.click(primary());
+    fireEvent.click(await view.findByRole('button', {name: 'Without voice'}));
+    await waitFor(() => assert.match(primary().textContent ?? '', /Pause practice/));
+    assert.equal(starts, 0, 'Without voice must not call recognition.start()');
+    fireEvent.click(primary());
+    await waitFor(() => assert.match(primary().textContent ?? '', /Resume/));
+    fireEvent.click(primary());
+    await waitFor(() => assert.match(primary().textContent ?? '', /Pause practice/));
+    assert.equal(starts, 0, 'resume keeps the explicit without-voice choice');
+    view.unmount();
+  } finally {
+    if (previous === undefined) delete w.SpeechRecognition;
+    else w.SpeechRecognition = previous;
+  }
+});
+test('piano practice reports buffering separately and resumes the same attempt', async () => {
+  previewGate = Promise.resolve();
+  window.localStorage.clear();
+  const view = render(<PianoWorkspaceHarness mode="practice"/>);
+  await waitFor(() => assert.ok(view.container.querySelector('#piano-practice-player')));
+  const primary = () => view.container.querySelector('#piano-practice-player .practice-player-primary') as HTMLButtonElement;
+  await waitFor(() => assert.match(primary().textContent ?? '', /Start practice|Resume section/));
+  fireEvent.click(primary());
+  await waitFor(() => assert.match(primary().textContent ?? '', /Pause practice/));
+  const video = view.container.querySelector('video')!;
+  const before = (video as unknown as {currentTime: number}).currentTime;
+  video.dispatchEvent(new window.Event('waiting'));
+  await waitFor(() => assert.ok(view.container.querySelector('.practice-runtime-buffering'),
+    `status: ${view.container.querySelector('.practice-runtime-state')?.textContent}`));
+  (video as unknown as {currentTime: number}).currentTime = before + 0.4;
+  video.dispatchEvent(new window.Event('timeupdate'));
+  await new Promise(resolve => setTimeout(resolve, 80));
+  assert.ok(view.container.querySelector('.practice-runtime-buffering'), 'time did not silently advance practice');
+  video.dispatchEvent(new window.Event('playing'));
+  await video.play();
+  await waitFor(() => assert.match(primary().textContent ?? '', /Pause practice/,
+    `state=${view.container.querySelector('.practice-runtime-state')?.textContent} paused=${(video as unknown as {paused: boolean}).paused}`));
+  view.unmount();
+});
+
+test('piano practice exposes the shared section picker and a section selection seeks there', async () => {
+  previewGate = Promise.resolve();
+  clearPracticeStoreMemory();
+  window.localStorage.clear();
+  const view = render(<PianoWorkspaceHarness mode="practice"/>);
+  await waitFor(() => assert.ok(view.container.querySelector('#piano-practice-player'), 'dock'));
+  const browse = view.container.querySelector('.practice-timeline-browse') as HTMLButtonElement;
+  assert.ok(browse, 'browse button');
+  await waitFor(() => assert.equal(browse.disabled, false));
+  fireEvent.click(browse);
+  await waitFor(() => assert.ok(view.container.querySelector('[aria-label="Practice sections"]'), 'picker panel'));
+  const options = [...view.container.querySelectorAll<HTMLButtonElement>('[aria-label="Practice sections"] button')];
+  assert.ok(options.length > 0, 'picker options');
+  const target = options[Math.min(1, options.length - 1)];
+  fireEvent.click(target);
+  await waitFor(() => assert.ok(view.container.querySelector('[aria-label="Practice sections"]') === null, 'picker closes'));
+  const video = view.container.querySelector('video') as unknown as {currentTime: number};
+  assert.ok(Number.isFinite(video.currentTime) && video.currentTime >= 0, 'seek position');
+  fireEvent.click(view.container.querySelector('[aria-label="Compact view"]')!);
+  await waitFor(() => assert.equal(
+    view.container.querySelector('.piano-practice-stage')?.getAttribute('data-compact-view'), 'guide'));
+  fireEvent.click(view.getByRole('button', {name: 'Sheet', exact: true}));
+  await waitFor(() => assert.equal(
+    view.container.querySelector('.piano-practice-stage')?.getAttribute('data-compact-view'), 'sheet'));
+  assert.equal(window.localStorage.getItem('piano-review-compact-view-v1'), 'sheet');
+  view.unmount();
+});
+
+test('piano practice uses the full A0-C8 range on wide stages and a pannable window below it', async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'clientWidth');
+  let width = 1200;
+  Object.defineProperty(window.HTMLElement.prototype, 'clientWidth', {
+    configurable: true, get() { return width; },
+  });
+  previewGate = Promise.resolve();
+  clearPracticeStoreMemory();
+  window.localStorage.clear();
+  try {
+    const view = render(<PianoWorkspaceHarness mode="practice"/>);
+    await waitFor(() => assert.ok(view.container.querySelector('#piano-practice-player')));
+    const keyboard = () => view.container.querySelector('[data-first-pitch][data-semitones]') as HTMLElement;
+    await waitFor(() => assert.equal(keyboard()?.getAttribute('data-first-pitch'), '21'));
+    assert.equal(keyboard().getAttribute('data-semitones'), '87');
+    width = 600;
+    window.dispatchEvent(new window.Event('resize'));
+    await waitFor(() => assert.ok(Number(keyboard().getAttribute('data-semitones')) < 87));
+    assert.ok(Number(keyboard().getAttribute('data-first-pitch')) >= 21);
+    view.unmount();
+  } finally {
+    if (descriptor) Object.defineProperty(window.HTMLElement.prototype, 'clientWidth', descriptor);
+  }
+});
+test('piano practice defaults to live grand synthesis, attacks onset zero and updates source volume', async () => {
+  const webAudio = window as unknown as {AudioContext?: unknown};
+  const previous = webAudio.AudioContext;
+  webAudio.AudioContext = function AudioContextDouble() {};
+  previewGate = Promise.resolve();
+  clearPracticeStoreMemory();
+  window.localStorage.clear();
+  window.localStorage.setItem('piano-playback-preferences', JSON.stringify({mode: 'piano', volume: 0.8}));
+  liveNotes.length = 0;
+  try {
+    const view = render(<PianoWorkspaceHarness mode="practice"/>);
+    await waitFor(() => assert.ok(view.container.querySelector('#piano-practice-player')));
+    const primary = () => view.container.querySelector('#piano-practice-player .practice-player-primary') as HTMLButtonElement;
+    await waitFor(() => assert.match(primary().textContent ?? '', /Start practice/));
+    fireEvent.click(primary());
+    await waitFor(() => assert.match(primary().textContent ?? '', /Pause practice/));
+    await waitFor(() => assert.ok(liveNotes.length > 0), {timeout: 3000});
+    assert.equal(liveNotes[0].pitch, fixture.events[0].pitch);
+    assert.ok(liveNotes.some(note => note.delaySeconds === 0 || note.elapsed !== undefined),
+      'the first onset must attack, including at source time zero');
+    const video = view.container.querySelector('video') as HTMLVideoElement;
+    assert.equal(video.muted, true, 'live synthesis mutes the source audio');
+    assert.ok(Math.abs(video.volume - 0.8) < 0.001, 'the shared volume reaches the source element');
+    fireEvent.click(view.container.querySelector('.practice-runtime-header-actions [aria-label="Practice settings"]')!);
+    const source = await waitFor(() => {
+      const select = view.container.querySelector('[aria-label="Piano synthesis source"]') as HTMLSelectElement;
+      assert.ok(select);
+      return select;
+    });
+    assert.equal(source.value, 'live');
+    source.value = 'wav';
+    fireEvent.change(source);
+    await waitFor(() => assert.equal(
+      (view.container.querySelector('[aria-label="Piano synthesis source"]') as HTMLSelectElement).value, 'wav'));
+    view.unmount();
+  } finally {
+    window.localStorage.removeItem('piano-playback-preferences');
     if (previous === undefined) delete webAudio.AudioContext;
     else webAudio.AudioContext = previous;
   }

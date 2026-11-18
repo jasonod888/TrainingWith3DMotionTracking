@@ -1623,16 +1623,18 @@
   background: #10241d;
   border-top: 1px solid #ffffff14;
 }
-.ws-practice-source-select {
-  min-height: 34px;
-  max-width: 112px;
-  padding: 0 7px;
+.ws-practice-source-select,
+.ws-practice-view-select {
   border: 1px solid #ffffff24;
-  border-radius: 8px;
   background: #183328;
   color: #dde7de;
-  font-size: 12px;
 }
+.ws-practice-source-select { max-width: 112px; }
+.ws-practice-view-select { max-width: 118px; }
+.ws-keys-view { flex: 1 1 auto; min-height: 0; justify-content: flex-end; }
+.ws-keys-view .ws-keyboard-surface { margin-top: auto; }
+.ws-notes-practice { flex: 1 1 auto; min-height: 0; }
+.ws-notes-follow { position: absolute; z-index: 6; top: 4px; right: 8px; }
 .ws-shell[data-practice-mode="true"] .practice-player-dock .practice-player-status {
   color: #adbeaf;
 }

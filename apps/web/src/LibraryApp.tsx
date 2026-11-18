@@ -155,7 +155,7 @@ const [editId,setEditId]=useState<string|null>(routeOf().page==='music-edit'?rou
  const [sessionSection,setSessionSection]=useState<number|null>(null);
  const practicePreferences=useRef<Record<string,PracticePreferences>>({});
  const previewPositions=useRef<Record<string,number>>({});
- const chooseMode=(mode:'practice'|'compete')=>{setSessionSection(null);navigate(mode);};
+ const chooseMode=(mode:'practice'|'challenge')=>{setSessionSection(null);navigate(mode==='challenge'?'compete':'practice');};
  const saved=!!lesson?.animation.key.startsWith('lessons/');
  const save=async(sections:Section[],title:string)=>{
   if(!lesson)return;
