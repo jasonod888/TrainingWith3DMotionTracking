@@ -10,7 +10,7 @@ import {CameraSetupController,SETUP_DEFAULTS,type SetupIntent} from './camera-se
 import {calibrationEnabled} from './camera-setup-policy';
 import {MotionStage} from './MotionStage';
 import {PracticePanel} from './PracticePanel';
-import {PracticeTimeline} from './PracticeTimeline';
+import {PracticePlayerDock} from './PracticePlayerDock';
 import {PracticeSettingsProvider,SettingsGroup,SettingsMount,SettingsRow,SettingsChoices} from './PracticeSettings';
 import {StageControls} from './StageControls';
 import type {PracticeFraming,PracticePreferences} from './practice-types';
@@ -624,64 +624,59 @@ export function PracticeWorkspace({lesson,player,onBack,onEdit,editable,notice,o
    {cameraState!=='off'&&!runActive&&<button onClick={()=>camera.current?.stop()}>{cameraState==='starting'?'Cancel camera setup':'Turn camera off'}</button>}
    <div className="compete-progress"><span>{stamp(s.time)}</span><progress aria-label="Run progress" value={s.time} max={lesson.duration}/><span>{stamp(lesson.duration)}</span></div>
   </footer>:
-<div
-   ref={practiceDock}
+  <PracticePlayerDock
+   dockRef={practiceDock}
    id="practice-section-timeline"
-   className="practice-player-dock"
    hidden={focusActive&&timelineHidden}
    inert={Boolean(setupIntent)||Boolean(panel)||voicePrompt==='fallback'||undefined}
-  >
-   <PracticeTimeline
-    sections={player.sections} duration={lesson.duration} time={s.time} activeIndex={s.index} range={session.range}
-    disabled={Boolean(setupIntent)||Boolean(panel)||voicePrompt!=='idle'||s.calibrating}
-    onScrubStart={()=>{session.pause('scrubbing');setReview(null);redraw(n=>n+1);}}
-    onSeek={time=>{session.seek(time);setPositionIntent('position');setReview(null);redraw(n=>n+1);}}
-    onSelect={index=>{session.select(index);setPositionIntent('selected');setReview(null);redraw(n=>n+1);}}
-    onBrowse={()=>open('sections')}
-   />
-   <div className="practice-player-toolbar">
-    <div className="practice-player-actions">
-     <button
-      className="practice-player-primary"
-      disabled={voicePrompt==='requesting'||(offerVoiceStart&&voiceStatus==='checking')}
-      aria-pressed={instructorOnly?session.phase!=='paused':cameraState!=='off'}
-      onClick={runPrimaryAction}
-      title={offerVoiceStart?'Start with voice commands':''}
-     >
-      {session.phase!=='paused'&&instructorOnly?<Pause size={18} aria-hidden="true"/>:offerNextSection?<ChevronRight size={18} aria-hidden="true"/>:!instructorOnly?<Camera size={18} aria-hidden="true"/>:<Play size={18} aria-hidden="true"/>}
-      <span>{voicePrompt==='requesting'?'Connecting…':instructorOnly?instructorAction:cameraState==='off'?'Start camera practice':cameraState==='starting'?'Cancel setup':'End practice'}</span>
+   sections={player.sections}
+   duration={lesson.duration}
+   time={s.time}
+   activeIndex={s.index}
+   range={session.range}
+   timelineDisabled={Boolean(setupIntent)||Boolean(panel)||voicePrompt!=='idle'||s.calibrating}
+   onScrubStart={()=>{session.pause('scrubbing');setReview(null);redraw(n=>n+1);}}
+   onSeek={time=>{session.seek(time);setPositionIntent('position');setReview(null);redraw(n=>n+1);}}
+   onSelect={index=>{session.select(index);setPositionIntent('selected');setReview(null);redraw(n=>n+1);}}
+   onBrowse={()=>open('sections')}
+   primaryAction={<>
+    <button
+     className="practice-player-primary"
+     disabled={voicePrompt==='requesting'||(offerVoiceStart&&voiceStatus==='checking')}
+     aria-pressed={instructorOnly?session.phase!=='paused':cameraState!=='off'}
+     onClick={runPrimaryAction}
+     title={offerVoiceStart?'Start with voice commands':''}
+    >
+     {session.phase!=='paused'&&instructorOnly?<Pause size={18} aria-hidden="true"/>:offerNextSection?<ChevronRight size={18} aria-hidden="true"/>:!instructorOnly?<Camera size={18} aria-hidden="true"/>:<Play size={18} aria-hidden="true"/>}
+     <span>{voicePrompt==='requesting'?'Connecting…':instructorOnly?instructorAction:cameraState==='off'?'Start camera practice':cameraState==='starting'?'Cancel setup':'End practice'}</span>
+    </button>
+    {instructorOnly&&hasProgress&&session.phase==='paused'&&!sectionFinished&&(
+     <button className="player-text-action" disabled={voicePrompt==='requesting'} onClick={startOver}>
+      <RotateCcw size={14} aria-hidden="true"/><span>Start over</span>
      </button>
-     {instructorOnly&&hasProgress&&session.phase==='paused'&&!sectionFinished&&(
-      <button className="player-text-action" disabled={voicePrompt==='requesting'} onClick={startOver}>
-       <RotateCcw size={14} aria-hidden="true"/><span>Start over</span>
-      </button>
-     )}
-     {offerVoiceStart&&(
-      <button className="player-text-action" onClick={continueWithoutVoice}>
-       {voicePrompt==='requesting'?'Continue without voice':'Without voice'}
-      </button>
-     )}
-     {offerNextSection&&<button className="player-text-action" onClick={()=>action('again')}>Repeat section</button>}
-    </div>
-    <div className="practice-player-tools">
-     {modeControl}
-     {voiceControl}
-     <button className="player-tool player-speed" aria-label={`Playback speed ${s.speed}×`} title="Playback speed" onClick={()=>openSettings('speed')}>{s.speed}×</button>
-     <button className="player-tool" aria-label="Practice settings" title="Practice settings" onClick={()=>openSettings()}><Settings2 size={19} aria-hidden="true"/></button>
-     {instructorOnly&&<button className="player-tool" aria-label={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} title={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} disabled={voicePrompt==='requesting'} onClick={toggleInstructorFocus}>{focusActive?<Minimize size={19}/>:<Maximize size={19}/>}</button>}
-    </div>
-   </div>
-   {!instructorOnly&&(
+    )}
+    {offerVoiceStart&&(
+     <button className="player-text-action" onClick={continueWithoutVoice}>
+      {voicePrompt==='requesting'?'Continue without voice':'Without voice'}
+     </button>
+    )}
+    {offerNextSection&&<button className="player-text-action" onClick={()=>action('again')}>Repeat section</button>}
+   </>}
+   toolsBefore={<>{modeControl}{voiceControl}</>}
+   speed={s.speed}
+   onSpeedClick={()=>openSettings('speed')}
+   onSettingsClick={()=>openSettings()}
+   toolsAfter={instructorOnly&&<button className="player-tool" aria-label={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} title={focusActive?'Exit instructor fullscreen':'Fullscreen instructor'} disabled={voicePrompt==='requesting'} onClick={toggleInstructorFocus}>{focusActive?<Minimize size={19}/>:<Maximize size={19}/>}</button>}
+   extra={!instructorOnly&&(
     <div className="practice-player-camera-actions">
      {cameraState==='live'&&(recording.recording||recordNext.current?<button className="record-take active" onClick={stopTake}>{recording.recording?'Stop recording':'Cancel recording'}</button>:!recording.url&&<button className="record-take" disabled={!!camera.current?.readiness(connection.current.wasOnline)||replayMode} onClick={startTake}><Video size={16}/>Record practice</button>)}
      {recording.url&&<button className="take-review-button" onClick={()=>{session.pause('review take');setTakeOpen(true);}}>Review take{takeSaved?'':' · not saved'}</button>}
      <button className="player-text-action" onClick={()=>open('history')}>Practice history</button>
     </div>
    )}
-   <div className="practice-player-status" role="status">
-    {recording.error||(recording.recording?'Recording your practice':cameraState==='starting'?'Starting camera…':voicePrompt==='requesting'?'Allow microphone access to begin':/could not|unavailable|failed/i.test(notice||hint)?notice||hint:'')}
-   </div>
-  </div>}
+   status={recording.error||(recording.recording?'Recording your practice':cameraState==='starting'?'Starting camera…':voicePrompt==='requesting'?'Allow microphone access to begin':/could not|unavailable|failed/i.test(notice||hint)?notice||hint:'')}
+  />
+  }
 
   {compete&&runResultsOpen&&competition.result&&<CompetitionResults result={competition.result} revision={lesson.revision_id} onClose={()=>setRunResultsOpen(false)} onRetry={()=>{setRunResultsOpen(false);if(cameraState==='off')void camera.current?.start();else action('play');}} onPractice={()=>switchMode(false)} onSection={practiseSection}/>}
   {panel==='settings'&&<PracticePanel title="Practice settings" onClose={close} drawer dismissOnBackdrop={false} modal={false} footer={<><span className="settings-footer-note">Changes apply immediately</span>{!compete&&<button className="settings-preview-toggle" onClick={()=>action(session.phase==='paused'?'play':'pause',true)}>{session.phase==='paused'?<Play size={15}/>:<Pause size={15}/>} {session.phase==='paused'?'Play preview':'Pause preview'}</button>}</>}>

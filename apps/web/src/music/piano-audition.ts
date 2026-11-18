@@ -2,8 +2,9 @@
  * This is a duration-monitoring audition, not a calibrated acoustic-piano renderer.
  */
 import {
-  grandPianoPartials, pitchVelocityCutoff, velocityDecay, velocityGain, velocityValue,
+  grandPianoPartials, pitchRegisterGain, pitchVelocityCutoff, velocityDecay, velocityGain, velocityValue,
 } from './music-velocity';
+import {getSampleBuffer} from './piano-sampler';
 
 export type EnvelopePoint = {time: number; gain: number};
 export type PianoVoice = {
@@ -37,25 +38,25 @@ export function auditionEnvelope(duration: number, pitch: number, velocity?: num
 export function grandPianoEnvelope(duration: number, pitch: number, velocity?: number | null,
   dampedByKey = true): EnvelopePoint[] {
   if (!Number.isFinite(duration) || duration <= 0) return [];
-  const level = velocityGain(velocity);
+  const level = velocityGain(velocity) * pitchRegisterGain(pitch);
   const release = dampedByKey ? Math.min(0.16, duration * 0.35) : Math.min(0.28, duration * 0.4);
   // Keep a minimum held body while preserving the full damper-release tail.
   const heldUntil = Math.max(duration * 0.2, duration - release);
   const attack = Math.min(velocityValue(velocity) >= 0.75 ? 0.0035 : 0.006, heldUntil * 0.18);
   const bloomEnd = Math.min(0.11, heldUntil * 0.35);
   const f0 = 440 * Math.pow(2, (pitch - 69) / 12);
-  const tau = Math.max(0.45, Math.min(2.6, 1.25 * Math.pow(220 / Math.max(1, f0), 0.6)));
+  const tau = Math.max(0.55, Math.min(3.4, 1.55 * Math.pow(220 / Math.max(1, f0), 0.55)));
   const heldGain = Math.max(SILENCE * 2,
-    level * 0.22 * Math.exp(-Math.max(0, heldUntil - bloomEnd) / tau));
+    level * 0.28 * Math.exp(-Math.max(0, heldUntil - bloomEnd) / tau));
   const points: EnvelopePoint[] = [
     {time: 0, gain: SILENCE},
     {time: attack, gain: level},
-    {time: bloomEnd, gain: level * 0.22},
+    {time: bloomEnd, gain: level * 0.28},
   ];
   if (heldUntil - bloomEnd > 0.25) {
     const midTime = bloomEnd + (heldUntil - bloomEnd) * 0.5;
     points.push({time: midTime,
-      gain: Math.max(SILENCE * 2, level * 0.22 * Math.exp(-(midTime - bloomEnd) / tau))});
+      gain: Math.max(SILENCE * 2, level * 0.28 * Math.exp(-(midTime - bloomEnd) / tau))});
   }
   points.push({time: heldUntil, gain: heldGain}, {time: duration, gain: SILENCE});
   // Keep automation strictly ordered even for pathological tiny durations.
@@ -74,6 +75,7 @@ export function envelopeGainAt(points: EnvelopePoint[], time: number): number {
   for (let i = 1; i < points.length; i++) {
     const right = points[i], left = points[i - 1];
     if (time <= right.time) {
+      if (time === right.time) return right.gain;
       const fraction = (time - left.time) / (right.time - left.time);
       return left.gain * (right.gain / left.gain) ** fraction;
     }
@@ -89,6 +91,59 @@ export function schedulePianoVoice(context: BaseAudioContext, destination: Audio
   const elapsed = Math.max(0, note.elapsed ?? 0);
   const length = Math.min(note.duration - elapsed, note.windowSeconds ?? Infinity);
   if (!Number.isFinite(length) || length <= 0 || !Number.isInteger(note.pitch) || note.pitch < 0 || note.pitch > 127) return null;
+  if (note.acousticDecay && typeof (context as AudioContext).createBufferSource === 'function') {
+    const sampled = getSampleBuffer(context, note.pitch);
+    if (sampled) {
+      const source = context.createBufferSource();
+      const gain = context.createGain();
+      const panner = typeof context.createStereoPanner === 'function' ? context.createStereoPanner() : null;
+      source.buffer = sampled.buffer;
+      source.playbackRate.value = Math.pow(2, (note.pitch - sampled.sampleMidi) / 12);
+      const level = Math.max(SILENCE * 2, Math.min(1, velocityGain(note.velocity) * 2.2));
+      const release = (note.dampedByKey ?? true) ? Math.min(0.16, length * 0.35) : Math.min(0.32, length * 0.4);
+      const fadeStart = Math.max(0.005, length - release);
+      const start = note.startTime;
+      const attackEnd = start + (elapsed > 0 ? 0.006 : 0.002);
+      const end = start + length;
+      gain.gain.setValueAtTime(SILENCE, start);
+      gain.gain.exponentialRampToValueAtTime(level, attackEnd);
+      const holdAt = Math.min(end - 0.001, Math.max(attackEnd + 0.001, start + fadeStart));
+      if (holdAt > attackEnd) gain.gain.setValueAtTime(level, holdAt);
+      gain.gain.exponentialRampToValueAtTime(SILENCE, end);
+      source.connect(gain);
+      if (panner) {
+        panner.pan.value = Math.max(-0.35, Math.min(0.35, ((note.pitch - 60) / 44) * 0.35));
+        gain.connect(panner).connect(destination);
+      } else {
+        gain.connect(destination);
+      }
+      const offset = Math.min(elapsed, Math.max(0, sampled.buffer.duration - 0.02));
+      source.start(start, offset);
+      source.stop(end + 0.01);
+      const disconnect = () => {
+        try { source.disconnect(); } catch { /* disconnected */ }
+        try { gain.disconnect(); } catch { /* disconnected */ }
+        try { panner?.disconnect(); } catch { /* disconnected */ }
+      };
+      source.onended = disconnect;
+      return {
+        oscillator: source as unknown as OscillatorNode,
+        gain,
+        stop: () => {
+          try { source.stop(); } catch { /* already stopped */ }
+          disconnect();
+        },
+        releaseAt: (time, fadeSeconds = .015) => {
+          const at = Math.max(start, time);
+          const fade = Math.max(.003, fadeSeconds);
+          try { gain.gain.cancelScheduledValues?.(at); } catch { /* unsupported */ }
+          try { gain.gain.setValueAtTime(level, at); } catch { /* already ended */ }
+          try { gain.gain.exponentialRampToValueAtTime(SILENCE, at + fade); } catch { /* already ended */ }
+          try { source.stop(at + fade + 0.01); } catch { /* already stopping */ }
+        },
+      };
+    }
+  }
   const points = note.acousticDecay
     ? grandPianoEnvelope(note.duration, note.pitch, note.velocity, note.dampedByKey ?? true)
     : auditionEnvelope(note.duration, note.pitch, note.velocity);
@@ -197,7 +252,7 @@ export function schedulePianoVoice(context: BaseAudioContext, destination: Audio
     const fade = Math.max(.003, fadeSeconds);
     const relative = elapsed + Math.max(0, at - note.startTime);
     const current = Math.max(SILENCE, envelopeGainAt(points, relative));
-    try { gain.gain.cancelScheduledValues(at); } catch { /* minimal test double */ }
+    try { gain.gain.cancelScheduledValues?.(at); } catch { /* unsupported */ }
     try { gain.gain.setValueAtTime(current, at); } catch { /* already ended */ }
     try { gain.gain.exponentialRampToValueAtTime(SILENCE, at + fade); } catch { /* already ended */ }
     try { oscillator.stop(at + fade + .005); } catch { /* already stopping */ }

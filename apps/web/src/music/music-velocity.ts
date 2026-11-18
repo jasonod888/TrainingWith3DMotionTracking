@@ -18,8 +18,16 @@ export function intensityPercent(value: number | null | undefined): number | nul
 
 /** Per-note gain before the shared compressor/master stage. */
 export function velocityGain(value: number | null | undefined): number {
-  const velocity = velocityValue(value);
-  return 0.035 + 0.33 * Math.pow(velocity, 1.65);
+  return 0.03 + 0.59 * Math.pow(velocityValue(value), 1.85);
+}
+
+/** Slightly taper the highest register so melody notes do not dominate the mix. */
+export function pitchRegisterGain(pitch: number): number {
+  if (!Number.isFinite(pitch)) return 1;
+  const midi = Math.max(0, Math.min(127, pitch));
+  if (midi <= 64) return 1;
+  const t = Math.max(0, Math.min(1, (midi - 64) / 24));
+  return 1 - 0.42 * t;
 }
 
 /** Low-pass cutoff (Hz): louder notes are brighter, not merely louder. */
@@ -28,13 +36,13 @@ export function velocityCutoff(value: number | null | undefined): number {
   return 650 + 5100 * Math.pow(velocity, 1.5);
 }
 
-/** Fundamental-aware cutoff: soft treble notes must never be muffled below f0. */
+/** Fundamental-aware cutoff: tames upper-treble brightness without muffling f0. */
 export function pitchVelocityCutoff(pitch: number, velocity: number | null | undefined): number {
-  const value = velocityValue(velocity);
-  const midi = Number.isFinite(pitch) ? Math.max(0, Math.min(127, Math.round(pitch))) : 60;
-  const fundamental = 440 * Math.pow(2, (midi - 69) / 12);
-  const brightness = 0.35 + 0.65 * Math.pow(value, 1.2);
-  return Math.min(18000, Math.max(velocityCutoff(value), fundamental * (1.7 + 2.8 * brightness)));
+  const v = velocityValue(velocity);
+  const midi = Number.isFinite(pitch) ? pitch : 60;
+  const f0 = 440 * Math.pow(2, (midi - 69) / 12);
+  return Math.max(400, f0 * 1.4, midi < 48 ? velocityCutoff(v) : 0,
+    Math.min(7200, f0 * (1.6 + 3.4 * Math.pow(v, 1.15)) + 140 + 520 * v));
 }
 
 /** Harmonic amplitudes for a piano-like additive wave. */

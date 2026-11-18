@@ -12,6 +12,8 @@ import {LessonWorkspace} from './LessonWorkspace';
  * they never narrow a union.
  */
 const MusicLessonHome = lazy(() => import('./music/MusicLessonHome'));
+const PianoWorkspaceHarness = lazy(() => import('./music/workspace/PianoWorkspaceHarness')
+  .then(module => ({default: module.PianoWorkspaceHarness})));
 
 type BodyProps = Omit<ComponentProps<typeof LessonWorkspace>, 'lesson'>;
 type LibraryGuideProps={pianoLibrary?:boolean;guitarLibrary?:boolean};
@@ -33,6 +35,11 @@ function UnsupportedScreen({onBack}: {onBack: () => void}) {
 
 export function LessonExperienceHost({document,pianoLibrary=false,guitarLibrary=false, ...body}: {document: LessonDocument} & BodyProps & LibraryGuideProps) {
   if (document.kind === 'music') {
+    if (document.value.subject === 'piano') {
+      return <Suspense fallback={<MusicFallback onBack={body.onBack}/>}>
+        <PianoWorkspaceHarness lessonId={document.value.lesson_id} lessonTitle={document.value.title} embedded mode="practice" onBack={body.onBack}/>
+      </Suspense>;
+    }
     return <Suspense fallback={<MusicFallback onBack={body.onBack}/>}>
       <MusicLessonHome lesson={document.value} onBack={body.onBack} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>
     </Suspense>;

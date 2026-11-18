@@ -7,8 +7,11 @@ import {
   bindMusicReference, pitchName, type MusicReference,
 } from './music-reference';
 import './music.css';
+import '../practice.css';
+import '../practice-player.css';
 import {InstrumentGuideStage} from './renderers/InstrumentGuideStage';
 import {PianoNoteRoll} from './PianoNoteRoll';
+import {PracticeTimeline} from '../PracticeTimeline';
 import {shiftOnset,clampOffsetSeconds} from './piano-playback';
 import {usePianoSourcePlayer} from './usePianoSourcePlayer';
 import {usePianoPreferences} from './piano-preferences';
@@ -67,6 +70,7 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   const [feedbackNotice,setFeedbackNotice]=useState('');
   const [saves,setSaves]=useState<Record<string,SaveState>>({});
   const [historyRefresh,setHistoryRefresh]=useState(0);
+  const [drawer,setDrawer]=useState<'sections'|'settings'|'midi'|null>(null);
   const saveSession=useRef(0),saveAlive=useRef(true),saveIdentity=useRef(identity);saveIdentity.current=identity;
   const saveEntries=useRef(new Map<string,{id:string;state:SaveState['state'];payload:Record<string,unknown>}>());
   const resetSaves=()=>{saveSession.current++;saveEntries.current.clear();setSaves({});};
@@ -305,22 +309,29 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
   const span = shiftedReference ? currentSpan(shiftedReference, time) : null;
   const sections = lesson.section_set.sections;
 
-  return <section className="music-home music-guide">
-    <button className="back-link" onClick={onBack}>Back</button>
-    <header className="music-home-head">
-      <p className="eyebrow"><Music2 size={14} aria-hidden="true"/> {label(lesson).toUpperCase()} LESSON</p>
-      <h1>{lesson.title}</h1>
-      <p className="subtle">
-        Reviewed reference with {reference ? reference.events.length : 0} notes
-        {sections.length === 1 ? ' in 1 teaching section' : ` across ${sections.length} teaching sections`}.
-        Play the instructor video with the guide; this version has no scoring.
-      </p>
+  return <section className="practice-shell music-practice-shell" aria-label="Music lesson">
+    <header className="practice-topbar music-practice-topbar">
+      <button className="back-link" onClick={onBack}>Back</button>
+      <div className="music-practice-heading">
+        <p className="eyebrow"><Music2 size={14} aria-hidden="true"/> {label(lesson).toUpperCase()} LESSON</p>
+        <h1>{lesson.title}</h1>
+        <span className="music-active-pill">{sectionIndex>=0?sections[sectionIndex]?.label:'All sections'}</span>
+      </div>
+      <div className="music-practice-topbar-actions">
+        <button type="button" aria-expanded={drawer==='sections'} aria-controls="music-practice-drawer"
+          onClick={()=>setDrawer(value=>value==='sections'?null:'sections')}>Sections</button>
+        <button type="button" aria-expanded={drawer==='settings'} aria-controls="music-practice-drawer"
+          onClick={()=>setDrawer(value=>value==='settings'?null:'settings')}>Settings</button>
+        {midiSetupEnabled&&lesson.subject==='piano'&&<button type="button" aria-expanded={drawer==='midi'} aria-controls="music-practice-drawer"
+          onClick={()=>setDrawer(value=>value==='midi'?null:'midi')}>MIDI</button>}
+      </div>
     </header>
-    {error && <p className="inline-notice error-notice" role="alert">{error}<button onClick={()=>setRetry(value=>value+1)}>Retry reference</button></p>}
-    {!reference && !error && <p role="status">Loading the reviewed reference…</p>}
-    {reference && <>
-      <div className="music-player">
-        <div className="music-video">
+
+    <main className="practice-stage music-practice-stage">
+      {error && <p className="inline-notice error-notice" role="alert">{error}<button onClick={()=>setRetry(value=>value+1)}>Retry reference</button></p>}
+      {!reference && !error && <p role="status">Loading the reviewed reference…</p>}
+      {reference && <>
+        <div className="music-video music-stage-video">
           {source
             ? <video ref={video} src={source} controls={!practiceActive} playsInline preload="metadata"
                 onVolumeChange={event=>setVolume(event.currentTarget.volume)}
@@ -333,110 +344,150 @@ export function MusicLessonHome({lesson, onBack,midiSetupEnabled=false,musicHist
             : <div className="music-no-video">The original video is unavailable. The guide can still play on its own.</div>}
           <audio ref={piano} src={preview.url||undefined} preload="auto" hidden/>
         </div>
-        <div className="music-guide-panel">
-          <div className="music-transport">
-            <button className="primary" aria-label={playing ? 'Pause guide' : 'Play guide'} onClick={() => void toggle()}>
-              {playing ? <Pause size={16} aria-hidden="true"/> : <Play size={16} aria-hidden="true"/>}
-              {playing ? 'Pause' : 'Play'}
-            </button>
-            <div className="music-audio-modes" role="group" aria-label="Playback audio">
-              <button className={audioMode==='original'?'secondary active':'secondary'} aria-pressed={audioMode==='original'} onClick={()=>setAudioMode('original')}>Original</button>
-              <button className={audioMode==='piano'?'secondary active':'secondary'} aria-pressed={audioMode==='piano'} disabled={!preview.url||!player.ready} onClick={()=>setAudioMode('piano')}>Piano</button>
-            </div>
-            <label className="music-sync">Sync
-              <input aria-label="Sync offset in milliseconds" type="number" step={10} min={-10000} max={10000} value={syncOffsetMs} onChange={event=>setSyncOffsetMs(clampOffsetSeconds(Number(event.target.value)/1000)*1000)}/> ms (temporary)
-            </label>
-            <label className="music-sync"><input aria-label="Loop playback" type="checkbox" checked={loop} onChange={event=>setLoop(event.target.checked)}/> Loop</label>
-            <label className="music-sync">from <input aria-label="Loop start" type="number" min={0} max={reference.duration} step={0.1} value={loopStart} onChange={event=>setLoopStart(Number(event.target.value))}/></label>
-            <label className="music-sync">to <input aria-label="Loop end" type="number" min={0} max={reference.duration} step={0.1} value={loopEnd} onChange={event=>setLoopEnd(Number(event.target.value))}/></label>
-            {!lesson.piano_preview&&<p className="small muted">Piano audio is unavailable for this lesson.</p>}
-            {player.error&&<p role="alert">{player.error}</p>}
-            {preview.error&&<p role="alert">{preview.error} <button onClick={preview.retry}>Retry piano audio</button></p>}
-            {lesson.piano_preview&&!preview.url&&!preview.error&&<p role="status">Preparing piano audio. Original audio is available.</p>}
-            <label>Listening volume<input aria-label="Listening volume" type="range" min={0} max={1} step={.01} value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
-            <input aria-label="Lesson position" type="range" min={0} max={reference.duration} step={0.01}
-              value={Math.min(time, reference.duration)} onChange={event => seek(Number(event.target.value))}/>
-            <span className="music-time">{timeLabel(time)} / {timeLabel(reference.duration)}</span>
-          </div>
+        {(practice?.phase==='count-in'||active.length>0||span||practice?.phase==='playing')&&<div className="music-stage-overlay">
+          {practice?.phase==='count-in'&&<div className="practice-count" role="status"><strong>{practice?.beat}</strong><span>Get ready</span></div>}
           <p className="music-now" role="status">
             {active.length ? active.map(event => pitchName(event.pitch)).join(' · ') : 'No note sounding'}
             {span && <span className="music-span"> · {span.start.toFixed(1)}–{span.end.toFixed(1)}s</span>}
+            {practice && practice.phase==='playing'&&practiceOptions?<span className="music-time"> · {practiceSourceTime(practice,practiceOptions).toFixed(1)}s</span>:null}
           </p>
+        </div>}
+        <div className="music-stage-guide">
           <InstrumentGuideStage key={identity} reference={reference} active={active} time={time} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>
-          {(lesson.pedal?.length??0)>0&&<p className="small muted" data-pedal-active={lesson.pedal!.some(span=>time>=span.onset+syncOffset&&time<span.offset+syncOffset)}>Sustain pedal: {lesson.pedal!.some(span=>time>=span.onset+syncOffset&&time<span.offset+syncOffset)?'on':'off'} (estimated)</p>}
           <PianoNoteRoll events={reference.events.map(event=>({pitch:event.pitch,onset:event.onset,duration:event.duration??null}))}
             duration={reference.duration} time={time} offsetSeconds={syncOffset}/>
-          <ol className="music-sections" aria-label="Teaching sections">
-            {sections.map(section => <li key={section.id}>
-              <button className="secondary" aria-current={sectionIndex===sections.indexOf(section) ? 'step' : undefined}
-                aria-label={`Seek to section ${section.label}`} onClick={() => seek(section.start)}>
-                {section.label}<small>{section.start.toFixed(1)}–{section.end.toFixed(1)}s</small>
-              </button>
-            </li>)}
-          </ol>
-          {practice===null?<div className="practice-setup" role="group" aria-label="Timed practice">
-            <label>Practice section<select aria-label="Practice section" value={practiceSection} onChange={event=>setPracticeSection(event.target.value)}><option value="all">Whole lesson</option>{sections.map(section=><option key={section.id} value={section.id}>{section.label}</option>)}</select></label>
-            <p className="small muted">Silent guide practice: use your instrument’s sound. Count-in is visual at 120 beats per minute.</p>
-            <label>Count-in<select aria-label="Count-in" value={countIn} onChange={event=>setCountIn(Number(event.target.value))}><option value={0}>Off</option><option value={2}>2 beats</option><option value={4}>4 beats</option></select></label>
-            <label>Repeats<select aria-label="Repeats" value={repeats} onChange={event=>setRepeats(Number(event.target.value))}>{[1,2,3,5].map(value=><option key={value} value={value}>{value}</option>)}</select></label>
-            <label>Speed<select aria-label="Practice speed" value={speed} onChange={event=>setSpeed(Number(event.target.value) as PracticeSpeed)}>{PRACTICE_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select></label>
-            <button className="primary" disabled={Boolean(calibration)} onClick={beginPractice}>Start practice</button>
-          </div>:<section className="music-practice" aria-label="Timed practice" role="status">
-            {practice.phase==='count-in'&&<div className="practice-count"><strong>{practice.beat}</strong><span>Get ready</span></div>}
-            <p className="practice-status">{practiceLabel(practice,practiceOptions??{sectionId:'all',start:0,end:reference.duration,repeats,countInBeats:countIn,speed})}
-              {practice.phase==='playing'&&practiceOptions?<span className="music-time"> · {practiceSourceTime(practice,practiceOptions).toFixed(1)}s</span>:null}</p>
-            {practice.phase==='done'
-              ? <><p><strong>Practice complete</strong> · {keyboardConnected?`${captured} MIDI ${captured===1?'attack':'attacks'} counted locally`:'No keyboard input was measured'}. This run is unscored.{eligibility.eligible?' Local feedback appears below.':' This lesson stays ungraded.'}</p><div className="inline-actions"><button className="secondary" onClick={beginPractice}>Practice again</button><button className="back-link" onClick={()=>stopPractice()}>Close practice</button></div></>
-              : <button className="secondary" onClick={()=>stopPractice()}>Stop practice</button>}
-          </section>}
+        </div>
+        {(lesson.pedal?.length??0)>0&&<p className="small muted music-stage-note" data-pedal-active={lesson.pedal!.some(span=>time>=span.onset+syncOffset&&time<span.offset+syncOffset)}>Sustain pedal: {lesson.pedal!.some(span=>time>=span.onset+syncOffset&&time<span.offset+syncOffset)?'on':'off'} (estimated)</p>}
+      </>}
+    </main>
+
+    <div className="practice-player music-practice-player">
+      {reference ? <PracticeTimeline sections={sections} duration={reference.duration} time={time}
+        activeIndex={sectionIndex} range={loop&&loopEnd>loopStart?{start:loopStart,end:loopEnd}:null}
+        disabled={false} onScrubStart={()=>{}} onSeek={seek}
+        onSelect={index=>seek(sections[index].start)} onBrowse={()=>setDrawer('sections')}/> : null}
+      <div className="practice-player-toolbar">
+        <div className="practice-player-actions">
+          <button className="primary practice-player-primary" aria-label={playing ? 'Pause guide' : 'Play guide'}
+            disabled={!reference} onClick={() => void toggle()}>
+            {playing ? <Pause size={16} aria-hidden="true"/> : <Play size={16} aria-hidden="true"/>}
+            {playing ? 'Pause' : 'Play'}
+          </button>
+          <label className="music-sync">Speed
+            <select aria-label="Playback speed" value={speed} onChange={event=>setSpeed(Number(event.target.value) as PracticeSpeed)} disabled={!reference}>
+              {[0.5,0.75,1].map(value=><option key={value} value={value}>{value}×</option>)}
+              {![0.5,0.75,1].includes(speed)&&<option value={speed}>{speed}×</option>}
+            </select>
+          </label>
+          <div className="music-audio-modes" role="group" aria-label="Playback audio">
+            <button className={audioMode==='original'?'secondary active':'secondary'} aria-pressed={audioMode==='original'} onClick={()=>setAudioMode('original')}>Original</button>
+            <button className={audioMode==='piano'?'secondary active':'secondary'} aria-pressed={audioMode==='piano'} disabled={!preview.url||!player.ready} onClick={()=>setAudioMode('piano')}>Piano</button>
+          </div>
+          <button className={practiceActive?'secondary':'primary'} disabled={!reference||(!practiceActive&&Boolean(calibration))}
+            onClick={()=>practiceActive?stopPractice():beginPractice()}>
+            {practiceActive?'Stop practice':practice?.phase==='done'?'Practice again':'Start practice'}
+          </button>
         </div>
       </div>
-      {midiSetupEnabled&&lesson.subject==='piano'&&lesson.assessment.assessment==='notes'&&<section className="music-home-panel input-delay" aria-label="Timing alignment">
-        <h2>Timing alignment · approximate</h2>
-        {latency!==null?<p role="status">Estimated personal alignment: {latency} ms. <button className="back-link" onClick={()=>setLatency(null)}>Measure again</button></p>:<button className="secondary" disabled={!keyboardConnected||Boolean(calibration)||practiceActive} onClick={startCalibration}>Estimate timing alignment</button>}
-        {calibration?<div className="calibration-pulse" role="status"><strong>{calibration.pulse}</strong><span>Play one note with each pulse</span><small>{calibration.samples} taps measured</small></div>:<p className="small muted">Play one note with each of eight visual pulses. This estimates your alignment, including reaction time; it does not measure hardware latency.</p>}
-        {feedbackNotice&&<p className="small muted" role="status">{feedbackNotice}</p>}
-      </section>}
-      {feedback.length>0&&<section className="music-feedback" aria-label="Practice feedback">
-        <h2>Local feedback · unscored</h2>
-        <p className="small muted">Note eligibility reflects complete timing windows, not keyboard observation coverage or accuracy.</p>
-        {feedback.map((run,index)=><article className="feedback-run" key={`${run.run}-${index}`}>
-          <h3>Run {run.run+1}</h3>
-          {run.status==='invalid'?<p role="alert">This run could not be analysed: {run.reason}</p>:<p>{run.matched} matched · {run.missing} missing · {run.extra} extra · {run.assessed} of {run.total} notes eligible for comparison ({Math.round(run.coverage*100)}% of reference notes){run.unassessed?` · ${run.unassessed} unassessed`:''}</p>}
-          {run.status==='complete'&&<ul>{run.notes.map((note,noteIndex)=><li key={noteIndex} className={`feedback-note ${note.status}`}>{note.status==='matched'?`${note.name} ${note.timing}${note.errorSeconds!==null?` (${Math.round(note.errorSeconds*1000)} ms)`:''}`:note.status==='missing'?`Missing ${note.name}`:`Extra ${note.name}`}</li>)}</ul>}
-          {musicHistoryEnabled&&eligibility.eligible&&run.status==='complete'&&(()=>{const key=`${saveSession.current}:${run.run}-${run.window.start}-${run.window.end}`;const saved=saves[key];
-            return <div className="feedback-save">{saved?.state==='saved'?<p role="status">Summary saved to your private history.</p>:
-              <><button className="secondary" disabled={saved?.state==='saving'} onClick={()=>void saveRun(run)}>{saved?.state==='saving'?'Saving…':saved?.state==='error'?'Retry save':'Save summary'}</button>
-              {saved?.state==='error'&&<p className="small muted" role="alert">{saved.message}</p>}</>}</div>;})()}
-        </article>)}
-        {feedback.some(run=>!run.latencyMeasured)&&<p className="small muted">No timing alignment estimate was made; timing feedback is approximate.</p>}
-        <p className="small muted">Timing remains approximate, including after visual alignment. {musicHistoryEnabled?'Feedback is unscored. A summary is sent only when you choose Save summary.':'Feedback is local and unscored. Nothing is saved or sent.'}</p>
-      </section>}
-      {musicHistoryEnabled&&<Suspense fallback={<p>Opening history controls…</p>}><MusicHistoryPanel key={identity} lessonId={lesson.lesson_id} refreshToken={historyRefresh} onDelete={id=>{
-        for(const [key,entry] of saveEntries.current)if(entry.id===id)saveEntries.current.delete(key);
-        setSaves(previous=>Object.fromEntries(Object.entries(previous).filter(([,value])=>value.id!==id)));
-      }}/></Suspense>}
-      {midiSetupEnabled&&lesson.subject==='piano'&&<MidiKeyboardCheck key={lesson.revision_id} onAttack={handleAttack} onInputChange={id=>{setKeyboardConnected(Boolean(id));cancelCalibration();setLatency(null);if(practiceRef.current)stopPractice();}}/>}
-      <div className="music-home-grid">
-        <article className="music-home-panel">
-          <h2>Reference</h2>
-          <dl>
-            <div><dt>Instrument</dt><dd>{label(lesson)}</dd></div>
-            <div><dt>Duration</dt><dd>{timeLabel(reference.duration)}</dd></div>
-            <div><dt>Notes</dt><dd>{reference.events.length}{reference.events.some(event => event.optional) ? ' · optional notes marked' : ''}</dd></div>
-            <div><dt>Assessment</dt><dd>{lesson.assessment.assessment === 'none' ? 'None' : lesson.assessment.assessment}</dd></div>
-            {lesson.instrument.capo ? <div><dt>Capo</dt><dd>{lesson.instrument.capo}</dd></div> : null}
-            {lesson.instrument.tuning ? <div><dt>Tuning</dt><dd>{lesson.instrument.tuning}</dd></div> : null}
-          </dl>
-        </article>
-        <article className="music-home-panel">
-          <h2>How the guide works</h2>
-          <p className="subtle">Notes light up at their reviewed start time and stay lit until their reviewed length ends.
-            Notes without a held length flash briefly. Optional notes are drawn like other notes; the guide does not grade your playing.</p>
-          <p className="small muted">{midiSetupEnabled&&lesson.subject==='piano'?'No camera or microphone is used. MIDI access is requested only when you connect a keyboard.':'No camera, microphone or MIDI access has been requested.'}</p>
-        </article>
+    </div>
+
+    {reference&&<aside id="music-practice-drawer" className="practice-drawer music-practice-drawer" hidden={!drawer}
+      aria-label="Lesson controls">
+      <div className="music-drawer-head">
+        <h2>{drawer==='sections'?'Sections':drawer==='midi'?'MIDI':'Settings'}</h2>
+        <button type="button" className="back-link" onClick={()=>setDrawer(null)}>Close</button>
       </div>
-    </>}
+      <div className="music-drawer-pane" hidden={drawer!=='sections'}>
+      <div className="practice-panel-body">
+        <ol className="music-sections" aria-label="Teaching sections">
+          {sections.map(section => <li key={section.id}>
+            <button className="secondary" aria-current={sectionIndex===sections.indexOf(section) ? 'step' : undefined}
+              aria-label={`Seek to section ${section.label}`} onClick={() => seek(section.start)}>
+              {section.label}<small>{section.start.toFixed(1)}–{section.end.toFixed(1)}s</small>
+            </button>
+          </li>)}
+        </ol>
+      </div></div>
+      <div className="music-drawer-pane" hidden={drawer!=='settings'}>
+      <div className="practice-panel-body">
+        <div className="music-transport">
+          <label className="music-sync">Sync
+            <input aria-label="Sync offset in milliseconds" type="number" step={10} min={-10000} max={10000} value={syncOffsetMs} onChange={event=>setSyncOffsetMs(clampOffsetSeconds(Number(event.target.value)/1000)*1000)}/> ms (temporary)
+          </label>
+          <label className="music-sync"><input aria-label="Loop playback" type="checkbox" checked={loop} onChange={event=>setLoop(event.target.checked)}/> Loop</label>
+          <label className="music-sync">from <input aria-label="Loop start" type="number" min={0} max={reference.duration} step={0.1} value={loopStart} onChange={event=>setLoopStart(Number(event.target.value))}/></label>
+          <label className="music-sync">to <input aria-label="Loop end" type="number" min={0} max={reference.duration} step={0.1} value={loopEnd} onChange={event=>setLoopEnd(Number(event.target.value))}/></label>
+          {!lesson.piano_preview&&<p className="small muted">Piano audio is unavailable for this lesson.</p>}
+          {player.error&&<p role="alert">{player.error}</p>}
+          {preview.error&&<p role="alert">{preview.error} <button onClick={preview.retry}>Retry piano audio</button></p>}
+          {lesson.piano_preview&&!preview.url&&!preview.error&&<p role="status">Preparing piano audio. Original audio is available.</p>}
+          <label>Listening volume<input aria-label="Listening volume" type="range" min={0} max={1} step={.01} value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
+          <input aria-label="Lesson position" type="range" min={0} max={reference.duration} step={0.01}
+            value={Math.min(time, reference.duration)} onChange={event => seek(Number(event.target.value))}/>
+          <span className="music-time">{timeLabel(time)} / {timeLabel(reference.duration)}</span>
+        </div>
+        {practice===null?<div className="practice-setup" role="group" aria-label="Timed practice">
+          <label>Practice section<select aria-label="Practice section" value={practiceSection} onChange={event=>setPracticeSection(event.target.value)}><option value="all">Whole lesson</option>{sections.map(section=><option key={section.id} value={section.id}>{section.label}</option>)}</select></label>
+          <p className="small muted">Silent guide practice: use your instrument’s sound. Count-in is visual at 120 beats per minute.</p>
+          <label>Count-in<select aria-label="Count-in" value={countIn} onChange={event=>setCountIn(Number(event.target.value))}><option value={0}>Off</option><option value={2}>2 beats</option><option value={4}>4 beats</option></select></label>
+          <label>Repeats<select aria-label="Repeats" value={repeats} onChange={event=>setRepeats(Number(event.target.value))}>{[1,2,3,5].map(value=><option key={value} value={value}>{value}</option>)}</select></label>
+          <label>Speed<select aria-label="Practice speed" value={speed} onChange={event=>setSpeed(Number(event.target.value) as PracticeSpeed)}>{PRACTICE_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select></label>
+        </div>:<section className="music-practice" aria-label="Timed practice" role="status">
+          <p className="practice-status">{practiceLabel(practice,practiceOptions??{sectionId:'all',start:0,end:reference.duration,repeats,countInBeats:countIn,speed})}
+            {practice.phase==='playing'&&practiceOptions?<span className="music-time"> · {practiceSourceTime(practice,practiceOptions).toFixed(1)}s</span>:null}</p>
+          {practice.phase==='done'&&<><p><strong>Practice complete</strong> · {keyboardConnected?`${captured} MIDI ${captured===1?'attack':'attacks'} counted locally`:'No keyboard input was measured'}. This run is unscored.{eligibility.eligible?' Local feedback appears below.':' This lesson stays ungraded.'}</p><button className="back-link" onClick={()=>stopPractice()}>Close practice</button></>}
+        </section>}
+        {feedback.length>0&&<section className="music-feedback" aria-label="Practice feedback">
+          <h2>Local feedback · unscored</h2>
+          <p className="small muted">Note eligibility reflects complete timing windows, not keyboard observation coverage or accuracy.</p>
+          {feedback.map((run,index)=><article className="feedback-run" key={`${run.run}-${index}`}>
+            <h3>Run {run.run+1}</h3>
+            {run.status==='invalid'?<p role="alert">This run could not be analysed: {run.reason}</p>:<p>{run.matched} matched · {run.missing} missing · {run.extra} extra · {run.assessed} of {run.total} notes eligible for comparison ({Math.round(run.coverage*100)}% of reference notes){run.unassessed?` · ${run.unassessed} unassessed`:''}</p>}
+            {run.status==='complete'&&<ul>{run.notes.map((note,noteIndex)=><li key={noteIndex} className={`feedback-note ${note.status}`}>{note.status==='matched'?`${note.name} ${note.timing}${note.errorSeconds!==null?` (${Math.round(note.errorSeconds*1000)} ms)`:''}`:note.status==='missing'?`Missing ${note.name}`:`Extra ${note.name}`}</li>)}</ul>}
+            {musicHistoryEnabled&&eligibility.eligible&&run.status==='complete'&&(()=>{const key=`${saveSession.current}:${run.run}-${run.window.start}-${run.window.end}`;const saved=saves[key];
+              return <div className="feedback-save">{saved?.state==='saved'?<p role="status">Summary saved to your private history.</p>:
+                <><button className="secondary" disabled={saved?.state==='saving'} onClick={()=>void saveRun(run)}>{saved?.state==='saving'?'Saving…':saved?.state==='error'?'Retry save':'Save summary'}</button>
+                {saved?.state==='error'&&<p className="small muted" role="alert">{saved.message}</p>}</>}</div>;})()}
+          </article>)}
+          {feedback.some(run=>!run.latencyMeasured)&&<p className="small muted">No timing alignment estimate was made; timing feedback is approximate.</p>}
+          <p className="small muted">Timing remains approximate, including after visual alignment. {musicHistoryEnabled?'Feedback is unscored. A summary is sent only when you choose Save summary.':'Feedback is local and unscored. Nothing is saved or sent.'}</p>
+        </section>}
+        {musicHistoryEnabled&&<Suspense fallback={<p>Opening history controls…</p>}><MusicHistoryPanel key={identity} lessonId={lesson.lesson_id} refreshToken={historyRefresh} onDelete={id=>{
+          for(const [key,entry] of saveEntries.current)if(entry.id===id)saveEntries.current.delete(key);
+          setSaves(previous=>Object.fromEntries(Object.entries(previous).filter(([,value])=>value.id!==id)));
+        }}/></Suspense>}
+        <div className="music-home-grid">
+          <article className="music-home-panel">
+            <h2>Reference</h2>
+            <dl>
+              <div><dt>Instrument</dt><dd>{label(lesson)}</dd></div>
+              <div><dt>Duration</dt><dd>{timeLabel(reference.duration)}</dd></div>
+              <div><dt>Notes</dt><dd>{reference.events.length}{reference.events.some(event => event.optional) ? ' · optional notes marked' : ''}</dd></div>
+              <div><dt>Assessment</dt><dd>{lesson.assessment.assessment === 'none' ? 'None' : lesson.assessment.assessment}</dd></div>
+              {lesson.instrument.capo ? <div><dt>Capo</dt><dd>{lesson.instrument.capo}</dd></div> : null}
+              {lesson.instrument.tuning ? <div><dt>Tuning</dt><dd>{lesson.instrument.tuning}</dd></div> : null}
+            </dl>
+          </article>
+          <article className="music-home-panel">
+            <h2>How the guide works</h2>
+            <p className="subtle">Notes light up at their reviewed start time and stay lit until their reviewed length ends.
+              Notes without a held length flash briefly. Optional notes are drawn like other notes; the guide does not grade your playing.</p>
+            <p className="small muted">{midiSetupEnabled&&lesson.subject==='piano'?'No camera or microphone is used. MIDI access is requested only when you connect a keyboard.':'No camera, microphone or MIDI access has been requested.'}</p>
+          </article>
+        </div>
+      </div></div>
+      <div className="music-drawer-pane" hidden={drawer!=='midi'}>
+      <div className="practice-panel-body">
+        {midiSetupEnabled&&lesson.subject==='piano'&&lesson.assessment.assessment==='notes'&&<section className="music-home-panel input-delay" aria-label="Timing alignment">
+          <h2>Timing alignment · approximate</h2>
+          {latency!==null?<p role="status">Estimated personal alignment: {latency} ms. <button className="back-link" onClick={()=>setLatency(null)}>Measure again</button></p>:<button className="secondary" disabled={!keyboardConnected||Boolean(calibration)||practiceActive} onClick={startCalibration}>Estimate timing alignment</button>}
+          {calibration?<div className="calibration-pulse" role="status"><strong>{calibration.pulse}</strong><span>Play one note with each pulse</span><small>{calibration.samples} taps measured</small></div>:<p className="small muted">Play one note with each of eight visual pulses. This estimates your alignment, including reaction time; it does not measure hardware latency.</p>}
+          {feedbackNotice&&<p className="small muted" role="status">{feedbackNotice}</p>}
+        </section>}
+        {midiSetupEnabled&&lesson.subject==='piano'&&<MidiKeyboardCheck key={lesson.revision_id} onAttack={handleAttack} onInputChange={id=>{setKeyboardConnected(Boolean(id));cancelCalibration();setLatency(null);if(practiceRef.current)stopPractice();}}/>}
+        {(!midiSetupEnabled||lesson.subject!=='piano')&&<p className="small muted">MIDI keyboard input is not enabled for this lesson.</p>}
+      </div></div>
+    </aside>}
   </section>;
 }
 

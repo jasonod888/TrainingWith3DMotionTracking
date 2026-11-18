@@ -143,6 +143,40 @@ async function openWorkspace() {
   return view;
 }
 
+test('piano practice reserves space for playback outside the scrolling stage', async () => {
+  const view = render(<PianoWorkspaceHarness mode="practice"/>);
+  await waitFor(() => assert.ok(view.container.querySelector('#piano-practice-player')));
+  const shell = view.container.querySelector('.ws-shell')!;
+  const stage = shell.querySelector('.ws-correction')!;
+  const dock = shell.querySelector('#piano-practice-player')!;
+  assert.equal(dock.parentElement, shell, 'playback must not scroll or clip with the editor');
+  assert.equal(stage.parentElement, shell);
+  assert.ok(stage.compareDocumentPosition(dock) & window.Node.DOCUMENT_POSITION_FOLLOWING);
+
+  const styles = ['music/workspace/workspace.css', 'practice.css', 'practice-player.css']
+    .map(path => readFileSync(resolve('src', path), 'utf8'));
+  for (const order of [styles, [...styles].reverse()]) {
+    const layout = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+    try {
+      for (const css of order) {
+        const sheet = layout.window.document.createElement('style');
+        sheet.textContent = css;
+        layout.window.document.head.append(sheet);
+      }
+      layout.window.document.body.innerHTML = shell.outerHTML;
+      const root = layout.window.document.querySelector('.ws-shell')!;
+      const player = root.querySelector('#piano-practice-player')!;
+      assert.equal(layout.window.getComputedStyle(root).display, 'flex',
+        'shared immersive styles must not replace the piano column layout');
+      assert.equal(layout.window.getComputedStyle(player).position, 'relative');
+      assert.equal(layout.window.getComputedStyle(player).flexShrink, '0');
+      assert.equal(layout.window.getComputedStyle(root.querySelector('.ws-correction')!).overflowY, 'auto');
+    } finally {
+      layout.window.close();
+    }
+  }
+});
+
 test('live Piano plays edited performance notes, mutes video, and restores Original', async () => {
   draft.piano_preview = null;
   draft.preview_identity = null;

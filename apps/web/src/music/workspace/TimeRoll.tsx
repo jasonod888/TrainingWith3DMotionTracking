@@ -36,6 +36,8 @@ type Props = {
   sharedViewportWidth?: number;
   gutter?: number;
   cursorX?: number | null;
+  /** Frame-driven fallback seconds for the internal cursor leaf. */
+  cursorFallbackSeconds?: number | null;
   onGestureStart?: () => void;
   onGestureEnd?: () => void;
   window: TimeWindow;
@@ -70,17 +72,31 @@ type Props = {
   onGhostPlace?: (seconds: number, pitch: number) => void;
 };
 
+function RollCursorLine({clock, fallback, cursorX, layout, alignment, gutter, pitchHeight}: {
+  clock?: ClockStore | null;
+  fallback: number | null;
+  cursorX: number | null;
+  layout?: TimelineLayout;
+  alignment?: Props['alignment'];
+  gutter: number;
+  pitchHeight: number;
+}) {
+  const time = useClockTime(clock, fallback ?? 0);
+  const x = cursorX !== null ? cursorX
+    : layout && alignment ? gutter + layout.sourceSecondsToX(time, alignment, 0) : 0;
+  return <line className="ws-shared-surface-cursor ws-roll-playhead" data-shared-cursor
+    data-playhead-seconds={time} x1={x} y1={0} x2={x} y2={pitchHeight}/>;
+}
+
 export function TimeRoll({
   document, window, onWindowChange, selectedOccurrenceId, reveal, playhead, offsetSeconds = 0,
   layout, alignment, sharedScrollLeft = 0, sharedViewportWidth = 0, gutter = 0, onGestureStart, onGestureEnd, cursorX = null,
+  cursorFallbackSeconds = null,
   activeOccurrenceIds = [], onSelect, onSeek, onWindowChangeOrigin, clock = null, intervals,
   onGestureCommit, onAuditionPitch, snapSeconds = null, addMode = false, ghost = null, onGhostPlace,
   editingEnabled = true,
 }: Props) {
-  const livePlayhead = useClockTime(clock, playhead);
-  const liveActive = intervals
-    ? intervals.filter(interval => livePlayhead >= interval.start && livePlayhead < interval.end).map(interval => interval.id)
-    : activeOccurrenceIds;
+  const liveActive = activeOccurrenceIds;
   const [viewportRef, measuredWidth, element] = useElementWidth<HTMLDivElement>();
   const [labelOffset, setLabelOffset] = useState(0);
   const syncing = useRef(false);
@@ -412,8 +428,9 @@ export function TimeRoll({
                 : (ghost.durationSeconds ?? 0.25) * pps)} height={Math.max(3, rowHeight - 1)} rx={2}
               aria-label={`New note ${pitchName(ghost.pitch)} at ${ghost.seconds.toFixed(2)} seconds`}/>;
           })() : null}
-          {cursorX !== null ? <line className="ws-shared-surface-cursor ws-roll-playhead" data-shared-cursor
-            data-playhead-seconds={livePlayhead} x1={cursorX} y1={0} x2={cursorX} y2={pitchHeight}/> : null}
+          {cursorX !== null || cursorFallbackSeconds !== null ? <RollCursorLine
+            clock={clock} fallback={cursorFallbackSeconds} cursorX={cursorX}
+            layout={layout} alignment={alignment} gutter={gutter} pitchHeight={pitchHeight}/> : null}
         </svg>
       </div>
     </div>

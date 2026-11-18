@@ -18,7 +18,7 @@ import {
 } from './viewport';
 import {useElementWidth} from './useElementWidth';
 import {useClockTime, type ClockStore} from './clock';
-import {effectiveSecondsToTick, type Alignment} from '../../../../../packages/music-notation/index.ts';
+import type {Alignment} from '../../../../../packages/music-notation/index.ts';
 import {diatonicStep, type GestureEdit} from './gestures';
 
 const RULER_HEIGHT = 22;
@@ -75,6 +75,8 @@ type Props = {
   layout?: TimelineLayout;
   sharedScrollLeft?: number;
   cursorX?: number | null;
+  /** Frame-driven fallback seconds for the internal cursor leaf. */
+  cursorFallbackSeconds?: number | null;
   /** Linked-navigation target from the roll or playback, performed once per token. */
   scrollTarget?: ScoreScrollTarget | null;
   onSelect: (occurrenceId: string) => void;
@@ -91,6 +93,20 @@ type Props = {
   editingEnabled?: boolean;
 };
 
+function ScoreCursorLine({clock, fallback, cursorX, playheadTick, layout, alignment}: {
+  clock?: ClockStore | null;
+  fallback: number | null;
+  cursorX: number | null;
+  playheadTick: number | null;
+  layout?: TimelineLayout;
+  alignment?: Alignment | null;
+}) {
+  const time = useClockTime(clock, fallback ?? 0);
+  const x = cursorX !== null ? cursorX
+    : layout && alignment ? 116 + layout.sourceSecondsToX(time, alignment, 0) : 0;
+  return <line className="ws-shared-surface-cursor ws-score-playhead" data-shared-cursor
+    data-playhead-tick={playheadTick ?? ''} x1={x} y1={RULER_HEIGHT} x2={x} y2={HEIGHT - 10}/>;
+}
 
 const SHARP_ORDER = [
   {letter: 'F', treble: 5, bass: 3}, {letter: 'C', treble: 5, bass: 3},
@@ -120,12 +136,10 @@ export function ContinuousScore({
   scrollTarget = null, onSelect, onAmbiguous, onSeekTick, onUserScroll,
   clock = null, alignment = null, offsetSeconds = 0, intervals,
   onGestureCommit, onAuditionPitch, editingEnabled = true, layout, sharedScrollLeft = 0, cursorX = null,
+  cursorFallbackSeconds = null,
 }: Props) {
-  const liveSeconds = useClockTime(clock, Number.NaN);
-  const liveTick = clock && alignment ? effectiveSecondsToTick(alignment, liveSeconds, offsetSeconds) : playheadTick;
-  const liveActive = intervals
-    ? intervals.filter(interval => liveSeconds >= interval.start && liveSeconds < interval.end).map(interval => interval.id)
-    : activeOccurrenceIds;
+  const liveTick = playheadTick;
+  const liveActive = activeOccurrenceIds;
   const [hostRef, width] = useElementWidth<HTMLDivElement>();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const programmatic = useRef(false);
@@ -148,14 +162,16 @@ export function ContinuousScore({
     const element = scrollRef.current;
     if (!element) return;
     const update = () => {
-      setScrollLeft(element.scrollLeft);
+      // Shared mode writes this viewport directly at 60 fps for follow-scroll.
+      // Its local scroll state is only used by independent virtualization.
+      if (!layout) setScrollLeft(element.scrollLeft);
       if (programmatic.current || !onUserScroll) return;
       onUserScroll(tickAtX(boxes, document, element.scrollLeft + CONTEXT_WIDTH + 4));
     };
-    setScrollLeft(element.scrollLeft);
+    if (!layout) setScrollLeft(element.scrollLeft);
     element.addEventListener('scroll', update, {passive: true});
     return () => element.removeEventListener('scroll', update);
-  }, [width, boxes, document, onUserScroll]);
+  }, [width, boxes, document, onUserScroll, layout]);
 
   // Reveal once per token: panning or editing must not pull the strip back.
   useEffect(() => {
@@ -337,8 +353,9 @@ export function ContinuousScore({
             const x = element.scrollLeft + (event.clientX - rect.left);
             onSeekTick(layout ? layout.xToTick(Math.max(0, x - CONTEXT_WIDTH)) : tickAtX(boxes, document, x));
           }}/>
-        {cursorX !== null ? <line className="ws-shared-surface-cursor ws-score-playhead" data-shared-cursor
-          data-playhead-tick={playheadTick ?? ''} x1={cursorX} y1={RULER_HEIGHT} x2={cursorX} y2={HEIGHT - 10}/> : null}
+        {cursorX !== null || cursorFallbackSeconds !== null ? <ScoreCursorLine
+          clock={clock} fallback={cursorFallbackSeconds} cursorX={cursorX}
+          playheadTick={playheadTick} layout={layout} alignment={alignment}/> : null}
         {liveTick !== null && !layout ? <line className="ws-score-playhead" data-playhead-tick={liveTick}
           x1={xForSharedTick(liveTick)} y1={RULER_HEIGHT}
           x2={xForSharedTick(liveTick)} y2={HEIGHT - 10}/> : null}

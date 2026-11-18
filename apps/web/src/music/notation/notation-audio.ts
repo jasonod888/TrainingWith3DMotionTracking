@@ -1,6 +1,7 @@
 /** Small, allocation-light piano audition for score editing. No samples or network. */
 import {MASTER_GAIN} from '../music-velocity';
 import {schedulePianoVoice, type PianoVoice} from '../piano-audition';
+import {preloadPianoSamples} from '../piano-sampler';
 
 type ScheduledPianoNote = {
   pitch: number;
@@ -40,9 +41,9 @@ export class NotationAudio {
     const context = new Ctor();
     const master = context.createGain();
     const compressor = context.createDynamicsCompressor();
-    compressor.threshold.value = -8;
+    compressor.threshold.value = -6;
     compressor.knee.value = 12;
-    compressor.ratio.value = 3;
+    compressor.ratio.value = 2.5;
     compressor.attack.value = 0.003;
     compressor.release.value = 0.25;
     // A warm, slightly resonant soundboard stage sits before the shared limiter.
@@ -53,11 +54,12 @@ export class NotationAudio {
       body.type = 'peaking';
       body.frequency.value = 220;
       body.Q.value = 0.7;
-      body.gain.value = 1.5;
+      body.gain.value = 0;
       body.connect(compressor);
       bus = body;
     }
     compressor.connect(master).connect(context.destination);
+    preloadPianoSamples(context);
     this.context = context;
     this.master = master;
     this.bus = bus;

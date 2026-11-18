@@ -95,6 +95,7 @@ function transform(fileName, source) {
 }
 
 export async function load(url, context, nextLoad) {
+  if (/\.css(?:[?#].*)?$/.test(url)) return {format: 'module', source: '', shortCircuit: true};
   if (/\.(ts|tsx|mts|cts)(?:[?#].*)?$/.test(url)) {
     const fileName = fileURLToPath(url);
     const source = await readFile(fileName, 'utf8');

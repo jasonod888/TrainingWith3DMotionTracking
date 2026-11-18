@@ -411,3 +411,86 @@
 .draft-preview-controls{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
 .draft-preview-controls label{display:flex;align-items:center;gap:6px}
 .draft-preview-controls input[type=range]{width:100px;accent-color:#527a46}
+
+/* Shared Full-Body practice chrome for reviewed music lessons. */
+.music-practice-shell {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: min(820px, calc(100dvh - 76px));
+  overflow: hidden;
+  background: #f4f2ea;
+}
+.music-practice-topbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #dedacd;
+  background: #fffdf8;
+}
+.music-practice-heading { min-width: 0; }
+.music-practice-heading h1 { margin: 2px 0 4px; font-size: 18px; line-height: 1.2; overflow-wrap: anywhere; }
+.music-practice-heading .eyebrow { margin: 0; color: #53645a; }
+.music-active-pill { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 999px; background: #e5eee6; color: #31523d; font-size: 11px; }
+.music-practice-topbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.music-practice-topbar-actions button { min-height: 34px; padding: 0 10px; border: 1px solid #d3d0c4; border-radius: 8px; background: #fff; color: #2d4034; }
+.music-practice-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(220px, .72fr) minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  padding: 10px;
+  overflow: hidden;
+}
+.music-stage-video { position: relative; min-height: 0; border-radius: 12px; overflow: hidden; background: #16251e; }
+.music-stage-video video, .music-stage-video > img { width: 100%; height: 100%; object-fit: contain; background: #16251e; }
+.music-stage-video .music-no-video { height: 100%; display: grid; place-items: center; padding: 18px; color: #d8e4da; text-align: center; }
+.music-stage-guide { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; padding: 8px; border-radius: 12px; background: #fffdf8; border: 1px solid #e1ddd0; }
+.music-stage-overlay { position: absolute; z-index: 2; left: 22px; top: 22px; right: calc(42% + 22px); pointer-events: none; }
+.music-stage-overlay .music-now { display: inline-block; padding: 5px 9px; border-radius: 8px; background: #fffdf8e8; font-size: 12px; }
+.music-stage-note { margin: 0; padding: 0 12px 8px; }
+.music-practice-player {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid #dcd8cb;
+  background: #f0ede4;
+}
+.music-practice-player .practice-player-toolbar { display: flex; align-items: center; gap: 8px; }
+.music-practice-player .practice-player-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.music-practice-player .music-sync { font-size: 12px; }
+.music-practice-drawer {
+  position: absolute;
+  z-index: 30;
+  top: 64px;
+  right: 0;
+  bottom: 0;
+  width: min(390px, 92%);
+  overflow: auto;
+  padding: 14px;
+  border-left: 1px solid #d6d2c5;
+  background: #fffdf8;
+  box-shadow: -12px 0 32px #1f2a2424;
+}
+.music-practice-drawer[hidden] { display: none; }
+.music-drawer-pane[hidden] { display: none; }
+.music-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.music-drawer-head h2 { margin: 0; font-size: 16px; }
+.music-practice-drawer .practice-panel-body { display: flex; flex-direction: column; gap: 10px; }
+.music-practice-drawer .music-home-grid { grid-template-columns: 1fr; }
+.music-practice-drawer .music-sections { display: grid; gap: 6px; padding: 0; margin: 0; list-style: none; }
+.music-practice-drawer .music-sections button { width: 100%; justify-content: space-between; }
+@media (max-width: 760px) {
+  .music-practice-shell { min-height: calc(100dvh - 60px); }
+  .music-practice-topbar { grid-template-columns: auto minmax(0, 1fr); padding: 8px 10px; gap: 8px; }
+  .music-practice-topbar-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .music-practice-stage { grid-template-columns: 1fr; grid-template-rows: minmax(150px, 42%) minmax(0, 1fr); padding: 6px; gap: 6px; }
+  .music-stage-overlay { left: 12px; right: 12px; top: 12px; }
+  .music-practice-player { padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
+  .music-practice-player .practice-player-actions { gap: 4px; }
+  .music-practice-drawer { top: 0; width: 100%; }
+}

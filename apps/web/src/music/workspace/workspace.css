@@ -1455,3 +1455,188 @@
     flex: 0 0 auto;
   }
 }
+
+.ws-video-pip {
+  position: fixed;
+  right: 20px;
+  bottom: 84px;
+  width: min(320px, 42vw);
+  z-index: 45;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #111;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.ws-video-pip[hidden] { display: none; }
+.ws-video-pip-bar {
+  cursor: grab;
+  user-select: none;
+  padding: 6px 10px;
+  background: rgba(17, 17, 17, 0.92);
+  color: #f5f5f5;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ws-video-pip-bar:active { cursor: grabbing; }
+.ws-video-pip-bar button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff1c;
+  color: #fff;
+  cursor: pointer;
+}
+.ws-video-pip .ws-video {
+  width: 100%;
+  display: block;
+  max-height: 220px;
+  background: #000;
+}
+@media (max-width: 560px) {
+  .ws-video-pip { width: min(280px, 82vw); right: 10px; bottom: 106px; }
+}
+.ws-practice-chunks {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.ws-practice-chunks button {
+  min-height: 28px;
+  padding: 2px 7px;
+  border: 1px solid #d3d0c4;
+  border-radius: 7px;
+  background: #fff;
+  color: #2d4034;
+  font-size: 11px;
+}
+.ws-practice-chunk-status {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #53645a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.ws-shell[data-practice-mode="true"] .practice-player {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ws-practice-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 14px calc(6px + env(safe-area-inset-bottom));
+  background: #f1efe7;
+}
+.ws-practice-footer .practice-player-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ws-practice-footer .practice-player-actions,
+.ws-practice-footer .practice-player-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ws-practice-footer .practice-player-primary {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #24543a;
+  color: #fff;
+  font-weight: 650;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ws-practice-footer .player-text-action,
+.ws-practice-footer .player-tool {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid #d3d0c4;
+  border-radius: 8px;
+  background: #fff;
+  color: #2d4034;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ws-practice-footer .player-tool[aria-pressed="true"] { background: #e3eee6; border-color: #9bb4a3; }
+.ws-practice-footer .practice-timeline { width: 100%; }
+.ws-practice-footer .ws-audio { padding: 1px; }
+.ws-practice-footer .ws-audio button { min-height: 30px; }
+.ws-practice-chunk-picker { padding-top: 8px; border-top: 1px solid #e1ddd0; }
+.ws-practice-chunk-picker h3 { margin: 0 0 6px; font-size: 13px; }
+.ws-practice-chunk-picker .ws-row { flex-wrap: wrap; }
+.ws-practice-chunk-picker button { min-height: 32px; }
+.ws-practice-chunk-picker button[aria-pressed="true"] { background: #e3eee6; border-color: #8fa997; }
+.ws-topbar-actions[hidden] { display: none !important; }
+/* Keep the piano column layout even when the shared immersive styles load later. */
+.ws-shell.ws-shell-focused[data-practice-mode="true"] {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  background: #0e2018;
+  color: #dde7de;
+}
+.ws-shell[data-practice-mode="true"] > .ws-correction {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+.ws-shell[data-practice-mode="true"] .ws-topbar {
+  flex-shrink: 0;
+  background: #10241d;
+  border-bottom-color: #ffffff14;
+  color: #dde7de;
+}
+.ws-shell[data-practice-mode="true"] .ws-title-block h1,
+.ws-shell[data-practice-mode="true"] .ws-back { color: #dde7de; }
+.ws-shell.ws-shell-focused[data-practice-mode="true"] > .practice-player-dock {
+  /* A sibling of the scrolling stage reserves its actual height, including
+     wrapped mobile controls and the safe-area inset. */
+  position: relative;
+  bottom: auto;
+  left: auto;
+  right: auto;
+  z-index: 20;
+  flex-shrink: 0;
+  background: #10241d;
+  border-top: 1px solid #ffffff14;
+}
+.ws-practice-source-select {
+  min-height: 34px;
+  max-width: 112px;
+  padding: 0 7px;
+  border: 1px solid #ffffff24;
+  border-radius: 8px;
+  background: #183328;
+  color: #dde7de;
+  font-size: 12px;
+}
+.ws-shell[data-practice-mode="true"] .practice-player-dock .practice-player-status {
+  color: #adbeaf;
+}
+@media (max-width: 560px) {
+  .ws-practice-footer .player-tool span { display: none; }
+  .ws-practice-footer .practice-player-tools { gap: 3px; }
+}

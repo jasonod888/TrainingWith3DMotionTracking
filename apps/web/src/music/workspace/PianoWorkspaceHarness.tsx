@@ -6,10 +6,17 @@
  * reference video and inspector alongside. Isolated from the review workflow; it
  * loads the same draft through the same API and writes nothing.
  */
-import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
-  ArrowLeft, MoreHorizontal, Pause, Play, Redo2, Settings as SettingsIcon, Undo2, Video, Volume2, X,
+  ArrowLeft, ChevronRight, Mic, MicOff, MoreHorizontal, Pause, Play, Redo2, RotateCcw, Settings as SettingsIcon, Undo2, Video, Volume2, X,
 } from 'lucide-react';
+import {PracticePlayerDock} from '../../PracticePlayerDock';
+import {PracticePanel} from '../../PracticePanel';
+import {
+  PracticeSettingsProvider, SettingsChoices, SettingsGroup, SettingsRow,
+} from '../../PracticeSettings';
+import '../../practice.css';
+import '../../practice-player.css';
 import {ApiError, assetUrl, getSession, request} from '../../api';
 import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
@@ -21,13 +28,19 @@ import {
 } from '../../../../../packages/music-notation/index.ts';
 import {useHandAssignments} from './useHandAssignments';
 import {pitchName} from '../music-reference';
-import {buildTimelineLayout, clampScroll, heldPassageAt} from './timeline-layout';
+import {buildTimelineLayout, clampScroll, heldPassageAt, type TimelineLayout} from './timeline-layout';
 import {KeyboardEditor} from '../notation/KeyboardEditor';
 import {
   clampStandardPianoWindow, FULL_PIANO_MIN_WIDTH, isStandardPianoRange,
   narrowSemitonesForWidth, resolveKeyboardRange, STANDARD_PIANO_RANGE, type PianoRange,
 } from '../notation/piano-key-geometry';
 import {NotationAudio} from '../notation/notation-audio';
+import {downloadMidiFile, exportPerformanceToMidi} from '../midi-export';
+import {MidiPlayerEngine} from '../midi-player';
+import {
+  buildPracticeChunks, chunkAtTime, parseVoiceCommand,
+  type ChunkBarsOption, type PracticeChunk, type PracticeVoiceCommand,
+} from '../practice-chunks';
 import {usePianoSourcePlayer} from '../usePianoSourcePlayer';
 import {usePianoPreviewAsset} from '../usePianoPreviewAsset';
 import {
@@ -103,6 +116,17 @@ function timeLabel(seconds: number): string {
   return `${Math.floor(safe / 60)}:${String(Math.floor(safe % 60)).padStart(2, '0')}`;
 }
 
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: {results: ArrayLike<ArrayLike<{transcript: string}>>}) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  abort: () => void;
+};
+
 /** Display-only title; the saved/source title is never rewritten. */
 function displayPieceTitle(raw: string): string {
   const clean = raw.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -169,10 +193,12 @@ function NumberField({label, value, min, max, step, disabled, onCommit}: {
   </label>;
 }
 
-export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false, onBack, onDirty, onSaved}: {
+export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false, mode = 'review', lessonTitle, onBack, onDirty, onSaved}: {
   lessonId?: string;
   /** Normal review route: hide harness-only labels and demo affordances. */
   embedded?: boolean;
+  mode?: 'review' | 'practice';
+  lessonTitle?: string;
   onBack?: () => void;
   /** Mirrors workspace dirty state to the app router/navigation guards. */
   onDirty?: (dirty: boolean) => void;
@@ -181,6 +207,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 } = {}) {
   const params = new URLSearchParams(location.search);
   const lessonId = lessonIdProp ?? params.get('id') ?? '';
+  const isPractice = mode === 'practice';
 
   const [state, setState] = useState<WorkspaceState | null>(null);
   const [scoreMode, setScoreMode] = useState<'correction' | 'formatted'>('correction');
@@ -231,6 +258,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const pianoRef = useRef<HTMLAudioElement>(null);
   const emptyPianoRef = useRef<HTMLAudioElement | null>(null);
   const liveAudioRef = useRef<NotationAudio | null>(null);
+  const midiPlayerRef = useRef<MidiPlayerEngine | null>(null);
+  const [midiReady, setMidiReady] = useState(false);
   const liveMutedRef = useRef<boolean | null>(null);
   const userVideoMutedRef = useRef<boolean | null>(null);
   /** Latest render's "playback started" handler, used by the native media event. */
@@ -242,6 +271,19 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [previewIdentity, setPreviewIdentity] = useState('');
   const [audioMode, setAudioMode] = useState<'original' | 'piano'>('original');
   const [preferRenderedWav, setPreferRenderedWav] = useState(false);
+  const [pipOpen, setPipOpen] = useState(() => mode === 'practice');
+  const [pipPos, setPipPos] = useState<{left: number; top: number} | null>(null);
+  const [chunkBars, setChunkBars] = useState<ChunkBarsOption>(() => mode === 'practice' ? 2 : 0);
+  const [activeChunkIndex, setActiveChunkIndex] = useState(0);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'off' | 'listening' | 'unsupported'>('off');
+  const [practiceStarted, setPracticeStarted] = useState(false);
+  const [chunkPickerOpen, setChunkPickerOpen] = useState(false);
+  const [practicePanel, setPracticePanel] = useState<'settings' | 'sections' | null>(null);
+  const [settingsRow, setSettingsRow] = useState<string | null>(null);
+  const [volume, setVolume] = useState(1);
+  const practiceCommandSeek = useRef(false);
+  const autoPausedChunk = useRef<number | null>(null);
   const hasWebAudio = typeof globalThis.window !== 'undefined'
     && Boolean(globalThis.window.AudioContext
       || (globalThis.window as typeof globalThis.window & {webkitAudioContext?: typeof AudioContext}).webkitAudioContext);
@@ -255,7 +297,6 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const [scoreReveal, setScoreReveal] = useState<{tick: number; token: number} | null>(null);
   const revealToken = useRef(0);
   const clockRef = useRef(createClock());
-  const livePlayhead = useClockTime(clockRef.current, playhead);
   const [accountId, setAccountId] = useState('');
   const [draftId, setDraftId] = useState('');
   const [sourceSha256, setSourceSha256] = useState('');
@@ -513,10 +554,13 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   const audibleTimings = useMemo(
     () => document ? resolvePerformanceAudibleTimings(document.performance, pedalSpans) : new Map(),
     [document, pedalSpans]);
+  const liveMidiBytes = useMemo(
+    () => document ? exportPerformanceToMidi(document.performance, pedalSpans) : null,
+    [document, pedalSpans]);
   const interactionPolicy = document
     ? resolveInteractionPolicy(document.performance.length, interactiveLimitApproved())
     : {mode: 'read-only' as const, reason: 'The score is not ready.'};
-  const readOnly = interactionPolicy.mode === 'read-only';
+  const readOnly = isPractice || interactionPolicy.mode === 'read-only';
   readOnlyRef.current = readOnly;
   const hands = useHandAssignments(document, lessonId,
     Boolean(lessonId) && !readOnly && !params.get('demo'));
@@ -672,7 +716,66 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     };
   }, [videoUrl]);
 
-  useEffect(() => () => { audioRef.current?.dispose(); liveAudioRef.current?.dispose(); }, []);
+  useEffect(() => () => {
+    audioRef.current?.dispose();
+    liveAudioRef.current?.dispose();
+    midiPlayerRef.current?.dispose();
+    midiPlayerRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!livePiano) { midiPlayerRef.current?.stop(); return; }
+    if (!MidiPlayerEngine.isSupported()) { setMidiReady(false); return; }
+    let disposed = false;
+    const player = midiPlayerRef.current ??= new MidiPlayerEngine();
+    void player.init().then(ok => { if (!disposed && ok) setMidiReady(true); });
+    return () => { disposed = true; };
+  }, [livePiano]);
+
+  useEffect(() => {
+    if (!liveMidiBytes || !midiPlayerRef.current) return;
+    midiPlayerRef.current.loadMidi(liveMidiBytes, Math.max(0,
+      (videoRef.current?.currentTime ?? clockRef.current.get()) - offsetSeconds));
+  }, [liveMidiBytes, midiReady]);
+
+  useEffect(() => {
+    if (!midiReady) return;
+    liveAudioRef.current?.stop();
+  }, [midiReady]);
+
+  useEffect(() => {
+    if (!livePiano || !midiReady) return;
+    const player = midiPlayerRef.current;
+    const media = videoRef.current;
+    if (!player || !media) return;
+    const sync = (forceSeek: boolean) => {
+      player.setVolume(media.volume);
+      player.syncTransport({
+        playing: !media.paused && !media.ended && !media.seeking && media.readyState >= 2,
+        currentTime: media.currentTime,
+        rate: media.playbackRate || rate,
+        offsetSeconds,
+        forceSeek,
+      });
+    };
+    const handlers: [string, () => void][] = [
+      ['play', () => sync(false)],
+      ['pause', () => sync(false)],
+      ['seeking', () => sync(true)],
+      ['seeked', () => sync(true)],
+      ['ratechange', () => sync(false)],
+      ['volumechange', () => sync(false)],
+      ['waiting', () => sync(false)],
+      ['playing', () => sync(false)],
+    ];
+    for (const [name, handler] of handlers) media.addEventListener(name, handler);
+    sync(false);
+    const timer = globalThis.setInterval(() => sync(false), 250);
+    return () => {
+      globalThis.clearInterval(timer);
+      for (const [name, handler] of handlers) media.removeEventListener(name, handler);
+    };
+  }, [livePiano, midiReady, offsetSeconds, rate, videoUrl]);
 
   // The existing source-driven controller for a verified WAV preview. Live synthesis has
   // its own source-clock scheduler and must not bind an empty/stale audio element.
@@ -725,7 +828,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   }, [livePiano, videoUrl]);
 
   useEffect(() => {
-    if (!livePiano || !document) return;
+    if (!livePiano || !document || midiReady) return;
     const media = videoRef.current;
     const audio = liveAudioRef.current ??= new NotationAudio(1.15);
     const triggered = new Set<string>();
@@ -782,7 +885,12 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             && nextOnset < note.onset + rawDuration) {
             duration = nextOnset - note.onset;
           }
-          dampedByKey = rawDuration < 1.2;
+          const pedaled = pedalSpans.some(span => {
+            const start = (span as MusicPedalSpan & {start?: number}).start ?? span.onset;
+            const end = (span as MusicPedalSpan & {end?: number}).end ?? span.offset;
+            return start <= note.onset && note.onset <= end;
+          });
+          dampedByKey = pedalSpans.length > 0 ? !pedaled && rawDuration < 1.2 : rawDuration < 1.2;
         }
         const start = shiftOnset(note.onset, offsetSeconds);
         const end = start + duration;
@@ -844,7 +952,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       reset();
       if (media) for (const [name, handler] of listeners) media.removeEventListener(name, handler);
     };
-  }, [audibleTimings, livePiano, livePerformanceKey, offsetSeconds, pedalSpans.length, rate, rawModelDraft, videoUrl]);
+  }, [audibleTimings, livePiano, livePerformanceKey, midiReady, offsetSeconds, pedalSpans.length, rate, rawModelDraft, videoUrl]);
 
   const seek = useCallback((seconds: number) => {
     const media = videoRef.current;
@@ -1013,7 +1121,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   useEffect(() => {
     if (!addMode) return;
     const onKey = (event: KeyboardEvent) => {
-      if (scoreModeRef.current === 'formatted') return;
+      if (scoreModeRef.current === 'formatted' || readOnlyRef.current) return;
       const target = event.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
       if (event.key === 'Enter') { event.preventDefault(); commitAdd(); }
@@ -1043,7 +1151,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (scoreModeRef.current === 'formatted') return;
+      if (scoreModeRef.current === 'formatted' || readOnlyRef.current) return;
       const target = event.target as HTMLElement | null;
       if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
       const modifier = event.metaKey || event.ctrlKey;
@@ -1091,6 +1199,120 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     () => (document && baseAlignment ? applyAnchors(baseAlignment, document, anchors) : null),
     [document, baseAlignment, anchors]);
   const alignment = mapState ?? anchored?.alignment ?? baseAlignment;
+  const chunks = useMemo(() => (isPractice && document && alignment && chunkBars > 0)
+    ? buildPracticeChunks(document.measures, alignment, offsetSeconds, document.duration, chunkBars)
+    : [], [isPractice, document, alignment, offsetSeconds, chunkBars]);
+  const timelineSections = useMemo(() => chunks.length
+    ? chunks.map((chunk, index) => ({
+      id: `chunk-${index}`, label: chunk.label, start: chunk.start, end: chunk.end,
+    }))
+    : document ? [{id: 'all', label: 'Whole piece', start: 0, end: document.duration}] : [],
+    [chunks, document]);
+  const practiceTimelineIndex = Math.min(activeChunkIndex, Math.max(0, timelineSections.length - 1));
+
+  const runPracticeCommand = useCallback((command: PracticeVoiceCommand) => {
+    if (!isPractice) return;
+    const video = videoRef.current;
+    if (command === 'play') { void video?.play().catch(() => {}); return; }
+    if (command === 'pause') { video?.pause(); return; }
+    if (!chunks.length) return;
+    let index = activeChunkIndex;
+    if (command === 'next') index = Math.min(chunks.length - 1, index + 1);
+    else if (command === 'back') index = Math.max(0, index - 1);
+    if (command !== 'again') setActiveChunkIndex(index);
+    practiceCommandSeek.current = true;
+    globalThis.setTimeout(() => { practiceCommandSeek.current = false; }, 150);
+    seek(chunks[index].start);
+    void video?.play().catch(() => {});
+  }, [isPractice, chunks, activeChunkIndex, seek]);
+
+  const startPracticePlayback = useCallback((voice: 'keep' | 'off') => {
+    if (!isPractice) return;
+    setPracticeStarted(true);
+    if (voice === 'off') setVoiceEnabled(false);
+    if (chunks.length) {
+      setActiveChunkIndex(0);
+      practiceCommandSeek.current = true;
+      globalThis.setTimeout(() => { practiceCommandSeek.current = false; }, 150);
+      seek(chunks[0].start);
+    }
+    void videoRef.current?.play().catch(() => {});
+  }, [isPractice, chunks, seek]);
+
+  useEffect(() => {
+    if (!isPractice || playing || !chunks.length) return;
+    if (autoPausedChunk.current === activeChunkIndex) { autoPausedChunk.current = null; return; }
+    setActiveChunkIndex(chunkAtTime(chunks, playhead));
+  }, [isPractice, playing, chunks, playhead, activeChunkIndex]);
+
+  useEffect(() => {
+    if (!isPractice || !playing || !chunks.length) return;
+    const chunk = chunks[Math.min(activeChunkIndex, chunks.length - 1)];
+    if (!chunk) return;
+    let paused = false;
+    return clockRef.current.subscribe(() => {
+      if (paused || clockRef.current.get() < chunk.end - 0.02) return;
+      if (practiceCommandSeek.current) return;
+      paused = true;
+      autoPausedChunk.current = activeChunkIndex;
+      videoRef.current?.pause();
+      midiPlayerRef.current?.syncTransport({playing: false, currentTime: chunk.end, rate, offsetSeconds});
+      seek(chunk.end);
+    });
+  }, [isPractice, playing, chunks, activeChunkIndex, rate, offsetSeconds, seek]);
+
+  useEffect(() => {
+    if (!isPractice || !chunks.length) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
+      if (event.key === 'ArrowRight') { event.preventDefault(); runPracticeCommand('next'); }
+      else if (event.key === 'ArrowLeft') { event.preventDefault(); runPracticeCommand('back'); }
+      else if (event.key === 'r' || event.key === 'R') { event.preventDefault(); runPracticeCommand('again'); }
+    };
+    globalThis.window.addEventListener('keydown', onKey);
+    return () => globalThis.window.removeEventListener('keydown', onKey);
+  }, [isPractice, chunks.length, runPracticeCommand]);
+
+  useEffect(() => {
+    if (!isPractice || !voiceEnabled) { setVoiceStatus('off'); return; }
+    const speechWindow = globalThis.window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (typeof Recognition !== 'function') { setVoiceStatus('unsupported'); return; }
+    let disposed = false;
+    let failed = false;
+    let recognition: SpeechRecognitionLike | null = null;
+    try {
+      recognition = new Recognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      recognition.onresult = event => {
+        if (disposed || playing) return;
+        const result = event.results[event.results.length - 1];
+        const transcript = result?.[0]?.transcript ?? '';
+        const command = parseVoiceCommand(transcript);
+        if (command) runPracticeCommand(command);
+      };
+      recognition.onerror = () => { failed = true; if (!disposed) setVoiceStatus('off'); };
+      recognition.onend = () => {
+        if (disposed || failed || !voiceEnabled) return;
+        try { recognition?.start(); } catch { setVoiceStatus('off'); }
+      };
+      recognition.start();
+      setVoiceStatus('listening');
+    } catch {
+      setVoiceStatus('unsupported');
+    }
+    return () => {
+      disposed = true;
+      recognition?.abort();
+    };
+  }, [isPractice, voiceEnabled, playing, runPracticeCommand]);
   const intervals = useMemo(() => (document ? occurrenceIntervals(document, offsetSeconds) : []), [document, offsetSeconds]);
 
   // Active highlighting and key selection use the same offset-aware intervals as
@@ -1300,7 +1522,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
 
   // A reopened reference becomes the clean saved state once its document is applied.
   useEffect(() => {
-    if (!lessonId || !draftId || rawModelDraft) { setVerification(null); return; }
+    if (!lessonId || !draftId || rawModelDraft || isPractice) { setVerification(null); return; }
     let stopped = false;
     void loadVerification(lessonId, draftId).then(value => {
       if (stopped || value === null) return;
@@ -1308,7 +1530,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       if (parsed.ok) setVerification(parsed.value);
     }).catch(() => {});
     return () => { stopped = true; };
-  }, [lessonId, draftId, rawModelDraft]);
+  }, [lessonId, draftId, rawModelDraft, isPractice]);
 
   const decideFinding = useCallback(async (finding: VerificationFinding, decision: 'accepted' | 'rejected') => {
     if (readOnlyRef.current) {
@@ -1593,7 +1815,10 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     if (!bar || scoreModeRef.current === 'formatted' || bar.clientWidth <= 0) return;
     const next = bar.scrollLeft;
     setSharedWidth(bar.clientWidth);
-    if (Math.abs(next - commandedScroll.current) > 2 && !gestureLock) setFollowSuspended(true);
+    // Follow writes the DOM directly at 60 fps and advances commandedScroll first.
+    // Ignore its echoed scroll events so they do not re-enter React every frame.
+    if (Math.abs(next - commandedScroll.current) <= 2) return;
+    if (!gestureLock) setFollowSuspended(true);
     commandedScroll.current = next;
     setSharedScrollLeft(next);
     for (const node of globalThis.document.querySelectorAll<HTMLElement>('.ws-roll-viewport, .ws-score-viewport')) {
@@ -1676,28 +1901,44 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
   }, [addMenuOpen, overlap, reviewOpen, toggleTransport]);
 
   // One frame-driven follow writer: stationary cursor until the safe-area threshold,
-  // then content advances beneath it. No smooth-scroll timer races the clock.
-  useLayoutEffect(() => {
-    if (!follow || followSuspended || gestureLock || !playing || !document || !alignment || !timelineLayout) return;
-    const W = sharedBarRef.current?.clientWidth || sharedWidth;
-    if (W <= 0) return;
-    const p = 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0);
-    const plotWidth = Math.max(1, W - 116);
-    const ratio = W < 700 ? 0.6 : 0.7;
-    const right = 116 + ratio * plotWidth;
-    const q = p - sharedScrollLeft;
-    if (q < 0 || q > W) {
-      commitSharedScroll(p - W * 0.25);
-      return;
-    }
-    if (q > right) commitSharedScroll(p - right);
-  }, [livePlayhead, follow, followSuspended, gestureLock, playing, document, alignment,
-    timelineLayout, sharedWidth, sharedScrollLeft, commitSharedScroll]);
-
-  // A pause freezes the view; nothing else writes scroll while paused.
+  // then content advances beneath it. The DOM scrolls every frame; React state is
+  // refreshed at only 4 Hz so virtualization stays current without a render storm.
   useEffect(() => {
-    if (!playing) commandedScroll.current = sharedScrollLeft;
-  }, [playing, sharedScrollLeft]);
+    if (!follow || followSuspended || gestureLock || !playing || !document || !alignment || !timelineLayout) return;
+    let lastReactSync = 0;
+    const unsubscribe = clockRef.current.subscribe(() => {
+      const W = sharedBarRef.current?.clientWidth || sharedWidth;
+      if (W <= 0) return;
+      const p = 116 + timelineLayout.sourceSecondsToX(clockRef.current.get(), alignment, 0);
+      const plotWidth = Math.max(1, W - 116);
+      const ratio = W < 700 ? 0.6 : 0.7;
+      const right = 116 + ratio * plotWidth;
+      const q = p - commandedScroll.current;
+      let target: number | null = null;
+      if (q < 0 || q > W) target = p - W * 0.25;
+      else if (q > right) target = p - right;
+      if (target === null) return;
+      const next = clampScroll(target, timelineWidth + 116, W);
+      commandedScroll.current = next;
+      const bar = sharedBarRef.current;
+      if (bar && Math.abs(bar.scrollLeft - next) > 0.5) bar.scrollLeft = next;
+      for (const node of globalThis.document.querySelectorAll<HTMLElement>('.ws-roll-viewport, .ws-score-viewport')) {
+        if (Math.abs(node.scrollLeft - next) > 0.5) node.scrollLeft = next;
+      }
+      const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (nowMs - lastReactSync >= 250) {
+        lastReactSync = nowMs;
+        setSharedScrollLeft(next);
+      }
+    });
+    return unsubscribe;
+  }, [follow, followSuspended, gestureLock, playing, document, alignment,
+    timelineLayout, timelineWidth, sharedWidth]);
+
+  // A pause freezes the view; flush the latest commanded position to React once.
+  useEffect(() => {
+    if (!playing) setSharedScrollLeft(commandedScroll.current);
+  }, [playing]);
 
   // Keep the source clock's rate when the video (re)mounts.
   useEffect(() => {
@@ -1705,9 +1946,15 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     if (media) media.playbackRate = rate;
   }, [videoUrl, rate]);
 
+  // Keep the source volume under the shared practice settings control.
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.volume = volume;
+    if (pianoRef.current) pianoRef.current.volume = volume;
+  }, [volume, videoUrl, previewAsset]);
+
   const zoom = useCallback((factor: number) => {
     if (!timelineLayout || !alignment || gestureLock || !document) return;
-    const p = 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0);
+    const p = 116 + timelineLayout.sourceSecondsToX(clockRef.current.get(), alignment, 0);
     const anchorX = p >= sharedScrollLeft && p <= sharedScrollLeft + sharedWidth
       ? p : sharedScrollLeft + sharedWidth / 2;
     const anchorTick = timelineLayout.xToTick(Math.max(0, anchorX - 116));
@@ -1985,7 +2232,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     URL.revokeObjectURL(url);
   };
 
-  const headerStatus = readOnly ? 'Read-only lesson'
+  const headerStatus = isPractice ? 'Practice'
+    : readOnly ? 'Read-only lesson'
     : saveMessage ? 'Saved'
     : dirty ? 'Unsaved changes · private draft'
     : savedRevisionId ? 'Saved' : 'Private draft';
@@ -2020,15 +2268,53 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     </p>}
   </section> : null;
 
-  return <main className="ws-shell ws-shell-focused" ref={shellRef} data-workspace-dirty={dirty ? 'true' : 'false'}
-    data-interactive-mode={interactionPolicy.mode}
-    style={{overflowX: 'clip', maxWidth: '100vw', contain: 'paint'}}
+  const startPipDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || (event.target as Element | null)?.closest?.('button')) return;
+    const pip = event.currentTarget.parentElement;
+    if (!pip) return;
+    event.preventDefault();
+    const rect = pip.getBoundingClientRect();
+    const startX = event.clientX, startY = event.clientY;
+    const startLeft = rect.left, startTop = rect.top;
+    const move = (next: PointerEvent) => {
+      const maxLeft = Math.max(0, globalThis.innerWidth - rect.width);
+      const maxTop = Math.max(0, globalThis.innerHeight - rect.height);
+      setPipPos({
+        left: Math.max(0, Math.min(maxLeft, startLeft + next.clientX - startX)),
+        top: Math.max(0, Math.min(maxTop, startTop + next.clientY - startY)),
+      });
+    };
+    const end = () => {
+      globalThis.window.removeEventListener('pointermove', move);
+      globalThis.window.removeEventListener('pointerup', end);
+      globalThis.window.removeEventListener('pointercancel', end);
+    };
+    globalThis.window.addEventListener('pointermove', move);
+    globalThis.window.addEventListener('pointerup', end);
+    globalThis.window.addEventListener('pointercancel', end);
+  };
+
+  return <main className={`ws-shell ws-shell-focused${isPractice ? ' mimic-shell mimic-immersive minimal-practice' : ''}`} ref={shellRef} data-workspace-dirty={dirty ? 'true' : 'false'}
+    data-practice-mode={isPractice ? 'true' : 'false'}
+    data-interactive-mode={isPractice ? 'read-only' : interactionPolicy.mode}
+    style={isPractice ? {overflowX: 'clip', maxWidth: '100vw'} : {overflowX: 'clip', maxWidth: '100vw', contain: 'paint'}}
     onPointerDownCapture={event => {
       workspaceActive.current = true;
       const target = (event.target as Element | null)?.closest?.('[data-occurrence]') as HTMLElement | null;
       const occurrenceId = target?.getAttribute('data-occurrence');
       if (target && occurrenceId) selectionReference.current = {occurrenceId, element: target};
     }}>
+    <div className="ws-video-pip" hidden={!pipOpen || !videoUrl}
+      data-video-pip={pipOpen ? 'open' : 'closed'}
+      style={pipPos ? {left: pipPos.left, top: pipPos.top, right: 'auto', bottom: 'auto'} : undefined}>
+      <div className="ws-video-pip-bar" onPointerDown={startPipDrag}>
+        <span>Video</span>
+        <button type="button" aria-label="Close video" title="Close video"
+          onClick={() => setPipOpen(false)}><X size={15}/></button>
+      </div>
+      <video ref={videoRef} src={videoUrl ?? undefined} controls playsInline preload="metadata" className="ws-video"/>
+      {previewAsset ? <audio ref={pianoRef} src={preview.url || undefined} preload="auto"/> : null}
+    </div>
     <header className="ws-topbar">
       <div className="ws-topbar-lead">
         {onBack && <button type="button" className="ws-icon-button ws-back" data-workspace-back="true"
@@ -2038,27 +2324,27 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             onBack();
           }}><ArrowLeft size={19}/></button>}
         <div className="ws-title-block">
-          <h1>{displayPieceTitle(title)}</h1>
-          <p className="ws-topbar-status" data-save-status={dirty ? 'dirty' : 'clean'}
-            title={headerStatusDetail}>{headerStatus}</p>
+          <h1>{isPractice ? displayPieceTitle(lessonTitle || title) : displayPieceTitle(title)}</h1>
+          {!isPractice && <p className="ws-topbar-status" data-save-status={dirty ? 'dirty' : 'clean'}
+            title={headerStatusDetail}>{headerStatus}</p>}
         </div>
       </div>
-      <div className="ws-topbar-actions">
+      <div className="ws-topbar-actions" hidden={isPractice}>
         {scoreMode === 'formatted' && <button type="button" className="ws-quiet-button"
           onClick={() => setScoreMode('correction')}>Return to correction</button>}
-        <button type="button" className="ws-icon-button ws-undo" aria-label="Undo" title="Undo"
+        {!isPractice && <button type="button" className="ws-icon-button ws-undo" aria-label="Undo" title="Undo"
           onClick={() => dispatch({type: 'undo'})}
-          disabled={readOnly || !state.past.length || Boolean(replaceMode) || Boolean(addMode)}><Undo2 size={19}/></button>
-        <button type="button" className="ws-icon-button ws-redo" aria-label="Redo" title="Redo"
+          disabled={readOnly || !state.past.length || Boolean(replaceMode) || Boolean(addMode)}><Undo2 size={19}/></button>}
+        {!isPractice && <button type="button" className="ws-icon-button ws-redo" aria-label="Redo" title="Redo"
           onClick={() => dispatch({type: 'redo'})}
-          disabled={readOnly || !state.future.length || Boolean(replaceMode) || Boolean(addMode)}><Redo2 size={19}/></button>
+          disabled={readOnly || !state.future.length || Boolean(replaceMode) || Boolean(addMode)}><Redo2 size={19}/></button>}
         <button type="button" className="ws-icon-button" aria-label="Settings" title="Settings"
           aria-expanded={drawerOpen && drawerTarget === 'settings'} data-settings-toggle="true"
           onClick={() => openDrawer('settings')}><SettingsIcon size={19}/></button>
         <button type="button" className="ws-icon-button ws-more" aria-label="More" title="More"
           aria-expanded={drawerOpen && drawerTarget === 'more'} data-more-toggle="true"
           onClick={() => openDrawer('more')}><MoreHorizontal size={19}/></button>
-        {!readOnly && <button ref={reviewTrigger} type="button" className="ws-save"
+        {!isPractice && !readOnly && <button ref={reviewTrigger} type="button" className="ws-save"
           onClick={() => {
             setReviewOpen(true); setDrawerOpen(false); setAddMenuOpen(false);
             setPitchPickMode(null); setReplaceMode(null); setAddMode(null); setDuplicateId(null);
@@ -2071,7 +2357,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       </div>
     </header>
 
-    {(readOnly || saveMessage || saveError || saveConflict || reopenMessage || report || notice
+    {!isPractice && (readOnly || saveMessage || saveError || saveConflict || reopenMessage || report || notice
       || verification?.stale || verification?.report_error || verification?.conflicts.length) &&
       <div className="ws-notice-strip">
         {readOnly ? <div className="inline-notice" role="status" data-read-only="true">
@@ -2100,7 +2386,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
     {scoreMode === 'formatted' ? <FormattedScore document={document} title={title}
       selectedOccurrenceId={selection?.occurrenceId ?? null}/> : null}
     <div className="ws-correction" hidden={scoreMode === 'formatted'}>
-    {recoveryOffer && <section className="ws-panel" role="status" aria-label="Local recovery" data-recovery="offer">
+    {!isPractice && recoveryOffer && <section className="ws-panel" role="status" aria-label="Local recovery" data-recovery="offer">
       <p>A local checkpoint from {new Date(recoveryOffer.savedAt).toLocaleString()} is available.
         It is <strong>not saved to the server</strong>.</p>
       <div className="ws-row">
@@ -2108,8 +2394,8 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         <button type="button" onClick={() => { clearRecovery(); setRecoveryOffer(null); }}>Discard</button>
       </div>
     </section>}
-    {recoveryNotice && <p className="ws-hint" role="status" data-recovery="rejected">{recoveryNotice}</p>}
-    {staleCheckpoint && <section className="ws-panel" role="status" aria-label="Stale local recovery" data-recovery="stale">
+    {!isPractice && recoveryNotice && <p className="ws-hint" role="status" data-recovery="rejected">{recoveryNotice}</p>}
+    {!isPractice && staleCheckpoint && <section className="ws-panel" role="status" aria-label="Stale local recovery" data-recovery="stale">
       <p>This checkpoint was written against an older saved revision. Restoring keeps your work but
         saves as a new revision on the current base.</p>
       <div className="ws-row">
@@ -2175,15 +2461,15 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             onClick={() => setRollOpen(open => !open)}>
             <span>Piano roll</span><span className="ws-accordion-state">{rollVisible ? 'Hide' : 'Show'}</span>
           </button>
-          <button type="button" className="ws-quiet-button ws-add-trigger" data-add-menu-toggle="true"
+          {!isPractice && <button type="button" className="ws-quiet-button ws-add-trigger" data-add-menu-toggle="true"
             aria-expanded={addMenuOpen} aria-label="Add note" title="Add note"
-            onClick={() => addMenuOpen ? setAddMenuOpen(false) : openAddMenu()}>+ Add note</button>
+            onClick={() => addMenuOpen ? setAddMenuOpen(false) : openAddMenu()}>+ Add note</button>}
           </div>
           <div id="piano-roll-body" hidden={!rollVisible}>
           <TimeRoll document={document} window={window} onWindowChange={next => changeWindow(next, 'reveal')}
             layout={timelineLayout ?? undefined} alignment={alignment ?? undefined}
             sharedScrollLeft={sharedScrollLeft} sharedViewportWidth={sharedWidth} gutter={sharedWidth > 0 && sharedWidth < 700 ? 82 : 70}
-            cursorX={timelineLayout && alignment ? (sharedWidth > 0 && sharedWidth < 700 ? 82 : 70) + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0) : null}
+            cursorFallbackSeconds={timelineLayout && alignment ? playhead : null}
             onGestureStart={() => { setGestureLock(true); setFollowSuspended(true); }}
             onGestureEnd={() => setGestureLock(false)}
             onWindowChangeOrigin={changeWindow}
@@ -2192,7 +2478,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             selectedOccurrenceId={selection?.occurrenceId ?? null}
             reveal={null}
             onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
-            editingEnabled={scoreMode === 'correction' && !replaceMode && !addMode}
+            editingEnabled={!isPractice && scoreMode === 'correction' && !replaceMode && !addMode}
             snapSeconds={snapTicks ? snapTicks * secondsPerTick : null}
             addMode={Boolean(addMode)}
             ghost={addMode ? {seconds: addMode.seconds, pitch: addMode.pitch,
@@ -2212,10 +2498,10 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             playheadTick={playheadTick} activeOccurrenceIds={activeIds}
             clock={clockRef.current} alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals}
             layout={timelineLayout ?? undefined} sharedScrollLeft={sharedScrollLeft}
-            cursorX={timelineLayout && alignment ? 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0) : null}
+            cursorFallbackSeconds={timelineLayout && alignment ? playhead : null}
             onSeekTick={seekToTick}
             onGestureCommit={applyGestureEdit} onAuditionPitch={auditionPitch}
-            editingEnabled={scoreMode === 'correction' && !replaceMode && !addMode}
+            editingEnabled={!isPractice && scoreMode === 'correction' && !replaceMode && !addMode}
             onAmbiguous={(logicalNoteId, occurrenceIds) => setNotice(
               `This written note maps ${occurrenceIds.length} occurrences; choose one in the roll (logical ${logicalNoteId}).`)}/>
         </section>
@@ -2241,7 +2527,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         {stageView === 'place' && addModePanel}
       </div>
 
-      <div className="ws-dock" data-compact={limitedHeight ? 'true' : 'false'}>
+      {!isPractice && <div className="ws-dock" data-compact={limitedHeight ? 'true' : 'false'}>
         <button type="button" className="ws-play" onClick={toggleTransport}
           aria-label={playing ? 'Pause' : 'Play'} aria-keyshortcuts="Space"
           title={playing ? 'Pause (Space)' : 'Play (Space)'}>
@@ -2263,11 +2549,29 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
               if (seekSeconds !== undefined) seek(seekSeconds);
             }}/>
           <div className="ws-dock-times">
-            <span className="ws-time">{timeLabel(livePlayhead)}</span>
+            <LiveTimeLabel clock={clockRef.current} fallback={playhead}/>
             <span>{timeLabel(document.duration)}</span>
           </div>
         </div>
         <div className="ws-dock-actions">
+          {isPractice&&chunks.length>0&&<div className="ws-practice-chunks" role="group" aria-label="Practice chunks">
+            <button type="button" aria-label="Previous chunk"
+              onClick={() => runPracticeCommand('back')}>Back</button>
+            <button type="button" aria-label="Repeat chunk"
+              onClick={() => runPracticeCommand('again')}>Again</button>
+            <button type="button" aria-label="Next chunk"
+              onClick={() => runPracticeCommand('next')}>Next</button>
+            <span className="ws-practice-chunk-status" data-practice-chunk="true">
+              {chunks[Math.min(activeChunkIndex, chunks.length - 1)]?.label}
+              {` (${Math.min(activeChunkIndex, chunks.length - 1) + 1}/${chunks.length})`}
+            </span>
+          </div>}
+          {isPractice&&chunks.length>0&&<button type="button" className="ws-icon-button"
+            aria-label="Voice commands" aria-pressed={voiceEnabled}
+            title={voiceStatus === 'unsupported'
+              ? 'Voice recognition unavailable in this browser'
+              : 'Voice commands (Next, Back, Again)'}
+            onClick={() => setVoiceEnabled(enabled => !enabled)}>Mic</button>}
           <span className="ws-hand-mini" data-hands-inline-legend="true" role="img"
             aria-label="Hand colour legend: blue left, amber right, grey-green unknown">
             <span className="hand-left" title="Left hand">Left</span>
@@ -2292,17 +2596,9 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           </div>}
           {followSuspended && <button type="button" className="ws-pill" onClick={returnToPlayhead}>Resume follow</button>}
           {followSuspended && <span className="ws-sr-only" data-follow-suspended="true">Follow suspended · manual inspection</span>}
-          {(() => {
-            if (!timelineLayout || !alignment || sharedWidth <= 0) return null;
-            const p = 116 + timelineLayout.sourceSecondsToX(livePlayhead, alignment, 0);
-            const direction = p < sharedScrollLeft ? 'left' : p > sharedScrollLeft + sharedWidth ? 'right' : 'visible';
-            if (direction === 'visible') return null;
-            return <span className="ws-follow-direction" data-follow-direction={direction}
-              aria-label={playing ? (direction === 'right' ? 'Playing to the right' : 'Playing to the left')
-                : (direction === 'right' ? 'Playhead to the right' : 'Playhead to the left')}>
-              {direction === 'right' ? '→' : '←'}
-            </span>;
-          })()}
+          <LiveFollowDirection clock={clockRef.current} fallback={playhead}
+            timelineLayout={timelineLayout} alignment={alignment}
+            sharedWidth={sharedWidth} sharedScrollLeft={sharedScrollLeft} playing={playing}/>
           <label className="ws-speed">
             <span className="ws-sr-only">Playback speed</span>
             <select value={rate} aria-label={`Playback speed ${rate}×`}
@@ -2320,14 +2616,85 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
               title={pianoTitle}
               onClick={() => setAudioMode('piano')}>Piano</button>
           </div>
-          <button type="button" className="ws-icon-button" onClick={() => openDrawer('video')}
-            aria-label="Video" title="Video"><Video size={19}/></button>
+          <button type="button" className="ws-icon-button" aria-pressed={pipOpen}
+            aria-label="Video" title={pipOpen ? 'Hide video' : 'Show video'}
+            onClick={() => setPipOpen(open => !open)}><Video size={19}/></button>
           <button type="button" className="ws-icon-button" onClick={() => openDrawer('sound')}
             aria-label="Sound options" title="Sound options"><Volume2 size={19}/></button>
         </div>
-      </div>
+      </div>}
 
-      <aside ref={drawerRef} className="ws-side ws-drawer"
+
+
+      {isPractice && practicePanel === 'settings' && <PracticePanel title="Practice settings"
+        drawer modal={false} onClose={() => setPracticePanel(null)}>
+        <PracticeSettingsProvider row={settingsRow} setRow={setSettingsRow}>
+          <SettingsGroup id="setup" title="Audio & Practice"
+            summary={audioMode === 'piano' ? 'Piano' : 'Original'}>
+            <SettingsRow id="audio" label="Sound" value={audioMode === 'piano' ? 'Piano' : 'Original'}>
+              <SettingsChoices label="Sound" value={audioMode}
+                options={[{value: 'original', label: 'Original'},
+                  {value: 'piano', label: 'Piano', disabled: pianoDisabled}]}
+                onChange={value => setAudioMode(value === 'piano' ? 'piano' : 'original')}/>
+            </SettingsRow>
+            <SettingsRow id="stops" label="Practice stops"
+              value={chunkBars === 0 ? 'Off' : `${chunkBars} bar${chunkBars === 1 ? '' : 's'}`}>
+              <SettingsChoices label="Practice stops" value={chunkBars}
+                options={[{value: 0, label: 'Off (0)'}, {value: 1, label: '1 bar'},
+                  {value: 2, label: '2 bars'}, {value: 4, label: '4 bars'}]}
+                onChange={value => { setChunkBars(value as ChunkBarsOption); setActiveChunkIndex(0); }}/>
+            </SettingsRow>
+            <SettingsRow id="voice" label="Voice commands" value={voiceEnabled ? 'On' : 'Off'}>
+              <SettingsChoices label="Voice commands" value={voiceEnabled ? 'on' : 'off'}
+                options={[{value: 'off', label: 'Off'}, {value: 'on', label: 'On'}]}
+                onChange={value => setVoiceEnabled(value === 'on')}/>
+            </SettingsRow>
+            <SettingsRow id="volume" label="Volume" value={`${Math.round(volume * 100)}%`}>
+              <input aria-label="Volume" type="range" min={0} max={1} step={0.01}
+                value={volume} onChange={event => setVolume(Number(event.target.value))}/>
+            </SettingsRow>
+          </SettingsGroup>
+          <SettingsGroup id="playback" title="Playback" summary={`${rate}×`}>
+            <SettingsRow id="speed" label="Speed" value={`${rate}×`}>
+              <SettingsChoices label="Speed" value={rate}
+                options={[{value: 0.5, label: '0.5×'}, {value: 0.75, label: '0.75×'},
+                  {value: 1, label: '1×'}]}
+                onChange={value => changeRate(value)}/>
+            </SettingsRow>
+          </SettingsGroup>
+          <SettingsGroup id="display" title="Display" summary={pipOpen ? 'Video on' : 'Video hidden'}>
+            <SettingsRow id="video" label="Instructor video" value={pipOpen ? 'Shown' : 'Hidden'}>
+              <SettingsChoices label="Instructor video" value={pipOpen ? 'show' : 'hide'}
+                disabled={!videoUrl}
+                options={[{value: 'show', label: 'Show'}, {value: 'hide', label: 'Hide'}]}
+                onChange={value => setPipOpen(value === 'show')}/>
+            </SettingsRow>
+            <SettingsRow id="roll" label="Piano roll" value={rollVisible ? 'Shown' : 'Hidden'}>
+              <SettingsChoices label="Piano roll" value={rollVisible ? 'show' : 'hide'}
+                options={[{value: 'show', label: 'Show'}, {value: 'hide', label: 'Hide'}]}
+                onChange={value => setRollOpen(value === 'show')}/>
+            </SettingsRow>
+          </SettingsGroup>
+        </PracticeSettingsProvider>
+      </PracticePanel>}
+      {isPractice && practicePanel === 'sections' && <PracticePanel title="Sections"
+        onClose={() => setPracticePanel(null)}>
+        <div className="practice-section-list section-picker">
+          {chunks.length > 0 ? chunks.map(chunk => <button key={chunk.index}
+            type="button" className="section-picker-item" onClick={() => {
+              setActiveChunkIndex(chunk.index);
+              seek(chunk.start);
+              setPracticePanel(null);
+            }}>{chunk.label}</button>)
+            : <button type="button" className="section-picker-item" onClick={() => {
+              seek(0);
+              setActiveChunkIndex(0);
+              setPracticePanel(null);
+            }}>Whole piece</button>}
+        </div>
+      </PracticePanel>}
+
+      {!isPractice && <aside ref={drawerRef} className="ws-side ws-drawer"
         role={drawerTarget === 'note' ? 'region' : 'dialog'}
         aria-label={drawerTarget === 'note' ? 'Note editor' : drawerTarget === 'more' ? 'More'
           : drawerTarget === 'video' ? 'Video' : drawerTarget === 'sound' ? 'Sound' : 'Settings and details'}
@@ -2354,7 +2721,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             ['lesson', 'Lesson'],
             ['timing', 'Advanced timing'],
             ['more', 'More'],
-          ] as const).map(([key, label]) =>
+          ] as const).filter(([key]) => !isPractice || key !== 'editing').map(([key, label]) =>
             <button key={key} type="button" aria-pressed={settingsTab === key}
               className={settingsTab === key ? 'is-active' : ''}
               onClick={() => setSettingsTab(key)}>{label}</button>)}
@@ -2368,6 +2735,31 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
             </label>
           </div>
           <p className="ws-hint" data-space-hint="true">Press Space to play or pause when the workspace has focus. Typing, sliders, buttons and piano keys keep their normal Space behavior.</p>
+          {isPractice&&<div className="ws-row" data-practice-stops="true">
+            <label className="ws-field ws-inline">
+              <span>Practice stops</span>
+              <select aria-label="Practice stops" value={chunkBars}
+                onChange={event => {
+                  setChunkBars(Number(event.target.value) as ChunkBarsOption);
+                  setActiveChunkIndex(0);
+                }}>
+                <option value={0}>Off / Continuous</option>
+                <option value={1}>Every 1 bar</option>
+                <option value={2}>Every 2 bars (8 beats in 4/4)</option>
+                <option value={4}>Every 4 bars</option>
+              </select>
+            </label>
+          </div>}
+          {isPractice&&chunkPickerOpen&&<section className="ws-practice-chunk-picker" data-practice-chunk-picker="true">
+            <h3>Practice sections</h3>
+            <div className="ws-row">
+              {chunks.length > 0 ? chunks.map((chunk, index) => <button key={chunk.index} type="button"
+                aria-pressed={activeChunkIndex === index}
+                onClick={() => { setActiveChunkIndex(index); seek(chunk.start); }}>
+                {chunk.label} <small>{chunk.start.toFixed(1)}–{chunk.end.toFixed(1)}s</small>
+              </button>) : <button type="button" onClick={() => seek(0)}>Whole piece</button>}
+            </div>
+          </section>}
           <section className="ws-hand-legend" data-hands-legend="true" aria-label="Hand estimate legend">
             <h2>Hands</h2>
             <div className="ws-row">
@@ -2483,13 +2875,20 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
               className={preferRenderedWav ? 'is-active' : ''}
               onClick={() => setPreferRenderedWav(true)}>Rendered WAV</button>
           </div>}
+          <div className="ws-row" role="group" aria-label="MIDI export">
+            <button type="button" disabled={!liveMidiBytes}
+              onClick={() => {
+                if (!liveMidiBytes) return;
+                downloadMidiFile(`${title.trim() || 'performance'}.mid`, liveMidiBytes);
+              }}>Export .mid</button>
+          </div>
         </section>
         <section className="ws-drawer-section" data-ws-section="video" aria-label="Reference video">
           <h3>Video</h3>
           {videoUrl
-            ? <video ref={videoRef} src={videoUrl} controls playsInline preload="metadata" className="ws-video"/>
+            ? <button type="button" aria-pressed={pipOpen}
+                onClick={() => setPipOpen(open => !open)}>{pipOpen ? 'Hide video' : 'Show video'}</button>
             : <p className="ws-hint">This draft has no source video.</p>}
-          {previewAsset ? <audio ref={pianoRef} src={preview.url || undefined} preload="auto"/> : null}
           <span className="ws-hint" data-preview-state={verifyingPreview ? 'verifying'
             : previewAsset && !preview.url ? 'unavailable' : useWavPreview ? 'verified' : 'live'}>
             {previewStale
@@ -2533,7 +2932,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
                       setNotice(`Choose a key for ${selected.spelling}, or press Escape to cancel.`);
                     }}>Choose on keyboard</button>
                 </div>
-                {narrowViewport && <div className="ws-row ws-note-history" role="group" aria-label="Note history">
+                {!isPractice && narrowViewport && <div className="ws-row ws-note-history" role="group" aria-label="Note history">
                   <button type="button" onClick={() => dispatch({type: 'undo'})}
                     disabled={readOnly || !state.past.length || Boolean(replaceMode) || Boolean(addMode)}>Undo</button>
                   <button type="button" onClick={() => dispatch({type: 'redo'})}
@@ -2872,7 +3271,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
           </details>
         </section>
         </div>
-      </aside>
+      </aside>}
       {drawerOpen && drawerTarget !== 'note' && !editorSuppressed &&
         <button type="button" className="ws-drawer-scrim" aria-label="Close settings"
           onClick={() => setDrawerOpen(false)}/>}
@@ -2907,7 +3306,7 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
       </div>}
 
       {stageView !== 'place' && addModePanel}
-      {addMenuOpen && <section className="ws-add-menu" role="dialog" aria-label="Add note options">
+      {!isPractice && addMenuOpen && <section className="ws-add-menu" role="dialog" aria-label="Add note options">
         <header><strong>Add a note</strong>
           <button type="button" className="ws-icon-button" aria-label="Close add note" onClick={() => setAddMenuOpen(false)}><X size={16}/></button>
         </header>
@@ -2926,6 +3325,47 @@ export function PianoWorkspaceHarness({lessonId: lessonIdProp, embedded = false,
         <p className="ws-hint">Rest insertion is not supported by this score yet.</p>
       </section>}
     </div>
+
+      {isPractice && <LivePracticeDock clock={clockRef.current} fallback={playhead}
+        id="piano-practice-player" sections={timelineSections} duration={document.duration}
+        activeIndex={practiceTimelineIndex} range={null} timelineDisabled={false}
+        onScrubStart={() => {}}
+        onSeek={seek}
+        onSelect={index => {
+          const section = timelineSections[index];
+          if (!section) return;
+          setActiveChunkIndex(index);
+          seek(section.start);
+        }}
+        onBrowse={() => {
+          setPracticePanel(panel => panel === 'sections' ? null : 'sections');
+        }}
+        primaryAction={<LivePracticePrimary clock={clockRef.current} fallback={playhead}
+          chunks={chunks} activeChunkIndex={activeChunkIndex} playing={playing}
+          practiceStarted={practiceStarted} onCommand={runPracticeCommand}
+          onStart={startPracticePlayback}/>}
+        toolsBefore={<>
+          <select className="ws-practice-source-select" aria-label="Source audio" value={audioMode}
+            onChange={event => setAudioMode(event.target.value === 'piano' ? 'piano' : 'original')}>
+            <option value="original">Original</option>
+            <option value="piano" disabled={pianoDisabled}>Piano</option>
+          </select>
+          <button type="button" className="player-tool" aria-label="Voice commands"
+            aria-pressed={voiceEnabled}
+            title={voiceStatus === 'unsupported'
+              ? 'Voice recognition unavailable in this browser'
+              : 'Voice commands (Next, Back, Again)'}
+            onClick={() => setVoiceEnabled(enabled => !enabled)}>
+            {voiceEnabled ? <Mic size={18}/> : <MicOff size={18}/>}
+            <span>{voiceEnabled ? 'Voice on' : 'Voice off'}</span>
+          </button>
+        </>}
+        speed={rate}
+        onSpeedClick={() => { setSettingsRow('speed'); setPracticePanel('settings'); }}
+        onSettingsClick={() => setPracticePanel(panel => panel === 'settings' ? null : 'settings')}
+        toolsAfter={<button type="button" className="player-tool" aria-label="Video" title="Video"
+          aria-pressed={pipOpen} onClick={() => setPipOpen(open => !open)}><Video size={19}/></button>}
+        status={voiceStatus === 'listening' ? 'Listening for voice commands' : undefined}/>}
   </main>;
 }
 
@@ -2964,6 +3404,89 @@ export default PianoWorkspaceHarness;
  * The keyboard lights keys from the frame-rate clock, so sounding pitches stay exact
  * without re-rendering the inspector around it.
  */
+function LivePracticePrimary({clock, fallback, chunks, activeChunkIndex, playing,
+  practiceStarted, onCommand, onStart}: {
+  clock: ClockStore;
+  fallback: number;
+  chunks: readonly PracticeChunk[];
+  activeChunkIndex: number;
+  playing: boolean;
+  practiceStarted: boolean;
+  onCommand: (command: PracticeVoiceCommand) => void;
+  onStart: (voice: 'keep' | 'off') => void;
+}) {
+  const t = useClockTime(clock, fallback);
+  const activeChunk = chunks[activeChunkIndex];
+  const chunkFinished = Boolean(!playing && activeChunk
+    && t >= activeChunk.end - 0.05 && activeChunkIndex < chunks.length - 1);
+  const hasProgress = Boolean(activeChunk ? t > activeChunk.start + 0.05 : t > 0.05);
+  if (!practiceStarted) {
+    return <>
+      <button type="button" className="practice-player-primary" onClick={() => onStart('keep')}>
+        <Play size={18}/><span>Start practice</span>
+      </button>
+      <button type="button" className="player-text-action" onClick={() => onStart('off')}>Without voice</button>
+    </>;
+  }
+  if (playing) {
+    return <button type="button" className="practice-player-primary" onClick={() => onCommand('pause')}>
+      <Pause size={18}/><span>Pause</span>
+    </button>;
+  }
+  if (chunkFinished) {
+    return <>
+      <button type="button" className="practice-player-primary" onClick={() => onCommand('next')}>
+        <ChevronRight size={18}/><span>Next section</span>
+      </button>
+      <button type="button" className="player-text-action" onClick={() => onCommand('again')}>Repeat section</button>
+    </>;
+  }
+  return <>
+    <button type="button" className="practice-player-primary" onClick={() => onCommand('play')}>
+      <Play size={18}/><span>Play</span>
+    </button>
+    {hasProgress && <button type="button" className="player-text-action" onClick={() => onCommand('again')}>
+      <RotateCcw size={14}/><span>Start over</span>
+    </button>}
+  </>;
+}
+
+function LivePracticeDock({clock, fallback, ...dock}: {
+  clock: ClockStore;
+  fallback: number;
+} & Omit<React.ComponentProps<typeof PracticePlayerDock>, 'time'>) {
+  const time = useClockTime(clock, fallback);
+  return <PracticePlayerDock {...dock} time={time}/>;
+}
+
+function LiveTimeLabel({clock, fallback}: {clock: ClockStore; fallback: number}) {
+  const time = useClockTime(clock, fallback);
+  return <span className="ws-time">{timeLabel(time)}</span>;
+}
+
+function LiveFollowDirection({clock, fallback, timelineLayout, alignment, sharedWidth,
+  sharedScrollLeft, playing}: {
+  clock: ClockStore;
+  fallback: number;
+  timelineLayout: TimelineLayout | null;
+  alignment: Alignment | null;
+  sharedWidth: number;
+  sharedScrollLeft: number;
+  playing: boolean;
+}) {
+  const time = useClockTime(clock, fallback);
+  if (!timelineLayout || !alignment || sharedWidth <= 0) return null;
+  const p = 116 + timelineLayout.sourceSecondsToX(time, alignment, 0);
+  const direction = p < sharedScrollLeft ? 'left'
+    : p > sharedScrollLeft + sharedWidth ? 'right' : 'visible';
+  if (direction === 'visible') return null;
+  return <span className="ws-follow-direction" data-follow-direction={direction}
+    aria-label={playing ? (direction === 'right' ? 'Playing to the right' : 'Playing to the left')
+      : (direction === 'right' ? 'Playhead to the right' : 'Playhead to the left')}>
+    {direction === 'right' ? '→' : '←'}
+  </span>;
+}
+
 function LiveKeyboard({document, clock, intervals, selectedPitch, onKey, onSelectKey, width, height,
   range, onRangeChange, toolbarHint, hint, hands}: {
   document: NotationDocument;

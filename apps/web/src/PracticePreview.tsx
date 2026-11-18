@@ -1,21 +1,27 @@
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,Maximize,Pause,Play,Rotate3D,Volume2,VolumeX,VideoOff} from 'lucide-react';
-import type {LessonManifest,LessonSummary} from '../../../packages/lesson-schema/index';
+import type {LessonManifest,LessonSummary,MusicLessonManifest,Section} from '../../../packages/lesson-schema/index';
 import {assetUrl,loadPublicMoves,type PublicMove} from './api';
 import {PracticeTimeline} from './PracticeTimeline';
 import {timelineSectionAt} from './practice-timeline';
 import './preview.css';
 
 export type WatchLesson={lesson:LessonSummary;owned:boolean};
-export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBack,lessons=[],onOpen,onPublic}:{lesson:LessonManifest;owned:boolean;resumeAt:number;onPosition:(time:number)=>void;onChoose:(mode:'practice'|'compete')=>void;onBack:()=>void;lessons?:WatchLesson[];onOpen:(item:WatchLesson)=>void;onPublic:(id:string)=>void}){
+export type PreviewLesson={
+ lesson_id:string;revision_id:string;title:string;duration:number;source_start?:number;
+ source_video?:{key:string}|null;thumbnail?:{key:string}|null;
+ section_set:{sections:Section[]};animation?:{key:string};creator_name?:string;description?:string;subject?:string;
+};
+export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBack,lessons=[],onOpen,onPublic}:{lesson:LessonManifest|MusicLessonManifest;owned:boolean;resumeAt:number;onPosition:(time:number)=>void;onChoose:(mode:'practice'|'compete')=>void;onBack:()=>void;lessons?:WatchLesson[];onOpen:(item:WatchLesson)=>void;onPublic:(id:string)=>void}){
  const video=useRef<HTMLVideoElement>(null),player=useRef<HTMLDivElement>(null),position=useRef(onPosition);position.current=onPosition;
- const start=lesson.source_start,end=start+lesson.duration;
+ const meta=lesson as PreviewLesson;
+ const start=meta.source_start??0,end=start+lesson.duration;
  const initial=resumeAt>=end-.1?start:Math.max(start,Math.min(resumeAt||start,end));
  const lastPosition=useRef(initial);
- const [time,setTime]=useState(initial-start),[unavailable,setUnavailable]=useState(!lesson.source_video),[ready,setReady]=useState(false),[paused,setPaused]=useState(true),[muted,setMuted]=useState(true),[browse,setBrowse]=useState(false);
+ const [time,setTime]=useState(initial-start),[unavailable,setUnavailable]=useState(!meta.source_video),[ready,setReady]=useState(false),[paused,setPaused]=useState(true),[muted,setMuted]=useState(true),[browse,setBrowse]=useState(false);
  const [publicMoves,setPublicMoves]=useState<PublicMove[]>([]),[recommendationsError,setRecommendationsError]=useState(false),[recommendationsLoading,setRecommendationsLoading]=useState(true),[retry,setRetry]=useState(0);
- const meta=lesson as LessonManifest&{creator_name?:string;description?:string};
- const creator=meta.creator_name||(owned?'Your lesson':lesson.animation.key.startsWith('public/')?'Public lesson':lesson.animation.key.startsWith('lessons/')?'Shared with you':'Form · Demonstration');
+ const animationKey=meta.animation?.key??'';
+ const creator=meta.creator_name||(owned?'Your lesson':animationKey.startsWith('public/')?'Public lesson':animationKey.startsWith('lessons/')?'Shared with you':meta.subject==='piano'?'Piano lesson':meta.subject==='guitar'?'Guitar lesson':meta.subject?'Lesson':'Form · Demonstration');
  const available=lessons.filter((item,index,all)=>item.lesson.lesson_id!==lesson.lesson_id&&all.findIndex(other=>other.lesson.lesson_id===item.lesson.lesson_id)===index);
  const related=publicMoves.filter(item=>item.lesson_id!==lesson.lesson_id&&!available.some(other=>other.lesson.lesson_id===item.lesson_id));
  useEffect(()=>{document.body.classList.add('in-preview');return()=>document.body.classList.remove('in-preview');},[]);
@@ -41,7 +47,7 @@ export function PracticePreview({lesson,owned,resumeAt,onPosition,onChoose,onBac
      <div className="preview-media">{!unavailable&&lesson.source_video?<video ref={video} src={assetUrl(lesson.source_video.key)} muted={muted} playsInline autoPlay preload="metadata" className={ready?'is-ready':''} aria-label="Original lesson video"
       onLoadedMetadata={()=>{const v=video.current;if(!v)return;if(!Number.isFinite(v.duration)||v.duration<=start){setUnavailable(true);return;}v.currentTime=Math.min(initial,Math.min(end,v.duration)-.05);remember(v.currentTime);setReady(true);void v.play().catch(()=>setPaused(true));}}
       onTimeUpdate={()=>{const v=video.current;if(!v)return;if(v.currentTime>=end){v.pause();if(v.currentTime>end+.05)v.currentTime=end;remember(end);}else remember(v.currentTime);}}
-      onPlay={()=>setPaused(false)} onPause={()=>setPaused(true)} onEnded={()=>{setPaused(true);remember(Math.min(end,video.current?.duration??end));}} onError={()=>setUnavailable(true)}/>:lesson.thumbnail?<img src={assetUrl(lesson.thumbnail.key)} alt="Lesson thumbnail"/>:null}</div>
+      onPlay={()=>setPaused(false)} onPause={()=>setPaused(true)} onEnded={()=>{setPaused(true);remember(Math.min(end,video.current?.duration??end));}} onError={()=>setUnavailable(true)}/>:meta.thumbnail?<img src={assetUrl(meta.thumbnail.key)} alt="Lesson thumbnail"/>:null}</div>
      {!unavailable&&<button className="watch-video-toggle" aria-label="Toggle video playback" onClick={toggle}>{paused&&<Play size={38} fill="currentColor"/>}</button>}
      {unavailable&&<div className="watch-unavailable" role="status"><VideoOff size={27}/><strong>Original video unavailable</strong><span>You can still practise with the 3D instructor.</span></div>}
      <div className="watch-controls">
