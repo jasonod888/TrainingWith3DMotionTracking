@@ -14,8 +14,8 @@ def test_editing_creates_a_new_revision_without_touching_the_shared_release(tmp_
     with real_media_app(tmp_path) as (client, app, settings, store, mail):
         lesson_id, view, _lease, _base, _payload = proposal(client, app, media(tmp_path, 'audio'))
         body = review_body(view)
-        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
-                              'rubric_version': 'music-watch-v1'}
+        body['assessment'] = {'assessment': 'notes', 'input_modes': ['midi', 'microphone'],
+                              'dimensions': ['pitch', 'timing'], 'rubric_version': 'piano-midi-v1'}
         reviewed = client.post(f'/api/lessons/{lesson_id}/music-draft/review', json=body)
         assert reviewed.status_code == 200, reviewed.text
         first = reviewed.json()
@@ -41,8 +41,8 @@ def test_editing_creates_a_new_revision_without_touching_the_shared_release(tmp_
                 'spans': [{'start': 0, 'end': 1, 'kind': 'explanation'},
                           {'start': 1, 'end': 2, 'kind': 'playing'}],
                 'sections': body['sections'],
-                'assessment': {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
-                               'rubric_version': 'music-watch-v1'},
+                'assessment': {'assessment': 'notes', 'input_modes': ['midi', 'microphone'],
+                               'dimensions': ['pitch', 'timing'], 'rubric_version': 'piano-midi-v1'},
                 'confirm_reviewed': True}
         with patch('apps.api.music_edit.storage_client', return_value=store):
             overlap = {**edit, 'spans': [{'start': 0, 'end': 2, 'kind': 'playing'},
@@ -88,6 +88,30 @@ def test_editing_creates_a_new_revision_without_touching_the_shared_release(tmp_
             assert updated['revision_id'] == second['revision_id']
 
 
+def test_editing_preserves_creator_off_when_the_partial_body_omits_it(tmp_path):
+    with real_media_app(tmp_path) as (client,app,settings,store,mail):
+        lesson_id,view,*_=proposal(client,app,media(tmp_path,'audio'))
+        body=review_body(view);body['feedback_enabled']=False
+        reviewed=client.post(f'/api/lessons/{lesson_id}/music-draft/review',json=body)
+        assert reviewed.status_code==200,reviewed.text
+        first=reviewed.json()
+        edit={'base_revision_id':first['revision_id'],'title':'Still off',
+              'events':body['events'],'spans':body['spans'],'sections':body['sections'],
+              'assessment':body['assessment'],'confirm_reviewed':True}
+        with patch('apps.api.music_edit.storage_client',return_value=store):
+            saved=client.post(f'/api/lessons/{lesson_id}/music-revision',json=edit)
+        assert saved.status_code==200,saved.text
+        second=saved.json()
+        assert second['feedback_enabled'] is False
+        assert second['assessment']['assessment']=='notes'
+        assert client.get(f'/api/lessons/{lesson_id}',headers={'X-Lesson-Formats':'1,2'}).json()['feedback_enabled'] is False
+        enabled={**edit,'base_revision_id':second['revision_id'],'feedback_enabled':True}
+        with patch('apps.api.music_edit.storage_client',return_value=store):
+            on=client.post(f'/api/lessons/{lesson_id}/music-revision',json=enabled)
+        assert on.status_code==200,on.text
+        assert on.json()['feedback_enabled'] is True
+
+
 def _notation_for(events, duration=2.0, bpm=120):
     """A minimal but complete notation document matching the reviewed performance."""
     ppq = 480
@@ -119,8 +143,8 @@ def test_edit_persists_notation_and_refuses_a_mismatched_performance(tmp_path):
     with real_media_app(tmp_path) as (client, app, settings, store, mail):
         lesson_id, view, _lease, _base, _payload = proposal(client, app, media(tmp_path, 'audio'))
         body = review_body(view)
-        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
-                              'rubric_version': 'music-watch-v1'}
+        body['assessment'] = {'assessment': 'notes', 'input_modes': ['midi', 'microphone'],
+                              'dimensions': ['pitch', 'timing'], 'rubric_version': 'piano-midi-v1'}
         reviewed = client.post(f'/api/lessons/{lesson_id}/music-draft/review', json=body)
         assert reviewed.status_code == 200, reviewed.text
         first = reviewed.json()
@@ -154,8 +178,8 @@ def test_title_only_edit_preserves_velocity_and_confidence(tmp_path):
         body = review_body(view)
         body['events'][0]['velocity'] = 0.5
         body['events'][0]['confidence'] = 0.9
-        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
-                              'rubric_version': 'music-watch-v1'}
+        body['assessment'] = {'assessment': 'notes', 'input_modes': ['midi', 'microphone'],
+                              'dimensions': ['pitch', 'timing'], 'rubric_version': 'piano-midi-v1'}
         reviewed = client.post(f'/api/lessons/{lesson_id}/music-draft/review', json=body)
         assert reviewed.status_code == 200, reviewed.text
         first = reviewed.json()
@@ -174,8 +198,8 @@ def test_edit_persists_reviewed_positions_and_chords(tmp_path):
     with real_media_app(tmp_path) as (client, app, settings, store, mail):
         lesson_id, view, _lease, _base, _payload = proposal(client, app, media(tmp_path, 'audio'))
         body = review_body(view)
-        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
-                              'rubric_version': 'music-watch-v1'}
+        body['assessment'] = {'assessment': 'notes', 'input_modes': ['midi', 'microphone'],
+                              'dimensions': ['pitch', 'timing'], 'rubric_version': 'piano-midi-v1'}
         reviewed = client.post(f'/api/lessons/{lesson_id}/music-draft/review', json=body)
         first = reviewed.json()
         edit = {'base_revision_id': first['revision_id'], 'title': 'Guitar choices',

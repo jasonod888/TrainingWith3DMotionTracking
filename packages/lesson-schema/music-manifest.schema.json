@@ -443,6 +443,18 @@
       },
       "title": "Warnings",
       "type": "array"
+    },
+    "feedback_enabled": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Feedback Enabled"
     }
   },
   "required": [

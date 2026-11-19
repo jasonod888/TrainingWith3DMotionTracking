@@ -54,6 +54,36 @@ def prepare_instructor(folder,command,duration):
     return output
 
 
+def prepare_mediapipe_instructor(folder,command,duration,edge_style=DEFAULT_EDGE_STYLE):
+    """Person-focused instructor video for the CPU MediaPipe route.
+
+    No SAM 2 model or prompt is involved: the heavy Pose Landmarker already produced
+    the probability masks, so this only feeds ``motion/mediapipe.npz`` and
+    ``motion/segmentation`` to the same approved compositor. The caller still decides
+    whether the mask contract is met and otherwise keeps ``preview.mp4`` as the
+    instructor presentation, so the instructor never disappears.
+    """
+    folder=Path(folder);video=folder/'preview.mp4';motion=folder/'motion/mediapipe.npz'
+    masks=folder/'motion/segmentation'
+    if not video.is_file():raise ValueError('The normalized source is missing.')
+    if not motion.is_file():raise ValueError('MediaPipe landmarks are missing.')
+    if not reusable_masks(masks,video,motion):
+        raise ValueError('MediaPipe segmentation does not cover this source.')
+    output=folder/'instructor.mp4'
+    command([sys.executable,str(ROOT/'scripts/focus_instructor_video.py'),
+             '--video',str(video),'--motion',str(motion),'--output',str(output),
+             '--masks',str(masks),'--mode','person','--edge-style',edge_style,'--alpha',
+             '--landmark-format','mediapipe-33'],
+            timeout=max(900,duration*5))
+    report=json.loads(output.with_suffix('.json').read_text(encoding='utf-8'))
+    edge=report.get('edge_treatment',{})
+    if (edge.get('style')!=edge_style or edge.get('body_opacity')!=1
+            or report.get('video_sha256')!=digest(output)
+            or report.get('landmark_format')!='mediapipe-33'):
+        raise ValueError('Instructor output does not match the approved treatment.')
+    return output
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--folder',type=Path,required=True)

@@ -131,8 +131,10 @@ def ensure_release(session, lesson, revision, account_id, source='publish'):
         current = latest_revision(session, lesson)
         if current is None or current.id != revision.id:
             raise HTTPException(409, 'Review the latest music revision before sharing it.')
-        if not (revision.manifest or {}).get('reference_reviewed'):
+        manifest = revision.manifest or {}
+        if not manifest.get('reference_reviewed'):
             raise HTTPException(409, 'This music reference is not reviewed.')
+        # Feedback availability is a creator choice, not a publication prerequisite.
         lesson.published_revision_id = revision.id
         return record
     record = accept_revision(session, lesson, revision, account_id, warnings=[], source=source)
@@ -188,7 +190,8 @@ def public_manifest(revision, publication, tags):
     value['title'] = publication.title or value.get('title', 'Move')
     value['public_tags'] = tags
     value['public_creator'] = publication.creator_name
-    return value
+    from .music_assessment import with_effective_feedback
+    return with_effective_feedback(value)
 
 
 def visible_manifest(session, lesson, revision, account_id):
@@ -205,5 +208,7 @@ def visible_manifest(session, lesson, revision, account_id):
         if publication and publication.listed and not publication.moderation_hidden:
             from .public import public_keys
             return public_keys(public_manifest(revision, publication, tags), lesson.id)
-        return {**revision.manifest, 'source_video': None, 'focused_video': None, 'thumbnail': None}
-    return revision.manifest
+        from .music_assessment import with_effective_feedback
+        return with_effective_feedback({**revision.manifest, 'source_video': None, 'focused_video': None, 'thumbnail': None})
+    from .music_assessment import with_effective_feedback
+    return with_effective_feedback(revision.manifest)

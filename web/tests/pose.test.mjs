@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {HeightCalibration,assessStanding,heightPlacement,fromReference,comparePoses,bestMatch,videoFit} from '../dist/pose.js';
+import {HeightCalibration,assessStanding,heightPlacement,fromReference,comparePoses,bestMatch,videoFit,MP,SAM} from '../dist/pose.js';
 const reference=JSON.parse(readFileSync(new URL('../dist/assets/reference.json',import.meta.url)));
 function standing(){
   const image=Array.from({length:33},()=>({x:.5,y:.18,z:0,visibility:.99,presence:.99}));
@@ -129,4 +129,66 @@ test('left/right mirroring is reversible and timing tolerance uses one whole pos
   assert.deepEqual(mirrored.lw.p,[-original[41][0],original[41][1],original[41][2]]);
   const time=reference.times[200];const match=bestMatch(fromReference(original),reference,time+.4,false,true);
   assert.ok(match.score>97);assert.ok(match.time>=time-.61&&match.time<=time+.55);
+});
+
+// ---------------------------------------------------------------- mediapipe-33
+function mediaPipeRow(){
+  const row=Array.from({length:33},()=>[0,0,0]);
+  row[15]=[1,2,3];row[16]=[4,5,6];
+  return row;
+}
+function mediaPipeVisibility(){
+  const values=new Array(33).fill(0);values[15]=.9;values[16]=.4;
+  return values;
+}
+
+test('mediapipe-33 references use MP joints and the frame-matched confidence',()=>{
+  const joints=fromReference(mediaPipeRow(),false,'mediapipe-33',mediaPipeVisibility());
+  assert.deepEqual(joints.lw.p,[1,2,3]);
+  assert.equal(joints.lw.confidence,.9);
+  assert.deepEqual(joints.rw.p,[4,5,6]);
+  assert.equal(joints.rw.confidence,.4);
+  // A placeholder landmark keeps a finite zero position and zero confidence.
+  assert.deepEqual(joints.nose.p,[0,0,0]);
+  assert.equal(joints.nose.confidence,0);
+  // Fewer than 33 landmarks is not a mediapipe-33 reference at all.
+  assert.equal(fromReference(new Array(20).fill([0,0,0]),false,'mediapipe-33'),null);
+});
+
+test('mirroring moves the joint, the x coordinate and the confidence together',()=>{
+  const mirrored=fromReference(mediaPipeRow(),true,'mediapipe-33',mediaPipeVisibility());
+  assert.deepEqual(mirrored.lw.p,[-4,5,6]);
+  assert.equal(mirrored.lw.confidence,.4);
+  assert.deepEqual(mirrored.rw.p,[-1,2,3]);
+  assert.equal(mirrored.rw.confidence,.9);
+});
+
+test('an unscorable pose is null instead of a zero score',()=>{
+  const sparse=Array.from({length:33},()=>[0,0,0]);
+  sparse[15]=[.1,.2,0];
+  const visibility=new Array(33).fill(0);visibility[15]=.9;
+  const pose=fromReference(sparse,false,'mediapipe-33',visibility);
+  assert.equal(comparePoses(pose,pose),null);
+});
+
+test('both target confidence and finite coordinates gate scoring',()=>{
+  const target=fromReference(reference.keypoints[200]);
+  const weakTarget=Object.fromEntries(Object.entries(target).map(([k,v])=>[k,{...v,confidence:.2}]));
+  assert.equal(comparePoses(target,weakTarget),null);
+  const broken=Object.fromEntries(Object.entries(target).map(([k,v])=>[k,{...v,p:[NaN,v.p[1],v.p[2]]}]));
+  assert.equal(comparePoses(target,broken),null);
+});
+
+test('bestMatch reads the landmark format and visibility from the reference',()=>{
+  const source=reference.keypoints[200];
+  const row=Array.from({length:33},()=>[0,0,0]);
+  for(const [name,index] of Object.entries(MP))row[index]=[...source[SAM[name]]];
+  const visibility=new Array(33).fill(.95);
+  const mediaPipeReference={duration:1,times:[0],keypoints:[row],landmarkFormat:'mediapipe-33',visibility:[visibility]};
+  const student=fromReference(row,false,'mediapipe-33',visibility);
+  const match=bestMatch(student,mediaPipeReference,0,false,false);
+  assert.ok(match&&match.score>99);
+  // Hidden confidence rows make the same reference unscorable rather than a zero.
+  const hidden={...mediaPipeReference,visibility:[new Array(33).fill(0)]};
+  assert.equal(bestMatch(student,hidden,0,false,false),null);
 });

@@ -49,8 +49,8 @@ def test_real_basic_pitch_draft_reaches_a_learner(tmp_path):
                 'title': 'Bach excerpt', 'events': view['events'],
                 'spans': [{'start': 0, 'end': 12, 'kind': 'playing'}],
                 'sections': [{'id': 'whole', 'label': 'Whole lesson', 'start': 0, 'end': 12}],
-                'assessment': {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
-                               'rubric_version': 'music-watch-v1'}, 'confirm_reviewed': True}
+                'assessment': {'assessment': 'notes', 'input_modes': ['midi', 'microphone'], 'dimensions': ['pitch', 'timing'],
+                               'rubric_version': 'piano-midi-v1'}, 'confirm_reviewed': True}
         reviewed = client.post(f'/api/lessons/{lesson_id}/music-draft/review', json=body)
         assert reviewed.status_code == 200, reviewed.text
         manifest = reviewed.json()

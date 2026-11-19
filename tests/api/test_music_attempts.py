@@ -48,6 +48,21 @@ def test_music_history_is_off_by_default_and_pose_history_refuses_music(tmp_path
             assert session.query(MusicPracticeAttempt).count() == session.query(MimicAttempt).count() == 0
 
 
+def test_creator_off_refuses_new_note_or_challenge_evidence(tmp_path):
+    with music_app(tmp_path,music_history_enabled=True) as system:
+        client,app,*_=system
+        lesson=imported_music(system)
+        with Session(app.state.engine) as session:
+            revision=session.get(LessonRevision,lesson.revision_id)
+            revision.manifest={**revision.manifest,'feedback_enabled':False}
+            session.commit()
+        path=f'/api/lessons/{lesson.lesson_id}/music-attempts'
+        response=client.post(path,json=payload(lesson))
+        assert response.status_code==409
+        assert 'Feedback is not enabled for this lesson' in response.text
+        assert client.get(path).json()==[]
+
+
 def test_summary_save_is_exact_idempotent_bounded_and_deletable(tmp_path, monkeypatch):
     monkeypatch.setattr('apps.api.music_attempts.MAX_SUMMARIES', 1)
     with music_app(tmp_path, music_history_enabled=True) as system:

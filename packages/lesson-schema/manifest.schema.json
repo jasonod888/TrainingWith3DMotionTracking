@@ -157,7 +157,7 @@
       "maximum": 240,
       "minimum": 1,
       "title": "Frame Rate",
-      "type": "integer"
+      "type": "number"
     },
     "engine": {
       "enum": [
@@ -208,7 +208,15 @@
       "type": "number"
     },
     "animation": {
-      "$ref": "#/$defs/Asset"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "landmarks": {
       "$ref": "#/$defs/Asset"
@@ -293,6 +301,18 @@
       },
       "title": "Presentation",
       "type": "object"
+    },
+    "feedback_enabled": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Feedback Enabled"
     }
   },
   "required": [
@@ -306,7 +326,6 @@
     "root_motion",
     "confidence",
     "standing_time",
-    "animation",
     "landmarks",
     "section_set"
   ],

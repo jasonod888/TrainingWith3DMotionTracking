@@ -9,6 +9,7 @@ import {
   buildNotation, parseNotationDocument,
   type Alignment, type NotationDocument, type PerformanceNote,
 } from '../../../../../packages/music-notation/index.ts';
+import {assessmentPolicyForSubject} from '../music-feedback';
 
 export type SavedSpan = { start: number; end: number; kind: 'playing' | 'explanation' };
 export type AnchorPointSaved = { seconds: number; tick: number };
@@ -107,6 +108,8 @@ export function buildSaveBody(input: {
   verificationStateToken?: string | null;
   sections?: { id: string; label: string; start: number; end: number }[];
   assessment?: unknown;
+  /** Creator-controlled practice feedback; false must survive save and reopen. */
+  feedbackEnabled?: boolean;
   /** Reviewed guitar chord shapes; ignored for piano documents. */
   guitarChords?: SavedGuitarChord[];
 }) {
@@ -130,7 +133,8 @@ export function buildSaveBody(input: {
     spans: input.spans,
     ...(guitar ? {guitar_chords: input.guitarChords ?? []} : {}),
     sections: input.sections?.length ? input.sections : [{id: 'whole', label: 'Whole lesson', start: 0, end: duration}],
-    assessment: input.assessment ?? {assessment: 'none', input_modes: ['none'], dimensions: [], rubric_version: 'music-watch-v1'},
+    assessment: input.assessment ?? assessmentPolicyForSubject(input.document.subject),
+    ...(input.feedbackEnabled !== undefined ? {feedback_enabled: input.feedbackEnabled} : {}),
     confirm_reviewed: true as const,
     notation: input.document,
     alignment: serializeAlignment(input.alignment, input.anchors, input.offsetSeconds),

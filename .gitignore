@@ -3,6 +3,7 @@
 node_modules/
 apps/web/dist/
 apps/web/public/tracking/
+apps/web/public/onnxruntime/
 .pytest_cache/
 .local/
 test-results/

@@ -47,7 +47,8 @@ export function avatarRequested(): AvatarId {
  * keeps the canonical reference.
  */
 export function pilotClipFor(
-  lesson: {lesson_id: string; animation?: {key: string}; presentation?: Partial<Record<AvatarId, {key:string}>>},
+  // `animation` is nullable on the wire (the CPU MediaPipe route is video only).
+  lesson: {lesson_id: string; animation?: {key: string} | null; presentation?: Partial<Record<AvatarId, {key:string}>>},
   id: AvatarId,
 ): string {
   const key = lesson.animation?.key ?? '';

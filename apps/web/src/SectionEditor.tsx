@@ -13,7 +13,7 @@ import { lessonFrameTime } from './lesson-clock';
 import { timeLabel } from './timeline';
 import './section-editor.css';
 
-export function SectionEditor({ lesson, onBack, onPractice, onSave, onDirty, persistent }: { lesson: LessonManifest; onBack: () => void; onPractice: () => void; onSave: (sections: Section[], title: string) => Promise<void> | void; onDirty?: (dirty: boolean) => void; persistent: boolean }) {
+export function SectionEditor({ lesson, onBack, onPractice, onSave, onDirty, persistent }: { lesson: LessonManifest; onBack: () => void; onPractice: () => void; onSave: (sections: Section[], title: string, feedbackEnabled?: boolean) => Promise<void> | void; onDirty?: (dirty: boolean) => void; persistent: boolean }) {
   const [player] = useState(() => {
     const value = new Playback(lesson.section_set.sections, lesson.duration);
     value.mode('continuous');
@@ -22,6 +22,7 @@ export function SectionEditor({ lesson, onBack, onPractice, onSave, onDirty, per
   const [draft, setDraft] = useState(() => initialMarkers(lesson.section_set.sections));
   const [selected, setSelected] = useState(0);
   const [title, setTitle] = useState(lesson.title);
+  const [feedbackEnabled, setFeedbackEnabled] = useState(lesson.feedback_enabled !== false);
   const { state, refresh } = useSectionPlayback(player);
   const [source, setSource] = useState(Boolean(lesson.focused_video || lesson.source_video));
   const [dirty, setDirty] = useState(false);
@@ -93,7 +94,7 @@ export function SectionEditor({ lesson, onBack, onPractice, onSave, onDirty, per
     try {
       if (!title.trim()) throw new Error('Give your move a name.');
       const sections = draft.map((section, index) => ({ ...section, label: section.label.trim() || String(index + 1) }));
-      await onSave(validateSections(sections, lesson.duration), title.trim());
+      await onSave(validateSections(sections, lesson.duration), title.trim(), feedbackEnabled);
       setDraft(sections); setDirty(false); onDirty?.(false);
       setMessage(persistent ? 'All changes saved.' : 'Draft kept in this session.');
     } catch (error) { setMessage((error as Error).message); }
@@ -131,6 +132,8 @@ export function SectionEditor({ lesson, onBack, onPractice, onSave, onDirty, per
         <span>SECTION EDITOR</span>
         <input aria-label="Move name" value={title} maxLength={200} disabled={saving} onChange={e => { setTitle(e.target.value); setDirty(true); setMessage(''); }} />
       </div>
+      <label className="section-feedback"><input aria-label="Enable practice feedback" type="checkbox" role="switch" checked={feedbackEnabled} disabled={saving}
+        onChange={event => { setFeedbackEnabled(event.target.checked); setDirty(true); setMessage(''); }}/> Practice feedback</label>
       <span className="section-save-state">{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
       <button className="studio-practice" disabled={dirty || saving} onClick={onPractice}>
         <Play size={15} />

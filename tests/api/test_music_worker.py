@@ -31,7 +31,7 @@ shutil.copyfile(a.source,out/'source.mp4')
 manifest=dict(schema_version=2,experience_family='music',lesson_id=job['id'],revision_id='fixture',
 title='Reviewed fixture',subject=job['subject'],duration=job['duration'],instrument={'instrument':job['instrument']},
 section_set=dict(id='sections',revision=1,duration=job['duration'],sections=[dict(id='all',label='Whole clip',start=0,end=job['duration'])]),
-reference_reviewed='''+repr(reviewed)+''',assessment=dict(rubric_version='fixture-watch-v1',assessment='none',input_modes=['none'],dimensions=[]),warnings=[])
+reference_reviewed='''+repr(reviewed)+''',assessment=dict(rubric_version='piano-midi-v1',assessment='notes',input_modes=['midi','microphone'],dimensions=['pitch','timing']),warnings=[])
 (out/'result.json').write_text(json.dumps(dict(manifest=manifest,files={'reference':'reference.json','source_video':'source.mp4'})))
 ''', encoding='utf-8')
     return [sys.executable, str(file)]

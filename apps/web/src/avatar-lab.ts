@@ -293,7 +293,7 @@ function lessonAsset(lessonId: string, name: string): string {
 }
 
 function projectFromLesson(lesson: LessonManifest): Project {
-  const referenceName = basename(lesson.animation.key);
+  const referenceName = basename(lesson.animation?.key ?? '');
   return {
     id: lesson.lesson_id,
     title: lesson.title,
@@ -306,7 +306,7 @@ function projectFromLesson(lesson: LessonManifest): Project {
 }
 
 function projectFromDemo(lesson: LessonManifest): Project {
-  const referenceName = basename(lesson.animation.key);
+  const referenceName = basename(lesson.animation?.key ?? '');
   return {
     id: lesson.lesson_id,
     title: lesson.title,

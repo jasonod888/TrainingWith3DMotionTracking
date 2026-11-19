@@ -10,3 +10,64 @@
   font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   text-align: center;
 }
+
+.feedback-choice { display: grid; gap: 7px; padding: 0 0 12px; margin: 0 0 8px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.feedback-choice-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.feedback-choice-heading h3 { margin: 0; font-size: 13px; }
+.feedback-choice-buttons { display: flex; gap: 8px; }
+.feedback-choice-buttons .ui-btn.is-selected { border-color: #9be2b7; background: rgba(155,226,183,.16); color: #e7f4ea; }
+.feedback-choice-status { margin: 0; }
+
+/* Listen-then-play experimental feedback. The product policy is unscored. */
+.piano-practice-stage { position: relative; }
+.listen-play-overlay {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 12;
+  display: grid;
+  gap: 3px;
+  min-width: 200px;
+  padding: 10px 16px;
+  border: 1px solid rgba(155, 226, 183, .45);
+  border-radius: 12px;
+  background: rgba(11, 20, 15, .88);
+  color: #e7f4ea;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+  font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.listen-play-overlay strong { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #9be2b7; }
+.listen-play-overlay i { font-style: normal; font-size: 28px; font-weight: 700; line-height: 1; }
+.listen-play-setup { display: grid; gap: 8px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.12); }
+.listen-play-setup h3 { margin: 0; font-size: 13px; }
+.listen-play-feedback {
+  position: fixed;
+  bottom: 96px;
+  left: 50%;
+  z-index: 40;
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(52vh, 460px);
+  overflow: auto;
+  padding: 16px 18px;
+  border: 1px solid rgba(155, 226, 183, .4);
+  border-radius: 14px;
+  background: rgba(11, 20, 15, .96);
+  color: #e7f4ea;
+  box-shadow: 0 18px 60px rgba(0,0,0,.45);
+  transform: translateX(-50%);
+  font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.listen-play-feedback header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.listen-play-feedback h2 { margin: 2px 0 6px; font-size: 18px; }
+.listen-play-feedback dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; margin: 10px 0; }
+.listen-play-feedback dl div { min-width: 0; }
+.listen-play-feedback dt { color: #aebcb0; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.listen-play-feedback dd { margin: 2px 0 0; }
+.listen-play-feedback ul { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 0; padding: 0; list-style: none; }
+.listen-play-feedback .feedback-note { padding: 3px 7px; border-radius: 999px; background: rgba(255,255,255,.08); }
+.listen-play-feedback .feedback-note.matched { color: #b8f0ca; }
+.listen-play-feedback .feedback-note.missing { color: #ffb4a8; }
+.listen-play-feedback .feedback-note.extra { color: #ffd28a; }
+.listen-play-feedback .feedback-note.unassessed { color: #aebcb0; font-style: italic; }

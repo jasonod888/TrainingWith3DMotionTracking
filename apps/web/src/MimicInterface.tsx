@@ -1,9 +1,14 @@
 import {forwardRef,useImperativeHandle,useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import {SettingsPortal,SettingsRow,SettingsChoices} from './PracticeSettings';
-import {HeightCalibration,fromMediaPipe,bestMatch,MP,LINKS,type Point,type Reference,type Calibration} from '../../../web/dist/pose.js';
+import {HeightCalibration,fromMediaPipe,fromReference,bestMatch,MP,LINKS,type Point,type Reference,type Calibration,type LandmarkFormat} from '../../../web/dist/pose.js';
 import {placeHandLabels} from '../../../web/dist/hand-labels.js';
 import {CameraFramingController,FRAMING_DEFAULTS,handPositionsForTransform,mapSourcePoint,type DisplayTransform} from './camera-framing';
 import {suggestedAvatarPosition} from '../../../web/dist/composite.js';
+import {PoseRunCapture} from './pose-capture';
+import {sliceReference} from './reference-window';
+import {useFeedbackPreference} from './feedback-preference';
+import {effectiveFeedbackEnabled} from './music/music-feedback';
+import {POSE_ALIGNMENT_REPORT_ENABLED, type PoseAlignmentReport, type PoseFrame} from '../../../packages/learning-engine/pose-best-fit-align';
 import {videoFit} from '../../../web/dist/pose.js';
 import {PracticeVoice} from './practice/practice-voice';
 import {voiceCommandToBodyAction} from './practice/practice-input';
@@ -25,11 +30,12 @@ import type {CameraStatus} from './mimic-connection';
 type Mode='off'|'camera'|'recorded';
 type TrackerMessage={type:string;epoch?:number;landmarks?:Point[];world?:Point[];message?:string;timestamp?:number};
 export type CameraState='off'|'starting'|'live';
-export type MimicHandle={setMirrorReference:(value:boolean)=>void;setInstructorOpacity:(value:number)=>void;startVoice:()=>void;stopVoice:()=>void;start:()=>Promise<void>;stop:()=>void;stream:()=>MediaStream|null;configuration:()=>string;display:()=>{model_mirror:boolean;camera_mirror:boolean};readiness:(remote:boolean)=>string;scoringIssue:()=>string;applyCalibration:(value:Calibration)=>void;confirmControls:()=>void;transform:()=>DisplayTransform|null;sourceIdentity:()=>SetupSourceIdentity;facing:()=>'user'|'environment';selection:()=>CameraSelection|null;cameraStatus:()=>CameraStatus;sourceGeneration:()=>number;cameras:()=>CameraDevice[];request:()=>CameraRequest;refreshCameras:()=>Promise<CameraDevice[]>;setCamera:(request:CameraRequest)=>Promise<void>};
+export type MimicHandle={setMirrorReference:(value:boolean)=>void;setInstructorOpacity:(value:number)=>void;startVoice:()=>void;stopVoice:()=>void;start:()=>Promise<void>;stop:()=>void;stream:()=>MediaStream|null;configuration:()=>string;display:()=>{model_mirror:boolean;camera_mirror:boolean};readiness:(remote:boolean)=>string;scoringIssue:()=>string;applyCalibration:(value:Calibration)=>void;confirmControls:()=>void;transform:()=>DisplayTransform|null;sourceIdentity:()=>SetupSourceIdentity;facing:()=>'user'|'environment';selection:()=>CameraSelection|null;cameraStatus:()=>CameraStatus;sourceGeneration:()=>number;cameras:()=>CameraDevice[];request:()=>CameraRequest;refreshCameras:()=>Promise<CameraDevice[]>;setCamera:(request:CameraRequest)=>Promise<void>;poseReport:()=>PoseAlignmentReport|null};
 export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player:Playback;onCommand:(c:PracticeAction)=>void;renderReference:(framing:PracticeFraming)=>ReactNode;cameraEnabled?:boolean;setup?:CameraSetupController;onRequestSetup?:()=>void;onClose?:()=>void;onVoiceStatus?:(state:string,error?:string)=>void;layout?:'combined'|'separate'|'instructor';angle?:number;competition?:boolean;onCameraState?:(state:CameraState)=>void;onSummary?:(value:{score:number|null;cue:string;coverage:number})=>void}>(function MimicInterface({lesson,player,onCommand,renderReference,cameraEnabled=true,onClose=()=>{},onVoiceStatus,layout='separate',angle=0,competition=false,onSummary,onCameraState,setup,onRequestSetup},ref){
  const cameraAllowed=useRef(cameraEnabled);cameraAllowed.current=cameraEnabled;
  const video=useRef<HTMLVideoElement>(null),canvas=useRef<HTMLCanvasElement>(null),pane=useRef<HTMLDivElement>(null),frame=useRef<HTMLDivElement>(null),left=useRef<HTMLSpanElement>(null),right=useRef<HTMLSpanElement>(null);
  const framingController=useRef(new CameraFramingController()).current;
+ const poseRun=useRef(new PoseRunCapture()).current;
  const displayHandle=useRef<{current:DisplayTransform|null}>({current:null});
  const latestPose=useRef<{image:Point[];timestamp:number}|null>(null),latestJoints=useRef<Record<string,number>|undefined>(undefined);
  const [autoFrame,setAutoFrame]=useState(true),autoFrameRef=useRef(autoFrame);autoFrameRef.current=autoFrame;
@@ -42,7 +48,9 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
  const options=useRef({request:loadPreference(preferenceStore()),mirrorPreview:true,mirrorReference:false,skeleton:true,composite:false,angle:0});options.current.angle=angle;
  const [,refreshUi]=useState(0);
  const [mode,setMode]=useState<Mode>('off'),[message,setMessage]=useState('Camera off'),[error,setError]=useState(''),[progress,setProgress]=useState(0),[score,setScore]=useState<number|null>(null),[voiceState,setVoiceState]=useState('off'),[voiceError,setVoiceError]=useState('');
- const [devices,setDevices]=useState<CameraDevice[]>([]),[lastCommand,setLastCommand]=useState(''),[cue,setCue]=useState(''),[feedback,setFeedback]=useState(true);
+ const [devices,setDevices]=useState<CameraDevice[]>([]),[lastCommand,setLastCommand]=useState(''),[cue,setCue]=useState('');
+ const [feedback,setFeedback]=useFeedbackPreference(lesson.lesson_id);
+ const lessonFeedbackEnabled=effectiveFeedbackEnabled(lesson);
  const [controlsConfirmed,setControlsConfirmed]=useState(false);
  const summaryCallback=useRef(onSummary);summaryCallback.current=onSummary;
  const cameraCallback=useRef(onCameraState);cameraCallback.current=onCameraState;
@@ -81,10 +89,23 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
  };
  // Opacity is a stage control beside the arrangement it belongs to.
  const setInstructorOpacity=(value:number)=>setFraming(previous=>({...previous,opacity:value}));
- useImperativeHandle(ref,()=>({setMirrorReference,setInstructorOpacity,startVoice,stopVoice:()=>voice.current?.stop(),start:()=>start('camera'),stop,stream:()=>resources.current.stream,display:()=>({model_mirror:resources.current.mode!=='off'?options.current.mirrorPreview!==options.current.mirrorReference:options.current.mirrorReference,camera_mirror:options.current.mirrorPreview}),scoringIssue:()=>resources.current.mode!=='camera'?'Use a live camera for a scored run.':!resources.current.reference?'This practice has no compatible scoring reference.':resources.current.lastScore===null||performance.now()-resources.current.lastPose>900?'Keep your whole body clearly visible before starting.':'',configuration:()=>`${resources.current.mode}:${currentFacing()}:${options.current.mirrorReference?'mirror':'same'}:${options.current.angle}:calibration=${calibrationEnabled()?'matched':'default'}`,readiness:remote=>resources.current.mode==='off'?'':!resources.current.locked&&calibrationEnabled()?'Finish height matching before starting.':currentFacing()==='environment'&&!remote&&!controlsConfirmed?'For the rear camera, confirm your visible display and controls in Camera setup.':'',applyCalibration,confirmControls,transform:()=>displayHandle.current.current,sourceIdentity:setupSource,facing:currentFacing,selection:()=>resources.current.selection,cameraStatus:()=>resources.current.status,sourceGeneration:()=>resources.current.epoch,cameras:()=>resources.current.devices,request:()=>options.current.request,refreshCameras:()=>refreshCameras(),setCamera:request=>setCamera(request)}));
+ useImperativeHandle(ref,()=>({setMirrorReference,setInstructorOpacity,startVoice,stopVoice:()=>voice.current?.stop(),start:()=>start('camera'),stop,stream:()=>resources.current.stream,display:()=>({model_mirror:resources.current.mode!=='off'?options.current.mirrorPreview!==options.current.mirrorReference:options.current.mirrorReference,camera_mirror:options.current.mirrorPreview}),scoringIssue:()=>resources.current.mode!=='camera'?'Use a live camera for a scored run.':!resources.current.reference?'This practice has no compatible scoring reference.':resources.current.lastScore===null||performance.now()-resources.current.lastPose>900?'Keep your whole body clearly visible before starting.':'',configuration:()=>`${resources.current.mode}:${currentFacing()}:${options.current.mirrorReference?'mirror':'same'}:${options.current.angle}:calibration=${calibrationEnabled()?'matched':'default'}`,readiness:remote=>resources.current.mode==='off'?'':!resources.current.locked&&calibrationEnabled()?'Finish height matching before starting.':currentFacing()==='environment'&&!remote&&!controlsConfirmed?'For the rear camera, confirm your visible display and controls in Camera setup.':'',applyCalibration,confirmControls,transform:()=>displayHandle.current.current,sourceIdentity:setupSource,facing:currentFacing,selection:()=>resources.current.selection,cameraStatus:()=>resources.current.status,sourceGeneration:()=>resources.current.epoch,cameras:()=>resources.current.devices,request:()=>options.current.request,refreshCameras:()=>refreshCameras(),setCamera:request=>setCamera(request),
+  poseReport:()=>{
+   if(!POSE_ALIGNMENT_REPORT_ENABLED)return null;
+   const r=resources.current;
+   if(!r.reference||!poseRun.sampleCount)return null;
+   const reference:Array<{time:number;joints:PoseFrame['joints']}>=r.reference.times.map((time,index)=>{
+    const joints=fromReference(r.reference!.keypoints[index],options.current.mirrorReference,
+      r.reference!.landmarkFormat??'sam-3d-body',r.reference!.visibility?.[index]??null);
+    // The reference JSON is external data; the adapter already rejected a short row.
+    return joints?{time,joints:joints as unknown as PoseFrame['joints']}:null;
+   }).filter((value):value is {time:number;joints:PoseFrame['joints']}=>value!==null);
+   return poseRun.report(reference,{min:-2,max:2},lesson.section_set.sections.map(section=>({...section})));
+  }}));
  useEffect(()=>{setFraming(value=>({...value,composite:layout==='combined'}));},[layout]);
 
  const clear=useCallback(()=>{setScore(null);setCue('');resources.current.lastScore=null;},[]);
+ useEffect(()=>{if(!lessonFeedbackEnabled)clear();},[lessonFeedbackEnabled,clear]);
  const clearOverlay=useCallback(()=>{const c=canvas.current;c?.getContext('2d')?.clearRect(0,0,c.width,c.height);if(left.current)left.current.hidden=true;if(right.current)right.current.hidden=true;},[]);
  const stop=useCallback(()=>{
   const r=resources.current;lifetime.stop();r.epoch=lifetime.generation;r.mode='off';r.ready=false;r.inFlight=false;r.calibrating=false;r.locked=null;r.lastPose=0;r.lastVideo=-1;
@@ -270,11 +291,16 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
    if(result.done){r.locked={...result.value};r.calibrating=false;framingHint.current='';framingController.setPaused(false);player.calibrating(false);setMessage('Height matched · locked');setFraming(value=>({...value,calibrating:false,calibration:{...result.value},position:suggestedAvatarPosition(result.value,'left',v.videoWidth,v.videoHeight,mirrored)}));if(r.mode==='recorded'){v.currentTime=lesson.source_start;void v.play().catch(()=>setMessage('Play the recorded test again to continue.'));}}
   }
   let joints:Record<string,number>|undefined;
-  if(r.locked&&!r.calibrating&&r.reference&&options.current.angle===0){
+  if(lessonFeedbackEnabled&&r.locked&&!r.calibrating&&r.reference&&options.current.angle===0){
    const state=player.state;
    let reference=r.reference;
-   if(state.mode==='sections'&&player.current){const current=player.current;const indices=reference.times.map((t,i)=>t>=current.start&&t<=current.end?i:-1).filter(i=>i>=0);if(indices.length)reference={duration:current.end,times:indices.map(i=>reference.times[i]),keypoints:indices.map(i=>reference.keypoints[i])};}
-   const result=bestMatch(fromMediaPipe(world,image),reference,state.index<0?lesson.standing_time:state.time,options.current.mirrorReference,state.playing);
+   if(state.mode==='sections'&&player.current){const current=player.current;const indices=reference.times.map((t,i)=>t>=current.start&&t<=current.end?i:-1).filter(i=>i>=0);if(indices.length)reference=sliceReference(reference,indices,{duration:current.end});}
+   const student=fromMediaPipe(world,image) as PoseFrame['joints'];
+   if(competition&&POSE_ALIGNMENT_REPORT_ENABLED&&state.playing)poseRun.add({time:state.time,joints:student});
+   // A reference whose standing frame was not a confident upright pose keeps its own
+   // thumbnail-derived time; the manifest value must not be treated as standing.
+   const seek=state.index<0?(reference.standingCalibrationAvailable===false?0:lesson.standing_time):state.time;
+   const result=bestMatch(student,reference,seek,options.current.mirrorReference,state.playing);
    if(result){const stamp=performance.now(),dt=previousScoreAt?(stamp-previousScoreAt)/1000:.2;r.lastScore=previousScore===null?result.score:previousScore+(result.score-previousScore)*(1-Math.exp(-dt/.4));r.lastScoreAt=stamp;setScore(Math.round(r.lastScore));joints=result.joints;setMessage(competition?'Tracking clearly':r.mode==='recorded'?'Recorded test · approximate pose match':'Tracking clearly · approximate similarity');
     const names:Record<string,string>={le:'left elbow',re:'right elbow',ls:'left shoulder',rs:'right shoulder',lh:'left hip',rh:'right hip',lk:'left knee',rk:'right knee'};
     const worst=Object.entries(result.joints).sort((a,b)=>a[1]-b[1])[0];const key=worst&&worst[1]<55?worst[0]:'';if(cueState.current.key!==key)cueState.current={key,since:stamp,shown:cueState.current.shown};
@@ -295,15 +321,22 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
 
  const start=async(next:Exclude<Mode,'off'>)=>{
   if(!cameraAllowed.current)return;
+  if(next==='camera')poseRun.reset();
   stop();player.calibrating(!setup&&calibrationEnabled());setError('');setMessage(next==='camera'?'Starting camera…':'Loading recorded test…');const r=resources.current,epoch=r.epoch;r.mode=next;setMode(next);cameraCallback.current?.('starting');
   try{
-   if(lesson.engine==='sam-3d-body'){
+   // Both body pipelines deliver a scoring reference here: SAM3D's MHR70 rows and
+   // the MediaPipe heavy route's 33-landmark rows. The format travels with the data.
+   if(lesson.engine==='sam-3d-body'||lesson.engine==='mediapipe'){
    const response=await fetch(assetUrl(lesson.landmarks.key));if(!response.ok)throw new Error('The movement comparison data could not load.');const reference=await response.json() as Reference;
    if(epoch!==r.epoch)return;
-   if(!Array.isArray(reference.times)||!Array.isArray(reference.keypoints)||reference.times.length!==reference.keypoints.length||reference.keypoints.some(row=>row.length<63))throw new Error('This lesson has no compatible comparison data.');
+   const landmarkFormat:LandmarkFormat=reference.landmarkFormat==='mediapipe-33'?'mediapipe-33':'sam-3d-body';
+   const minimum=landmarkFormat==='mediapipe-33'?33:63;
+   if(!Array.isArray(reference.times)||!Array.isArray(reference.keypoints)||reference.times.length!==reference.keypoints.length||reference.keypoints.some(row=>!Array.isArray(row)||row.length<minimum))throw new Error('This lesson has no compatible comparison data.');
+   const visibility=Array.isArray(reference.visibility)&&reference.visibility.length===reference.keypoints.length?reference.visibility:null;
+   const normalized:Reference={...reference,landmarkFormat,visibility};
    const offset=lesson.animation_start??0;
    const indices=reference.times.map((t,i)=>t>=offset-1e-6&&t<=offset+lesson.duration+1e-6?i:-1).filter(i=>i>=0);
-   r.reference={duration:lesson.duration,times:indices.map(i=>reference.times[i]-offset),keypoints:indices.map(i=>reference.keypoints[i])};
+   r.reference=sliceReference(normalized,indices,{duration:lesson.duration,offset});
    }else r.reference=null;
    if(next==='camera'){
     const result=await acquire(options.current.request);
@@ -446,7 +479,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
    </div></div>}</div>
    <div className="reference-pane" data-draggable={active&&framing.composite?'instructor':undefined} tabIndex={active&&framing.composite?0:undefined} role={active&&framing.composite?'group':undefined} aria-label={active&&framing.composite?'Reference placement. Drag it, or use the arrow keys, to move it across the camera image.':undefined} onPointerDown={dragPosition} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={nudgePosition}>{renderReference(framing)}</div>
   </div>
-  <div className="practice-tracking" role={error||voiceError?'alert':undefined} aria-live={error||voiceError?'assertive':'off'}>{error||voiceError|| (active?angle!==0?'Observation angle · comparison paused':message:'Camera off · watch freely')}{!competition&&feedback&&active&&score!==null&&<span> · {score}% similarity</span>}{!competition&&feedback&&active&&cue&&<span> · {cue}</span>}</div>
+  <div className="practice-tracking" role={error||voiceError?'alert':undefined} aria-live={error||voiceError?'assertive':'off'}>{error||voiceError|| (active?angle!==0?'Observation angle · comparison paused':message:'Camera off · watch freely')}{!competition&&lessonFeedbackEnabled&&feedback&&active&&score!==null&&<span> · {score}% similarity</span>}{!competition&&lessonFeedbackEnabled&&feedback&&active&&cue&&<span> · {cue}</span>}</div>
   {voiceState!=='off'&&<p className="small" role="status">Voice {voiceState}{lastCommand&&` · heard “${lastCommand}”`}</p>}
   <SettingsPortal slot="camera" disabledReason={!cameraEnabled?'Camera is off.':undefined}>
    <SettingsRow id="camera-selection" label="Camera device" value={options.current.request.deviceId?'Selected device':'Automatic'}>
@@ -466,9 +499,8 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
     {!calibrationEnabled()&&<p>Height matching is unavailable. Default alignment is used.</p>}
     {!competition&&(import.meta as ImportMeta&{env?:{DEV?:boolean}}).env?.DEV&&new URLSearchParams(location.search).get('diagnostics')==='1'&&lesson.source_video&&<button onClick={()=>{void start('recorded');close();}}>Recorded source test</button>}
    </SettingsRow>}
-   <SettingsRow id="feedback" label="Similarity & cues" value={feedback?'On':'Off'} disabledReason={competition?'Challenge requires camera scoring.':angle!==0?'Comparison is paused at this angle. Choose Front above to resume.':undefined} status={competition?'Fixed':angle!==0?'Paused':undefined}>
-    <label>Show similarity and cues<input type="checkbox" role="switch" checked={feedback} onChange={event=>setFeedback(event.target.checked)}/></label><p>Approximate movement similarity, not technique correctness.</p>
-   </SettingsRow>
+   <SettingsRow id="feedback" label="Similarity & cues" value={!lessonFeedbackEnabled?'Off by creator':feedback?'On':'Off'} status={!lessonFeedbackEnabled?'Feedback not enabled for this lesson':angle!==0?'Paused':feedback&&(!cameraEnabled||mode==='off')?'Camera off':competition?'Scoring continues':undefined}>
+    <label>Show similarity and cues<input type="checkbox" role="switch" disabled={!lessonFeedbackEnabled} checked={lessonFeedbackEnabled&&feedback} onChange={event=>setFeedback(event.target.checked)}/></label><p>{lessonFeedbackEnabled?'Approximate movement similarity, not technique correctness. Feedback is On by default; turning it Off does not change the recorded assessment.':'Feedback not enabled for this lesson. Your saved preference is unchanged; ordinary playback still works.'}</p>{lessonFeedbackEnabled&&feedback&&(!cameraEnabled||mode==='off')&&<p className="small muted" role="status">Feedback preference is On. Start the camera to receive similarity and cues.</p>}</SettingsRow>
   </SettingsPortal>
  </div>;
 });

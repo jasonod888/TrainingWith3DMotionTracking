@@ -17,7 +17,9 @@ import {usePianoPreviewAsset} from './usePianoPreviewAsset';
 import {MidiKeyboardCheck} from './MidiKeyboardCheck';
 const MusicHistoryPanel=lazy(()=>import('./MusicHistoryPanel').then(module=>({default:module.MusicHistoryPanel})));
 import {attackSourceTime} from '../../../../packages/music-engine/onsets';
-import {buildRunFeedback, calibrateLatency, feedbackEligibility, invalidFeedback, type Attack, type MusicFeedback, type RunClock} from './music-feedback';
+import {buildRunFeedback, calibrateLatency, effectiveFeedbackEnabled, feedbackEligibility, invalidFeedback, type Attack, type MusicFeedback, type RunClock} from './music-feedback';
+import {FeedbackChoice, setFeedbackChoice} from './workspace/FeedbackChoice';
+import {useFeedbackPreference} from '../feedback-preference';
 import {MUSIC_CAPABILITIES, countInFromBeats, countInOptionsFromBeats, voiceControl, type PracticeCapabilities} from '../../../../packages/learning-engine/practice-capabilities';
 import {emptyPracticeSnapshot} from '../../../../packages/learning-engine/practice-runtime';
 import {musicPracticePlan} from '../practice/practice-plans';
@@ -69,6 +71,9 @@ export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=fa
   const [calibration,setCalibration]=useState<{pulse:number;samples:number}|null>(null);
   const [feedback,setFeedback]=useState<MusicFeedback[]>([]);
   const [feedbackNotice,setFeedbackNotice]=useState('');
+  const [feedbackEnabled,setFeedbackEnabled]=useFeedbackPreference(lesson.lesson_id);
+  const effectiveAssessment=lesson.assessment;
+  const lessonFeedbackEnabled=effectiveFeedbackEnabled(lesson);
   const [saves,setSaves]=useState<Record<string,SaveState>>({});
   const [historyRefresh,setHistoryRefresh]=useState(0);
   const [drawer,setDrawer]=useState<'sections'|'settings'|'midi'|null>(null);
@@ -89,8 +94,9 @@ export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=fa
     calibrationTimer.current=null;calibrationFinish.current=null;
     calibrationRef.current={active:false,expected:[],samples:[]};setCalibration(null);
   };
-  const eligibility=feedbackEligibility({assessment:lesson.assessment,subject:lesson.subject,
-    referenceReviewed:lesson.reference_reviewed===true,inputSelected:keyboardConnected,latencyMeasured:latency!==null});
+  const eligibility=feedbackEligibility({assessment:effectiveAssessment,subject:lesson.subject,
+    referenceReviewed:lesson.reference_reviewed===true,inputSelected:keyboardConnected,latencyMeasured:latency!==null,
+    creatorEnabled:lessonFeedbackEnabled});
   const eligibilityRef=useRef(eligibility);eligibilityRef.current=eligibility;
   const source = lesson.source_video && !videoFailed ? assetUrl(lesson.source_video.key) : '';
   const plan=useMemo(()=>musicPracticePlan(lesson),[lesson]);
@@ -236,13 +242,22 @@ export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=fa
     const unit=plan.units[snapshot?.unitIndex??0];
     const gate=eligibilityRef.current;
     if(!attempt.completed){runClock.current=null;setFeedbackNotice('Practice was interrupted. This run is not scored.');return;}
-    if(gate.eligible&&referenceRef.current&&unit){
+    if(!lessonFeedbackEnabled){setFeedbackNotice('Feedback not enabled for this lesson.');}
+    else if(feedbackEnabled&&gate.eligible&&referenceRef.current&&unit){
       setFeedback(previous=>[...previous,buildRunFeedback({reference:referenceRef.current!,sectionId:unit.id,
         start:unit.start,end:unit.end,speed:snapshot?.rate??1,run:run.run,attacks:run.attacks,
         latencyMs:latencyRef.current??0,latencyMeasured:latencyRef.current!==null})]);
-    }else{setFeedbackNotice(gate.reasons[0]??'Feedback is unavailable for this lesson.');}
+    }else if(!feedbackEnabled){setFeedbackNotice('Feedback is Off. Ordinary practice playback remains available.');}
+    else{setFeedbackNotice(gate.reasons[0]??'Feedback is unavailable until setup is complete.');}
     runClock.current=null;
-  },[practice.lastAttempt]);
+  },[practice.lastAttempt,feedbackEnabled,lessonFeedbackEnabled]);
+
+  useEffect(()=>{
+    if(lessonFeedbackEnabled)return;
+    setFeedback([]);
+    setFeedbackNotice('Feedback not enabled for this lesson.');
+    cancelCalibration();
+  },[lessonFeedbackEnabled]);
 
   const handleAttack=useCallback(({pitch,timeStamp}:{pitch:number;timeStamp:number})=>{
     const calibrationState=calibrationRef.current;
@@ -306,7 +321,7 @@ export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=fa
       const id=crypto.randomUUID();
       entry={id,state:'saving',payload:{summary_version:1,status:'complete',id,save_requested:true,
         revision_id:lesson.revision_id,reference_sha256:lesson.reference.sha256,
-        rubric_version:lesson.assessment.rubric_version,section_id:run.sectionId,
+        rubric_version:effectiveAssessment.rubric_version,section_id:run.sectionId,
         start:run.window.start,end:run.window.end,speed:run.speed,run:run.run,
         assessment:'unscored',alignment:run.latencyMeasured?'visual-estimate':'none',
         note_window:{total:run.total,eligible:run.assessed,matched:run.matched,missing:run.missing,extra:run.extra}}};
@@ -355,7 +370,7 @@ export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=fa
         onClick={()=>setDrawer(value=>value==='sections'?null:'sections')}>Sections</button>
       <button type="button" aria-expanded={drawer==='settings'} aria-controls="music-practice-drawer"
         onClick={()=>setDrawer(value=>value==='settings'?null:'settings')}>Settings</button>
-      {midiSetupEnabled&&lesson.subject==='piano'&&<button type="button" aria-expanded={drawer==='midi'} aria-controls="music-practice-drawer"
+      {midiSetupEnabled&&(lesson.subject==='piano'||lesson.subject==='guitar')&&<button type="button" aria-expanded={drawer==='midi'} aria-controls="music-practice-drawer"
         onClick={()=>setDrawer(value=>value==='midi'?null:'midi')}>MIDI</button>}
     </div>}
     toolsBefore={<div className="music-audio-modes" role="group" aria-label="Playback audio">
@@ -363,6 +378,13 @@ export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=fa
       <button className={audioMode==='piano'?'secondary active':'secondary'} aria-pressed={audioMode==='piano'} disabled={!preview.url||!player.ready} onClick={()=>setAudioMode('piano')}>Piano</button>
     </div>}
     settingsExtra={<>
+      <FeedbackChoice subject={lesson.subject} assessment={effectiveAssessment}
+        referenceReviewed={lesson.reference_reviewed===true} inputSelected={keyboardConnected}
+        inputMode="midi" microphoneAvailable={false} enabled={feedbackEnabled}
+        lessonEnabled={lessonFeedbackEnabled}
+        active={snapshot?.status==='playing'} onEnabledChange={value=>setFeedbackChoice(value,{
+          eligible:eligibility.eligible,creatorEnabled:lessonFeedbackEnabled,
+          cancel:()=>{},setEnabled:setFeedbackEnabled})}/>
       <label>Practice section<select aria-label="Practice section" value={practiceSection}
         onChange={event=>selectPracticeUnit(event.target.value)}><option value="all">Whole lesson</option>
         {plan.units.map(section=><option key={section.id} value={section.id}>{section.label}</option>)}</select></label>
@@ -451,7 +473,7 @@ export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=fa
           {snapshot.status==='buffering'&&<p className="small muted">Practice resumes from the same source position when the video is ready.</p>}
           {(snapshot.status==='lesson-complete'||practice.lastAttempt?.completed)&&<><p><strong>Practice complete</strong> · {keyboardConnected?`${captured} MIDI ${captured===1?'attack':'attacks'} counted locally`:'No keyboard input was measured'}. This run is unscored.{eligibility.eligible?' Local feedback appears below.':' This lesson stays ungraded.'}</p><button className="back-link" onClick={()=>stopPractice()}>Close practice</button></>}
         </section>}
-        {feedback.length>0&&<section className="music-feedback" aria-label="Practice feedback">
+        {lessonFeedbackEnabled&&feedback.length>0&&<section className="music-feedback" aria-label="Practice feedback">
           <h2>Local feedback · unscored</h2>
           <p className="small muted">Note eligibility reflects complete timing windows, not keyboard observation coverage or accuracy.</p>
           {feedback.map((run,index)=><article className="feedback-run" key={`${run.run}-${index}`}>
@@ -477,7 +499,7 @@ export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=fa
               <div><dt>Instrument</dt><dd>{label(lesson)}</dd></div>
               <div><dt>Duration</dt><dd>{timeLabel(reference.duration)}</dd></div>
               <div><dt>Notes</dt><dd>{reference.events.length}{reference.events.some(event => event.optional) ? ' · optional notes marked' : ''}</dd></div>
-              <div><dt>Assessment</dt><dd>{lesson.assessment.assessment === 'none' ? 'None' : lesson.assessment.assessment}</dd></div>
+              <div><dt>Assessment</dt><dd>Notes · pitch and timing</dd></div>
               {lesson.instrument.capo ? <div><dt>Capo</dt><dd>{lesson.instrument.capo}</dd></div> : null}
               {lesson.instrument.tuning ? <div><dt>Tuning</dt><dd>{lesson.instrument.tuning}</dd></div> : null}
             </dl>
@@ -486,19 +508,19 @@ export function MusicLessonHome({lesson, onBack,onModeChange,midiSetupEnabled=fa
             <h2>How the guide works</h2>
             <p className="subtle">Notes light up at their reviewed start time and stay lit until their reviewed length ends.
               Notes without a held length flash briefly. Optional notes are drawn like other notes; the guide does not grade your playing.</p>
-            <p className="small muted">{midiSetupEnabled&&lesson.subject==='piano'?'No camera or microphone is used. MIDI access is requested only when you connect a keyboard.':'No camera, microphone or MIDI access has been requested.'}</p>
+            <p className="small muted">{midiSetupEnabled&&(lesson.subject==='piano'||lesson.subject==='guitar')?'No camera or microphone is used. MIDI access is requested only when you connect a keyboard.':'No camera, microphone or MIDI access has been requested.'}</p>
           </article>
         </div>
       </div></div>
       <div className="music-drawer-pane" hidden={drawer!=='midi'}>
       <div className="practice-panel-body">
-        {midiSetupEnabled&&lesson.subject==='piano'&&lesson.assessment.assessment==='notes'&&<section className="music-home-panel input-delay" aria-label="Timing alignment">
+        {midiSetupEnabled&&(lesson.subject==='piano'||lesson.subject==='guitar')&&effectiveAssessment.assessment==='notes'&&<section className="music-home-panel input-delay" aria-label="Timing alignment">
           <h2>Timing alignment · approximate</h2>
           {latency!==null?<p role="status">Estimated personal alignment: {latency} ms. <button className="back-link" onClick={()=>setLatency(null)}>Measure again</button></p>:<button className="secondary" disabled={!keyboardConnected||Boolean(calibration)||practiceActive} onClick={startCalibration}>Estimate timing alignment</button>}
           {calibration?<div className="calibration-pulse" role="status"><strong>{calibration.pulse}</strong><span>Play one note with each pulse</span><small>{calibration.samples} taps measured</small></div>:<p className="small muted">Play one note with each of eight visual pulses. This estimates your alignment, including reaction time; it does not measure hardware latency.</p>}
           {feedbackNotice&&<p className="small muted" role="status">{feedbackNotice}</p>}
         </section>}
-        {midiSetupEnabled&&lesson.subject==='piano'&&<MidiKeyboardCheck key={lesson.revision_id} onAttack={handleAttack} onInputChange={id=>{setKeyboardConnected(Boolean(id));cancelCalibration();setLatency(null);if(practice.runtime)stopPractice();}}/>}
+        {midiSetupEnabled&&(lesson.subject==='piano'||lesson.subject==='guitar')&&<MidiKeyboardCheck key={lesson.revision_id} onAttack={handleAttack} onInputChange={id=>{setKeyboardConnected(Boolean(id));cancelCalibration();setLatency(null);if(practice.runtime)stopPractice();}}/>}
         {(!midiSetupEnabled||lesson.subject!=='piano')&&<p className="small muted">MIDI keyboard input is not enabled for this lesson.</p>}
       </div></div>
     </aside>}

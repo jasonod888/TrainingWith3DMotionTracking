@@ -58,6 +58,22 @@ def test_non_owner_cannot_accept(system):
                         json={'revision_id': lesson.revision_id}).status_code == 404
 
 
+def test_body_feedback_off_persists_through_partial_section_edits(system):
+    lesson, owner, app, _ = owner_of(system)
+    assert owner.get(f'/api/lessons/{lesson.lesson_id}').json()['feedback_enabled'] is True
+    sections = [section.model_dump() for section in lesson.section_set.sections]
+    edit = {'base_revision_id': lesson.revision_id, 'title': lesson.title,
+            'sections': sections, 'feedback_enabled': False}
+    saved = owner.put(f'/api/lessons/{lesson.lesson_id}/sections', json=edit)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()['feedback_enabled'] is False
+    partial = {'base_revision_id': saved.json()['revision_id'], 'title': lesson.title, 'sections': sections}
+    later = owner.put(f'/api/lessons/{lesson.lesson_id}/sections', json=partial)
+    assert later.status_code == 200, later.text
+    assert later.json()['feedback_enabled'] is False
+    assert owner.get(f'/api/lessons/{lesson.lesson_id}').json()['feedback_enabled'] is False
+
+
 def test_publishing_records_a_legacy_acceptance_and_metadata_does_not(system):
     lesson, owner, app, _ = owner_of(system)
     published = owner.post(f'/api/lessons/{lesson.lesson_id}/publish',

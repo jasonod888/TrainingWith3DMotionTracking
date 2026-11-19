@@ -1,4 +1,46 @@
-"""Export stored native MHR parameters as a skinned skeletal GLB on CPU."""
+"""Export stored native MHR parameters as a skinned skeletal GLB on CPU.
+
+Architecture
+------------
+This script is the MHR-to-GLB step of the ``sam-3d-body-v1`` pipeline. It is a pure
+conversion: it never runs inference and never touches the source video.
+
+Inputs
+    ``motion.npz`` written by ``scripts/process_video.py``:
+        ``mhr_model_params``  ``[frames, 204]`` float32, the native MHR parameter
+                              vector (MHR204): global rotation, body pose, shape,
+                              expression and bone scales. Translation is excluded by
+                              the model, so root motion is added afterwards.
+        ``pred_cam_t``        ``[frames, 3]`` float32, estimated camera translation in
+                              metres. An estimate, not a solved world trajectory.
+        ``pred_keypoints_3d`` ``[frames, 70, 3]`` float32, the MHR70 keypoint layout
+                              (metres, camera axes). Not consumed here; kept for the
+                              reference JSON and the instructor-marker path.
+        ``timestamps``        ``[frames]`` float64 presentation seconds.
+
+    MHR rig assets from ``models/mhr`` (``compact_v6_1.model`` plus ``lod1.fbx``).
+    Obtain them with ``scripts/download_models.py --assets-only``.
+
+Coordinate axes
+    MHR skeleton states are produced in centimetres with ``+Y`` up and ``-Z``
+    forward. SAM 3D Body camera output (``pred_cam_t``) is metres with ``+Y`` down and
+    ``+Z`` forward. The conversion flips Y and Z and scales by 100, and the first
+    frame's translation is subtracted so the clip starts at the origin. Grounding can
+    replace that translation entirely (see below).
+
+Downstream consumers
+    * ``scripts/source_grounding.py`` repairs floor motion and writes a placement
+      artifact; ``--grounding`` consumes it and replaces the camera translation.
+    * ``scripts/retarget_mixamo.py`` retargets the exported GLB onto the Mixamo
+      male/female rigs for the two avatar presentations.
+    * ``scripts/saas_worker.py`` runs this export, then the grounding and avatar
+      steps, and verifies the animation sampler inputs against the motion clock.
+
+Standalone CLI
+    ``python scripts/export_glb.py outputs/job/motion/motion.npz --output reference.glb``
+    ``--smooth`` optionally blurs parameters; ``--in-place`` drops root translation;
+    ``--grounding`` uses a reviewed placement artifact instead of camera motion.
+"""
 import argparse
 import json
 from pathlib import Path
@@ -62,6 +104,9 @@ def export(motion_path, output, assets, sigma=0, root_motion=True, grounding=Non
         times = data['timestamps'] - data['timestamps'][0]
         if len(times) < 2 or np.any(np.diff(times) <= 0):
             raise ValueError('Animation requires at least two frames with increasing timestamps.')
+        # MHR204 layout: [0:3] translation, [3:6] global rotation (extrinsic xyz),
+        # [6:136] joint rotations, [136:204] bone scales. Root travel comes from
+        # pred_cam_t below, so the parameter translation is left untouched here.
         params = smooth_motion(raw_params, sigma)
         states = np.asarray(geometry.model_parameters_to_skeleton_state(char, params), dtype=np.float32).copy()
         # Native MHR skeleton states use cm, +Y up/-Z forward. SAM camera output
@@ -83,6 +128,9 @@ def export(motion_path, output, assets, sigma=0, root_motion=True, grounding=Non
             raise ValueError('Non-finite skeleton states; export stopped.')
     fps = (len(times)-1) / float(times[-1])
     output.parent.mkdir(parents=True, exist_ok=True)
+    # The builder only needs a nominal rate to lay keyframes out; `set_timestamps`
+    # then rewrites every sampler input with the preserved presentation times, so a
+    # fractional source rate is not rounded by the export.
     builder = geometry.GltfBuilder(fps=fps)
     builder.add_character(char)
     builder.add_skeleton_states(char, fps, states)

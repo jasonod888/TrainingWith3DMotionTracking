@@ -116,6 +116,8 @@ def create_app(settings: Settings | None = None):
                 'subject_filter':settings.subject_filter_enabled,
                 'music_midi_setup':settings.music_midi_setup_enabled,
                 'music_history':settings.music_history_enabled,
+                'music_challenge':settings.music_challenge_enabled,
+                'music_inference':settings.music_inference_enabled,
                 'music_piano_library_ui':settings.music_piano_library_ui_enabled,
                 'music_guitar_library_ui':settings.music_guitar_library_ui_enabled,
                 'processing':processing_routes.capability_flags(settings),

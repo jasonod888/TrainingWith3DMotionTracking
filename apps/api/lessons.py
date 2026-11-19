@@ -236,6 +236,7 @@ class SaveSections(BaseModel):
     base_revision_id: str = Field(min_length=1, max_length=80)
     title: str = Field(min_length=1, max_length=200)
     sections: list[Section] = Field(min_length=1, max_length=1000)
+    feedback_enabled: bool | None = Field(default=None, strict=True)
 
 class RenameInput(BaseModel):
     title: str = Field(max_length=200)
@@ -280,7 +281,8 @@ def install_lessons(app, engine, settings, identity, db):
             Lesson.owner_id == account.id, Lesson.archived.is_(False), Lesson.disabled.is_(False),
             Lesson.experience_family == 'body', LessonRevision.version == Lesson.version)
             .order_by(Lesson.created_at.desc())).scalars().all()
-        return [row.manifest for row in rows]
+        from .music_assessment import with_effective_feedback
+        return [with_effective_feedback(row.manifest) for row in rows]
 
     @router.get('/summaries')
     def summaries(request: Request, subject: str | None = None, account=Depends(identity), session: Session = Depends(db)):
@@ -323,7 +325,8 @@ def install_lessons(app, engine, settings, identity, db):
         if 'owner' in reasons or 'direct' in reasons or 'group' in reasons:
             _,revision=readable_lesson(session,lesson_id,account.id)
             ensure_supported(lesson, revision, request)
-            return revision.manifest
+            from .music_assessment import with_effective_feedback
+            return with_effective_feedback(revision.manifest)
         # A public-only reader never receives private source media.
         _,revision,publication=public_lesson(session,lesson_id)
         ensure_supported(lesson, revision, request)
@@ -444,6 +447,9 @@ def install_lessons(app, engine, settings, identity, db):
         manifest.title = body.title.strip()
         if not manifest.title:
             raise HTTPException(422, 'Give your lesson a name.')
+        from .music_assessment import effective_feedback_enabled
+        manifest.feedback_enabled = (body.feedback_enabled if body.feedback_enabled is not None
+                                     else effective_feedback_enabled(revision.manifest))
         # Compare-and-swap remains safe when two requests read the same base revision.
         updated = session.execute(update(Lesson).where(Lesson.id == lesson.id, Lesson.owner_id == account.id,
             Lesson.archived.is_(False), Lesson.disabled.is_(False), Lesson.version == revision.version).values(version=revision.version+1, title=manifest.title))
@@ -520,7 +526,8 @@ def install_lessons(app, engine, settings, identity, db):
         manifest['title'] = title
         revision.manifest = manifest
         session.commit()
-        return manifest
+        from .music_assessment import with_effective_feedback
+        return with_effective_feedback(manifest)
 
     @router.delete('/{lesson_id}')
     def archive(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):

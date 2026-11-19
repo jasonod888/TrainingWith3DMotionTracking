@@ -233,7 +233,8 @@ def install_sharing(app,settings,identity,db):
         from .lessons import client_formats
         if released and released.manifest.get('schema_version')==2 and '2' not in client_formats(request):
             raise HTTPException(406,'This music lesson needs a newer app. Refresh before accepting it.')
-        if lesson.owner_id==account.id:return latest_revision(session,lesson).manifest
+        from .music_assessment import with_effective_feedback
+        if lesson.owner_id==account.id:return with_effective_feedback(latest_revision(session,lesson).manifest)
         grant=session.get(LessonGrant,(lesson.id,account.id))
         if invitation:
             if invitation.accepted_account_id and (not grant or grant.revoked or grant.invitation_id!=invitation.id):raise HTTPException(404,'Access was revoked or this invitation was replaced. Ask for a new invitation.')
@@ -244,7 +245,8 @@ def install_sharing(app,settings,identity,db):
             if not grant:grant=LessonGrant(lesson_id=lesson.id,account_id=account.id,source='link',generation=lesson.share_generation,revoked=False);session.add(grant)
             elif grant.source=='link':grant.generation=lesson.share_generation
         session.commit()
-        return readable_lesson(session,lesson.id,account.id)[1].manifest
+        from .music_assessment import with_effective_feedback
+        return with_effective_feedback(readable_lesson(session,lesson.id,account.id)[1].manifest)
 
     @router.post('/lessons/{lesson_id}/report',status_code=202)
     def report(lesson_id:str,body:ReportInput,account=Depends(identity),session:Session=Depends(db)):

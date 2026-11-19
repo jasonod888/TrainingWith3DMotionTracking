@@ -163,14 +163,27 @@ def test_the_runner_never_imports_a_correction_stage():
         assert forbidden not in text
 
 
-def test_each_family_uses_its_own_pinned_interpreter(tmp_path):
+def test_interpreter_layouts_are_platform_aware():
+    windows = jobs._venv_python('.venv-music', 'nt')
+    posix = jobs._venv_python('.venv-music', 'posix')
+    assert windows.parts[-2:] == ('Scripts', 'python.exe')
+    assert posix.parts[-2:] == ('bin', 'python')
+    assert '.venv-music' in windows.parts and '.venv-music' in posix.parts
+
+
+def test_each_family_uses_its_own_pinned_interpreter(tmp_path, monkeypatch):
     from scripts import piano_model_registry
     built = piano_model_registry.build()
     basic = piano_model_registry.variant(built, 'basic-pitch-native')
     kong = piano_model_registry.variant(built, 'kong-piano')
-    assert Path(jobs._interpreter(basic)).name == 'python.exe'
-    assert '.venv-music' in jobs._interpreter(basic)
-    assert '.venv\\' in jobs._interpreter(kong) or '.venv/' in jobs._interpreter(kong)
+    basic_python = tmp_path / 'basic-python'
+    kong_python = tmp_path / 'kong-python'
+    basic_python.touch()
+    kong_python.touch()
+    monkeypatch.setitem(jobs.RUNTIME_INTERPRETERS, 'basic-pitch', basic_python)
+    monkeypatch.setitem(jobs.RUNTIME_INTERPRETERS, 'kong', kong_python)
+    assert Path(jobs._interpreter(basic)) == basic_python
+    assert Path(jobs._interpreter(kong)) == kong_python
     assert jobs._interpreter(kong, 'custom-python') == 'custom-python'
 
 

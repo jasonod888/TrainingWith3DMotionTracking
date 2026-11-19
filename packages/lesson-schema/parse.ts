@@ -43,7 +43,7 @@ const BODY_KEYS = new Set([
   'animation_start', 'animation_duration', 'frame_rate', 'engine', 'engine_version', 'units',
   'landmark_axes', 'root_motion', 'confidence', 'animation', 'landmarks', 'source_video',
   'focused_video', 'focused_video_start', 'focused_video_alpha', 'thumbnail', 'section_set',
-  'warnings', 'presentation',
+  'warnings', 'presentation', 'feedback_enabled',
   // The public projection adds these two keys to a body manifest.
   'public_tags', 'public_creator',
 ]);
@@ -52,6 +52,7 @@ const MUSIC_KEYS = new Set([
   'schema_version', 'experience_family', 'lesson_id', 'revision_id', 'title', 'subject', 'duration',
   'instrument', 'section_set', 'reference', 'reference_reviewed', 'assessment',
   'source_video', 'preview_video', 'piano_preview', 'playback', 'pedal', 'preview_identity', 'waveform', 'midi_export', 'public_poster', 'warnings',
+  'feedback_enabled',
 ]);
 
 const SUMMARY_KEYS = new Set([
@@ -77,6 +78,11 @@ const isImage = (asset: Asset): boolean => asset.mime.startsWith('image/');
 
 /** Optional assets are validated once and returned as null when absent. */
 type OptionalAsset = Asset | null | undefined;
+
+function readFeedbackEnabled(value: unknown): boolean | null | undefined {
+  if (value === undefined || value === null) return null;
+  return typeof value === 'boolean' ? value : undefined;
+}
 
 function readAsset(value: unknown): Asset | null | undefined {
   if (value === null) return null;
@@ -205,7 +211,7 @@ export function parseLessonManifest(value: unknown): ParseResult<LessonManifest>
   if (value.units !== 'metres' || value.landmark_axes !== 'x-right/y-down/z-forward') return malformed('This lesson uses unsupported coordinates.');
   if (!ROOT_MOTIONS.includes(value.root_motion as string)) return malformed('This lesson has an unknown root motion.');
   if (value.confidence !== 'unmeasured' && value.confidence !== 'measured') return malformed('This lesson has an unknown confidence value.');
-  if (value.frame_rate !== undefined && (!isCount(value.frame_rate) || value.frame_rate < 1 || value.frame_rate > 240)) {
+  if (value.frame_rate !== undefined && (!isNumber(value.frame_rate) || value.frame_rate < 1 || value.frame_rate > 240)) {
     return malformed('This lesson has an invalid frame rate.');
   }
   const animationStart = value.animation_start ?? 0;
@@ -218,11 +224,15 @@ export function parseLessonManifest(value: unknown): ParseResult<LessonManifest>
       && (!isNumber(value.focused_video_start) || value.focused_video_start < 0)) {
     return malformed('This lesson has an invalid instructor video start.');
   }
-  const animation = readAsset(value.animation);
+  // Engine-specific completeness: a 3D lesson needs its GLB, a video-only lesson
+  // needs the clip the person actually watches. `animation` is nullable on the wire.
+  const animation: OptionalAsset = readAsset(value.animation);
   const landmarks = readAsset(value.landmarks);
-  if (!animation || !landmarks) return malformed('This lesson is missing its movement assets.');
-  if (animation.mime !== 'model/gltf-binary') return malformed('This lesson animation is not a GLB.');
+  if (animation === undefined || !landmarks) return malformed('This lesson is missing its movement assets.');
+  if (animation && animation.mime !== 'model/gltf-binary') return malformed('This lesson animation is not a GLB.');
   if (landmarks.mime !== 'application/json') return malformed('This lesson landmarks are not JSON.');
+  const engine = value.engine as LessonManifest['engine'];
+  if (engine !== 'mediapipe' && !animation) return malformed('This 3D lesson is missing its animation.');
   const sourceVideo: OptionalAsset = readAsset(value.source_video);
   const thumbnail: OptionalAsset = readAsset(value.thumbnail);
   const focused: OptionalAsset = readAsset(value.focused_video);
@@ -230,6 +240,7 @@ export function parseLessonManifest(value: unknown): ParseResult<LessonManifest>
   if (sourceVideo === undefined || thumbnail === undefined || focused === undefined || alpha === undefined) {
     return malformed('This lesson has an invalid media asset.');
   }
+  if (engine === 'mediapipe' && !sourceVideo) return malformed('This video-only lesson has no video.');
   if (sourceVideo && !isVideo(sourceVideo)) return malformed('This lesson source is not a video.');
   if (thumbnail && !isImage(thumbnail)) return malformed('This lesson thumbnail is not an image.');
   // Model rules: a focused instructor video needs its source and MP4; a transparent
@@ -241,6 +252,8 @@ export function parseLessonManifest(value: unknown): ParseResult<LessonManifest>
     return malformed('This lesson instructor alpha does not match its video.');
   }
   if (value.warnings !== undefined && !isStringArray(value.warnings)) return malformed('This lesson has invalid warnings.');
+  const feedbackEnabled = readFeedbackEnabled(value.feedback_enabled);
+  if (feedbackEnabled === undefined) return malformed('This lesson has an invalid feedback setting.');
   if (!readPresentations(value.presentation)) return malformed('This lesson has invalid presentation assets.');
   if (value.public_tags !== undefined && !isStringArray(value.public_tags)) return malformed('This lesson has invalid public tags.');
   if (value.public_creator !== undefined && !isText(value.public_creator)) return malformed('This lesson has an invalid public creator.');
@@ -259,6 +272,7 @@ export function parseLessonManifest(value: unknown): ParseResult<LessonManifest>
       section_set: sectionSet,
       warnings: value.warnings ?? [],
       presentation: (value.presentation ?? {}) as LessonManifest['presentation'],
+      feedback_enabled: feedbackEnabled ?? true,
     },
   };
 }
@@ -307,6 +321,8 @@ export function parseMusicLessonManifest(value: unknown): ParseResult<MusicLesso
   if (midi && !MIDI_MIMES.includes(midi.mime)) return malformed('This music lesson has an invalid MIDI export.');
   if (poster && !isImage(poster)) return malformed('This music lesson has an invalid public poster.');
   if (value.warnings !== undefined && !isStringArray(value.warnings)) return malformed('This music lesson has invalid warnings.');
+  const feedbackEnabled = readFeedbackEnabled(value.feedback_enabled);
+  if (feedbackEnabled === undefined) return malformed('This music lesson has an invalid feedback setting.');
   return {
     ok: true,
     value: {
@@ -315,6 +331,7 @@ export function parseMusicLessonManifest(value: unknown): ParseResult<MusicLesso
       section_set: sectionSet,
       reference,
       assessment,
+      feedback_enabled: feedbackEnabled ?? assessment.assessment !== 'none',
       source_video: sourceVideo ?? null,
       preview_video: preview ?? null,
       piano_preview: pianoPreview ?? null,
@@ -406,7 +423,7 @@ export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
  if(!isRecord(value)||value.draft_version!==1||!isId(value.draft_id)||!isId(value.lesson_id)||!isTitle(value.title)||
    !['draft','reviewed'].includes(String(value.status))||!isNumber(value.duration)||value.duration<=0||
    (value.subject!=='piano'&&value.subject!=='guitar'))return bad();
- const keys=['draft_version','draft_id','lesson_id','revision_id','title','status','subject','instrument','duration','reference','source_video','piano_preview','playback','pedal','preview_identity','raw_model','correction_operations','events','spans','guitar_chords','analysis','provenance','warnings','baseline_events','working_corrected','automatic_corrections','verification_state_token'];
+ const keys=['draft_version','draft_id','lesson_id','revision_id','title','status','subject','instrument','duration','reference','source_video','piano_preview','playback','pedal','preview_identity','raw_model','correction_operations','feedback_enabled','events','spans','guitar_chords','analysis','provenance','warnings','baseline_events','working_corrected','automatic_corrections','verification_state_token'];
  if(Object.keys(value).some(key=>!keys.includes(key)))return bad();
  const instrument=readInstrument(value.instrument),reference=readAsset(value.reference),source=readAsset(value.source_video??null),pianoPreview=readAsset(value.piano_preview??null);
  const playback=readPlayback(value.playback),pedal=readPedal(value.pedal);
@@ -417,6 +434,7 @@ export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
  if(!instrument||instrument.instrument!==value.subject||!reference||reference.mime!=='application/json'||source===undefined||source&&!isVideo(source)||pianoPreview===undefined||pianoPreview&&pianoPreview.mime!=='audio/wav'||playback===null||pedal===null)return bad();
  if(value.raw_model!==undefined&&typeof value.raw_model!=='boolean')return bad();
  if(value.correction_operations!==undefined&&(!isCount(value.correction_operations)||value.correction_operations<0))return bad();
+ const feedbackEnabled=readFeedbackEnabled(value.feedback_enabled);if(feedbackEnabled===undefined)return bad();
  if(!Array.isArray(value.events)||value.events.length>20000||!Array.isArray(value.spans)||value.spans.length>500)return bad();
  const draftDuration=value.duration as number;
  const readDraftEvents=(values:unknown):MusicDraftEvent[]|null=>{
@@ -490,6 +508,7 @@ export function parseMusicDraftView(value:unknown):ParseResult<MusicDraftView>{
   subject:value.subject,instrument,duration:value.duration,reference,source_video:source,piano_preview:pianoPreview??null,
  ...(playback?{playback}:{}),...(pedal?{pedal}:{}),...(previewIdentity?{preview_identity:previewIdentity}:{}),...(value.raw_model!==undefined?{raw_model:value.raw_model}:{}),
  ...(value.correction_operations!==undefined?{correction_operations:value.correction_operations}:{}),
+ ...(feedbackEnabled!==null?{feedback_enabled:feedbackEnabled}:{}),
  events,spans,guitar_chords:chords,analysis:analysis??null,warnings:[...value.warnings],
   ...(baselineEvents?{baseline_events:baselineEvents}:{}),
   ...(automaticCorrections?{automatic_corrections:automaticCorrections}:{}),

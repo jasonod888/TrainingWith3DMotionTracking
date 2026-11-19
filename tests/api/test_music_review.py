@@ -42,6 +42,8 @@ def review_body(view):
     return {'draft_id':view['draft_id'],'reference_sha256':view['reference']['sha256'],
             'title':'Reviewed piano','events':view['events'],'spans':view['spans'],
             'sections':[{'id':'whole','label':'Whole lesson','start':0,'end':2}],
+            'assessment':{'assessment':'notes','input_modes':['midi','microphone'],
+                          'dimensions':['pitch','timing'],'rubric_version':'piano-midi-v1'},
             'confirm_reviewed':True}
 
 
@@ -72,7 +74,7 @@ def test_owner_review_creates_exact_private_revision_and_is_idempotent(tmp_path)
         reference=json.loads(store.objects[manifest['reference']['key']])
         assert reference['events'][0]['pitch']==62
         assert hashlib.sha256(store.objects[manifest['reference']['key']]).hexdigest()==manifest['reference']['sha256']
-        assert manifest['assessment']['assessment']=='none'
+        assert manifest['assessment']['assessment']=='notes'
         assert manifest['source_video']==view['source_video']
         assert client.post(url,json=body).json()==manifest
         changed=copy.deepcopy(body);changed['events'][0]['pitch']=63
@@ -141,12 +143,14 @@ def test_review_can_choose_midi_feedback_without_enabling_scoring_or_publishing(
         assert response.status_code == 200, response.text
         manifest = response.json()
         assert manifest['assessment']['assessment'] == 'notes'
-        assert manifest['assessment']['input_modes'] == ['midi']
+        assert manifest['assessment']['input_modes'] == ['midi', 'microphone']
         assert manifest['assessment']['dimensions'] == ['pitch', 'timing']
         assert manifest['assessment']['rubric_version'] == 'piano-midi-v1'
         assert client.post(url, json=body).json() == manifest
         changed = copy.deepcopy(body)
         changed['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [], 'rubric_version': 'music-watch-v1'}
+        # The draft was already reviewed; a different legacy policy is a conflict, not
+        # a new mandatory-notes rejection.
         assert client.post(url, json=changed).status_code == 409
         with Session(app.state.engine) as session:
             assert session.query(MusicReview).one().document['assessment'] == body['assessment']
@@ -158,6 +162,25 @@ def test_review_can_choose_midi_feedback_without_enabling_scoring_or_publishing(
         assert shared.status_code == 200, shared.text
 
 
+def test_reviewer_can_disable_feedback_without_losing_the_note_rubric(tmp_path):
+    with real_media_app(tmp_path) as (client,app,settings,store,mail):
+        lesson_id,view,lease,base,payload=proposal(client,app,media(tmp_path,'audio'))
+        body=review_body(view)
+        body['feedback_enabled']=False
+        url=f'/api/lessons/{lesson_id}/music-draft/review'
+        bad=copy.deepcopy(body);bad['feedback_enabled']='false'
+        assert client.post(url,json=bad).status_code==422
+        response=client.post(url,json=body)
+        assert response.status_code==200,response.text
+        manifest=response.json()
+        assert manifest['feedback_enabled'] is False
+        assert manifest['assessment']['assessment']=='notes'
+        assert client.get(f'/api/lessons/{lesson_id}',headers={'X-Lesson-Formats':'1,2'}).json()['feedback_enabled'] is False
+        shared=client.post(f'/api/lessons/{lesson_id}/publish',json={
+            'revision_id':manifest['revision_id'],'mode':'invite','reviewed':True,'rights_acknowledged':True})
+        assert shared.status_code==200,shared.text
+
+
 def test_review_persists_positions_and_chords(tmp_path):
     with real_media_app(tmp_path) as (client, app, settings, store, mail):
         lesson_id, view, lease, base, payload = proposal(client, app, media(tmp_path, 'audio'))
@@ -165,8 +188,8 @@ def test_review_persists_positions_and_chords(tmp_path):
         body['events'][0].update(pitch=60, string=2, fret=1)
         body['guitar_chords'] = [{'id': 'c', 'name': 'C', 'start': 0,
                                   'frets': [-1, 3, 2, 0, 1, 0], 'position': 1}]
-        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
-                              'rubric_version': 'music-watch-v1'}
+        body['assessment'] = {'assessment': 'notes', 'input_modes': ['midi', 'microphone'],
+                              'dimensions': ['pitch', 'timing'], 'rubric_version': 'piano-midi-v1'}
         url = f'/api/lessons/{lesson_id}/music-draft/review'
         bad = copy.deepcopy(body)
         bad['guitar_chords'][0]['frets'][1] = 6

@@ -60,6 +60,8 @@ def listing_item(session, publication, lesson):
 
 def public_keys(manifest, lesson_id):
     value = dict(manifest)
+    # `animation` is nullable now (video-only movements), so the projection must treat
+    # every asset slot as possibly absent rather than assuming a GLB.
     for field in ('animation', 'landmarks'):
         asset = value.get(field)
         if asset:
@@ -147,8 +149,8 @@ def install_public(app, settings, identity, db):
     @router.get('/moves/{lesson_id}/assets/{name}')
     def asset(lesson_id: str, name: str, request: Request, session: Session = Depends(db)):
         lesson, revision, _ = public_lesson(session, lesson_id)
-        allowed = {Path(revision.manifest[field]['key']).name for field in ('animation', 'landmarks')
-                   if revision.manifest.get(field)}
+        allowed = {Path(asset['key']).name for field in ('animation', 'landmarks')
+                   for asset in (revision.manifest.get(field),) if asset}
         allowed.update(Path(asset['key']).name for name,asset in revision.manifest.get('presentation',{}).items()
                        if name in ('male','female'))
         if name not in allowed:
@@ -201,6 +203,11 @@ def install_public(app, settings, identity, db):
             raise HTTPException(409, 'Check this move before listing it publicly.')
         if revision.manifest.get('schema_version') != 1:
             raise HTTPException(409, 'Music lessons can only be shared by private invitation.')
+        # Public lessons never expose their source video. A video-only movement has no
+        # other representation, so listing it would either leak the creator's footage or
+        # publish an empty page. Refuse with a reason the person can act on.
+        if revision.manifest.get('animation') is None:
+            raise HTTPException(409, 'This move is video only, so it cannot be published publicly. Share it privately instead.')
         if not body.rights_acknowledged:
             raise HTTPException(422, 'Confirm you have the right to share this move publicly.')
         title = (body.title if body.title is not None else (publication.title if publication and publication.title else lesson.title)).strip()

@@ -21,12 +21,12 @@ def test_explicit_fixture_loop_reaches_a_private_learner(tmp_path):
 
         view = client.get(f'/api/lessons/{lesson_id}/music-draft').json()
         body = review_body(view)
-        body['assessment'] = {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
-                              'rubric_version': 'music-watch-v1'}
+        body['assessment'] = {'assessment': 'notes', 'input_modes': ['midi', 'microphone'], 'dimensions': ['pitch', 'timing'],
+                              'rubric_version': 'piano-midi-v1'}
         reviewed = client.post(f'/api/lessons/{lesson_id}/music-draft/review', json=body)
         assert reviewed.status_code == 200, reviewed.text
         manifest = reviewed.json()
-        assert manifest['assessment']['assessment'] == 'none'
+        assert manifest['assessment']['assessment'] == 'notes'
         assert manifest['reference_reviewed'] is True
 
         published = client.post(f'/api/lessons/{lesson_id}/publish', json={

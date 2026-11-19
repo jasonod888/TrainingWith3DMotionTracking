@@ -33,6 +33,8 @@ export type RecoveryCheckpoint = {
   /** Added after v1 shipped: older checkpoints legitimately lack these. */
   sections?: {id: string; label: string; start: number; end: number}[];
   assessment?: {policy: 'none' | 'notes'};
+  /** Creator switch captured with the local work; false must not restore as true. */
+  feedbackEnabled?: boolean;
   /** Clip duration the sections were written against, for strict validation. */
   durationSeconds?: number;
   /** finding id → occurrence id → authored spelling, for faithful reversals. */
@@ -127,6 +129,9 @@ function normalizeCheckpointShapes(checkpoint: Partial<RecoveryCheckpoint>): str
   if (checkpoint.assessment !== undefined
     && (!checkpoint.assessment || !['none', 'notes'].includes(checkpoint.assessment.policy))) {
     return 'The local checkpoint has an invalid assessment policy and was ignored.';
+  }
+  if (checkpoint.feedbackEnabled !== undefined && typeof checkpoint.feedbackEnabled !== 'boolean') {
+    return 'The local checkpoint has an invalid feedback setting and was ignored.';
   }
   if (checkpoint.guitarChords !== undefined) {
     const chords = sanitizeGuitarChords(checkpoint.guitarChords);

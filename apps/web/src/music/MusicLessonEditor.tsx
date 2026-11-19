@@ -7,6 +7,7 @@ import {parseNotationDocument, type NotationDocument} from '../../../../packages
 import {assetUrl, request} from '../api';
 import {parseMusicReference, pitchName, type GuitarChord, type MusicReferenceSpan} from './music-reference';
 import {VelocityInput} from './VelocityInput';
+import {assessmentPolicyForSubject, effectiveFeedbackEnabled} from './music-feedback';
 import {NotationEditor, createNotation} from './notation/NotationEditor';
 import './music-review.css';
 import './notation/notation.css';
@@ -36,7 +37,8 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
   const [chords, setChords] = useState<GuitarChord[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [title, setTitle] = useState('');
-  const [policy, setPolicy] = useState<'none' | 'notes'>('none');
+  const [feedbackEnabled, setFeedbackEnabled] = useState(true);
+
   const [confirmed, setConfirmed] = useState(false);
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -78,7 +80,8 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
       setChords(reference.guitarChords);
       setSpans(reference.spans);
       setSections(parsed.value.section_set.sections);
-      setPolicy(parsed.value.assessment.assessment === 'notes' ? 'notes' : 'none');
+      setFeedbackEnabled(effectiveFeedbackEnabled(parsed.value));
+
     })().catch(cause => { if (!stopped) setError(cause instanceof Error ? cause.message : 'The lesson could not be opened.'); });
     return () => { stopped = true; };
   }, [lessonId]);
@@ -126,9 +129,8 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
         spans,
         guitar_chords: chords,
         sections,
-        assessment: policy === 'notes'
-          ? {assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch', 'timing'], rubric_version: 'piano-midi-v1'}
-          : {assessment: 'none', input_modes: ['none'], dimensions: [], rubric_version: 'music-watch-v1'},
+        assessment: assessmentPolicyForSubject(manifest?.subject ?? 'piano'),
+        feedback_enabled: feedbackEnabled,
         confirm_reviewed: true,
       });
       const parsed = parseMusicLessonManifest(result);
@@ -182,12 +184,10 @@ export function MusicLessonEditor({lessonId, onBack, onSaved, onDirty}: {
     {!manifest ? !error && <p role="status">Opening the reviewed lesson…</p> : <>
       <label>Lesson title<input maxLength={200} value={title} disabled={busy}
         onChange={event => { changed(); setTitle(event.target.value); }}/></label>
-      <fieldset className="music-review-policy"><legend>Assessment</legend>
-        <label className="review-checkbox"><input type="radio" name="assessment" checked={policy === 'none'} disabled={busy}
-          onChange={() => { changed(); setPolicy('none'); }}/>Watch only — no feedback</label>
-        <label className="review-checkbox"><input type="radio" name="assessment" checked={policy === 'notes'}
-          disabled={busy} onChange={() => { changed(); setPolicy('notes'); }}/>MIDI note feedback (unscored)</label>
-        <p className="small muted">Scoring stays disabled. Watch-only remains safe for this milestone.</p>
+      <fieldset className="music-review-policy"><legend>Feedback</legend>
+        <label className="review-checkbox"><input type="checkbox" checked={feedbackEnabled} data-feedback-enabled
+          disabled={busy} onChange={event => { changed(); setFeedbackEnabled(event.target.checked); }}/>Enable practice feedback</label>
+        <p className="small muted">Turn learner practice feedback off without removing notes, passages or sections. Scores remain experimental and withheld; guitar feedback uses sounding pitch only.</p>
       </fieldset>
       <h2>Notes</h2>
       {<>

@@ -99,8 +99,8 @@ def test_edit_round_trips_alignment_and_authored_spelling(tmp_path):
         edit = {
             'base_revision_id': manifest['revision_id'], 'title': 'Edited spelling',
             'events': body['events'], 'spans': body['spans'], 'sections': body['sections'],
-            'assessment': {'assessment': 'none', 'input_modes': ['none'], 'dimensions': [],
-                           'rubric_version': 'music-watch-v1'},
+            'assessment': {'assessment': 'notes', 'input_modes': ['midi', 'microphone'], 'dimensions': ['pitch', 'timing'],
+                           'rubric_version': 'piano-midi-v1'},
             'confirm_reviewed': True, 'notation': edited_notation,
             'alignment': alignment(view['duration'], offset=-0.5,
                                    anchors=[{'seconds': 0.5, 'tick': 480}]),

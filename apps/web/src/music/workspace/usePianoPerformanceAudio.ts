@@ -13,7 +13,7 @@ import {resolvePerformanceAudibleTimings, shiftOnset} from '../piano-playback';
  */
 export function usePianoPerformanceAudio({
   document, videoRef, clock, livePiano, offsetSeconds, pedalSpans, rate, volume, rawModelDraft = false,
-  guitarProgram = 25,
+  guitarProgram = 25, enabled = true,
 }: {
   document: NotationDocument | null;
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -26,6 +26,8 @@ export function usePianoPerformanceAudio({
   rawModelDraft?: boolean;
   /** General MIDI guitar program used when the document is a guitar lesson. */
   guitarProgram?: number;
+  /** False during a muted reference capture or challenge. */
+  enabled?: boolean;
 }) {
   const liveAudio = useRef<NotationAudio | null>(null);
   const midiPlayer = useRef<MidiPlayerEngine | null>(null);
@@ -44,13 +46,13 @@ export function usePianoPerformanceAudio({
     [document, pedalSpans, guitarProgram]);
 
   useEffect(() => {
-    if (!livePiano) { midiPlayer.current?.stop(); return; }
+    if (!livePiano || !enabled) { midiPlayer.current?.stop(); return; }
     if (!MidiPlayerEngine.isSupported()) { setMidiReady(false); return; }
     let disposed = false;
     const player = midiPlayer.current ??= new MidiPlayerEngine();
     void player.init().then(ok => { if (!disposed) setMidiReady(ok); }).catch(() => { if (!disposed) setError('Piano synthesis could not start.'); });
     return () => { disposed = true; };
-  }, [livePiano]);
+  }, [livePiano, enabled]);
 
   useEffect(() => {
     if (!midiBytes || !midiPlayer.current) return;
@@ -61,7 +63,7 @@ export function usePianoPerformanceAudio({
   }, [midiBytes, midiReady, offsetSeconds, clock, videoRef]);
 
   useEffect(() => {
-    if (!livePiano || !midiReady) return;
+    if (!livePiano || !midiReady || !enabled) return;
     const player = midiPlayer.current;
     const media = videoRef.current;
     if (!player || !media) return;
@@ -90,7 +92,7 @@ export function usePianoPerformanceAudio({
       globalThis.clearInterval(timer);
       for (const [name, handler] of handlers) media.removeEventListener(name, handler);
     };
-  }, [livePiano, midiReady, offsetSeconds, rate, videoRef]);
+  }, [livePiano, midiReady, offsetSeconds, rate, videoRef, enabled]);
 
   // Track the learner's own mute choice while Original owns the video.
   useEffect(() => {
@@ -118,15 +120,16 @@ export function usePianoPerformanceAudio({
   useEffect(() => {
     const media = videoRef.current;
     const audio = liveAudio.current ??= new NotationAudio(1.15);
-    audio.setVolume(volume);
+    audio.setVolume(enabled ? volume : 0);
+    if (!enabled) audio.stop();
     if (media) media.volume = volume;
-  }, [volume, videoRef, livePiano]);
+  }, [volume, videoRef, livePiano, enabled]);
 
   // Live synthesis is source-clocked and only runs when the MIDI engine is not
   // already providing playback, matching the review workspace. Guitar always uses
   // the SoundFont engine so its string channels keep the chosen guitar tone.
   useEffect(() => {
-    if (!livePiano || !document || midiReady || guitar) return;
+    if (!livePiano || !document || midiReady || guitar || !enabled) return;
     const media = videoRef.current;
     const audio = liveAudio.current ??= new NotationAudio(1.15);
     const triggered = new Set<string>();
@@ -230,7 +233,7 @@ export function usePianoPerformanceAudio({
       reset();
       if (media) for (const [name, handler] of listeners) media.removeEventListener(name, handler);
     };
-  }, [livePiano, midiReady, document, offsetSeconds, pedalSpans, audibleTimings, rate, rawModelDraft, videoRef, clock, volume, guitar]);
+  }, [livePiano, midiReady, document, offsetSeconds, pedalSpans, audibleTimings, rate, rawModelDraft, videoRef, clock, volume, guitar, enabled]);
 
   useEffect(() => () => {
     liveAudio.current?.dispose();

@@ -1,4 +1,4 @@
-﻿import {useEffect,useMemo,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import type {MusicDraftEvent,MusicDraftGuitarChord,MusicDraftView,MusicLessonManifest,Section} from '../../../../packages/lesson-schema/index';
 import {parseMusicDraftView,parseMusicLessonManifest} from '../../../../packages/lesson-schema/parse';
 import {assetUrl,request} from '../api';
@@ -10,6 +10,7 @@ import {usePianoSourcePlayer} from './usePianoSourcePlayer';
 import {usePianoPreferences} from './piano-preferences';
 import {usePianoPreviewAsset} from './usePianoPreviewAsset';
 import {applyFindingEdits, revertFindingEdits} from './working-edits';
+import {assessmentPolicyForSubject, effectiveFeedbackEnabled} from './music-feedback';
 import {decideVerification,findingDecision,loadVerification,parseVerificationState,rollbackAutomaticCorrections,type VerificationFinding,type VerificationState} from './verification';
 import {VelocityInput} from './VelocityInput';
 import './music.css';
@@ -22,7 +23,7 @@ const noteName=(pitch:number)=>`${['C','C♯','D','E♭','E','F','F♯','G','A�
 export function MusicDraftReview({lessonId,onBack,onCompare,onReviewed,onDirty}:{lessonId:string;onBack:()=>void;onCompare:()=>void;onReviewed:(lesson:MusicLessonManifest)=>void;onDirty:(dirty:boolean)=>void}){
  const [draft,setDraft]=useState<MusicDraftView|null>(null),[events,setEvents]=useState<MusicDraftEvent[]>([]),[sections,setSections]=useState<Section[]>([]),[title,setTitle]=useState('');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[confirmed,setConfirmed]=useState(false),[page,setPage]=useState(0),[retry,setRetry]=useState(0);
- const [policy,setPolicy]=useState<'none'|'notes'>('none');
+ const [feedbackEnabled,setFeedbackEnabled]=useState(true);
  const [chords,setChords]=useState<MusicDraftGuitarChord[]>([]);
  const [verification,setVerification]=useState<VerificationState|null>(null);
  const [verificationError,setVerificationError]=useState('');
@@ -43,10 +44,11 @@ export function MusicDraftReview({lessonId,onBack,onCompare,onReviewed,onDirty}:
  const [savingOffset,setSavingOffset]=useState(false);
  const [loop,setLoop]=useState(false),[loopStart,setLoopStart]=useState(0),[loopEnd,setLoopEnd]=useState(0);
  const syncOffset=playback?.sync_offset_seconds??0;
- useEffect(()=>{alive.current=true;let stopped=false;setError('');setDraft(null);setPolicy('none');
+ useEffect(()=>{alive.current=true;let stopped=false;setError('');setDraft(null);
   request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft`).then(value=>{
    const parsed=parseMusicDraftView(value);if(!parsed.ok)throw new Error(parsed.message);
    if(stopped)return;localDirty.current=false;setDraft(parsed.value);setEvents(parsed.value.events);setChords(parsed.value.guitar_chords);setTitle(parsed.value.title);
+   setFeedbackEnabled(effectiveFeedbackEnabled(parsed.value));
    setPlayback(parsed.value.playback??{sync_offset_seconds:0,revision:1});
    setOffsetMs(String(Math.round((parsed.value.playback?.sync_offset_seconds??0)*1000)));
    setSections([{id:'whole',label:'Whole lesson',start:0,end:parsed.value.duration}]);setConfirmed(false);setPage(0);
@@ -140,8 +142,8 @@ export function MusicDraftReview({lessonId,onBack,onCompare,onReviewed,onDirty}:
   try{const result=await request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft/review`,'POST',{
    draft_id:draft.draft_id,reference_sha256:draft.reference.sha256,title,events,spans:draft.spans,guitar_chords:chords,sections,confirm_reviewed:true,
    verification_state_token:verification?.state_token,
-   assessment:policy==='notes'?{assessment:'notes',input_modes:['midi'],dimensions:['pitch','timing'],rubric_version:'piano-midi-v1'}
-     :{assessment:'none',input_modes:['none'],dimensions:[],rubric_version:'music-watch-v1'},
+   assessment:assessmentPolicyForSubject(draft.subject),
+   feedback_enabled:feedbackEnabled,
   });const parsed=parseMusicLessonManifest(result);if(!parsed.ok)throw new Error(parsed.message);if(alive.current){onDirty(false);onReviewed(parsed.value);}}
   catch(e){if(alive.current)setError((e as Error).message);}finally{if(alive.current)setBusy(false);}
  };
@@ -284,11 +286,12 @@ export function MusicDraftReview({lessonId,onBack,onCompare,onReviewed,onDirty}:
    </div>
    <form onSubmit={event=>{event.preventDefault();void save();}}>
     <label>Lesson title<input required maxLength={200} value={title} disabled={locked} onChange={e=>{changed();setTitle(e.target.value);}}/></label>
-    <fieldset className="music-review-policy"><legend>Assessment</legend>
-     <label className="review-checkbox"><input type="radio" name="assessment" checked={policy==='none'} disabled={locked} onChange={()=>{changed();setPolicy('none');}}/>Watch only — no feedback</label>
-     <label className="review-checkbox"><input type="radio" name="assessment" checked={policy==='notes'} disabled={locked||draft.subject!=='piano'} onChange={()=>{changed();setPolicy('notes');}}/>MIDI note feedback (unscored)</label>
-     {draft.subject!=='piano'&&<p className="small muted">MIDI note feedback is available for piano only. This guitar reference stays watch only.</p>}
-     {policy==='notes'?<p className="small muted">Local pitch and timing corrections only. No score, grade, upload or persistence. Requires a connected MIDI keyboard; scoring stays disabled.</p>:<p className="small muted">Learners watch and use the guide; no corrections are produced.</p>}
+    <fieldset className="music-review-policy"><legend>Feedback</legend>
+     <label className="review-checkbox"><input type="checkbox" checked={feedbackEnabled} data-feedback-enabled disabled={locked}
+       onChange={event=>{changed();setFeedbackEnabled(event.target.checked);}}/>Enable practice feedback</label>
+     <p className="small muted">{feedbackEnabled
+       ?`Reviewed ${draft.subject} references offer local pitch-and-timing note feedback. Microphone or MIDI input is selected during practice; scoring remains experimental and withheld. Guitar feedback assesses sounding pitch only, not string/fret certainty.`
+       :'Practice feedback will be unavailable to learners for this lesson. Notes, sections and the reviewed reference are unchanged; ordinary playback still works.'}</p>
     </fieldset>
     {verificationLoading&&<p className="small muted" role="status">Checking automatic verification… Editing is paused until the report and any accepted suggestions have loaded.</p>}
     {verificationError&&<p className="inline-notice error-notice" role="alert">{verificationError}</p>}

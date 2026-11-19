@@ -1,13 +1,95 @@
-"""Download official assets or a public mirror verified against upstream hashes."""
+"""Download official assets or a public mirror verified against upstream hashes.
+
+Two families of asset are handled:
+
+* The gated SAM 3D Body checkpoint (or the hash-checked public redistribution) and
+  the MHR rig assets, used by the ``sam-3d-body-v1`` pipeline.
+* The ungated MediaPipe Pose Landmarker (heavy, float16, v1), used by the CPU
+  ``body-mediapipe-v1`` pipeline. It is small enough for CPU inference and is the
+  only model that route needs -- no SAM 2 checkpoint and no MHR rig.
+"""
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import sys
 import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# Official MediaPipe Pose Landmarker, heavy float16 v1. The browser bundle already
+# vendors this exact file at web/dist/assets, so the repo has an authoritative local
+# pin; an operator can override it with FORM_POSE_LANDMARKER_SHA256.
+POSE_LANDMARKER = {
+    'file': 'pose_landmarker_heavy.task',
+    'url': 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task',
+    'env': 'FORM_POSE_LANDMARKER_SHA256',
+    'destination': ROOT / 'models',
+}
+VENDORED_POSE_LANDMARKER = ROOT / 'web/dist/assets/pose_landmarker_heavy.task'
+
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as handle:
+        while chunk := handle.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def pose_landmarker_digest():
+    """The SHA-256 a downloaded landmarker must match.
+
+    Verification is mandatory: a truncated or replaced model must never be loaded by
+    the worker. The vendored browser copy is the default pin because both pipelines
+    must run the same weights; an operator can pin a different (still exact) digest
+    through the environment, for example when refreshing both copies together.
+    """
+    value = os.environ.get(POSE_LANDMARKER['env'], '').strip().lower()
+    if value:
+        if not re.fullmatch(r'[a-f0-9]{64}', value):
+            raise ValueError(f"{POSE_LANDMARKER['env']} must be a 64-character SHA-256 hex digest.")
+        return value
+    if VENDORED_POSE_LANDMARKER.is_file():
+        return sha256(VENDORED_POSE_LANDMARKER)
+    raise ValueError(
+        "No pinned SHA-256 for pose_landmarker_heavy.task. Set "
+        f"{POSE_LANDMARKER['env']} to the official digest, or vendor the file at "
+        f"{VENDORED_POSE_LANDMARKER.relative_to(ROOT)}. Refusing to accept an unverified model.")
+
+
+def fetch_pose_landmarker():
+    """Download and verify the CPU landmarker once; return its provenance."""
+    destination = POSE_LANDMARKER['destination'] / POSE_LANDMARKER['file']
+    expected = pose_landmarker_digest()
+    if destination.is_file():
+        actual = sha256(destination)
+        if actual != expected:
+            raise ValueError(f'{destination.name} does not match the pinned SHA-256; delete it and download again.')
+        print(f'{destination.name} already present and verified.', flush=True)
+    else:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_suffix('.download')
+        print(f"Downloading {destination.name}...", flush=True)
+        # Download beside the destination so a failed transfer never leaves a model
+        # that a later run would trust.
+        urllib.request.urlretrieve(POSE_LANDMARKER['url'], temporary)
+        actual = sha256(temporary)
+        if actual != expected:
+            temporary.unlink(missing_ok=True)
+            raise ValueError(f'{destination.name} failed SHA-256 verification; do not load it.')
+        temporary.replace(destination)
+        print(f'Verified {destination.name}', flush=True)
+    provenance = {'source': POSE_LANDMARKER['url'], 'sha256': expected,
+                  'size': destination.stat().st_size,
+                  'license': 'MediaPipe model card terms; see the upstream documentation.'}
+    (POSE_LANDMARKER['destination'] / 'pose_landmarker_heavy.provenance.json').write_text(
+        json.dumps(provenance, indent=2), encoding='utf-8')
+    return provenance
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -55,6 +137,10 @@ def main():
             print('Official model access is required: https://huggingface.co/facebook/sam-3d-body-dinov3')
             print('Accept/request access there, then authenticate locally with: .venv\\Scripts\\hf.exe auth login')
             return 2
+    # The CPU landmarker is ungated and is needed by the MediaPipe route, so it is
+    # fetched (and verified) even in --assets-only mode. A missing pin is an error:
+    # an unverified model is never accepted.
+    fetch_pose_landmarker()
     assets = ROOT / 'models/mhr'
     assets.mkdir(parents=True, exist_ok=True)
     if not list(assets.rglob('compact_v6_1.model')):

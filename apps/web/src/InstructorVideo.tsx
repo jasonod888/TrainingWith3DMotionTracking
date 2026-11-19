@@ -39,7 +39,9 @@ export function InstructorVideo({lesson,player,mirrored=false,onUnavailable,vide
   frame=requestAnimationFrame(sync);
   return()=>{cancelAnimationFrame(frame);video.current?.pause();};
  },[lesson,player,asset?.key,failed,fallback,video]);
- if(!asset||failed)return <div className="stage-message" role="status">Instructor video unavailable. Choose the 3D instructor to continue.</div>;
+ // A video-only movement has no 3D fallback to offer, so the failure copy must not
+ // send the person to a view that does not exist.
+ if(!asset||failed)return <div className="stage-message" role="status">{lesson.animation?'Instructor video unavailable. Choose the 3D instructor to continue.':'This move is video only and its video could not load. Try again.'}</div>;
  return <><video key={asset.key} ref={video} data-focused={Boolean(!fallback&&lesson.focused_video)} className="instructor-video" src={assetUrl(asset.key)} muted playsInline preload="auto" aria-label={fallback||!lesson.focused_video?'Original instructor video':'Person-focused instructor video'} style={{transform:mirrored?'scaleX(-1)':undefined}}
   onError={()=>{if(lesson.focused_video&&!fallback&&lesson.source_video){setFallback(true);}else{setFailed(true);callback.current?.();}}}/>
   {!fallback&&lesson.focused_video&&<InstructorMarkers lesson={lesson} video={video} mirrored={mirrored}/>}

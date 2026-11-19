@@ -1,27 +1,55 @@
-/** Gated, local, unscored feedback for explicitly MIDI-enabled piano rubrics. */
-import type {MusicLessonManifest} from '../../../../packages/lesson-schema/index';
+/** Local, unscored note feedback for reviewed piano and guitar references. */
+import type {AssessmentPolicy, MusicLessonManifest} from '../../../../packages/lesson-schema/index';
 import {attackSourceTime, matchOnsets, type Attack, type ExpectedAttack, type RunClock} from '../../../../packages/music-engine/onsets';
 import {pitchName, type MusicReference} from './music-reference';
 
 export type FeedbackEligibility = {eligible: boolean; reasons: string[]; warnings: string[]};
+
+export function assessmentPolicyForSubject(subject: string): AssessmentPolicy {
+  return subject === 'guitar'
+    ? {assessment: 'notes', input_modes: ['midi', 'microphone'], dimensions: ['pitch', 'timing'], rubric_version: 'guitar-notes-v1'}
+    : {assessment: 'notes', input_modes: ['midi', 'microphone'], dimensions: ['pitch', 'timing'], rubric_version: 'piano-midi-v1'};
+}
+
+/** Creator-controlled availability; absent legacy music follows its actual rubric. */
+export function effectiveFeedbackEnabled(input: {
+  schema_version?: number;
+  experience_family?: string;
+  feedback_enabled?: boolean | null;
+  assessment?: {assessment?: string} | null;
+} | null | undefined): boolean {
+  if (typeof input?.feedback_enabled === 'boolean') return input.feedback_enabled;
+  if (input?.experience_family === 'music' || input?.schema_version === 2) {
+    return input.assessment?.assessment !== undefined && input.assessment.assessment !== 'none';
+  }
+  return true;
+}
 
 export function feedbackEligibility(input: {
   assessment: MusicLessonManifest['assessment'];
   subject: string;
   referenceReviewed: boolean;
   inputSelected: boolean;
+  inputMode?: 'midi' | 'microphone';
   latencyMeasured: boolean;
+  creatorEnabled: boolean;
 }): FeedbackEligibility {
   const reasons: string[] = [];
-  if (input.assessment.assessment !== 'notes') reasons.push('This lesson has no MIDI note rubric.');
-  if (!(input.assessment.input_modes ?? []).includes('midi')) reasons.push('This lesson does not accept MIDI input.');
-  if (input.assessment.rubric_version !== 'piano-midi-v1' ||
+  const mode = input.inputMode ?? 'midi';
+  const expectedRubric = input.subject === 'guitar' ? 'guitar-notes-v1' : 'piano-midi-v1';
+  if (!input.creatorEnabled) reasons.push('Feedback not enabled for this lesson.');
+  if (input.subject !== 'piano' && input.subject !== 'guitar')
+    reasons.push('Note feedback is available for reviewed piano and guitar lessons.');
+  if (input.assessment.assessment !== 'notes') reasons.push('This lesson has no note rubric.');
+  if (!(input.assessment.input_modes ?? []).includes(mode)) reasons.push(`This lesson does not accept ${mode} input.`);
+  if (input.assessment.rubric_version !== expectedRubric ||
       !input.assessment.dimensions.includes('pitch') || !input.assessment.dimensions.includes('timing') ||
       input.assessment.dimensions.some(dimension => dimension !== 'pitch' && dimension !== 'timing'))
     reasons.push('This rubric version or its dimensions are not supported by local note feedback.');
-  if (input.subject !== 'piano') reasons.push('MIDI feedback is only available for piano lessons.');
   if (!input.referenceReviewed) reasons.push('The reference is not reviewed.');
-  if (!input.inputSelected) reasons.push('Choose a connected keyboard input.');
+  if (!input.inputSelected) reasons.push(mode === 'microphone'
+    ? 'Enable microphone access to receive feedback.'
+    : 'Connect a MIDI instrument to receive feedback.');
   return {
     eligible: reasons.length === 0,
     reasons,

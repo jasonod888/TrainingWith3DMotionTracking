@@ -18,6 +18,7 @@ from .auth import now
 from .contracts import (Asset, Contract, GuitarChord, MusicDraftDocument, MusicEvent, MusicLessonManifest,
                         MusicSpan, Section, SectionSet)
 from .database import LessonAsset, LessonRevision, MusicRevisionEdit
+from .music_assessment import assessment_for_subject
 from .music_alignment import validate_alignment
 from .music_notation import validate_notation
 from .music_review import ReviewAssessment, canonical
@@ -61,6 +62,7 @@ class EditMusic(Contract):
     guitar_chords: list[GuitarChord] = Field(default_factory=list, max_length=100)
     sections: list[Section] = Field(min_length=1, max_length=500)
     assessment: ReviewAssessment = Field(default_factory=ReviewAssessment)
+    feedback_enabled: bool | None = Field(default=None, strict=True)
     confirm_reviewed: Literal[True]
 
 
@@ -88,8 +90,6 @@ def install_music_edit(app, settings, identity, db):
             raise HTTPException(409, 'This lesson has a newer revision. Reopen it to edit.')
         if not accepted(session, lesson_id, current.id):
             raise HTTPException(409, 'Save the reviewed reference before editing it.')
-        if body.assessment.assessment == 'notes' and (lesson.instrument or lesson.subject) != 'piano':
-            raise HTTPException(422, 'MIDI note feedback is only available for piano lessons.')
         # Notation is shared by piano and guitar; the document names its instrument.
 
         store = storage_client(settings)
@@ -192,6 +192,19 @@ def install_music_edit(app, settings, identity, db):
                                                 ExtraArgs={'ContentType': asset.mime, 'Metadata': {'sha256': digest}})
 
         revision_id = uuid4().hex
+        from .music_assessment import effective_feedback_enabled
+        feedback_enabled = (body.feedback_enabled if body.feedback_enabled is not None
+                            else effective_feedback_enabled(current.manifest))
+        current_assessment = current.manifest.get('assessment') or {}
+        if not feedback_enabled:
+            if body.assessment.assessment == 'none':
+                policy = body.assessment.model_dump()
+            elif current_assessment.get('assessment') == 'none':
+                policy = current_assessment
+            else:
+                policy = assessment_for_subject(proposal.subject)
+        else:
+            policy = assessment_for_subject(proposal.subject)
         manifest = MusicLessonManifest.model_validate({
             **current.manifest, 'revision_id': revision_id, 'title': body.title.strip() or current.manifest['title'],
             'instrument': proposal.instrument.model_dump(),
@@ -200,7 +213,7 @@ def install_music_edit(app, settings, identity, db):
             'preview_identity': proposal.preview_identity,
             'pedal': [span.model_dump() for span in proposal.pedal],
             'warnings': [*current.manifest.get('warnings', []), *proposal.warnings],
-            'assessment': body.assessment.model_dump(), 'reference_reviewed': True,
+            'assessment': policy, 'feedback_enabled': feedback_enabled, 'reference_reviewed': True,
         })
         revision = LessonRevision(id=revision_id, lesson_id=lesson_id, version=version,
                                   manifest=manifest.model_dump(), subject=proposal.subject,
@@ -215,7 +228,8 @@ def install_music_edit(app, settings, identity, db):
                                       revision_id=revision.id, editor_id=account.id, created_at=reviewed_at,
                                       document={'request_sha256': request_hash,
                                                 'base_reference_sha256': current.manifest['reference']['sha256'],
-                                                'reference_sha256': digest}))
+                                                'reference_sha256': digest,
+                                                'feedback_enabled': feedback_enabled}))
         session.commit()
         return manifest
 

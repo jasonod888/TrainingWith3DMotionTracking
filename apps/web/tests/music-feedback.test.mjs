@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {buildRunFeedback, calibrateLatency, feedbackEligibility} from '../src/music/music-feedback.ts';
+import {buildRunFeedback, calibrateLatency, effectiveFeedbackEnabled, feedbackEligibility} from '../src/music/music-feedback.ts';
 import {parseMusicReference} from '../src/music/music-reference.ts';
 
 const reference = {
@@ -27,16 +27,16 @@ test('calibration takes a clamped median and needs four taps', () => {
 
 test('watch-only rubrics and missing input are refused with reasons', () => {
   const watch = feedbackEligibility({assessment: {rubric_version: 'x', assessment: 'none', input_modes: ['none'], dimensions: []},
-    subject: 'piano', referenceReviewed: true, inputSelected: true, latencyMeasured: true});
+    subject: 'piano', referenceReviewed: true, inputSelected: true, latencyMeasured: true, creatorEnabled: true});
   assert.equal(watch.eligible, false);
-  assert.match(watch.reasons.join(' '), /no MIDI note rubric/);
+  assert.match(watch.reasons.join(' '), /no note rubric/);
   const good = feedbackEligibility({assessment: {rubric_version: 'piano-midi-v1', assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch','timing']},
-    subject: 'piano', referenceReviewed: true, inputSelected: true, latencyMeasured: true});
+    subject: 'piano', referenceReviewed: true, inputSelected: true, latencyMeasured: true, creatorEnabled: true});
   assert.equal(good.eligible, true);
   const noInput = feedbackEligibility({assessment: {rubric_version: 'piano-midi-v1', assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch','timing']},
-    subject: 'piano', referenceReviewed: true, inputSelected: false, latencyMeasured: false});
+    subject: 'piano', referenceReviewed: true, inputSelected: false, latencyMeasured: false, creatorEnabled: true});
   assert.equal(noInput.eligible, false);
-  assert.match(noInput.reasons.join(' '), /keyboard input/);
+  assert.match(noInput.reasons.join(' '), /MIDI instrument/);
   assert.match(noInput.warnings.join(' '), /approximate/);
 });
 
@@ -77,7 +77,7 @@ test('each repeat is analysed independently', () => {
 
 
 test('unknown rubrics and unsupported dimensions never enable fixed-policy feedback', () => {
-  const base={subject:'piano', referenceReviewed:true, inputSelected:true, latencyMeasured:true};
+  const base={subject:'piano', referenceReviewed:true, inputSelected:true, latencyMeasured:true, creatorEnabled:true};
   for(const assessment of [
     {rubric_version:'future-midi-v2',assessment:'notes',input_modes:['midi'],dimensions:['pitch','timing']},
     {rubric_version:'piano-midi-v1',assessment:'notes',input_modes:['midi'],dimensions:['pitch','timing','release']},
@@ -85,6 +85,19 @@ test('unknown rubrics and unsupported dimensions never enable fixed-policy feedb
   ]) assert.equal(feedbackEligibility({...base,assessment}).eligible,false);
   assert.equal(feedback([],{speed:NaN}).status,'invalid');
   assert.equal(feedback([],{end:5}).status,'invalid');
+});
+
+test('creator availability is separate from setup and legacy music none stays off', () => {
+  assert.equal(effectiveFeedbackEnabled({schema_version: 2, experience_family: 'music',
+    assessment: {rubric_version: 'music-watch-v1', assessment: 'none', input_modes: ['none'], dimensions: []}}), false);
+  assert.equal(effectiveFeedbackEnabled({schema_version: 1}), true);
+  assert.equal(effectiveFeedbackEnabled({schema_version: 2, feedback_enabled: false,
+    assessment: {rubric_version: 'piano-midi-v1', assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch','timing']}}), false);
+  const creatorOff = feedbackEligibility({assessment: {rubric_version: 'piano-midi-v1', assessment: 'notes',
+    input_modes: ['midi'], dimensions: ['pitch','timing']}, subject: 'piano', referenceReviewed: true,
+    inputSelected: false, latencyMeasured: false, creatorEnabled: false});
+  assert.equal(creatorOff.eligible, false);
+  assert.match(creatorOff.reasons.join(' '), /Feedback not enabled for this lesson/);
 });
 
 test('coverage reports how much of the reference has a complete assessment window', () => {

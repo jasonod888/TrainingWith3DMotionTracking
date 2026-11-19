@@ -26,7 +26,8 @@ from .music_verification import (automatic_expression_document, automatic_workin
 from .storage import storage_client
 from botocore.exceptions import ClientError
 from types import SimpleNamespace
-from .processing import ENGINE_VERSION, PIPELINE_VERSION, Provider, processing_status
+from .processing import (ENGINE_VERSION, MEDIAPIPE_ENGINE_VERSION, MEDIAPIPE_PIPELINE_VERSION,
+                         PIPELINE_VERSION, Provider, processing_status)
 from .media_probe import MediaProbeError, probe_audio_media
 from . import processing_routes, subjects
 
@@ -34,6 +35,15 @@ PART_SIZE=5*1024*1024
 RUNNING=('validating','processing','exporting','verifying')
 # The four assets named by the lesson manifest, in manifest field order.
 MANIFEST_ASSETS=('reference.glb','reference.json','preview.mp4','thumbnail.jpg')
+# Manifest field for each body-route upload name. Completion verifies exactly the
+# route's declared required/optional roles instead of a second filename allowlist.
+BODY_ASSET_FIELDS={'reference.glb':'animation','reference.json':'landmarks','preview.mp4':'source_video',
+                   'thumbnail.jpg':'thumbnail','instructor.mp4':'focused_video',
+                   'instructor-alpha.webm':'focused_video_alpha'}
+# What a completion receipt must prove for each body pipeline. Both are pinned so a
+# worker cannot describe work the server did not request.
+BODY_RECEIPTS={PIPELINE_VERSION:('sam-3d-body',ENGINE_VERSION),
+               MEDIAPIPE_PIPELINE_VERSION:('mediapipe',MEDIAPIPE_ENGINE_VERSION)}
 # Avatar derivatives are presentation-only: they are stored beside the lesson and served by
 # the lesson asset route, but they never enter the immutable lesson manifest.
 DERIVATIVE_ASSETS=('avatar-male.glb','avatar-female.glb','avatar-report.json')
@@ -78,11 +88,16 @@ class NewConversion(BaseModel):
     subject:str|None=Field(default=None,max_length=32)
     instrument:str|None=Field(default=None,max_length=16)
     preparation:Preparation|None=None
+    # Upload intent, carried through the existing JSON preparation column until the
+    # first immutable revision/draft is created. Absent is distinct from false.
+    feedback_enabled:bool|None=Field(default=None,strict=True)
 
 
 class Heartbeat(BaseModel):
     stage:str=Field(pattern='^(validating|processing|exporting|verifying)$')
-    frames:int=Field(ge=0,le=10000,default=0)
+    # 1080p30 for the 300 s upload ceiling is 9000 frames; the cap leaves headroom
+    # for a normalised 30 fps clip plus MediaPipe's own frame counter.
+    frames:int=Field(ge=0,le=20000,default=0)
 
 
 class Failure(BaseModel):
@@ -95,6 +110,19 @@ class SubmissionReceipt(BaseModel):
 
 def stamp(value):
     return value if value.tzinfo else value.replace(tzinfo=now().tzinfo)
+
+
+def body_processing(settings, online_routes=None):
+    """The active body route's availability, in the legacy `processing` shape.
+
+    Clients use this for the stale-tab guard and the capability banner, so it must
+    describe the route uploads will actually use — not a hard-coded SAM pipeline.
+    """
+    route=processing_routes.body_route(settings)
+    return {**processing_status(settings),
+            'available':processing_routes.available(route,settings),
+            'pipeline_version':route.pipeline_version,'route':route.id,
+            'worker_online':processing_routes.online(route,settings,online_routes or set())}
 
 
 def install_conversions(app,engine,settings,identity,db):
@@ -112,11 +140,25 @@ def install_conversions(app,engine,settings,identity,db):
                 'state':job.state,'attempts':job.attempts,'frames':job.frames,'error':job.error,'lesson_id':job.lesson_id,
                 'subject':job.subject,'instrument':job.instrument,
                 'preparation':job.preparation or {},
+                'feedback_enabled':(job.preparation or {}).get('feedback_enabled'),
                 'target_lesson_id':job.target_lesson_id,
                 'parts':job.parts if job.state=='uploading' else {},'part_size':PART_SIZE,
                 'provider':job.provider,'pipeline_version':job.pipeline_version,
                 'media_findings':job.media_findings or {},
                 'retryable':job.state=='failed' and job.attempts<3 and job.error not in ('invalid_video','invalid_audio','source_expired') and job.submission_state=='none'}
+
+    def feedback_for_job(job,session,target):
+        """Upload intent wins; a replacement without one keeps the old lesson choice."""
+        requested=(job.preparation or {}).get('feedback_enabled')
+        if isinstance(requested,bool):
+            return requested
+        if target:
+            from .music_assessment import effective_feedback_enabled
+            previous=session.scalar(select(LessonRevision).where(
+                LessonRevision.lesson_id==target.id,LessonRevision.version==target.version))
+            if previous:
+                return effective_feedback_enabled(previous.manifest)
+        return True
 
     def worker_identity(request:Request,session:Session=Depends(db)):
         value=request.headers.get('authorization','')
@@ -140,7 +182,8 @@ def install_conversions(app,engine,settings,identity,db):
     def limits(account=Depends(identity),session:Session=Depends(db)):
         online_routes=set(session.execute(select(WorkerCredential.provider,WorkerCredential.pipeline_version).where(WorkerCredential.active.is_(True),WorkerCredential.last_seen>now()-timedelta(seconds=90))).all())
         return {'max_bytes':settings.max_upload_bytes,'max_seconds':settings.max_conversion_seconds,'max_active':settings.max_active_conversions,'part_size':PART_SIZE,
-                'processing':processing_status(settings),
+                'processing':body_processing(settings,online_routes),
+                'body_route':processing_routes.body_status(settings,online_routes),
                 'routes':processing_routes.status(settings,online_routes),
                 'capabilities':processing_routes.capability_flags(settings,online_routes),
                 'subjects':subjects.catalogue()}
@@ -149,8 +192,9 @@ def install_conversions(app,engine,settings,identity,db):
     def listing(account=Depends(identity),session:Session=Depends(db)):
         online_routes=set(session.execute(select(WorkerCredential.provider,WorkerCredential.pipeline_version).where(WorkerCredential.active.is_(True),WorkerCredential.last_seen>now()-timedelta(seconds=90))).all())
         jobs=session.scalars(select(Conversion).where(Conversion.owner_id==account.id).order_by(Conversion.created_at.desc()).limit(100)).all()
-        return {'worker_online':(settings.conversion_provider,PIPELINE_VERSION) in online_routes,
-                'processing':processing_status(settings),
+        return {'worker_online':processing_routes.body_status(settings,online_routes)['worker_online'],
+                'processing':body_processing(settings,online_routes),
+                'body_route':processing_routes.body_status(settings,online_routes),
                 'capabilities':processing_routes.capability_flags(settings,online_routes),
                 'routes':processing_routes.status(settings,online_routes),
                 'jobs':[{**summary(j),'processor_online':(j.provider,j.pipeline_version) in online_routes} for j in jobs]}
@@ -160,7 +204,7 @@ def install_conversions(app,engine,settings,identity,db):
         try:
             selected_subject,family,selected_instrument=subjects.validate_selection(body.subject,body.instrument)
             route=processing_routes.route_for(selected_subject,selected_instrument,
-                piano_model=settings.music_piano_default_model)
+                piano_model=settings.music_piano_default_model,settings=settings)
         except subjects.SubjectError as exc:
             raise HTTPException(422,str(exc)) from exc
         if not processing_routes.available(route,settings):
@@ -169,7 +213,7 @@ def install_conversions(app,engine,settings,identity,db):
         provider=processing_routes.provider_for(route,settings)
         if family=='body':
             # Preserve the existing stale-tab guard for the movement processor.
-            current=processing_status(settings)
+            current=body_processing(settings)
             if body.processing_provider!=current['provider']:raise HTTPException(409,'The video processor changed. Reopen Create before uploading.')
         if body.bytes>settings.max_upload_bytes or body.duration>settings.max_conversion_seconds or body.start!=0:
             raise HTTPException(422,'Choose a video within the displayed size and time limits.')
@@ -197,10 +241,13 @@ def install_conversions(app,engine,settings,identity,db):
         store=storage_client(settings)
         upload=store.create_multipart_upload(Bucket=settings.storage_bucket,Key=key,ContentType='application/octet-stream')['UploadId']
         external=provider in ('replicate','fal')
+        preparation=body.preparation.model_dump() if body.preparation else {}
+        if body.feedback_enabled is not None:
+            preparation['feedback_enabled']=body.feedback_enabled
         job=Conversion(id=uuid4().hex,owner_id=account.id,title=title if not target else target.title,filename=body.filename,source_bytes=body.bytes,source_key=key,
                        upload_id=upload,start=body.start,duration=body.duration,state='uploading',parts={},target_lesson_id=target.id if target else None,
                        subject=selected_subject,instrument=selected_instrument,
-                       preparation=body.preparation.model_dump() if body.preparation else {},
+                       preparation=preparation,
                        provider=provider,pipeline_version=route.pipeline_version,
                        provider_target=getattr(settings,route.target_setting,'') if external else '')
         try:session.add(job);session.commit()
@@ -399,7 +446,10 @@ def install_conversions(app,engine,settings,identity,db):
             total=0;checksum=hashlib.sha256()
             async for chunk in request.stream():
                 total+=len(chunk)
-                if total>160*1024*1024:raise HTTPException(413,'Output exceeded its limit.')
+                # Matches max_upload_bytes: a 300 s 1080p30 H.264 preview plus its
+                # optional instructor derivatives must not be rejected by a limit
+                # smaller than the source that produced them.
+                if total>250*1024*1024:raise HTTPException(413,'Output exceeded its limit.')
                 checksum.update(chunk);file.write(chunk)
             file.seek(0)
             def upload():
@@ -459,6 +509,7 @@ def install_conversions(app,engine,settings,identity,db):
             asset.key=key
         manifest.lesson_id=lesson_id;manifest.revision_id=revision_id
         manifest.title=target.title if target else job.title
+        manifest.feedback_enabled=feedback_for_job(job,session,target)
         manifest.section_set.id=uuid4().hex;manifest.section_set.revision=1
         projection={'subject':manifest.subject,'experience_family':'music','instrument':manifest.instrument.instrument}
         if target:
@@ -527,8 +578,10 @@ def install_conversions(app,engine,settings,identity,db):
             if (target.instrument or target.subject)!=body.instrument.instrument:
                 raise HTTPException(409,'Use a new lesson for a different instrument.')
         else:
+            target=None
             session.add(Lesson(id=lesson_id,owner_id=job.owner_id,title=job.title,version=1,
                                subject=job.subject,experience_family='music',instrument=job.instrument));session.flush()
+        body.feedback_enabled=feedback_for_job(job,session,target)
         draft_id=uuid4().hex
         key=f'lessons/{lesson_id}/{draft_id}-draft-reference.json'
         store.copy_object(Bucket=settings.storage_bucket,Key=key,
@@ -638,26 +691,40 @@ def install_conversions(app,engine,settings,identity,db):
             raise HTTPException(422,'Invalid converted lesson.') from exc
         if body.presentation:
             raise HTTPException(422,'Presentation assets must be verified through the derivative route.')
-        if job.state!='verifying' or body.engine!='sam-3d-body' or body.engine_version!=ENGINE_VERSION or body.duration>job.duration+.1 or body.source_start!=0 or body.section_set.revision!=1 or len(body.section_set.sections)!=1:
+        receipt=BODY_RECEIPTS.get(job.pipeline_version)
+        if receipt is None:raise HTTPException(422,'Unknown processing route.')
+        expected_engine,expected_version=receipt
+        if (job.state!='verifying' or body.engine!=expected_engine or body.engine_version!=expected_version
+                or body.duration>job.duration+.1 or body.source_start!=0 or body.section_set.revision!=1
+                or len(body.section_set.sections)!=1):
             raise HTTPException(422,'Invalid converted lesson.')
+        if body.engine=='mediapipe':
+            # A video-only lesson has no GLB and stands on its own normalised clip.
+            if body.animation is not None or body.root_motion!='hip-relative':
+                raise HTTPException(422,'Invalid video-only lesson.')
         if job.provider!='local' and job.submission_state!='submitted':raise HTTPException(409,'Missing provider submission receipt.')
         store=storage_client(settings)
-        assets=[body.animation,body.landmarks,body.source_video,body.thumbnail]
-        if any(a is None for a in assets):raise HTTPException(422,'Conversion outputs are incomplete.')
-        asset_names=list(MANIFEST_ASSETS)
-        if body.focused_video:
-            assets.append(body.focused_video);asset_names.append('instructor.mp4')
-        if body.focused_video_alpha:
-            assets.append(body.focused_video_alpha);asset_names.append('instructor-alpha.webm')
-        for asset,name in zip(assets,asset_names):
+        # Verify exactly the roles this route declares. Required roles must be present;
+        # an optional role that was uploaded must still be inside this attempt.
+        assets=[];asset_names=[]
+        for name in route.work_assets:
+            field=BODY_ASSET_FIELDS.get(name)
+            if field is None:raise HTTPException(422,'Unknown processing output.')
+            asset=getattr(body,field)
+            if asset is None:
+                if name in route.required_assets:raise HTTPException(422,'Conversion outputs are incomplete.')
+                continue
             expected=f'attempts/{job.id}/{token}/{name}'
             if asset.key!=expected or asset.mime!=FILES[name]:raise HTTPException(422,'Output is outside this processing attempt.')
             head=store.head_object(Bucket=settings.storage_bucket,Key=expected)
             if head['ContentLength']!=asset.bytes or head.get('Metadata',{}).get('sha256')!=asset.sha256:raise HTTPException(422,'Output checksum/size mismatch.')
-        obj=store.get_object(Bucket=settings.storage_bucket,Key=body.animation.key,Range='bytes=0-11')
-        try:header=obj['Body'].read()
-        finally:obj['Body'].close()
-        if len(header)!=12 or struct.unpack('<4sII',header)!=(b'glTF',2,body.animation.bytes):raise HTTPException(422,'Invalid animation container.')
+            assets.append(asset);asset_names.append(name)
+        # A 3D lesson keeps the GLB header proof; a video-only lesson has no container to read.
+        if body.animation is not None:
+            obj=store.get_object(Bucket=settings.storage_bucket,Key=body.animation.key,Range='bytes=0-11')
+            try:header=obj['Body'].read()
+            finally:obj['Body'].close()
+            if len(header)!=12 or struct.unpack('<4sII',header)!=(b'glTF',2,body.animation.bytes):raise HTTPException(422,'Invalid animation container.')
         lesson_id=job.target_lesson_id or job.id;revision_id=uuid4().hex
         target=None
         if job.target_lesson_id:
@@ -673,6 +740,7 @@ def install_conversions(app,engine,settings,identity,db):
             store.copy_object(Bucket=settings.storage_bucket,Key=key,CopySource={'Bucket':settings.storage_bucket,'Key':asset.key})
             asset.key=key
         body.lesson_id=lesson_id;body.revision_id=revision_id;body.title=target.title if target else job.title
+        body.feedback_enabled=feedback_for_job(job,session,target)
         # The subject the instructor chose travels with the job, so completion must not
         # reset a taekwondo or boxing lesson to the movement default.
         projection={'subject':job.subject or subjects.DEFAULT_SUBJECT,'experience_family':'body','instrument':None}

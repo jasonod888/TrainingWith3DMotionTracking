@@ -1,4 +1,38 @@
-"""Sequential official SAM 3D Body inference for one clearly visible person."""
+"""Sequential official SAM 3D Body inference for one clearly visible person.
+
+This is the inference entry point of the ``sam-3d-body-v1`` pipeline (the default
+body route). It is GPU-only and deliberately narrow: one person, one forward pass
+per sampled frame, raw model outputs written unchanged.
+
+Assets
+    ``models/sam-3d-body-dinov3/`` must contain:
+        ``model_config.yaml``  model architecture and preprocessing configuration
+        ``model.ckpt``         the official SAM 3D Body checkpoint
+        ``assets/mhr_model.pt`` the MHR parameter-to-geometry assets
+    Fetched by ``scripts/download_models.py`` (gated upstream repository, or the
+    metadata and SHA-256 verified public redistribution). The DINOv3 backbone source
+    lives in ``vendor/dinov3``; it is loaded through the same official factory without
+    importing unrelated evaluation heads.
+
+Outputs (``--output``)
+    ``motion.npz``        stacked per-frame model arrays plus ``timestamps`` and
+                          ``frame_indices``; ``mhr_model_params`` is the native MHR204
+                          vector that ``scripts/export_glb.py`` turns into a GLB.
+    ``motion.json``       provenance, timing, coordinate notes and array shapes.
+    ``frames/``           the raw per-frame arrays.
+    ``first_frame*.jpg``  a conversion sanity check, not a lesson asset.
+
+The stored ``pred_keypoints_3d`` (MHR70, metres, camera axes) becomes the scoring
+reference; ``scripts/export_glb.py`` consumes the parameters; the worker then runs
+grounding, avatar retargeting and the instructor presentation.
+
+CLI
+    ``python scripts/process_video.py clip.mp4 --duration 20 --fps 15``
+    ``--fps 0`` keeps every frame of an already normalised clip (the worker uses this).
+    ``--max-frames 1`` is the initial inference check.
+
+The CPU route is a separate program: ``scripts/process_video_mediapipe.py``.
+"""
 import argparse
 import json
 import os

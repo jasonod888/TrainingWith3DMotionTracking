@@ -27,7 +27,9 @@ export function MotionStage({lesson,player,source=false,companion=false,onVideoU
   const framingRef=useRef(framing);framingRef.current=framing;
   const leftHand=useRef<HTMLSpanElement>(null),rightHand=useRef<HTMLSpanElement>(null);
   useEffect(()=>{
-    if(source)return;
+    // Three.js is never initialised for a video-only movement: there is no GLB to
+    // load, and a renderer would only add a blank pane behind the instructor video.
+    if(source||!lesson.animation)return;
     const fitEnvelope=fit==='envelope';
     let disposed=false,frame=0;let renderer:THREE.WebGLRenderer|undefined,mixer:THREE.AnimationMixer|undefined,model:THREE.Group|undefined;
     const host=mount.current!;const scene=new THREE.Scene();const aligned=!!framing?.active;
@@ -121,7 +123,7 @@ export function MotionStage({lesson,player,source=false,companion=false,onVideoU
             setLoading(false);return;
           }catch(error){console.warn('Prepared avatar unavailable; showing the canonical reference.',error);}
         }
-        loader.load(assetUrl(lesson.animation.key),gltf=>{
+        loader.load(assetUrl(lesson.animation!.key),gltf=>{
           if(disposed){disposeModel(gltf.scene);return;}
           if(!gltf.animations[0]){setError('This reference has no animation.');setLoading(false);return;}
           model=gltf.scene;anchor.add(model);mixer=new THREE.AnimationMixer(model);action=mixer.clipAction(continuousPlayback(gltf.animations[0]));action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();mixer.setTime((lesson.animation_start??0)+lesson.standing_time);model.updateMatrixWorld(true);
@@ -184,7 +186,7 @@ export function MotionStage({lesson,player,source=false,companion=false,onVideoU
   },[lesson,player,source,framing?.active,immersive,locked,fit,interactive,companion]);
   return <div className={`motion-host ${companion&&!source?'has-companion':''}`}><div className="motion-render-area" hidden={source}><div className="motion-render" ref={mount}/></div>{source?(framing?.composite&&framing.active&&lesson.focused_video_alpha
   ?<InstructorGhost lesson={lesson} player={player} framing={framing} mirrored={Boolean(framing.mirrorReference)} onUnavailable={onAlphaUnavailable}/>
-  :<InstructorVideo videoRef={sourceVideo} lesson={lesson} player={player} mirrored={framing?.mirrorReference} onUnavailable={onVideoUnavailable}/>):companion&&lesson.source_video?<div className="instructor-video-inset" aria-label="Real instructor alongside 3D"><InstructorVideo videoRef={sourceVideo} lesson={lesson} player={player} mirrored={framing?.mirrorReference}/><span>Real instructor</span></div>:null}<span ref={leftHand} className="hand-label reference-hand" hidden>L</span><span ref={rightHand} className="hand-label reference-hand" hidden>R</span>{!source&&loading&&<div className="stage-message" role="status"><span className="loader"/>Loading your reference...</div>}{!source&&error&&<div className="stage-message" role="alert">{error}</div>}</div>;
+  :<InstructorVideo videoRef={sourceVideo} lesson={lesson} player={player} mirrored={framing?.mirrorReference} onUnavailable={onVideoUnavailable}/>):companion&&lesson.source_video?<div className="instructor-video-inset" aria-label="Real instructor alongside 3D"><InstructorVideo videoRef={sourceVideo} lesson={lesson} player={player} mirrored={framing?.mirrorReference}/><span>Real instructor</span></div>:null}<span ref={leftHand} className="hand-label reference-hand" hidden>L</span><span ref={rightHand} className="hand-label reference-hand" hidden>R</span>{!source&&!lesson.animation&&<div className="stage-message" role="status">This move is video only. Show the real instructor.</div>}{!source&&lesson.animation&&loading&&<div className="stage-message" role="status"><span className="loader"/>Loading your reference...</div>}{!source&&lesson.animation&&error&&<div className="stage-message" role="alert">{error}</div>}</div>;
 }
 function meshesOf(model:THREE.Object3D){const meshes:THREE.Mesh[]=[];model.traverse(node=>{if(node instanceof THREE.Mesh)meshes.push(node);});return meshes;}
 function disposeMaterial(material:THREE.Material|THREE.Material[]){for(const m of Array.isArray(material)?material:[material])m.dispose();}

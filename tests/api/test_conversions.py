@@ -52,8 +52,10 @@ def conversion(system):
     with patch('apps.api.conversions.storage_client',return_value=store):yield client,app,store,{'Authorization':'Bearer '+token},system
 
 
-def uploaded(client,data=b'synthetic source bytes',provider='local'):
-    result=client.post('/api/conversions',json={'title':'New lesson','filename':'demo.mp4','bytes':len(data),'start':0,'duration':2,'processing_provider':provider})
+def uploaded(client,data=b'synthetic source bytes',provider='local',feedback_enabled=None):
+    payload={'title':'New lesson','filename':'demo.mp4','bytes':len(data),'start':0,'duration':2,'processing_provider':provider}
+    if feedback_enabled is not None:payload['feedback_enabled']=feedback_enabled
+    result=client.post('/api/conversions',json=payload)
     assert result.status_code==201,result.text
     job=result.json();path='/api/conversions/'+job['id']
     result=client.put(path+'/parts/1',content=data,headers={'Content-Type':'application/octet-stream'})
@@ -148,6 +150,30 @@ def test_verified_finalisation_is_idempotent_and_stale_attempt_cannot_publish(co
     assert media.status_code==200 and media.content==b'focused'
     assert client.post(base+'/heartbeat',headers=headers,json={'stage':'verifying'}).status_code==409
     with Session(app.state.engine) as session:assert len(session.scalars(select(LessonRevision)).all())==1
+
+
+def test_body_feedback_off_survives_processing_without_removing_preview(conversion):
+    client,app,store,headers,_=conversion
+    job,path=uploaded(client,feedback_enabled=False)
+    claim=client.post('/api/worker/claim',headers=headers,json={}).json()
+    headers={**headers,'X-Job-Lease':claim['attempt_token']};base='/api/worker/jobs/'+job['id']
+    for stage in ('processing','exporting','verifying'):
+        assert client.post(base+'/heartbeat',headers=headers,json={'stage':stage}).status_code==200
+    manifest=json.loads((ROOT/'packages/lesson-schema/fixture.json').read_text())
+    manifest['engine']='sam-3d-body';manifest['engine_version']=ENGINE_VERSION
+    manifest['section_set']['sections']=[{'id':'whole','label':'Full movement','start':0,'end':2}]
+    for field,name,data in [('animation','reference.glb',(ROOT/'packages/lesson-schema/synthetic.glb').read_bytes()),
+                            ('landmarks','reference.json',b'{}'),('source_video','preview.mp4',b'preview'),
+                            ('thumbnail','thumbnail.jpg',b'image')]:
+        result=client.put(base+'/files/'+name,headers=headers,content=data)
+        assert result.status_code==200,result.text
+        manifest[field]=result.json()
+    finished=client.post(base+'/finish',headers=headers,json=manifest)
+    assert finished.status_code==200,finished.text
+    lesson=client.get('/api/lessons/'+finished.json()['lesson_id']).json()
+    assert lesson['feedback_enabled'] is False
+    assert lesson['animation']['bytes']==manifest['animation']['bytes']
+    assert lesson['source_video']['bytes']==manifest['source_video']['bytes']
 
 
 def test_avatar_derivatives_attach_to_the_lesson_without_touching_the_manifest(conversion):

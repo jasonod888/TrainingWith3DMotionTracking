@@ -245,6 +245,21 @@ test('R2: an offset-only change is dirty, requires confirmation and is saveable'
   assert.equal(posts[0].body.alignment.offset_seconds, 0.5);
 });
 
+test('creator Off is dirty and the save payload keeps explicit false', async () => {
+  posts = []; saveStatus = 200; latestReference = null; localStorage.clear();
+  const view = await open();
+  openSettings(view, 'Lesson');
+  const toggle = view.getByLabelText('Enable practice feedback') as HTMLInputElement;
+  assert.equal(toggle.checked, true);
+  fireEvent.click(toggle);
+  openReview(view);
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false, 'feedback change must be saveable'));
+  fireEvent.click(dialogSave(view));
+  await waitFor(() => assert.ok(view.queryByText(/Saved privately/i)));
+  assert.equal(posts[0].body.feedback_enabled, false);
+});
+
 test('R2: a recovered local checkpoint is dirty and saveable', async () => {
   posts = []; saveStatus = 200; latestReference = null; localStorage.clear();
   const {buildNotation} = await import('../../../packages/music-notation/index.ts');

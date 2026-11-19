@@ -236,3 +236,58 @@ test('identity lengths follow the contract', () => {
   longId.lesson_id = 'x'.repeat(81);
   assert.equal(parseMusicLessonManifest(longId).ok, false);
 });
+
+// A video-only movement: the CPU MediaPipe route has no GLB, so `animation` is null
+// and the source video is what the person actually watches.
+function mediapipeFixture(): any {
+  const value = read('fixture.json') as any;
+  value.engine = 'mediapipe';
+  value.engine_version = 'mediapipe-pose-heavy-v1';
+  value.root_motion = 'hip-relative';
+  value.animation = null;
+  value.source_video = {key: 'lessons/x/preview.mp4', mime: 'video/mp4', bytes: 10, sha256: 'a'.repeat(64)};
+  return value;
+}
+
+test('a mediapipe manifest parses with a null animation and a source video', () => {
+  const parsed = parseLessonManifest(mediapipeFixture());
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.value.animation, null);
+    assert.equal(parsed.value.engine, 'mediapipe');
+    assert.equal(parsed.value.source_video?.mime, 'video/mp4');
+  }
+});
+
+test('engine-specific completeness is enforced on the client boundary', () => {
+  const noAnimation = mediapipeFixture();
+  noAnimation.engine = 'sam-3d-body';
+  assert.equal(parseLessonManifest(noAnimation).ok, false);
+
+  const noVideo = mediapipeFixture();
+  noVideo.source_video = null;
+  assert.equal(parseLessonManifest(noVideo).ok, false);
+
+  const legacySam = read('fixture.json') as any;
+  legacySam.engine = 'sam-3d-body';
+  assert.equal(parseLessonManifest(legacySam).ok, true, 'an existing SAM lesson keeps its GLB rule');
+});
+
+test('frame_rate accepts finite fractions in 1-240 and rejects the rest', () => {
+  for (const value of [29.97, 23.976, 25, 30, 1, 240]) {
+    const manifest = read('fixture.json') as any;
+    manifest.frame_rate = value;
+    const parsed = parseLessonManifest(manifest);
+    assert.equal(parsed.ok, true, `frame_rate ${value} should parse`);
+    if (parsed.ok) assert.equal(parsed.value.frame_rate, value);
+  }
+  for (const value of [0.5, 0, 240.5, -1, Number.NaN, Number.POSITIVE_INFINITY, '30']) {
+    const manifest = read('fixture.json') as any;
+    manifest.frame_rate = value;
+    assert.equal(parseLessonManifest(manifest).ok, false, `frame_rate ${String(value)} should be rejected`);
+  }
+  // A legacy manifest that omits frame_rate still parses.
+  const legacy = read('fixture.json') as any;
+  delete legacy.frame_rate;
+  assert.equal(parseLessonManifest(legacy).ok, true);
+});

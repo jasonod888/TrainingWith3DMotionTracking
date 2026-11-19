@@ -28,8 +28,8 @@
   "assessment": {
     "rubric_version": "piano-midi-v1",
     "assessment": "notes",
-    "input_modes": ["midi", "none"],
-    "dimensions": ["pitch", "timing", "coverage"]
+    "input_modes": ["midi", "microphone"],
+    "dimensions": ["pitch", "timing"]
   },
   "warnings": []
 }

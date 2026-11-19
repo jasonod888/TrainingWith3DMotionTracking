@@ -35,11 +35,11 @@ export function readLessonSummaries(value:unknown):LessonSummary[]{
 const loadSummaries=async(path:string)=>readLessonSummaries(await request<unknown>(path,'GET',undefined,false,{'X-Lesson-Formats':'1,2'}));
 export const loadLessonSummaries=(subject?:string)=>loadSummaries(`/lessons/summaries${summaryQuery(subject)}`);
 export const loadSharedSummaries=(subject?:string)=>loadSummaries(`/shared-lessons/summaries${summaryQuery(subject)}`);
-export type Capabilities={music_piano_library_ui?:boolean;music_guitar_library_ui?:boolean;music_history?:boolean;music_midi_setup?:boolean;subject_filter?:boolean;processing?:Record<string,boolean>};
+export type Capabilities={music_piano_library_ui?:boolean;music_guitar_library_ui?:boolean;music_history?:boolean;music_challenge?:boolean;music_inference?:boolean;music_midi_setup?:boolean;subject_filter?:boolean;processing?:Record<string,boolean>};
 export const loadCapabilities=()=>request<Capabilities>('/capabilities');
 export const loadLesson=(id:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`);
 export const copyDemo=()=>request<LessonManifest>('/lessons/from-demo','POST');
-export const saveSections=(lesson:LessonManifest,sections:LessonManifest['section_set']['sections'],title:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/sections`,'PUT',{base_revision_id:lesson.revision_id,sections,title});
+export const saveSections=(lesson:LessonManifest,sections:LessonManifest['section_set']['sections'],title:string,feedbackEnabled?:boolean)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/sections`,'PUT',{base_revision_id:lesson.revision_id,sections,title,...(feedbackEnabled===undefined?{}:{feedback_enabled:feedbackEnabled})});
 export const trimMove=(lesson:LessonManifest,start_frame:number,end_frame:number)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/trim`,'PUT',{base_revision_id:lesson.revision_id,start_frame,end_frame,accept:true});
 export const renameMove=(id:string,title:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`,'PATCH',{title});
 

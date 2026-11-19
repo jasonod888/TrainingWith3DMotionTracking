@@ -79,7 +79,7 @@ const lesson: MusicLessonManifest = {
   ]},
   reference: {key: 'lessons/guitar-fixture/reference.json', mime: 'application/json', bytes: bytes.length, sha256},
   reference_reviewed: true,
-  assessment: {rubric_version: 'music-watch-v1', assessment: 'none', input_modes: ['none'], dimensions: []},
+  assessment: {rubric_version: 'guitar-notes-v1', assessment: 'notes', input_modes: ['midi', 'microphone'], dimensions: ['pitch', 'timing']},
   source_video: {key: 'lessons/guitar-fixture/video.mp4', mime: 'video/mp4', bytes: 1, sha256: '1'.repeat(64)},
   warnings: [],
 };

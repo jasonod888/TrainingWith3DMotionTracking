@@ -3,7 +3,7 @@ export type MarkerTrack={schema:1;video_sha256:string;order:string[];times:numbe
 export const MARKER_NAMES=['left_hand','right_hand','left_foot','right_foot'] as const;
 export function markerTrack(value:unknown,hash:string):MarkerTrack|null{
  const data=value as MarkerTrack|undefined;
- if(!data||data.schema!==1||data.video_sha256!==hash||!Array.isArray(data.times)||!Array.isArray(data.frames)||!data.times.length||data.times.length>12000||data.times.length!==data.frames.length)return null;
+ if(!data||data.schema!==1||data.video_sha256!==hash||!Array.isArray(data.times)||!Array.isArray(data.frames)||!data.times.length||data.times.length>20000||data.times.length!==data.frames.length)return null;
  if(!Array.isArray(data.order)||data.order.length!==4||MARKER_NAMES.some((name,index)=>data.order[index]!==name))return null;
  for(let i=0;i<data.times.length;i++){
   if(!Number.isFinite(data.times[i])||(i>0&&data.times[i]<=data.times[i-1])||!Array.isArray(data.frames[i])||data.frames[i].length!==4)return null;

@@ -30,9 +30,23 @@ STATUSES = ('blocked_license', 'identity_unresolved', 'queued', 'running', 'read
 DEFAULT_TIMEOUT_SECONDS = 900
 DEFAULT_BASE = (Path(__file__).resolve().parents[1] / '.local' / 'repo-research'
                 / 'comparisons')
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _venv_python(env: str, platform: str | None = None) -> Path:
+    """Return the venv interpreter path for the running platform.
+
+    `platform` is injectable so the Windows and POSIX layouts can both be tested on
+    either CI OS without creating or executing a virtualenv.
+    """
+    selected = platform or os.name
+    nested = Path('Scripts') / 'python.exe' if selected == 'nt' else Path('bin') / 'python'
+    return ROOT / env / nested
+
+
 RUNTIME_INTERPRETERS = {
-    'basic-pitch': Path(__file__).resolve().parents[1] / '.venv-music' / 'Scripts' / 'python.exe',
-    'kong': Path(__file__).resolve().parents[1] / '.venv' / 'Scripts' / 'python.exe',
+    'basic-pitch': _venv_python('.venv-music'),
+    'kong': _venv_python('.venv'),
 }
 
 

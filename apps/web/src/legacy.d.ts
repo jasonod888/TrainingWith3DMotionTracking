@@ -2,14 +2,19 @@
 declare module '*web/dist/pose.js' {
  export type Point={x:number;y:number;z:number;visibility?:number;presence?:number};
  export type Calibration={height:number;floor:number;center:number};
- export type Reference={duration:number;times:number[];keypoints:number[][][]};
+ export type LandmarkFormat='sam-3d-body'|'mediapipe-33';
+ /** A scoring reference. `visibility` is frame-matched to `keypoints` when present. */
+ export type Reference={duration:number;times:number[];keypoints:number[][][];
+  landmarkFormat?:LandmarkFormat;visibility?:number[][]|null;standingCalibrationAvailable?:boolean};
  export class HeightCalibration{samples:unknown[];reset():void;sample(image:Point[],world:Point[],now:number):{done?:boolean;progress:number;value:Calibration;message:string};}
  export const MP:Record<string,number>;
  export const LINKS:[string,string][];
  export function videoFit(vw:number,vh:number,w:number,h:number):{width:number;height:number;x:number;y:number};
  export function heightPlacement(value:Calibration,vw:number,vh:number,w:number,h:number,frustum:number,avatarHeight:number):{scale:number;floorY:number;screenHeight:number};
  export function fromMediaPipe(world:Point[],image:Point[]):unknown;
- export function bestMatch(student:unknown,reference:Reference,time:number,mirror:boolean,playing:boolean):{score:number;joints:Record<string,number>;time:number}|null;
+ export function fromReference(row:number[][],mirror?:boolean,format?:LandmarkFormat|'sam',visibility?:number[]|null):Record<string,{p:number[];confidence:number}>|null;
+ export function comparePoses(student:unknown,target:unknown):{score:number;joints:Record<string,number>}|null;
+ export function bestMatch(student:unknown,reference:Reference,time:number,mirror?:boolean,playing?:boolean,format?:LandmarkFormat|'sam',visibility?:number[][]|null):{score:number;joints:Record<string,number>;time:number}|null;
  /** Structured standing assessment. Messages are for display only; branch on `reason`. */
  export type StandingReason='eligible'|'no_person'|'invalid'|'occluded'|'out_of_frame'|'not_standing'|'too_small'|'too_large';
  export type StandingEdge={top:boolean;bottom:boolean;left:boolean;right:boolean};

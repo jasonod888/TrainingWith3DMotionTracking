@@ -53,7 +53,10 @@ class LessonManifest(Contract):
     source_start: float = Field(ge=0)
     animation_start: float = Field(default=0, ge=0)
     animation_duration: float | None = Field(default=None, gt=0)
-    frame_rate: int = Field(default=15, ge=1, le=240)
+    # Finite fractional rates are required: a normalised 29.97 fps clip must be
+    # described exactly, because trim and marker sampling divide by this value.
+    # Integer SAM/synthetic manifests keep working (they coerce to a float).
+    frame_rate: float = Field(default=15, ge=1, le=240, allow_inf_nan=False)
     engine: Literal['sam-3d-body', 'mediapipe', 'synthetic']
     engine_version: str
     units: Literal['metres'] = 'metres'
@@ -61,7 +64,10 @@ class LessonManifest(Contract):
     root_motion: Literal['estimated-camera-relative', 'hip-relative', 'in-place', 'floor-guided']
     confidence: Literal['unmeasured', 'measured']
     standing_time: float = Field(ge=0)
-    animation: Asset
+    # Nullable because the MediaPipe route is video-only. The engine-specific rule
+    # below keeps a 3D lesson from losing its animation, so this is never a way to
+    # publish a half-specified movement.
+    animation: Asset | None = None
     landmarks: Asset
     source_video: Asset | None = None
     focused_video: Asset | None = None
@@ -71,6 +77,9 @@ class LessonManifest(Contract):
     section_set: SectionSet
     warnings: list[str] = Field(default_factory=list)
     presentation: dict[Literal['male','female','report'], Asset] = Field(default_factory=dict)
+    # Optional so legacy revisions keep their prior availability. New writes persist
+    # an explicit boolean; None must never be treated as an explicit choice.
+    feedback_enabled: bool | None = Field(default=None, strict=True)
 
     @model_validator(mode='after')
     def timeline(self):
@@ -82,6 +91,14 @@ class LessonManifest(Contract):
             raise ValueError('A transparent instructor video needs the focused video and WebM encoding.')
         if self.standing_time > self.duration or abs(self.section_set.duration-self.duration) > 1e-6:
             raise ValueError('Reference and sections must use the animation timeline.')
+        # Engine-specific completeness. A 3D lesson without its GLB, or a video-only
+        # lesson without the clip the person actually watches, is not a lesson.
+        if self.engine in ('sam-3d-body', 'synthetic') and self.animation is None:
+            raise ValueError('A 3D lesson needs its animation.')
+        if self.engine == 'mediapipe' and self.source_video is None:
+            raise ValueError('A video-only lesson needs its source video.')
+        if self.animation is not None and self.animation.mime != 'model/gltf-binary':
+            raise ValueError('A 3D lesson animation must be a GLB.')
         return self
 
 class Discovery(StrEnum):
@@ -190,6 +207,8 @@ class MusicLessonManifest(Contract):
     pedal: list[MusicPedalEvent] = Field(default_factory=list, max_length=2000)
     preview_identity: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
     warnings: list[str] = Field(default_factory=list)
+    # Lesson-level availability, separate from the note rubric. Missing means legacy.
+    feedback_enabled: bool | None = Field(default=None, strict=True)
 
     @model_validator(mode='after')
     def music_timeline(self):
@@ -328,6 +347,7 @@ class MusicDraftDocument(Contract):
     analysis: Asset | None = None
     provenance: DraftProvenance
     warnings: list[str] = Field(default_factory=list, max_length=100)
+    feedback_enabled: bool | None = Field(default=None, strict=True)
 
     @model_validator(mode='after')
     def bounded(self):

@@ -13,14 +13,40 @@ export function angle(a,b,c) { const u=sub(a,b),v=sub(c,b); return Math.acos(cla
 export function fromMediaPipe(world, image) {
   return Object.fromEntries(NAMES.map(k=>[k, { p:[world[MP[k]].x,world[MP[k]].y,world[MP[k]].z], confidence:Math.min(image[MP[k]].visibility??0, image[MP[k]].presence??1) }]));
 }
-export function fromReference(row, mirror=false) {
-  return Object.fromEntries(NAMES.map(k=>{const other=mirror && (k.startsWith('l')||k.startsWith('r'))?(k[0]==='l'?'r':'l')+k.slice(1):k; const p=[...row[SAM[other]]]; if(mirror)p[0]*=-1; return [k,{p,confidence:1}];}));
+// One joint is usable only when its coordinates and its confidence are finite.
+// A placeholder landmark (the documented missing-data contract) has zero
+// visibility, so it can never contribute to an angle or a direction.
+const usable=point=>!!point&&Array.isArray(point.p)&&point.p.length===3&&point.p.every(Number.isFinite)&&Number.isFinite(point.confidence);
+// `format` selects the landmark table; `visibility` is the frame-matched (33,)
+// confidence row for a MediaPipe reference. Mirroring moves the joint selection,
+// the x coordinate and the confidence together, so a mirrored left wrist can
+// never be scored with the right wrist's visibility.
+export function fromReference(row, mirror=false, format='sam', visibility=null) {
+  const map=format==='mediapipe-33'?MP:SAM, minimum=format==='mediapipe-33'?33:63;
+  if(!Array.isArray(row)||row.length<minimum)return null;
+  const entries=[];
+  for(const k of NAMES) {
+    const other=mirror && (k.startsWith('l')||k.startsWith('r'))?(k[0]==='l'?'r':'l')+k.slice(1):k;
+    const index=map[other], source=row[index];
+    const finite=Array.isArray(source)&&source.length>=3&&Number.isFinite(source[0])&&Number.isFinite(source[1])&&Number.isFinite(source[2]);
+    const p=finite?[source[0],source[1],source[2]]:[0,0,0];
+    if(finite&&mirror)p[0]*=-1;
+    let confidence=1;
+    if(visibility&&Array.isArray(visibility)){const value=visibility[index];confidence=Number.isFinite(value)?clamp(value,0,1):0;}
+    entries.push([k,{p,confidence:finite?confidence:0}]);
+  }
+  return Object.fromEntries(entries);
 }
 const ANGLES=[['ls','le','lw'],['rs','re','rw'],['le','ls','lh'],['re','rs','rh'],['ls','lh','lk'],['rs','rh','rk'],['lh','lk','la'],['rh','rk','ra']];
 export function comparePoses(student,target) {
+  // An unscorable pose is null, never a zero: callers exclude it from aggregation
+  // instead of treating missing tracking as a failed attempt.
+  if(!student||!target)return null;
   let sum=0, weight=0; const joints={};
   for(const [a,b,c] of ANGLES) {
-    const confidence=Math.min(student[a].confidence,student[b].confidence,student[c].confidence);
+    const points=[student[a],student[b],student[c],target[a],target[b],target[c]];
+    if(!points.every(usable))continue;
+    const confidence=Math.min(...points.map(point=>point.confidence));
     if(confidence<.6)continue;
     const error=Math.abs(angle(student[a].p,student[b].p,student[c].p)-angle(target[a].p,target[b].p,target[c].p));
     const score=100*Math.exp(-.5*(error/28)**2);
@@ -29,21 +55,26 @@ export function comparePoses(student,target) {
   if(Object.keys(joints).length<6) return null;
   let directionSum=0,directionWeight=0;
   for(const [a,b] of LINKS) {
-    const conf=Math.min(student[a].confidence,student[b].confidence);if(conf<.6)continue;
+    const points=[student[a],student[b],target[a],target[b]];
+    if(!points.every(usable))continue;
+    const conf=Math.min(...points.map(point=>point.confidence));if(conf<.6)continue;
     const u=sub(student[b].p,student[a].p),v=sub(target[b].p,target[a].p);
     const degrees=Math.acos(clamp(dot(u,v)/Math.max(len(u)*len(v),1e-9),-1,1))*180/Math.PI;
     directionSum+=100*Math.exp(-.5*(degrees/40)**2)*conf;directionWeight+=conf;
   }
   return {score:.75*sum/weight+.25*directionSum/Math.max(directionWeight,1e-9), joints};
 }
-export function bestMatch(student,reference,time,mirror=false,playing=true) {
+// `format` and `visibility` default to the reference's own fields, so a reference
+// object that is sliced for a section keeps scoring with the right landmark table
+// and the frame-matched confidence row.
+export function bestMatch(student,reference,time,mirror=false,playing=true,format=reference?.landmarkFormat??'sam',visibility=reference?.visibility??null) {
   let best=null;
   const start=Math.max(0,time-(playing?1:0)),end=Math.min(reference.duration,time+(playing?.15:0));
   // Match one whole reference pose at a time, rather than independently picking
   // a different time for each limb. Timing tolerance is in source seconds.
   for(let t=start;t<=end+.001;t+=playing?.1:1) {
     let lo=0,hi=reference.times.length-1;while(lo<hi){const mid=(lo+hi)>>1;if(reference.times[mid]<t)lo=mid+1;else hi=mid;}
-    const result=comparePoses(student,fromReference(reference.keypoints[lo],mirror));
+    const result=comparePoses(student,fromReference(reference.keypoints[lo],mirror,format,visibility?.[lo]??null));
     if(result && (!best || result.score>best.score))best={...result,time:reference.times[lo]};
   }
   return best;

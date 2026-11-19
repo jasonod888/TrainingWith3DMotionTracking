@@ -29,6 +29,7 @@ import {
 } from '../../../../../packages/music-notation/index.ts';
 import {useHandAssignments} from './useHandAssignments';
 import {pitchName} from '../music-reference';
+import {assessmentPolicyForSubject, effectiveFeedbackEnabled} from '../music-feedback';
 import {buildTimelineLayout, clampScroll, heldPassageAt, type TimelineLayout} from './timeline-layout';
 import {KeyboardEditor} from '../notation/KeyboardEditor';import {
   clampStandardPianoWindow, FULL_PIANO_MIN_WIDTH, isStandardPianoRange,
@@ -204,7 +205,10 @@ export function PianoWorkspaceHarness(props: {
   lessonId?: string;
   /** Normal review route: hide harness-only labels and demo affordances. */
   embedded?: boolean;
-  mode?: 'review' | 'practice';
+  mode?: 'review' | 'practice' | 'challenge';
+  challengeEnabled?: boolean;
+  challengeHistoryEnabled?: boolean;
+  audioAssessmentEnabled?: boolean;
   onModeChange?: (mode: 'watch' | 'practice' | 'compete') => void;
   lessonTitle?: string;
   onBack?: () => void;
@@ -213,9 +217,13 @@ export function PianoWorkspaceHarness(props: {
   /** Receives the revision and whether it represents the current work. */
   onSaved?: (revisionId: string, current: boolean) => void;
 } = {}) {
-  if ((props.mode ?? 'review') === 'practice') {
+  if ((props.mode ?? 'review') === 'practice' || props.mode === 'challenge') {
     return <PianoPracticeWorkspace lessonId={props.lessonId} lessonTitle={props.lessonTitle}
-      embedded={props.embedded} onBack={props.onBack} onModeChange={props.onModeChange}/>;
+      embedded={props.embedded} challengeMode={props.mode === 'challenge'}
+      challengeAvailable={props.challengeEnabled===true}
+      challengeHistoryEnabled={props.challengeHistoryEnabled===true}
+      audioAssessmentEnabled={props.audioAssessmentEnabled===true}
+      onBack={props.onBack} onModeChange={props.onModeChange}/>;
   }
   return <PianoReviewWorkspace {...props} mode="review"/>;
 }
@@ -325,7 +333,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
   const [verificationToken, setVerificationToken] = useState('');
   const [savedSections, setSavedSections] = useState<{id: string; label: string; start: number; end: number}[] | null>(null);
   const [sectionsDraft, setSectionsDraft] = useState<{id: string; label: string; start: number; end: number}[]>([]);
-  const [assessmentPolicy, setAssessmentPolicy] = useState<'none' | 'notes'>('none');
+  const [assessmentPolicy, setAssessmentPolicy] = useState<'none' | 'notes'>('notes');
+  const [feedbackEnabled, setFeedbackEnabled] = useState(true);
   const [verification, setVerification] = useState<VerificationState | null>(null);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [savedAssessment, setSavedAssessment] = useState<unknown>(null);
@@ -1219,8 +1228,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
   // avoids serializing the whole document on every edit.
   const metaSignature = useMemo(() => JSON.stringify({
     alignment: serializeAlignment(alignment, anchors, offsetSeconds),
-    anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy, guitarChords,
-  }), [alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy, guitarChords]);
+    anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy, feedbackEnabled, guitarChords,
+  }), [alignment, anchors, offsetSeconds, spans, title, sectionsDraft, assessmentPolicy, feedbackEnabled, guitarChords]);
   const workspaceSignature = document && state
     ? `${documentEpoch}:${historyIdentity(state)}:${metaSignature}` : '';
   workspaceSignatureRef.current = workspaceSignature;
@@ -1245,7 +1254,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       preview_identity?: string | null; sha256?: string;
       pedal?: MusicPedalSpan[];
       section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
-      assessment?: unknown; piano_preview?: Asset | null} | null) => {
+      assessment?: {assessment?: string}; feedback_enabled?: boolean | null; piano_preview?: Asset | null} | null) => {
     setBaseline(restored.document);
     setDocumentEpoch(value => value + 1);
     setState(createWorkspaceState(restored.document));
@@ -1269,7 +1278,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
     setSavedRevisionId(revisionId);
     setSavedSections(manifest?.section_set?.sections ?? null);
     if (manifest?.section_set?.sections?.length) setSectionsDraft(manifest.section_set.sections);
-    setAssessmentPolicy(((manifest?.assessment as {assessment?: string} | null)?.assessment === 'notes') ? 'notes' : 'none');
+    setAssessmentPolicy('notes');
+    setFeedbackEnabled(effectiveFeedbackEnabled(manifest));
     setSavedAssessment(manifest?.assessment ?? null);
     setPreviewAsset((manifest?.piano_preview as Asset | null) ?? null);
     setPreviewIdentity(manifest?.preview_identity ?? '');
@@ -1304,7 +1314,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
         pedal?: MusicPedalSpan[];
         draft_id?: string | null;
         section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
-        assessment?: unknown} | null = null;
+        assessment?: {assessment?: string}; feedback_enabled?: boolean | null} | null = null;
       try {
         manifest = await request(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false,
         {'X-Lesson-Formats': '1,2'});
@@ -1385,7 +1395,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
         setVerificationToken(draft.verification_state_token ?? '');
         setSectionsDraft(current => current.length ? current
           : [{id: 'whole', label: 'Whole lesson', start: 0, end: draft.duration}]);
-        setAssessmentPolicy(current => current === 'notes' ? 'notes' : 'none');
+        setAssessmentPolicy('notes');
+        setFeedbackEnabled(effectiveFeedbackEnabled(draft));
         setPreviewAsset((draft.piano_preview as Asset | null) ?? null);
         setPreviewIdentity(draft.preview_identity ?? '');
         setPreviewBaseline(draft.piano_preview ? document : null);
@@ -1522,6 +1533,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
         offsetSeconds, spans,
         sections: sectionsDraft.length ? sectionsDraft : undefined,
         assessment: {policy: assessmentPolicy},
+        feedbackEnabled,
         durationSeconds: document.duration,
         authoredSpellings: authoredSpellings.current,
         acceptedBaselines: acceptedBaselines.current,
@@ -1534,7 +1546,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
     }, 600);
     return () => clearTimeout(timer);
   }, [workspaceSignature, dirty, accountId, draftId, sourceSha256, title, alignment, anchors, offsetSeconds,
-      spans, recoveryIdentity, savedRevisionId, verificationToken, sectionsDraft, assessmentPolicy, guitarChords]);
+      spans, recoveryIdentity, savedRevisionId, verificationToken, sectionsDraft, assessmentPolicy, feedbackEnabled, guitarChords]);
 
   snapshotRef.current = {
     document, selection, dirty, past: state?.past.length ?? 0, future: state?.future.length ?? 0,
@@ -1881,9 +1893,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       draftId, referenceSha256: sourceSha256, verificationStateToken: verificationToken || null,
       sections: sectionsDraft.length ? sectionsDraft : (savedSections ?? undefined),
       guitarChords: validatedChords,
-      assessment: guitar || assessmentPolicy !== 'notes'
-        ? {assessment: 'none', input_modes: ['none'], dimensions: [], rubric_version: 'music-watch-v1'}
-        : {assessment: 'notes', input_modes: ['midi'], dimensions: ['pitch', 'timing'], rubric_version: 'piano-midi-v1'},
+      assessment: assessmentPolicyForSubject(document.subject),
+      feedbackEnabled,
     });
     try {
       const manifest = await request<{ revision_id: string }>(
@@ -1929,7 +1940,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       setSaving(false);
     }
   }, [document, lessonId, confirmReviewed, saving, title, spans, alignment, anchors, offsetSeconds,
-      savedRevisionId, workspaceSignature, draftId, sourceSha256, verificationToken, savedSections, savedAssessment, onSaved,
+      savedRevisionId, workspaceSignature, draftId, sourceSha256, verificationToken, savedSections, savedAssessment,
+      feedbackEnabled, onSaved,
       hands.assignments, guitarChords]);
 
   const saveOnLatestRevision = useCallback(async () => {
@@ -1949,7 +1961,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
     if (!lessonId) return;
     setReopenMessage('');
     try {
-      const lesson = await request<{ revision_id: string; reference: { key: string }; title?: string }>(
+      const lesson = await request<{ revision_id: string; reference: { key: string }; title?: string;
+        assessment?: {assessment?: string}; feedback_enabled?: boolean | null }>(
         `/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false, {'X-Lesson-Formats': '1,2'});
       const response = await fetch(assetUrl(lesson.reference.key), {credentials: 'same-origin'});
       if (!response.ok) throw new Error('The saved reference could not be read.');
@@ -1957,7 +1970,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       if (!restored.ok) throw new Error(restored.message);
       applyRestoredReference(restored.value, lesson.revision_id,
         lesson as {section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
-          assessment?: unknown; piano_preview?: Asset | null});
+          assessment?: {assessment?: string}; feedback_enabled?: boolean | null; piano_preview?: Asset | null});
       setConfirmReviewed(false);
       setReopenMessage(`Reopened revision ${lesson.revision_id.slice(0, 8)} from ${
         restored.value.source === 'notation' ? 'the authored notation' : 'performance only (legacy reference)'}.`);
@@ -1979,7 +1992,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       setOffsetSeconds(staleCheckpoint.offsetSeconds);
       setAnchors(canonicalAnchors(staleCheckpoint.alignment?.anchors ?? []));
       if (staleCheckpoint.sections?.length) setSectionsDraft(staleCheckpoint.sections);
-      if (staleCheckpoint.assessment) setAssessmentPolicy(staleCheckpoint.assessment.policy);
+      if (typeof staleCheckpoint.feedbackEnabled === 'boolean') setFeedbackEnabled(staleCheckpoint.feedbackEnabled);
+      setAssessmentPolicy('notes');
       authoredSpellings.current = staleCheckpoint.authoredSpellings ?? {};
       acceptedBaselines.current = (staleCheckpoint.acceptedBaselines ?? {}) as typeof acceptedBaselines.current;
       if (staleCheckpoint.alignment?.passages?.length) {
@@ -2011,7 +2025,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       setOffsetSeconds(recoveryOffer.offsetSeconds);
       setAnchors(canonicalAnchors(recoveryOffer.alignment?.anchors ?? []));
       if (recoveryOffer.sections?.length) setSectionsDraft(recoveryOffer.sections);
-      if (recoveryOffer.assessment) setAssessmentPolicy(recoveryOffer.assessment.policy);
+      if (typeof recoveryOffer.feedbackEnabled === 'boolean') setFeedbackEnabled(recoveryOffer.feedbackEnabled);
+      setAssessmentPolicy('notes');
       authoredSpellings.current = recoveryOffer.authoredSpellings ?? {};
       acceptedBaselines.current = (recoveryOffer.acceptedBaselines ?? {}) as typeof acceptedBaselines.current;
       // Recovered work keeps its server base so a retry is not a first review.
@@ -3346,15 +3361,17 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
                 }}>Remove</button>}
               </div>
             </fieldset>)}
-            <h2>Assessment</h2>
-            <label className="ws-field ws-inline"><span>Policy</span>
-              <select value={guitar ? 'none' : assessmentPolicy} data-assessment-policy disabled={readOnly || guitar}
-                onChange={event => { if (readOnlyRef.current) return; setAssessmentPolicy(event.target.value === 'notes' ? 'notes' : 'none'); setConfirmReviewed(false); }}>
-                <option value="none">Watch only (no note scoring)</option>
-                <option value="notes">Pitch and timing from MIDI</option>
-              </select>
+            <h2>Feedback</h2>
+            <label className="review-checkbox ws-field ws-inline">
+              <input type="checkbox" checked={feedbackEnabled} data-feedback-enabled
+                disabled={readOnly}
+                onChange={event => {
+                  if (readOnlyRef.current) return;
+                  setFeedbackEnabled(event.target.checked);
+                  setConfirmReviewed(false);
+                }}/> Enable practice feedback
             </label>
-            {guitar && <p className="ws-hint">Guitar lessons stay watch-only; MIDI note feedback is piano-only in this engine.</p>}
+            <p className="ws-hint" data-assessment-policy="notes">When enabled, reviewed piano and guitar references offer local pitch-and-timing feedback. Guitar uses sounding pitch only; scoring stays experimental and withheld. Turning it off never deletes notes, sections, alignment or the saved reference.</p>
             <h2>Verification diagnostics</h2>
             {!verification ? <p className="ws-hint">No verification report is available for this proposal.</p> : <>
               <p className="ws-hint" data-verification-status>

@@ -5,6 +5,17 @@ Missing masks use the existing image-space body predictions; no model is run.
 The default isolates the segmented person on a neutral background and follows
 their position at a fixed scale. The older whole-movement envelope is optional.
 Original timestamps, frame count and pixel scale are retained.
+
+Two landmark formats are accepted through ``--landmark-format``:
+
+* ``sam-3d-body`` (default, legacy) — MHR70 ``pred_keypoints_2d`` rows and the
+  unchanged MHR70 wrist/foot marker indices (62/41 and the toe/foot means).
+* ``mediapipe-33`` — the CPU MediaPipe heavy route's ``image_landmarks`` (pixels)
+  plus its frame-matched ``visibility`` row. Markers use wrists 15/16 and feet
+  31/32, with the ankles 27/28 as a fallback when a foot tip is not visible.
+
+The two formats only differ in which joint is a hand or a foot and in how a
+landmark is gated; the crop, matte, encoding and report contract are shared.
 """
 import argparse
 import hashlib
@@ -16,9 +27,110 @@ import subprocess
 import numpy as np
 
 
+# Reduced-resolution Farneback keeps the motion-aligned edge stabilization cheap on
+# 1080p outputs. Flow vectors are always rescaled back to full-resolution pixels.
+FLOW_MAX_HEIGHT = 480
+# A MediaPipe landmark contributes to a marker or to fallback crop bounds only when
+# its min(visibility, presence) value clears this. Stored values are already min().
+MARKER_VISIBILITY = 0.55
+
+
 def digest(path):
     with Path(path).open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def load_landmarks(motion, landmark_format='sam-3d-body'):
+    """Read and validate the prediction arrays for the requested landmark format.
+
+    Returns ``(points_2d, visibility, timestamps, frame_indices)`` where
+    ``points_2d`` is ``[frames, joints, 2]`` in source pixels and ``visibility`` is
+    ``[frames, joints]`` (or ``None`` for the legacy SAM arrays, whose confidence is
+    not part of the stored keypoints).
+    """
+    with np.load(motion, allow_pickle=False) as data:
+        files = set(data.files)
+        if landmark_format == 'mediapipe-33':
+            missing = {'image_landmarks', 'visibility', 'timestamps', 'frame_indices'} - files
+            if missing:
+                raise ValueError(f'MediaPipe motion is missing {sorted(missing)}; use process_video_mediapipe.py output.')
+            points = np.asarray(data['image_landmarks'], dtype=float)
+            visibility = np.asarray(data['visibility'], dtype=float)
+            if points.ndim != 3 or points.shape[1:] != (33, 2):
+                raise ValueError(f'MediaPipe image landmarks must be [frames,33,2]; got {points.shape}.')
+            if visibility.shape != points.shape[:2]:
+                raise ValueError(f'MediaPipe visibility must be [frames,33]; got {visibility.shape}.')
+            if not np.isfinite(visibility).all():
+                raise ValueError('MediaPipe visibility contains non-finite values.')
+        elif landmark_format == 'sam-3d-body':
+            missing = {'pred_keypoints_2d', 'timestamps', 'frame_indices'} - files
+            if missing:
+                raise ValueError(f'SAM motion is missing {sorted(missing)}; use process_video.py output.')
+            points = np.asarray(data['pred_keypoints_2d'], dtype=float)
+            visibility = None
+            if points.ndim != 3 or points.shape[2] != 2 or points.shape[1] < 63:
+                raise ValueError(f'SAM keypoints must be [frames,>=63,2]; got {points.shape}.')
+        else:
+            raise ValueError('Unknown landmark format.')
+        times = np.asarray(data['timestamps'], dtype=float)
+        indices = np.asarray(data['frame_indices'])
+    if not np.isfinite(points).all():
+        raise ValueError('Image predictions contain non-finite values.')
+    return points, visibility, times, indices
+
+
+def gated_points(frame_points, frame_visibility):
+    """Landmarks usable for fallback crop bounds: finite and confidently visible."""
+    if frame_visibility is None:
+        return frame_points
+    keep = (frame_visibility >= MARKER_VISIBILITY) & np.isfinite(frame_points).all(axis=1)
+    return frame_points[keep]
+
+
+def reduce_gray(gray, max_height=FLOW_MAX_HEIGHT):
+    """Downscale a gray frame so Farneback never runs taller than ``max_height``.
+
+    Returns ``(image, flow_width, flow_height)``; identical-size input is returned
+    unchanged so a small crop pays nothing for the benchmarked path.
+    """
+    import cv2
+    height, width = gray.shape
+    scale = min(1.0, max_height / max(height, 1))
+    flow_w = max(16, int(round(width * scale)))
+    flow_h = max(16, int(round(height * scale)))
+    if (flow_w, flow_h) == (width, height):
+        return gray, flow_w, flow_h
+    return cv2.resize(gray, (flow_w, flow_h), interpolation=cv2.INTER_AREA), flow_w, flow_h
+
+
+def scale_flow(flow, width, height, flow_w, flow_h):
+    """Rescale reduced-resolution flow vectors to full-resolution pixels."""
+    scaled = np.array(flow, dtype=np.float32, copy=True)
+    scaled[..., 0] *= width / flow_w
+    scaled[..., 1] *= height / flow_h
+    return scaled
+
+
+def warp_previous(previous, gray, offset=(0., 0.)):
+    """Sample the previous matte in the current crop, with motion and crop offset.
+
+    Farneback runs at most ``FLOW_MAX_HEIGHT`` tall, then the vectors are scaled by
+    ``full_w/flow_w`` and ``full_h/flow_h`` before remapping, so the matte follows
+    real motion. ``offset`` is ``(current_left-previous_left, current_top-previous_top)``:
+    the previous matte was stored in the previous crop's coordinates, so the crop's
+    own movement must be added before the current-crop pixel is looked up.
+    """
+    import cv2
+    height, width = gray.shape
+    current_small, flow_w, flow_h = reduce_gray(gray)
+    previous_small, _, _ = reduce_gray(previous['gray'])
+    flow = cv2.calcOpticalFlowFarneback(current_small, previous_small, None, .5, 2, 15, 2, 5, 1.1, 0)
+    flow = scale_flow(flow, width, height, flow_w, flow_h)
+    yy, xx = np.indices((height, width), dtype=np.float32)
+    warped = cv2.remap(previous['alpha'], xx + flow[..., 0] + np.float32(offset[0]),
+                       yy + flow[..., 1] + np.float32(offset[1]), cv2.INTER_LINEAR,
+                       borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    return warped
 
 
 def padded_crop(boxes, width, height, padding=.15):
@@ -59,7 +171,7 @@ def clean_person_mask(mask):
     return np.isin(labels,keep).astype(np.uint8)*255
 
 
-def outlined_person(frame,mask,background,previous=None):
+def outlined_person(frame,mask,background,previous=None,offset=(0.,0.)):
     """Keep source pixels in place; expand only the feathered white backing."""
     import cv2
     binary=(mask>127).astype(np.uint8)
@@ -80,10 +192,7 @@ def outlined_person(frame,mask,background,previous=None):
     rim_alpha=transition*transition*(3-2*transition)
     rim_alpha=cv2.GaussianBlur(rim_alpha,(5,5),.8)
     if previous is not None and previous['gray'].shape==gray.shape:
-        flow=cv2.calcOpticalFlowFarneback(gray,previous['gray'],None,.5,2,15,2,5,1.1,0)
-        yy,xx=np.indices(mask.shape,dtype=np.float32)
-        warped=cv2.remap(previous['alpha'],xx+flow[...,0],yy+flow[...,1],cv2.INTER_LINEAR,
-                        borderMode=cv2.BORDER_CONSTANT,borderValue=0)
+        warped=warp_previous(previous,gray,offset)
         agrees=(rim_alpha>.02)&(rim_alpha<.98)&(body_alpha==0)&(np.abs(warped-rim_alpha)<.18)
         rim_alpha=np.where(agrees,rim_alpha*.85+warped*.15,rim_alpha)
     rim_alpha=np.maximum(rim_alpha,body_alpha)
@@ -93,7 +202,7 @@ def outlined_person(frame,mask,background,previous=None):
     return np.clip(result,0,255).astype(np.uint8),{'gray':gray,'alpha':rim_alpha}
 
 
-def composite_person(frame, mask, background, style='outlined', previous=None):
+def composite_person(frame, mask, background, style='outlined', previous=None, offset=(0.,0.)):
     """Feather the matte, extend real foreground colors and stabilize its edge.
 
     Only the edge becomes translucent. Foreground-color extension avoids
@@ -101,7 +210,7 @@ def composite_person(frame, mask, background, style='outlined', previous=None):
     and a strict agreement gate limit temporal filtering to small edge changes.
     """
     import cv2
-    if style=='outlined':return outlined_person(frame,mask,background,previous)
+    if style=='outlined':return outlined_person(frame,mask,background,previous,offset)
     if style not in ('clean','soft','extra-soft'):
         raise ValueError('Unknown person edge treatment.')
     binary=(mask>127).astype(np.uint8)
@@ -135,10 +244,7 @@ def composite_person(frame, mask, background, style='outlined', previous=None):
         foreground=frame.astype(np.float32)*retain+extended*(1-retain)
         if previous is not None and previous['gray'].shape==gray.shape:
             # Backward flow samples the prior matte in current-frame coordinates.
-            flow=cv2.calcOpticalFlowFarneback(gray,previous['gray'],None,.5,2,15,2,5,1.1,0)
-            yy,xx=np.indices(mask.shape,dtype=np.float32)
-            warped=cv2.remap(previous['alpha'],xx+flow[...,0],yy+flow[...,1],cv2.INTER_LINEAR,
-                             borderMode=cv2.BORDER_CONSTANT,borderValue=0)
+            warped=warp_previous(previous,gray,offset)
             agrees=(alpha>.02)&(alpha<.98)&(np.abs(warped-alpha)<.18)
             alpha=np.where(agrees,alpha*.85+warped*.15,alpha)
     result=foreground*alpha[...,None]+background*(1-alpha[...,None])
@@ -174,17 +280,33 @@ def following_crops(boxes, width, height, fps, padding=.08, active=None):
     return crops
 
 
-def limb_markers(points,crop,mask):
-    """Anatomical MHR70 wrists and feet, normalized to the focused video.
+def limb_markers(points,crop,mask,landmark_format='sam-3d-body',visibility=None):
+    """Anatomical wrists and feet, normalized to the focused video.
 
-    These indices are the same anatomical mapping used by pose.js. Never infer
-    left/right from screen position. Spatial mask checks reject bad projections.
+    SAM uses the MHR70 indices that pose.js also uses. The MediaPipe route uses
+    wrists 15/16 and feet 31/32, falling back to the ankles 27/28 when a foot tip is
+    not confidently visible. Never infer left/right from screen position. Finite
+    coordinates, crop containment and a spatial mask check reject bad projections.
     """
-    if len(points)<63:return [None]*4
     left,top,width,height=crop
-    positions=[points[62],points[41],np.mean(points[15:18],axis=0),np.mean(points[18:21],axis=0)]
+    if landmark_format=='mediapipe-33':
+        if len(points)<33:return [None]*4
+        def marker(index,fallbacks=()):
+            for candidate in (index,*fallbacks):
+                if visibility is not None and not visibility[candidate]>=MARKER_VISIBILITY:continue
+                point=points[candidate]
+                if np.isfinite(point).all():return point
+            return None
+        positions=[marker(15),marker(16),marker(31,(27,)),marker(32,(28,))]
+    elif landmark_format=='sam-3d-body':
+        if len(points)<63:return [None]*4
+        positions=[points[62],points[41],np.mean(points[15:18],axis=0),np.mean(points[18:21],axis=0)]
+    else:
+        raise ValueError('Unknown landmark format.')
     result=[];radius=max(2,min(12,round(height*.025)))
     for point in positions:
+        if point is None:
+            result.append(None);continue
         x,y=map(float,point)
         if not np.isfinite(point).all() or not (left<=x<left+width and top<=y<top+height):
             result.append(None);continue
@@ -195,7 +317,18 @@ def limb_markers(points,crop,mask):
     return result
 
 
-def export(video, motion, output, masks=None, command=None, mode='person', active_range=None, edge_style='outlined', alpha=False):
+MARKER_SOURCES={'sam-3d-body':'sam-3d-body-mhr70-image','mediapipe-33':'mediapipe-pose-heavy-image'}
+
+
+def marker_source(landmark_format):
+    """Report label for the marker track's landmark origin."""
+    try:
+        return MARKER_SOURCES[landmark_format]
+    except KeyError:
+        raise ValueError('Unknown landmark format.') from None
+
+
+def export(video, motion, output, masks=None, command=None, mode='person', active_range=None, edge_style='outlined', alpha=False, landmark_format='sam-3d-body'):
     import cv2
     video, motion, output = map(Path, (video, motion, output))
     if output.resolve() == video.resolve():
@@ -208,13 +341,10 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
     finally:
         cap.release()
     source_hash = digest(video)
-    with np.load(motion, allow_pickle=False) as data:
-        points = data['pred_keypoints_2d']
-        times = data['timestamps']
-        indices = data['frame_indices']
+    points, visibility, times, indices = load_landmarks(motion, landmark_format)
     if (len(times) < 2 or len(times) != frames or not np.array_equal(indices, np.arange(frames))
-            or points.ndim != 3 or points.shape[0] != frames or points.shape[2] != 2
-            or not np.isfinite(points).all() or not np.isfinite(times).all()
+            or points.shape[0] != frames
+            or not np.isfinite(times).all()
             or fps <= 0 or not np.allclose(times, np.arange(frames) / fps, atol=.002)):
         raise ValueError('A frame-aligned normalized source and image predictions are required.')
     mask_root = Path(masks) if masks else None
@@ -244,7 +374,13 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
             boxes.append([xs.min(), ys.min(), xs.max() + 1, ys.max() + 1])
             mask_frames += 1
         else:
-            low, high = frame_points.min(axis=0), frame_points.max(axis=0)
+            # Confidence-aware bounds: only landmarks that are confidently visible and
+            # finite may define a fallback crop. A zero placeholder never does.
+            usable = gated_points(frame_points, visibility[index] if visibility is not None else None)
+            if len(usable) < 2:
+                boxes.append(None)
+                continue
+            low, high = usable.min(axis=0), usable.max(axis=0)
             # Failed perspective projections can be finite but thousands of
             # pixels outside the source. They are not trustworthy body bounds.
             valid = (np.all(low >= [-width * .1, -height * .1])
@@ -304,6 +440,8 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
                      '-row-mt', '1', '-cpu-used', '3', '-fps_mode', 'passthrough', str(alpha_output)],
                     stdin=subprocess.PIPE)
             previous=None
+            previous_origin=(0,0)
+            marker_source_name=marker_source(landmark_format)
             for index, (left,top,cw,ch) in enumerate(track):
                 ok, frame = reader.read()
                 if not ok:
@@ -313,10 +451,15 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
                 if mask is None:
                     mask = np.zeros((height,width),dtype=np.uint8)
                 else:mask=clean_person_mask(mask)
-                marker_frames.append(limb_markers(points[index],(left,top,cw,ch),mask))
+                marker_frames.append(limb_markers(points[index],(left,top,cw,ch),mask,landmark_format,
+                                                 visibility[index] if visibility is not None else None))
                 crop_frame=frame[top:top+ch,left:left+cw];crop_mask=mask[top:top+ch,left:left+cw]
+                # The previous matte lives in the previous crop's coordinates; pass the
+                # crop's own movement so temporal stabilization follows the person.
+                offset=(left-previous_origin[0],top-previous_origin[1]) if previous is not None else (0.,0.)
                 composed,previous=composite_person(crop_frame,crop_mask,
-                                                   background,edge_style,previous)
+                                                   background,edge_style,previous,offset)
+                previous_origin=(left,top)
                 writer.write(composed)
                 if alpha_pipe:
                     rgba=np.empty((ch,cw,4),dtype=np.uint8)
@@ -351,6 +494,7 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
     report = {'schema': 1, 'version': 'focused-instructor-v2' if mode=='person' else 'focused-instructor-v1', 'source_sha256': source_hash,
               'motion_sha256': digest(motion), 'crop': track[0] if track else crop, 'source_size': [width, height],
               'frames': frames, 'fps': fps, 'mask_frames': mask_frames,
+              'landmark_format': landmark_format,
               'landmark_frames': landmark_frames, 'held_frames': held_frames, 'padding': .08 if track else padding,
               'video_sha256': digest(output)}
     if track:
@@ -360,14 +504,17 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
         report.update(composition='person-on-neutral-background',crop_mode='follow-person-fixed-scale',
                       video_size=[w,h],crop_track=[list(map(int,box)) for box in track],
                       edge_treatment={'style':edge_style,'version':3 if edge_style=='outlined' else 1,'foreground_color_extension':edge_style in ('soft','extra-soft'),
-                                      'motion_aligned_stabilization':edge_style!='clean'})
+                                      'motion_aligned_stabilization':edge_style!='clean',
+                                      'flow_max_height':FLOW_MAX_HEIGHT,
+                                      'crop_movement_compensated':True,
+                                      'flow_rescaled_to_full':True})
         if edge_style=='outlined':
             report['edge_treatment'].update(body_opacity=1.,foreground_image_expansion=False,mask_expansion_px=max(1.,h*.0055),
                 white_border_px=max(.8,h*.0045),outer_feather_px=max(2.5,h*.018))
         if active_range:report['active_range']=list(map(float,active_range))
         if any(any(point is not None for point in row) for row in marker_frames):
             report['instructor_markers']={'schema':1,'video_sha256':report['video_sha256'],
-                'source':'sam-3d-body-mhr70-image','quality':'unmeasured',
+                'source':marker_source_name,'quality':'unmeasured',
                 'order':['left_hand','right_hand','left_foot','right_foot'],
                 'times':times.round(6).tolist(),'frames':marker_frames}
     output.with_suffix('.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
@@ -382,6 +529,10 @@ if __name__ == '__main__':
     parser.add_argument('--mode', choices=('person','envelope'), default='person')
     parser.add_argument('--edge-style', choices=('clean','soft','extra-soft','outlined'), default='outlined')
     parser.add_argument('--alpha', action='store_true', help='Also write a transparent WebM for camera compositing.')
+    # Explicit adapter: the legacy MHR70 arrays stay the default so existing SAM
+    # conversions and scripts are untouched; MediaPipe callers opt in by name.
+    parser.add_argument('--landmark-format', choices=('sam-3d-body','mediapipe-33'), default='sam-3d-body',
+                        help='Landmark table in --motion: MHR70 (default) or MediaPipe 33.')
     args = parser.parse_args()
-    result=export(args.video, args.motion, args.output, args.masks, mode=args.mode,edge_style=args.edge_style,alpha=args.alpha)
+    result=export(args.video, args.motion, args.output, args.masks, mode=args.mode,edge_style=args.edge_style,alpha=args.alpha,landmark_format=args.landmark_format)
     print(json.dumps({key:value for key,value in result.items() if key not in ('crop_track','instructor_markers')}, indent=2))

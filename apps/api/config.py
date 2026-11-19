@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     max_account_storage_bytes: int = 2 * 1024 * 1024 * 1024
     worker_lease_seconds: int = 120
     conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'local'
+    # Body processing rollout switch. SAM 3D Body stays the default; MediaPipe is an
+    # explicit opt-in (BODY_PIPELINE=mediapipe) and is local-only for now.
+    body_pipeline: Literal['mediapipe', 'sam-3d-body'] = 'sam-3d-body'
     # Each music instrument has its own route and kill switch, so piano can be enabled
     # while guitar stays off (and vice versa). Both are registered but disabled here.
     music_piano_conversion_provider: Literal['local', 'replicate', 'fal', 'disabled'] = 'disabled'
@@ -43,6 +46,11 @@ class Settings(BaseSettings):
     music_remote_conversion_enabled: bool = False
     music_midi_setup_enabled: bool = False
     music_history_enabled: bool = False
+    # Experimental whole-piece MIDI challenge. Off by default; no score is produced.
+    music_challenge_enabled: bool = False
+    # Browser capture/upload inference. Off until the model worker and device matrix
+    # have been reviewed; no score is produced by this path either.
+    music_inference_enabled: bool = False
     music_require_run_profile: bool = False
     music_allowed_run_profiles: str = ''  # Comma-separated operator-approved profile digests.
     music_kong_allowed_run_profiles: str = ''  # Route-specific approvals; never infer from a worker label.

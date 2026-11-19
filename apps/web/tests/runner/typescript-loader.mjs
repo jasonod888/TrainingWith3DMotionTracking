@@ -96,6 +96,13 @@ function transform(fileName, source) {
 
 export async function load(url, context, nextLoad) {
   if (/\.css(?:[?#].*)?$/.test(url)) return {format: 'module', source: '', shortCircuit: true};
+  // Mirror the bundler for JSON: Vite imports a JSON file as a default export, while
+  // Node 22 demands `with { type: 'json' }` on every JSON import. Serving it as a
+  // module here keeps the app source unchanged and the runtime consistent with Vite.
+  if (/\.json(?:[?#].*)?$/.test(url)) {
+    const source = await readFile(fileURLToPath(url), 'utf8');
+    return {format: 'module', source: `export default ${source.trim()};`, shortCircuit: true};
+  }
   if (/\.(ts|tsx|mts|cts)(?:[?#].*)?$/.test(url)) {
     const fileName = fileURLToPath(url);
     const source = await readFile(fileName, 'utf8');

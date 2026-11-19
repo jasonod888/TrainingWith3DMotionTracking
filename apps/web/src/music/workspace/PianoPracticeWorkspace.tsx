@@ -28,6 +28,14 @@ import {Button, IconButton, Input, Select} from '../../ui/controls';
 import './piano-practice-views.css';
 import {restoreFromReference, type SavedGuitarChord} from './save-payload';
 import {usePianoPerformanceAudio} from './usePianoPerformanceAudio';
+import {useListenPlay} from '../useListenPlay';
+import {useMusicChallenge} from '../useMusicChallenge';
+import {useUploadAssessment} from '../useUploadAssessment';
+import {FeedbackChoice, setFeedbackChoice} from './FeedbackChoice';
+import {useMidiInput} from '../useMidiInput';
+import {effectiveFeedbackEnabled, feedbackEligibility} from '../music-feedback';
+import {useFeedbackPreference} from '../../feedback-preference';
+import {challengeAttemptPayload} from '../challenge-payload';
 import {GuitarChordStrumHud} from './GuitarChordStrumHud';
 import GuitarNeckGuide from '../renderers/GuitarNeckGuide';
 import {ContinuousScore} from './ContinuousScore';
@@ -45,6 +53,12 @@ type Manifest = MusicLessonManifest & {reader?: unknown};
 const PRACTICE_PANELS_KEY = 'piano-practice-panels-v2';
 const LEGACY_PRACTICE_VIEW_KEY = 'piano-practice-view-v1';
 const PRACTICE_PANELS: PracticePanel[] = ['notes', 'waterfall', 'keys'];
+function newChallengeId():string {
+  const value=globalThis.crypto?.randomUUID?.();
+  if(value)return value;
+  const stamp=Date.now().toString(16).padStart(12,'0').slice(-12);
+  return `00000000-0000-4000-8000-${stamp}`;
+}
 
 function readPracticePanels(): PracticePanel[] {
   try {
@@ -72,10 +86,14 @@ function readPracticePanels(): PracticePanel[] {
  * notation and alignment, shares the rendering/transport modules with review,
  * and lets the common runtime own every practice transition.
  */
-export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, embedded = false, onBack, onModeChange}: {
+export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, embedded = false, challengeMode = false, challengeAvailable = false, challengeHistoryEnabled = false, audioAssessmentEnabled = false, onBack, onModeChange}: {
   lessonId?: string;
   lessonTitle?: string;
   embedded?: boolean;
+  challengeMode?: boolean;
+  challengeAvailable?: boolean;
+  challengeHistoryEnabled?: boolean;
+  audioAssessmentEnabled?: boolean;
   onBack?: () => void;
   onModeChange?: (mode: 'watch' | 'practice' | 'compete') => void;
 }) {
@@ -220,19 +238,158 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
   const liveCapabilities = useMemo<PracticeCapabilities>(() => ({...capabilities,
     voice: voiceControl(voice.status, voice.error, voice.supported)}), [capabilities, voice]);
   const dispatchPractice = (command: Parameters<typeof practice.dispatch>[0]) => {
+    if (listenPlay.active) listenPlay.cancel('Practice controls changed. This listen-then-play run is not scored.');
+    if (challenge.active) challenge.cancel('Challenge stopped by a practice control. This run is not scored.');
     practice.dispatch(command);
   };
 
   const intervals = useMemo(() => document ? occurrenceIntervals(document, offsetSeconds) : [], [document, offsetSeconds]);
   const playhead = snapshot?.time ?? 0;
-  const activeIds = useMemo(() => activeOccurrenceIds(intervals, playhead), [intervals, playhead]);
   const hands = useHandAssignments(document, lessonId || null, false);
   const sourcePlayer = usePianoSourcePlayer(videoRef, livePiano ? emptyPianoRef : pianoRef,
     livePiano ? 'original' : audioMode, offsetSeconds, manifest?.preview_identity ?? '', () => setAudioMode('original'));
+  const [listenPlayEnabled, setListenPlayEnabled] = useFeedbackPreference(lessonIdProp ?? manifest?.lesson_id ?? 'unscoped');
+  const [listenInputMode, setListenInputMode] = useState<'midi'|'microphone'>('midi');
+  const [challengeInputMode, setChallengeInputMode] = useState<'midi'|'microphone'>('midi');
+  const listenPlayRef = useRef<{recordAttack:(pitch:number,timeStamp:number)=>void; cancel:(reason?:string)=>void} | null>(null);
+  const challengeRef = useRef<{active:boolean; recordAttack:(pitch:number,timeStamp:number)=>void; cancel:(reason?:string)=>void} | null>(null);
+  const midi = useMidiInput({
+    onAttack: attack => {
+      if (challengeRef.current?.active) challengeRef.current.recordAttack(attack.pitch, attack.timeStamp);
+      else listenPlayRef.current?.recordAttack(attack.pitch, attack.timeStamp);
+    },
+    onInputChange: id => {
+      if (!id) {
+        challengeRef.current?.cancel('Keyboard input was disconnected. This challenge run is not scored.');
+        listenPlayRef.current?.cancel('Keyboard input was disconnected. This listen-then-play run is not scored.');
+      }
+    },
+  });
+  const listenExpected = useMemo(() => (document?.performance ?? []).map(note => ({
+    id: note.id, onset: note.onset, pitch: note.pitch, optional: note.optional === true,
+  })), [document]);
+  const listenSections = useMemo(() => manifest?.section_set?.sections ?? plan?.units ?? [], [manifest, plan]);
+  const listenUnit = plan?.units[snapshot?.unitIndex ?? 0] ?? null;
+  const listenAssessment = useMemo(() => manifest?.assessment ?? {
+    rubric_version: 'music-watch-v1', assessment: 'none' as const,
+    input_modes: [] as ('midi' | 'microphone' | 'none')[],
+    dimensions: [] as ('pitch' | 'timing' | 'release' | 'coverage')[],
+  }, [manifest?.assessment]);
+  const lessonFeedbackEnabled = effectiveFeedbackEnabled(manifest);
+  const microphoneEligible = (manifest?.subject === 'piano' || manifest?.subject === 'guitar')
+    && listenAssessment.assessment === 'notes'
+    && (listenAssessment.input_modes ?? []).includes('microphone')
+    && typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
+  const feedbackFor = (mode:'midi'|'microphone', selected:boolean) => feedbackEligibility({
+    assessment: listenAssessment, subject: manifest?.subject ?? '',
+    referenceReviewed: manifest?.reference_reviewed === true,
+    inputSelected: selected, inputMode: mode, latencyMeasured: false,
+    creatorEnabled: lessonFeedbackEnabled,
+  });
+  const listenEligibility = useMemo(() => feedbackFor(listenInputMode,
+    listenInputMode === 'midi' ? midi.connected : microphoneEligible),
+    [listenAssessment, manifest?.subject, manifest?.reference_reviewed, lessonFeedbackEnabled, midi.connected, listenInputMode, microphoneEligible]);
+  const challengeEligibility = useMemo(() => feedbackFor(challengeInputMode,
+    challengeInputMode === 'midi' ? midi.connected : microphoneEligible),
+    [listenAssessment, manifest?.subject, manifest?.reference_reviewed, lessonFeedbackEnabled, midi.connected, challengeInputMode, microphoneEligible]);
+  const listenPlayEligible = listenEligibility.eligible;
+  const challengeEligible = challengeEligibility.eligible;
+  const listenPlay = useListenPlay({
+    runtime: practice.runtime, snapshot, lastAttempt: practice.lastAttempt,
+    unit: listenUnit, speed: snapshot?.rate ?? 1,
+    expected: listenExpected, sections: listenSections,
+    inputMode: listenInputMode,
+    onPauseRuntime: () => practice.dispatch({type: 'action', action: 'pause'}),
+  });
+  listenPlayRef.current = {recordAttack: listenPlay.recordAttack, cancel: listenPlay.cancel};
+  const challenge = useMusicChallenge({
+    runtime: practice.runtime, snapshot, lastAttempt: practice.lastAttempt,
+    duration: document?.duration ?? 0, expected: listenExpected, sections: listenSections,
+    midiConnected: midi.connected && challengeMode && document?.subject === 'piano'
+      && manifest?.assessment.assessment === 'notes',
+    inputMode: challengeInputMode,
+    onPauseRuntime: () => practice.dispatch({type: 'action', action: 'pause'}),
+  });
+  challengeRef.current = {active: challenge.active, recordAttack: challenge.recordAttack, cancel: challenge.cancel};
+  const upload=useUploadAssessment({expected:listenExpected,target:{start:0,end:document?.duration??0},sections:listenSections});
+  useEffect(() => {
+    if (lessonFeedbackEnabled) return;
+    if (listenPlay.active) listenPlay.cancel('The lesson creator disabled feedback. This run is not scored.');
+    if (challenge.active) challenge.cancel('The lesson creator disabled feedback. This run is not scored.');
+    if (upload.phase !== 'idle' && upload.phase !== 'feedback' && upload.phase !== 'error') upload.cancel();
+    // A live creator update must stop capture without changing the learner preference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonFeedbackEnabled]);
+  const [challengeSave, setChallengeSave] = useState<{state:'idle'|'saving'|'saved'|'error'; message:string}>({state:'idle',message:''});
+  const challengeSaveId = useRef<string>('');
+  useEffect(() => {
+    if (challenge.phase === 'feedback' || upload.phase === 'feedback') {
+      challengeSaveId.current = newChallengeId();
+      setChallengeSave({state:'idle',message:''});
+    }
+  }, [challenge.phase, upload.phase]);
+  useEffect(() => {
+    if (!listenPlayEligible && listenPlay.active) {
+      listenPlay.cancel('Feedback input is temporarily unavailable. Feedback preference stays On.');
+    }
+  }, [listenPlayEligible, listenPlay.active]);
+  useEffect(() => {
+    if (!microphoneEligible && listenInputMode === 'microphone') setListenInputMode('midi');
+  }, [microphoneEligible, listenInputMode]);
+  const changeFeedbackEnabled = (value:boolean) => setFeedbackChoice(value, {
+    eligible: listenPlayEligible,
+    cancel: () => listenPlay.cancel('Feedback turned off. This listen-then-play run is not scored.'),
+    setEnabled: setListenPlayEnabled,
+    creatorEnabled: lessonFeedbackEnabled,
+  });
+  useEffect(() => {
+    if (listenPlay.active) listenPlay.cancel('Practice settings changed. This listen-then-play run is not scored.');
+    // The selected unit or speed invalidates the capture window.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot?.unitId, snapshot?.rate]);
+  const mutedBeforeCapture = useRef<boolean | null>(null);
+  const shouldMuteReference = listenPlay.phase === 'capturing' || challenge.active;
   const performanceAudio = usePianoPerformanceAudio({
     document, videoRef, clock: practice.clock, livePiano, offsetSeconds,
     pedalSpans, rate: snapshot?.rate ?? 1, volume, guitarProgram: guitarTone,
+    enabled: !shouldMuteReference,
   });
+  useEffect(() => {
+    const media = mediaRef.current;
+    if (!media) return;
+    if (shouldMuteReference && mutedBeforeCapture.current === null) {
+      mutedBeforeCapture.current = media.muted;
+      media.muted = true;
+    } else if (!shouldMuteReference && mutedBeforeCapture.current !== null) {
+      media.muted = mutedBeforeCapture.current;
+      mutedBeforeCapture.current = null;
+    }
+  }, [shouldMuteReference, mediaKey]);
+  const saveChallengeReport = async () => {
+    if (!challengeReport || !manifest) return;
+    setChallengeSave({state:'saving',message:''});
+    if (!challengeSaveId.current) challengeSaveId.current = newChallengeId();
+    try {
+      await request(`/lessons/${encodeURIComponent(manifest.lesson_id)}/music-challenge-attempts`, 'POST',
+        challengeAttemptPayload(challengeReport, {
+          id: challengeSaveId.current,
+          revisionId: manifest.revision_id,
+          referenceSha256: manifest.reference.sha256,
+          duration: document?.duration ?? manifest.duration,
+          inputMode: challenge.report ? (challenge.report.modelProfile ? 'microphone' : 'midi') : 'microphone',
+        }));
+      setChallengeSave({state:'saved',message:'Challenge report saved to your private history.'});
+    } catch (cause) {
+      setChallengeSave({state:'error',message:cause instanceof Error ? cause.message : 'The challenge report was not saved.'});
+    }
+  };
+  const stagePlayhead = listenPlay.capturePlayhead ?? playhead;
+  const challengeReport = challenge.report ?? upload.report;
+  const challengeReportSource = challenge.report ? (challenge.report.modelProfile ? 'live-microphone' : 'live-midi') : upload.report ? 'upload' : null;
+  const activeIds = useMemo(() => activeOccurrenceIds(intervals, stagePlayhead), [intervals, stagePlayhead]);
+  const shellCapabilities = useMemo<PracticeCapabilities>(() => (challengeMode || challengeAvailable) && document?.subject === 'piano'
+    ? {...liveCapabilities, challenge: 'supported'}
+    : liveCapabilities, [challengeMode, challengeAvailable, document?.subject, liveCapabilities]);
   const guitar = document?.subject === 'guitar';
   const activeSetup = normalizeGuitarSetup({tuning: document?.guitar_tuning, capo: document?.guitar_capo});
   const guitarFingers = useMemo<Record<string, GuitarFinger>>(() => document?.subject === 'guitar'
@@ -240,7 +397,7 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
     [document, activeSetup.tuning, activeSetup.capo]);
   const boxes = useMemo(() => document ? layoutMeasures(document).boxes : [], [document]);
   const layout = useMemo(() => document ? buildTimelineLayout(document, 1) : null, [document]);
-  const clockTime = useClockTime(practice.clock, playhead);
+  const clockTime = useClockTime(practice.clock, stagePlayhead);
   useEffect(() => {
     if (!guitar || !follow || followSuspended || !layout || !alignment) return;
     const width = Math.max(320, sharedWidth || 640);
@@ -263,15 +420,33 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
     return () => cancelAnimationFrame(frame);
   }, [sharedScrollLeft]);
   const seek = useCallback((value: number) => {
+    if (listenPlay.active) listenPlay.cancel('Position changed. This listen-then-play run is not scored.');
+    if (challenge.active) challenge.cancel('Position changed. This challenge run is not scored.');
     if (practice.runtime) practice.dispatch({type: 'seek', time: Math.max(0, Math.min(document?.duration ?? value, value))});
     else if (videoRef.current) videoRef.current.currentTime = value;
-  }, [practice, document?.duration]);
+  }, [practice, document?.duration, listenPlay, challenge]);
   const seekOccurrence = useCallback((id: string) => {
     const note = document?.performance.find(item => item.id === id);
     if (note) seek(note.onset + offsetSeconds);
   }, [document, offsetSeconds, seek]);
 
+  const listenPlayInProgress = listenPlay.phase==='listening'||listenPlay.phase==='guard'
+    ||listenPlay.phase==='count-in'||listenPlay.phase==='capturing'||listenPlay.phase==='analyzing';
   const stage = document ? <div className={`ws-stage piano-practice-stage ${!guitar&&practicePanels.length>1?'has-combined-panels':''}`}>
+    {listenPlayInProgress &&
+      <div className={`listen-play-overlay listen-play-${listenPlay.phase}`} role="status" aria-live="polite">
+        <strong>{listenPlay.phase==='listening'?'Listening':listenPlay.phase==='guard'?'Acoustic guard':listenPlay.phase==='count-in'?'Get ready':listenPlay.phase==='capturing'?'Play it back':'Analysing'}</strong>
+        <span>{listenPlay.phase==='listening'?'Reference audio plays. Do not play yet.'
+          :listenPlay.phase==='guard'?'Reference audio is muted. Let the room settle.'
+          :listenPlay.phase==='count-in'?`${Math.max(1,Math.ceil(listenPlay.remaining))}`
+          :listenPlay.phase==='capturing'?`${Math.max(0,Math.ceil(listenPlay.remaining))}s · ${listenPlay.captured} attacks measured`
+          :'Aligning your performance…'}</span>
+        {listenPlay.phase==='count-in'&&<i aria-hidden="true">{Math.max(1,Math.ceil(listenPlay.remaining))}</i>}
+      </div>}
+    {challengeMode&&(challenge.phase==='capturing'||challenge.phase==='analyzing')&&<div className={`listen-play-overlay listen-play-${challenge.phase}`} role="status" aria-live="polite">
+      <strong>{challenge.phase==='capturing'?'Challenge run':'Analysing challenge'}</strong>
+      <span>{challenge.phase==='capturing'?`Whole piece · 1× · ${challenge.captured} attacks measured`:'Fitting one global offset across the whole performance…'}</span>
+    </div>}
     <div className="ws-video-pip" hidden={!pipOpen} inert={!pipOpen || undefined}
       aria-hidden={!pipOpen || undefined} data-video-pip={pipOpen ? 'open' : 'closed'}>
       <div className="ws-video-pip-bar"><span>Video</span>
@@ -284,15 +459,15 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
       <PianoPracticeInstrumentView document={document} clock={practice.clock}
         showWaterfall={practicePanels.includes('waterfall')} showKeys={practicePanels.includes('keys')}
         alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals} activeIds={activeIds}
-        playhead={playhead} hands={hands.assignments} onSeekOccurrence={seekOccurrence} onSeek={seek}/>}
+        playhead={stagePlayhead} hands={hands.assignments} onSeekOccurrence={seekOccurrence} onSeek={seek}/>}
     {!guitar && practicePanels.includes('notes') && <PianoPracticeNotesView document={document} clock={practice.clock}
       alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals} activeIds={activeIds}
-      playhead={playhead} hands={hands.assignments} onSeekOccurrence={seekOccurrence} onSeek={seek}/>}
+      playhead={stagePlayhead} hands={hands.assignments} onSeekOccurrence={seekOccurrence} onSeek={seek}/>}
     {!guitar && practicePanels.length === 0 && <p className="piano-practice-empty">
       Choose Notes, Waterfall, or Piano keys from View.
     </p>}
     {guitar && <div className="ws-guitar-practice" data-guitar-practice="true" ref={sharedRef}>
-      <GuitarChordStrumHud chords={guitarChords} time={playhead}
+      <GuitarChordStrumHud chords={guitarChords} time={stagePlayhead}
         events={document.performance.map(note => ({onset: note.onset, pitch: note.pitch,
           string: note.string ?? resolveGuitarPosition(note.pitch, note.string, note.fret, activeSetup)?.string ?? null}))}
         beatsPerBar={document.time_signature.numerator}
@@ -316,7 +491,7 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
         onWindowChange={next => { setRollWindow(next); setFollowSuspended(true); }}
         layout={layout ?? undefined} alignment={alignment ?? undefined}
         sharedScrollLeft={sharedScrollLeft} sharedViewportWidth={sharedWidth} gutter={70}
-        cursorFallbackSeconds={playhead} playhead={playhead} offsetSeconds={offsetSeconds}
+        cursorFallbackSeconds={stagePlayhead} playhead={stagePlayhead} offsetSeconds={offsetSeconds}
         activeOccurrenceIds={activeIds} clock={practice.clock} intervals={intervals}
         selectedOccurrenceId={null} reveal={null} rowMode="strings"
         tuning={activeSetup.tuning} capo={activeSetup.capo}
@@ -325,7 +500,7 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
         selectedOccurrenceId={null} reveal={null} onSelect={seekOccurrence}
         clock={practice.clock} alignment={alignment} offsetSeconds={offsetSeconds} intervals={intervals}
         activeOccurrenceIds={activeIds} layout={layout ?? undefined}
-        sharedScrollLeft={sharedScrollLeft} cursorFallbackSeconds={playhead} playheadTick={null}
+        sharedScrollLeft={sharedScrollLeft} cursorFallbackSeconds={stagePlayhead} playheadTick={null}
         staffMode="guitar-tab" guitarChords={guitarChords}
         tuning={activeSetup.tuning} capo={activeSetup.capo}
         onUserScroll={() => setFollowSuspended(true)}
@@ -360,10 +535,10 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
   return <PracticeShell className="ws-shell ws-shell-focused piano-practice-shell mimic-shell mimic-immersive minimal-practice"
     stageClassName="ws-correction" dockId="piano-practice-player" title={title}
     eyebrow={embedded ? (guitar ? 'GUITAR PRACTICE' : 'PIANO PRACTICE') : undefined} onBack={onBack} stage={stage}
-    modeControl={onModeChange&&<ExperienceModeSelector compact current="practice"
-      capabilities={experienceModeCapabilitiesFrom(liveCapabilities)}
+    modeControl={onModeChange&&<ExperienceModeSelector compact current={challengeMode?'challenge':'practice'}
+      capabilities={experienceModeCapabilitiesFrom(shellCapabilities)}
       onSelect={mode=>onModeChange(experienceModeToLegacy(mode))}/>}
-    plan={plan} snapshot={displaySnapshot} capabilities={liveCapabilities} voice={voice} disabled={!snapshot}
+    plan={plan} snapshot={displaySnapshot} capabilities={shellCapabilities} voice={voice} disabled={!snapshot}
     onCommand={dispatchPractice} onSeek={seek} onSelect={index => dispatchPractice({type: 'select', index})}
     autoStartVoice
     status={shellStatus}
@@ -371,6 +546,23 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
       {!guitar && <PracticeCheckboxMenu label="View"
         options={[{value:'notes',label:'Notes'},{value:'waterfall',label:'Waterfall'},{value:'keys',label:'Piano keys'}]}
         selected={practicePanels} onToggle={togglePracticePanel}/>}
+      {!challengeMode && listenPlayEnabled && listenPlayEligible && <Button variant="dock-tool" type="button" className="player-tool"
+        data-listen-play="true" aria-pressed={listenPlay.active}
+        title={listenPlay.active ? 'Stop listen and play' : 'Play the section, then perform it back'}
+        onClick={() => listenPlay.active ? listenPlay.cancel() : listenPlay.start()}>
+        {listenPlay.active ? 'Stop listen & play' : 'Listen & play'}
+      </Button>}
+      {challengeMode && manifest?.subject==='piano' && <Button variant="dock-tool" type="button" className="player-tool"
+        data-music-challenge="true" aria-pressed={challenge.active} disabled={!challenge.active&&!challengeEligible}
+        title={challenge.active ? 'Stop the challenge' : 'Perform the whole piece at 1× with the reference muted'}
+        onClick={() => {
+          if (challenge.active) { challenge.cancel(); return; }
+          upload.cancel();
+          if (listenPlay.active) listenPlay.cancel();
+          challenge.start();
+        }}>
+        {challenge.active ? 'Stop challenge' : challenge.phase === 'feedback' ? 'Challenge again' : 'Start challenge'}
+      </Button>}
       <Select variant="dock-source" className="ws-practice-source-select" aria-label="Source audio" value={audioMode}
         onChange={event => setAudioMode(event.target.value === 'piano' ? 'piano' : 'original')}>
         <option value="original">Original</option>
@@ -384,6 +576,82 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
           onClick={() => { setFollow(true); setFollowSuspended(false); }}>Follow</Button>
       : undefined}
     settingsExtra={<>
+      {!challengeMode&&<FeedbackChoice subject={manifest?.subject??''} assessment={listenAssessment}
+        referenceReviewed={manifest?.reference_reviewed===true}
+        inputSelected={listenInputMode==='midi'?midi.connected:microphoneEligible}
+        inputMode={listenInputMode} microphoneAvailable={microphoneEligible}
+        enabled={listenPlayEnabled} active={listenPlay.active}
+        lessonEnabled={lessonFeedbackEnabled}
+        onEnabledChange={changeFeedbackEnabled}/>}
+      {challengeMode&&manifest?.subject==='piano'&&<section className="listen-play-setup" aria-label="Whole-piece challenge">
+        <h3>Whole-piece challenge · experimental</h3>
+        <p className="small muted">Perform the complete reviewed piece once at 1×. The reference is muted, one global start offset is fitted, and the overall score is withheld until the policy is qualified.</p>
+        {midi.supported?<>
+          {midi.inputs.length>0?<label>Keyboard input<Select variant="settings-extra" aria-label="Challenge keyboard input" value={midi.selected}
+            onChange={event=>midi.select(event.target.value)}>
+            <option value="">Choose an input</option>
+            {midi.inputs.map(input=><option key={input.id} value={input.id}>{input.name}</option>)}
+          </Select></label>:<Button variant="settings-choice" type="button" disabled={midi.busy} onClick={()=>void midi.connect()}>
+            {midi.busy?'Connecting keyboard…':'Connect a keyboard'}
+          </Button>}
+          {midi.selected&&<button type="button" className="back-link" onClick={midi.disconnect}>Disconnect keyboard</button>}
+          <p className="small muted" role="status">{midi.message}</p>
+        </>:<p role="alert">This browser cannot connect a MIDI keyboard here.</p>}
+        {microphoneEligible&&<label>Challenge input<Select variant="settings-extra" aria-label="Challenge input" value={challengeInputMode}
+          onChange={event=>setChallengeInputMode(event.target.value==='microphone'?'microphone':'midi')}>
+          <option value="midi">MIDI keyboard</option><option value="microphone">Microphone</option>
+        </Select></label>}
+        {!challengeEligible&&<p className="small muted" role="status">Challenge unavailable: {challengeInputMode==='midi'?listenEligibility.reasons.join(' '):'Microphone input is not enabled for this reviewed rubric.'}</p>}
+        <Button variant="settings-choice" type="button" disabled={!challengeEligible||challenge.active}
+          onClick={()=>challenge.start()}>{challenge.phase==='feedback'?'Run challenge again':'Start whole-piece challenge'}</Button>
+        {challenge.error&&<p className="small muted" role="alert">{challenge.error}</p>}
+        {audioAssessmentEnabled&&microphoneEligible&&<div className="listen-play-setup" aria-label="Uploaded performance">
+          <h3>Uploaded performance · experimental</h3>
+          <p className="small muted">Decode and transcribe an audio or video file locally, then align it to the whole piece. Raw media is not uploaded; the worker returns events and provenance, never a percentage.</p>
+          <input type="file" accept="audio/*,video/*,.mp4,.webm,.mov,.m4a,.wav,.mp3,.ogg" aria-label="Upload performance audio or video"
+            disabled={upload.phase==='decoding'||upload.phase==='transcribing'||upload.phase==='analyzing'}
+            onChange={event=>{
+              const file=event.currentTarget.files?.[0];
+              event.currentTarget.value='';
+              if(!file)return;
+              challenge.cancel();
+              listenPlay.cancel();
+              void upload.analyze(file);
+            }}/>
+          {(upload.phase==='decoding'||upload.phase==='transcribing'||upload.phase==='analyzing')&&<p className="small muted" role="status">
+            {upload.phase==='decoding'?'Decoding locally…':upload.phase==='transcribing'?'Transcribing with the pinned profile…':'Aligning…'} {Math.round(upload.progress*100)}%
+            <button type="button" className="back-link" onClick={upload.cancel}>Cancel</button>
+          </p>}
+          {upload.error&&<p className="small muted" role="alert">{upload.error}</p>}
+          <p className="small muted">No score is published. Browser/device qualification is still required; unsupported codecs fail explicitly.</p>
+        </div>}
+        <p className="small muted">Experimental. Counts, offset and coverage are reported; no score, ranking or leaderboard is produced. Microphone input is available only for a reviewed microphone rubric and remains unqualified.</p>
+      </section>}
+      {!challengeMode&&(manifest?.subject==='piano'||manifest?.subject==='guitar')&&listenAssessment.assessment==='notes'&&<section className="listen-play-setup" aria-label="Listen and play">
+        <h3>Listen &amp; play · experimental</h3>
+        <p className="small muted">Listen to the selected section, wait for the acoustic guard and count-in, then play it back with the reference audio muted. Feedback is local and unscored.</p>
+        {midi.supported?<>
+          {midi.inputs.length>0?<label>Keyboard input<Select variant="settings-extra" aria-label="Keyboard input" value={midi.selected}
+            onChange={event=>midi.select(event.target.value)}>
+            <option value="">Choose an input</option>
+            {midi.inputs.map(input=><option key={input.id} value={input.id}>{input.name}</option>)}
+          </Select></label>:<Button variant="settings-choice" type="button" disabled={midi.busy} onClick={()=>void midi.connect()}>
+            {midi.busy?'Connecting keyboard…':'Connect a keyboard'}
+          </Button>}
+          {midi.selected&&<button type="button" className="back-link" onClick={midi.disconnect}>Disconnect keyboard</button>}
+          <p className="small muted" role="status">{midi.message}</p>
+        </>:<p role="alert">This browser cannot connect a MIDI keyboard here. The guide and timing practice remain available.</p>}
+        <label>Feedback input<Select variant="settings-extra" aria-label="Feedback input" value={listenInputMode}
+          onChange={event=>setListenInputMode(event.target.value==='microphone'?'microphone':'midi')}>
+          <option value="midi">MIDI keyboard</option>
+          <option value="microphone" disabled={!microphoneEligible} title={microphoneEligible?undefined:'Microphone feedback is not enabled for this reviewed lesson.'}>Microphone</option>
+        </Select></label>
+        {!microphoneEligible&&<p className="small muted" role="status">Microphone feedback is unavailable for this lesson or browser. MIDI feedback can still be used when an instrument is connected.</p>}
+        {!listenPlayEligible&&<p className="small muted" role="status">Feedback preference is On, but setup is incomplete: {listenEligibility.reasons.join(' ')}</p>}
+        {listenPlayEnabled&&!listenPlay.active&&listenPlayEligible&&<p className="small muted" role="status">Feedback is On. Press “Listen &amp; play” in the tools to start the listen-then-play run.</p>}
+        {listenPlay.error&&<p className="small muted" role="alert">{listenPlay.error}</p>}
+        <p className="small muted">No score is shown. The start offset is fitted separately; timing remains approximate and is not hardware-qualified.</p>
+      </section>}
       <label>Practice stops<Select variant="settings-extra" aria-label="Practice stops" value={chunkBars}
         onChange={event => setChunkBars(Number(event.target.value) as ChunkBarsOption)}>
         <option value={0}>Off (whole piece)</option><option value={1}>1 bar</option>
@@ -417,5 +685,57 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
       {performanceAudio.error && <p role="alert">{performanceAudio.error}</p>}
       {preview.error && <p role="alert">{preview.error}</p>}
       <p className="small muted">{guitar ? 'Guitar' : 'Piano'} practice is unscored. The reviewed video or verified {guitar ? 'guitar' : 'piano'} audio is the only source clock.</p>
+    </>}
+    children={<>
+    {lessonFeedbackEnabled&&listenPlay.phase==='feedback'&&listenPlay.report?<section className="listen-play-feedback" aria-label="Listen and play feedback">
+      <header>
+        <div><p className="ws-eyebrow">EXPERIMENTAL · UNSCORED</p><h2>Listen &amp; play feedback</h2></div>
+        <Button variant="immersive-action" type="button" onClick={()=>listenPlay.start()}>Listen &amp; play again</Button>
+      </header>
+      <p role="status">No score is shown for this policy. The fitted start offset is reported separately from internal timing.</p>
+      <dl>
+        <div><dt>Required notes matched</dt><dd>{listenPlay.report.matchedRequired} / {listenPlay.report.assessedRequired} assessed</dd></div>
+        <div><dt>Missing · extra</dt><dd>{listenPlay.report.missingRequired} · {listenPlay.report.extra}</dd></div>
+        <div><dt>Start offset</dt><dd>{listenPlay.report.offsetSeconds.toFixed(2)} s source · {listenPlay.report.offsetRealSeconds.toFixed(2)} s real</dd></div>
+        <div><dt>Coverage</dt><dd>{Math.round(listenPlay.report.referenceCoverage*100)}% reference · {Math.round(listenPlay.report.captureCoverage*100)}% capture</dd></div>
+        <div><dt>Timing</dt><dd>{listenPlay.report.timing.available
+          ?`${Math.round((listenPlay.report.timing.meanAbsoluteErrorSeconds??0)*1000)} ms mean · ${listenPlay.report.timing.confidence} confidence`
+          :'Unavailable for this evidence'}</dd></div>
+      </dl>
+      {listenPlay.report.reasons.length>0&&<p className="small muted">Evidence notes: {listenPlay.report.reasons.join(', ')}.</p>}
+      {listenPlay.report.notes.length>0?<ul>{listenPlay.report.notes.slice(0,40).map(note=><li key={`${note.status}-${note.id}`} className={`feedback-note ${note.status}`}>
+        {note.status==='matched'?`${pitchName(note.pitch)} ${note.timing??'matched'}${note.errorSeconds!==null?` (${Math.round(note.errorSeconds*1000)} ms)`:''}`
+          :note.status==='missing'?`Missing ${pitchName(note.pitch)}`
+          :note.status==='extra'?`Extra ${pitchName(note.pitch)}`
+          :`Unassessed ${pitchName(note.pitch)}`}
+      </li>)}</ul>:<p className="small muted">No note-level feedback was available.</p>}
+      {listenPlay.report.notes.length>40&&<p className="small muted">Showing 40 of {listenPlay.report.notes.length} note events.</p>}
+    </section>:null}
+    {lessonFeedbackEnabled&&(challenge.phase==='feedback'||upload.phase==='feedback')&&challengeReport?<section className="listen-play-feedback challenge-feedback" aria-label="Whole-piece challenge report">
+      <header>
+        <div><p className="ws-eyebrow">EXPERIMENTAL · SCORE WITHHELD</p><h2>Whole-piece challenge{challengeReportSource==='upload'?' · uploaded performance':challengeReportSource==='live-microphone'?' · microphone':''}</h2></div>
+        {challengeHistoryEnabled&&<Button variant="immersive-action" type="button" disabled={challengeSave.state==='saving'}
+          onClick={()=>void saveChallengeReport()}>{challengeSave.state==='saving'?'Saving…':challengeSave.state==='saved'?'Saved':'Save report'}</Button>}
+      </header>
+      <p role="status">No overall score is published. {challengeReport.scoreReason?`Reason: ${challengeReport.scoreReason}.`:''} Counts, offset and coverage remain available.</p>
+      <dl>
+        <div><dt>Required notes matched</dt><dd>{challengeReport.matchedRequired} / {challengeReport.assessedRequired} assessed</dd></div>
+        <div><dt>Missing · extra</dt><dd>{challengeReport.missingRequired} · {challengeReport.extra}</dd></div>
+        <div><dt>Start offset</dt><dd>{challengeReport.offsetSeconds.toFixed(2)} s · support {Math.round(challengeReport.support*100)}%</dd></div>
+        <div><dt>Coverage</dt><dd>{Math.round(challengeReport.referenceCoverage*100)}% reference · {Math.round(challengeReport.captureCoverage*100)}% capture</dd></div>
+        <div><dt>Timing</dt><dd>{challengeReport.timing.available
+          ?`${Math.round((challengeReport.timing.meanAbsoluteErrorSeconds??0)*1000)} ms mean · ${challengeReport.timing.confidence} confidence`
+          :'Unavailable for this evidence'}</dd></div>
+        <div><dt>Alignment</dt><dd>{challengeReport.ambiguous?'Ambiguous':'One global offset'} · {Math.round(challengeReport.peakSeparationSeconds*1000)} ms peak separation</dd></div>
+      </dl>
+      {challengeReport.reasons.length>0&&<p className="small muted">Evidence notes: {challengeReport.reasons.join(', ')}.</p>}
+      {challengeReport.extraOutsideSections>0&&<p className="small muted">{challengeReport.extraOutsideSections} extra note{challengeReport.extraOutsideSections===1?'':'s'} outside the reviewed sections; not attributed to a section.</p>}
+      <ul>{challengeReport.sections.map(section=><li key={section.id} className="feedback-note">
+        {section.label}: {section.matchedRequired}/{section.assessedRequired} matched · {section.missingRequired} missing · {section.extra} extra
+        {section.recall!==null?` · ${Math.round(section.recall*100)}% recall`:''}
+      </li>)}</ul>
+      {challengeSave.message&&<p className="small muted" role={challengeSave.state==='error'?'alert':'status'}>{challengeSave.message}</p>}
+      <p className="small muted">Live MIDI only. No microphone, uploaded audio, leaderboard, ranking or publish action is enabled. This report is not device-qualified.</p>
+    </section>:null}
     </>}/>
 }

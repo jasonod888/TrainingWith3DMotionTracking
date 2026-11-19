@@ -4,7 +4,7 @@ import type {LessonManifest} from '../../../packages/lesson-schema/index';
 import {Playback} from '../../../packages/learning-engine/playback';
 import {MotionStage} from './MotionStage';
 import {VideoTimeline} from './VideoTimeline';
-import {acceptMove,trimMove,assetUrl} from './api';
+import {acceptMove,saveSections,trimMove,assetUrl} from './api';
 import {instructorStart,lessonFrameTime} from './lesson-clock';
 
 export function MoveCheck({lesson,onBack,onAccepted,onChooseAnother,onDirty}:{
@@ -16,13 +16,13 @@ export function MoveCheck({lesson,onBack,onAccepted,onChooseAnother,onDirty}:{
  const range=useRef({start:0,end:lesson.duration});range.current={start:start/fps,end:Math.min(end/fps,lesson.duration)};
  const [state,setState]=useState(player.snapshot());
  const notes=useRef<HTMLDialogElement>(null);
- const [source,setSource]=useState(Boolean(lesson.focused_video||lesson.source_video)),[busy,setBusy]=useState(false),[error,setError]=useState(''),[warnings,setWarnings]=useState(false);
+ const [source,setSource]=useState(Boolean(lesson.focused_video||lesson.source_video)),[busy,setBusy]=useState(false),[error,setError]=useState(''),[warnings,setWarnings]=useState(false),[feedbackEnabled,setFeedbackEnabled]=useState(lesson.feedback_enabled!==false);
  const previewVideo=lesson.focused_video??lesson.source_video;
  const switchPreview=(video:boolean)=>{player.seek(lessonFrameTime(lesson,player.state.time));setState(player.snapshot());setSource(video);};
- const changed=start!==0||end!==total;
+ const changed=start!==0||end!==total,feedbackChanged=feedbackEnabled!==(lesson.feedback_enabled!==false),dirty=changed||feedbackChanged;
  useEffect(()=>{if(warnings)notes.current?.showModal();else notes.current?.close();},[warnings]);
  useEffect(()=>{player.mode('continuous');},[player]);
- useEffect(()=>{onDirty?.(changed);const leave=(e:BeforeUnloadEvent)=>{if(changed){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',leave);return()=>{onDirty?.(false);window.removeEventListener('beforeunload',leave);};},[changed,onDirty]);
+ useEffect(()=>{onDirty?.(dirty);const leave=(e:BeforeUnloadEvent)=>{if(dirty){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',leave);return()=>{onDirty?.(false);window.removeEventListener('beforeunload',leave);};},[dirty,onDirty]);
  useEffect(()=>{
   let frame=0,last=performance.now(),draw=last;
   const tick=(now:number)=>{player.tick(Math.min((now-last)/1000,.25));last=now;if(player.state.time>=range.current.end)player.seek(range.current.end);if(now-draw>60){setState(player.snapshot());draw=now;}frame=requestAnimationFrame(tick);};
@@ -37,7 +37,14 @@ export function MoveCheck({lesson,onBack,onAccepted,onChooseAnother,onDirty}:{
   setError('');setStart(nextStart);setEnd(nextEnd);player.seek(time);setState(player.snapshot());
  };
  const play=()=>{if(player.state.playing)player.command('pause');else{if(player.state.time<range.current.start||player.state.time>=range.current.end-1e-6)player.seek(range.current.start);player.command('play');}setState(player.snapshot());};
- const accept=async()=>{setBusy(true);setError('');player.command('pause');try{const value=changed?await trimMove(lesson,start,end):lesson;if(!changed)await acceptMove(value.lesson_id,value.revision_id,value.warnings);onDirty?.(false);onAccepted(value);}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
+ const accept=async()=>{setBusy(true);setError('');player.command('pause');try{
+  let value=changed?await trimMove(lesson,start,end):lesson;
+  if(feedbackChanged){
+   value=await saveSections(value,value.section_set.sections,value.title,feedbackEnabled);
+   await acceptMove(value.lesson_id,value.revision_id,value.warnings);
+  }else if(!changed)await acceptMove(value.lesson_id,value.revision_id,value.warnings);
+  onDirty?.(false);onAccepted(value);
+ }catch(e){setError((e as Error).message);}finally{setBusy(false);}};
  const stamp=(time:number)=>`${Math.floor(time/60)}:${(time%60).toFixed(2).padStart(5,'0')}`;
  return <section className="workflow-screen check-screen" aria-label="Review and trim your move">
   <header className="check-heading"><button className="round" aria-label="Back to my moves" disabled={busy} onClick={onBack}><ArrowLeft size={20}/></button><div><p className="eyebrow">REVIEW & TRIM</p><h1 title={lesson.title}>{lesson.title}</h1></div><span className="check-instruction">Keep the movement you want to practise.</span></header>
@@ -53,7 +60,7 @@ export function MoveCheck({lesson,onBack,onAccepted,onChooseAnother,onDirty}:{
    <VideoTimeline compact frameRate={fps} source={previewVideo?assetUrl(previewVideo.key):undefined} sourceStart={instructorStart(lesson,Boolean(lesson.focused_video))} duration={lesson.duration} time={state.time} disabled={busy} onSeek={seek} range={{start:range.current.start,end:range.current.end,maxLength:lesson.duration,onChange:adjust}}/>
 
   </div>
-  <footer className="check-footer"><div className="check-feedback">{error?<p role="alert">{error}</p>:<span>Preview the selection, then keep it. {lesson.warnings.length>0&&<button onClick={()=>setWarnings(true)}>Review notes ({lesson.warnings.length})</button>}</span>}</div><div className="check-actions"><button className="secondary" disabled={busy} onClick={onChooseAnother}>Choose another video</button><button className="primary" disabled={busy} onClick={()=>void accept()}><Check size={18}/>{busy?'Saving…':'Looks good'}</button></div></footer>
+  <footer className="check-footer"><div className="check-feedback">{error?<p role="alert">{error}</p>:<span>Preview the selection, then keep it. {lesson.warnings.length>0&&<button onClick={()=>setWarnings(true)}>Review notes ({lesson.warnings.length})</button>}</span>}</div><label className="check-line"><input aria-label="Enable practice feedback" type="checkbox" role="switch" checked={feedbackEnabled} disabled={busy} onChange={event=>{setFeedbackEnabled(event.target.checked);setError('');}}/> Enable practice feedback <span className="small muted">On by default; playback still works when off.</span></label><div className="check-actions"><button className="secondary" disabled={busy} onClick={onChooseAnother}>Choose another video</button><button className="primary" disabled={busy} onClick={()=>void accept()}><Check size={18}/>{busy?'Saving…':'Looks good'}</button></div></footer>
   <dialog ref={notes} className="check-notes" aria-label="Review notes" onClose={()=>setWarnings(false)}><strong>Review notes</strong><ul>{lesson.warnings.map(w=><li key={w}>{w}</li>)}</ul><button className="primary" autoFocus onClick={()=>setWarnings(false)}>Got it</button></dialog>
  </section>;
 }

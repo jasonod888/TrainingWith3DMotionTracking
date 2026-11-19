@@ -30,6 +30,8 @@ def install_mimic_attempts(app,identity,db):
     def save(lesson_id:str,body:AttemptInput,account=Depends(identity),session:Session=Depends(db)):
         _,revision=readable_lesson(session,lesson_id,account.id,body.revision_id)
         if not revision or revision.manifest.get('schema_version')!=1:raise HTTPException(409,'Music practice uses separate history.')
+        from .music_assessment import effective_feedback_enabled
+        if not effective_feedback_enabled(revision.manifest):raise HTTPException(409,'Feedback is not enabled for this lesson.')
         if revision.id!=body.revision_id:raise HTTPException(409,'Lesson changed. Reopen it before saving attempts.')
         if body.end<body.start or body.end>revision.manifest['duration']:raise HTTPException(422,'Attempt outside lesson.')
         existing=session.get(MimicAttempt,body.id)

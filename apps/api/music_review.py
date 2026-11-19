@@ -18,6 +18,7 @@ from .database import LessonAsset, LessonRevision, MusicDraft, MusicReview, Musi
 from .music_verification import current_state_token, decisions_applied, proposal_sha256
 from .permissions import accept_revision, latest_revision, owned_lesson
 from .storage import storage_client
+from .music_assessment import assessment_for_subject
 from .music_alignment import validate_alignment
 from .music_notation import validate_notation
 from .music_preview import performance_changed, invalidate_preview
@@ -25,22 +26,30 @@ from . import interactive_limit
 
 
 class ReviewAssessment(Contract):
-    """Instructor-chosen assessment policy. It never enables scoring or publication."""
-    assessment: Literal['none', 'notes'] = 'none'
-    input_modes: list[Literal['none', 'midi']] = Field(default_factory=list, max_length=2)
-    dimensions: list[Literal['pitch', 'timing']] = Field(default_factory=list, max_length=2)
-    rubric_version: str = Field(default='music-watch-v1', max_length=80)
+    """Note rubric for new reviews, with a legacy watch-only representation.
+
+    The creator switch is separate: this policy says what evidence a lesson accepts,
+    not whether practice feedback is available to learners.
+    """
+    assessment: Literal['none', 'notes'] = 'notes'
+    input_modes: list[Literal['none', 'midi', 'microphone']] = Field(
+        default_factory=lambda: ['midi', 'microphone'], max_length=2)
+    dimensions: list[Literal['pitch', 'timing']] = Field(
+        default_factory=lambda: ['pitch', 'timing'], max_length=2)
+    rubric_version: str = Field(default='piano-midi-v1', max_length=80)
 
     @model_validator(mode='after')
     def supported(self):
         if self.assessment == 'none':
             if self.input_modes not in ([], ['none']) or self.dimensions or self.rubric_version != 'music-watch-v1':
                 raise ValueError('A watch-only policy takes no input modes or dimensions.')
-        else:
-            if self.input_modes != ['midi'] or set(self.dimensions) != {'pitch', 'timing'} or self.rubric_version != 'piano-midi-v1':
-                raise ValueError('MIDI feedback requires midi input, pitch/timing dimensions and piano-midi-v1.')
-            if len(set(self.dimensions)) != len(self.dimensions):
-                raise ValueError('Assessment dimensions must be unique.')
+            return self
+        if set(self.dimensions) != {'pitch', 'timing'} or len(set(self.dimensions)) != len(self.dimensions):
+            raise ValueError('Feedback requires unique pitch and timing dimensions.')
+        if not set(self.input_modes).issubset({'midi', 'microphone'}) or not self.input_modes:
+            raise ValueError('Feedback requires MIDI or microphone input.')
+        if self.rubric_version not in ('piano-midi-v1', 'guitar-notes-v1'):
+            raise ValueError('Unknown feedback rubric version.')
         return self
 
 
@@ -60,6 +69,8 @@ class ReviewMusic(Contract):
     sections: list[Section] = Field(min_length=1,max_length=500)
     confirm_reviewed: Literal[True]
     assessment: ReviewAssessment = Field(default_factory=ReviewAssessment)
+    # Explicit creator choice. Absent derives from the draft or legacy assessment.
+    feedback_enabled: bool | None = Field(default=None, strict=True)
     # Required whenever verification decisions exist; binds the save to the exact
     # working state the owner reviewed.
     verification_state_token: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
@@ -107,8 +118,6 @@ def install_music_review(app,settings,identity,db):
         newest=session.scalar(select(MusicDraft).where(MusicDraft.lesson_id==lesson_id)
                               .order_by(MusicDraft.created_at.desc(),MusicDraft.id.desc()))
         if newest.id!=row.id or row.status!='draft':raise HTTPException(409,'A newer draft is available. Reopen the review.')
-        if body.assessment.assessment=='notes' and row.subject!='piano':
-            raise HTTPException(422,'MIDI feedback is only available for piano lessons.')
         if body.subject is not None and body.subject!=row.subject:
             raise HTTPException(409,'The review subject does not match this draft.')
         if row.document['reference']['sha256']!=body.reference_sha256:
@@ -194,6 +203,19 @@ def install_music_review(app,settings,identity,db):
         store=storage_client(settings)
         store.upload_fileobj(io.BytesIO(data),settings.storage_bucket,key,
             ExtraArgs={'ContentType':asset.mime,'Metadata':{'sha256':digest}})
+        stored_feedback=row.document.get('feedback_enabled')
+        if body.feedback_enabled is not None:
+            feedback_enabled=body.feedback_enabled
+        elif isinstance(stored_feedback,bool):
+            feedback_enabled=stored_feedback
+        else:
+            feedback_enabled=body.assessment.assessment!='none'
+        if feedback_enabled and body.assessment.assessment=='none':
+            raise HTTPException(422,'Enabled practice feedback needs a note rubric.')
+        if feedback_enabled or body.assessment.assessment!='none':
+            policy=AssessmentPolicy(**assessment_for_subject(proposal.subject))
+        else:
+            policy=AssessmentPolicy(**body.assessment.model_dump())
         manifest=MusicLessonManifest(lesson_id=lesson_id,revision_id=uuid4().hex,title=body.title.strip() or lesson.title,
             subject=proposal.subject,duration=proposal.duration,instrument=proposal.instrument,
             section_set=sections,reference=asset,reference_reviewed=True,source_video=proposal.source_video,
@@ -201,8 +223,7 @@ def install_music_review(app,settings,identity,db):
             playback=proposal.playback or MusicPlaybackSettings(),
             pedal=proposal.pedal,
             preview_identity=proposal.preview_identity,
-            assessment=AssessmentPolicy(rubric_version=body.assessment.rubric_version,assessment=body.assessment.assessment,
-                input_modes=body.assessment.input_modes or ['none'],dimensions=body.assessment.dimensions),
+            assessment=policy,feedback_enabled=feedback_enabled,
             warnings=proposal.warnings)
         revision=LessonRevision(id=manifest.revision_id,lesson_id=lesson_id,version=version,
             manifest=manifest.model_dump(),subject=proposal.subject,experience_family='music',instrument=proposal.subject)
@@ -213,7 +234,8 @@ def install_music_review(app,settings,identity,db):
         session.add(MusicReview(id=uuid4().hex,draft_id=row.id,lesson_id=lesson_id,revision_id=revision.id,
             reviewer_id=account.id,reviewed_at=reviewed_at,document={'request_sha256':request_hash,
                 'source_reference_sha256':body.reference_sha256,'reviewed_reference_sha256':digest,
-                'provenance':proposal.provenance.model_dump(),'assessment':body.assessment.model_dump()}))
+                'provenance':proposal.provenance.model_dump(),'assessment':body.assessment.model_dump(),
+                'feedback_enabled':feedback_enabled}))
         accept_revision(session,lesson,revision,account.id,warnings=proposal.warnings,source='music-review')
         row.status='reviewed'
         session.commit()

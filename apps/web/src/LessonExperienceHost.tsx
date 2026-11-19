@@ -2,6 +2,7 @@ import {Suspense, lazy} from 'react';
 import type {ComponentProps} from 'react';
 import type {LessonDocument, MusicLessonManifest} from '../../../packages/lesson-schema/index';
 import {LessonWorkspace} from './LessonWorkspace';
+import {effectiveFeedbackEnabled} from './music/music-feedback';
 
 /**
  * The only dispatch boundary in the app.
@@ -33,13 +34,22 @@ function UnsupportedScreen({onBack}: {onBack: () => void}) {
   </section>;
 }
 
-export function LessonExperienceHost({document,pianoLibrary=false,guitarLibrary=false, ...body}: {document: LessonDocument} & BodyProps & LibraryGuideProps) {
+export function LessonExperienceHost({document,pianoLibrary=false,guitarLibrary=false,challengeEnabled=false,challengeHistoryEnabled=false,audioAssessmentEnabled=false, ...body}: {document: LessonDocument; challengeEnabled?:boolean; challengeHistoryEnabled?:boolean; audioAssessmentEnabled?:boolean} & BodyProps & LibraryGuideProps) {
   if (document.kind === 'music') {
     // Piano and guitar share one workspace engine; the document subject selects the
     // instrument-specific surfaces inside it.
     if (document.value.subject === 'piano' || document.value.subject === 'guitar') {
+      const canChallenge = challengeEnabled && effectiveFeedbackEnabled(document.value)
+        && document.value.subject === 'piano'
+        && document.value.assessment.assessment === 'notes'
+        && (document.value.assessment.input_modes.includes('midi')
+          || document.value.assessment.input_modes.includes('microphone'));
       return <Suspense fallback={<MusicFallback onBack={body.onBack}/>}>
-        <PianoWorkspaceHarness lessonId={document.value.lesson_id} lessonTitle={document.value.title} embedded mode="practice" onBack={body.onBack} onModeChange={body.onModeChange}/>
+        <PianoWorkspaceHarness lessonId={document.value.lesson_id} lessonTitle={document.value.title} embedded
+          mode={body.initialMode==='compete'&&canChallenge?'challenge':'practice'}
+          challengeEnabled={canChallenge} challengeHistoryEnabled={challengeHistoryEnabled}
+          audioAssessmentEnabled={audioAssessmentEnabled}
+          onBack={body.onBack} onModeChange={body.onModeChange}/>
       </Suspense>;
     }
     return <Suspense fallback={<MusicFallback onBack={body.onBack}/>}>

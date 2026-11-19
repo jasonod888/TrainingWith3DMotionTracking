@@ -8,13 +8,15 @@ export type LessonManifest = {
   engine: 'sam-3d-body' | 'mediapipe' | 'synthetic'; engine_version: string;
   units: 'metres'; landmark_axes: 'x-right/y-down/z-forward';
   root_motion: 'estimated-camera-relative' | 'hip-relative' | 'in-place' | 'floor-guided';
-  confidence: 'unmeasured' | 'measured'; animation: Asset; landmarks: Asset;
+  confidence: 'unmeasured' | 'measured'; animation: Asset | null; landmarks: Asset;
   source_video: Asset | null; thumbnail: Asset | null; section_set: SectionSet; warnings: string[];
   focused_video?: Asset | null;
   focused_video_start?: number | null;
   /** Transparent VP9 companion to `focused_video`, for camera compositing only. */
   focused_video_alpha?: Asset | null;
   presentation?: Partial<Record<'male' | 'female' | 'report', Asset>>;
+  /** Creator-controlled practice feedback. Missing means legacy availability. */
+  feedback_enabled?: boolean | null;
 };
 
 export function validateSections(sections: Section[], duration: number): Section[] {
@@ -72,7 +74,7 @@ export type MusicPlaybackSettings={sync_offset_seconds:number;revision:number};
 export type MusicPedalSpan={onset:number;offset:number;type:'sustain'};
 export type MusicDraftView={draft_version:1;draft_id:string;lesson_id:string;title:string;status:'draft'|'reviewed';
  subject:'piano'|'guitar';instrument:InstrumentConfig;duration:number;reference:Asset;source_video:Asset|null;
- piano_preview?:Asset|null;playback?:MusicPlaybackSettings;pedal?:MusicPedalSpan[];preview_identity?:string|null;raw_model?:boolean;correction_operations?:number;
+ piano_preview?:Asset|null;playback?:MusicPlaybackSettings;pedal?:MusicPedalSpan[];preview_identity?:string|null;raw_model?:boolean;correction_operations?:number;feedback_enabled?:boolean|null;
  events:MusicDraftEvent[];spans:{start:number;end:number;kind:'playing'|'explanation'}[];guitar_chords:MusicDraftGuitarChord[];analysis:{key:string;mime:string;bytes:number;sha256:string}|null;warnings:string[];
  baseline_events?:MusicDraftEvent[];working_corrected?:boolean;automatic_corrections?:MusicDraftCorrection[];verification_state_token?:string|null;
  provenance:{adapter:string;engine:string;model:string|null;model_version:string|null;code_version:string;audio_sha256:string;profile_sha256?:string|null}};
@@ -100,6 +102,8 @@ export type MusicLessonManifest = {
   midi_export?: Asset | null;
   public_poster?: Asset | null;
   warnings: string[];
+  /** Creator-controlled practice feedback. Missing means legacy availability. */
+  feedback_enabled?: boolean | null;
 };
 
 export type SummaryCapabilities = {
