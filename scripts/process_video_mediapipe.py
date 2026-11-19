@@ -50,8 +50,10 @@ DEFAULT_MODEL = ROOT / 'models' / MODEL_NAME
 MIN_POSE_COVERAGE = .95
 MIN_MASK_COVERAGE = .95
 MAX_GAP_SECONDS = .5
-# A landmark below this can still be stored, but never gates a marker or a score.
-SCORING_VISIBILITY = .55
+# Marker presentation threshold (0.55) is intentionally separate from scoring.
+MARKER_VISIBILITY = .55
+# Scoring requires 0.60, matching web/dist/pose.js.
+SCORING_VISIBILITY = .60
 STANDING_VISIBILITY = .65
 # pose.js scoring triples; a frame is usable when at least 6 of the 8 are confident.
 SCORING_ANGLES = ((11, 13, 15), (12, 14, 16), (13, 11, 23), (14, 12, 24),
@@ -203,6 +205,22 @@ def clock_milliseconds(times):
     return milliseconds
 
 
+def playback_duration(times, frame_rate, probed_duration=None):
+    """Playback end: last frame start plus one display interval.
+
+    ``times`` remains exact zero-based frame starts; the duration shown to the
+    player/section clock includes the final frame's display interval.
+    """
+    if not len(times):
+        return float(probed_duration or 0.0)
+    rate = float(frame_rate) if frame_rate and math.isfinite(float(frame_rate)) and frame_rate > 0 else None
+    if rate is not None:
+        return float(times[-1]) + 1.0 / rate
+    if probed_duration and math.isfinite(float(probed_duration)) and probed_duration > 0:
+        return float(probed_duration)
+    return float(times[-1])
+
+
 def empty_landmarks():
     """Finite zero placeholders with 0.0 visibility: never NaN, never scorable."""
     return (np.zeros((33, 3), dtype=np.float32),
@@ -238,6 +256,35 @@ def longest_gap(times, usable):
         before = times[start - 1] if start else times[0]
         longest = max(longest, float(times[-1] - before))
     return longest
+
+
+def pose_reference_contract(times, usable):
+    """Pose-quality contract, independent of matte/derivative quality."""
+    coverage = float(sum(usable)) / max(len(usable), 1)
+    gap = longest_gap(times, usable)
+    acceptable = coverage >= MIN_POSE_COVERAGE - 1e-9 and gap <= MAX_GAP_SECONDS + 1e-9
+    return {'acceptable': acceptable, 'coverage': coverage, 'gap_seconds': gap,
+            'reason': None if acceptable else ('coverage' if coverage < MIN_POSE_COVERAGE - 1e-9 else 'gap')}
+
+
+def segmentation_contract(times, mask_frames, observed, repaired_frames=0):
+    """Complete observed matte contract.
+
+    Until a validated motion-aligned repair exists, any unrepaired gap (including a
+    single leading/interior/trailing frame) disables focused/alpha derivatives. A
+    repaired frame, if ever added, can never count as observed.
+    """
+    total = len(times)
+    observed = list(observed)
+    coverage = float(mask_frames) / max(total, 1)
+    gap = longest_gap(times, observed) if total else 0.0
+    complete = (total > 0 and mask_frames == total and len(observed) == total
+                and all(observed) and repaired_frames == 0)
+    return {'available': complete, 'coverage': coverage, 'gap_seconds': gap,
+            'observed_frames': int(sum(1 for value in observed if value)),
+            'repaired_frames': int(repaired_frames),
+            'policy': 'complete-observed-matte-required',
+            'reason': None if complete else 'unrepaired_matte_gap'}
 
 
 def _angle(a, b, c):
@@ -476,16 +523,18 @@ def run(video, output, model=DEFAULT_MODEL, max_frames=0, landmarker=None):
                         frame_indices=np.arange(total, dtype=np.int64))
 
     usable = [usable_scoring_pose(world_array[i], visibility_array[i]) for i in range(total)]
-    pose_coverage = float(sum(usable)) / max(total, 1)
-    pose_gap = longest_gap(times, usable)
-    mask_coverage = float(mask_frames) / max(total, 1)
-    mask_gap = longest_gap(times, observed)
-    if pose_coverage < MIN_POSE_COVERAGE - 1e-9:
-        raise ValueError(f'Usable scoring poses cover {pose_coverage:.1%} of frames; at least 95% is required.')
-    if pose_gap > MAX_GAP_SECONDS + 1e-9:
+    pose_contract = pose_reference_contract(times, usable)
+    pose_coverage = pose_contract['coverage']
+    pose_gap = pose_contract['gap_seconds']
+    if not pose_contract['acceptable']:
+        if pose_coverage < MIN_POSE_COVERAGE - 1e-9:
+            raise ValueError(f'Usable scoring poses cover {pose_coverage:.1%} of frames; at least 95% is required.')
         raise ValueError(f'A pose gap of {pose_gap:.2f}s exceeds the 0.5s limit.')
 
-    segmentation_available = mask_coverage >= MIN_MASK_COVERAGE - 1e-9 and mask_gap <= MAX_GAP_SECONDS + 1e-9
+    segmentation = segmentation_contract(times, mask_frames, observed, repaired_frames=0)
+    mask_coverage = segmentation['coverage']
+    mask_gap = segmentation['gap_seconds']
+    segmentation_available = segmentation['available']
     motion_hash = digest(motion)
     video_hash = digest(video)
     if segmentation_available:
@@ -517,13 +566,20 @@ def run(video, output, model=DEFAULT_MODEL, max_frames=0, landmarker=None):
                         'visibility': 'min(visibility, presence), 0.0 when unavailable'},
         'video_sha256': video_hash, 'motion_sha256': motion_hash,
         'width': width, 'height': height, 'frames': total, 'frame_rate': fps,
+        'duration': playback_duration(times, fps),
         'scoring_coverage': pose_coverage, 'pose_gap_seconds': pose_gap,
         'mask_coverage': mask_coverage, 'mask_gap_seconds': mask_gap,
         'segmentation': {'available': segmentation_available, 'mask_frames': mask_frames,
+                         'observed_frames': segmentation['observed_frames'],
+                         'repaired_frames': segmentation['repaired_frames'],
+                         'policy': segmentation['policy'], 'reason': segmentation['reason'],
                          'path': 'segmentation' if segmentation_available else None},
+        'derivatives': {'focused': segmentation_available, 'alpha': segmentation_available,
+                        'reason': None if segmentation_available else 'unrepaired_matte_gap'},
         'standing_index': standing, 'thumbnail_index': thumbnail,
         'thresholds': {'min_pose_coverage': MIN_POSE_COVERAGE, 'min_mask_coverage': MIN_MASK_COVERAGE,
                        'max_gap_seconds': MAX_GAP_SECONDS, 'scoring_visibility': SCORING_VISIBILITY,
+                       'marker_visibility': MARKER_VISIBILITY,
                        'standing_visibility': STANDING_VISIBILITY},
         'limitations': ('Single-person CPU pose estimate. World landmarks are hip-relative metres '
                         'with no validated world trajectory or foot-contact solver.'),

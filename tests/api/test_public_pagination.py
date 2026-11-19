@@ -25,7 +25,8 @@ def seed_public(session, owner_id, subject, count, prefix):
         session.add(LessonAcceptance(id=uuid4().hex, lesson_id=lesson_id, revision_id=revision_id,
                                      account_id=owner_id, warnings=[], source='owner'))
         session.add(LessonPublication(lesson_id=lesson_id, revision_id=revision_id, title=title,
-                                      creator_name='Ari', listed=True, listed_at=now()))
+                                      creator_name='Ari', listed=True, listed_at=now(),
+                                      roles=['interactive_data']))
         ids.append(lesson_id)
     return ids
 

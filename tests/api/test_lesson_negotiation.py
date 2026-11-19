@@ -148,7 +148,7 @@ def test_capability_and_limit_responses_are_per_route(system):
     assert limits['routes']['music-guitar']['available'] is False
     assert limits['capabilities'] == {'conversion': True, 'music_piano': False, 'music_guitar': False}
     assert {item['id'] for item in limits['subjects']} == {
-        'movement_other', 'dance', 'taekwondo', 'boxing', 'piano', 'guitar'}
+        'movement_other', 'dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'drawing'}
 
 
 def test_a_music_route_does_not_change_body_availability(tmp_path):

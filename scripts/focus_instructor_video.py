@@ -68,8 +68,8 @@ def load_landmarks(motion, landmark_format='sam-3d-body'):
                 raise ValueError(f'SAM motion is missing {sorted(missing)}; use process_video.py output.')
             points = np.asarray(data['pred_keypoints_2d'], dtype=float)
             visibility = None
-            if points.ndim != 3 or points.shape[2] != 2 or points.shape[1] < 63:
-                raise ValueError(f'SAM keypoints must be [frames,>=63,2]; got {points.shape}.')
+            if points.ndim != 3 or points.shape[2] != 2 or points.shape[1] < 1:
+                raise ValueError(f'SAM keypoints must be [frames,>=1,2]; got {points.shape}.')
         else:
             raise ValueError('Unknown landmark format.')
         times = np.asarray(data['timestamps'], dtype=float)
@@ -104,21 +104,31 @@ def reduce_gray(gray, max_height=FLOW_MAX_HEIGHT):
 
 
 def scale_flow(flow, width, height, flow_w, flow_h):
-    """Rescale reduced-resolution flow vectors to full-resolution pixels."""
-    scaled = np.array(flow, dtype=np.float32, copy=True)
-    scaled[..., 0] *= width / flow_w
-    scaled[..., 1] *= height / flow_h
+    """Spatially resize reduced flow to full resolution, then scale displacements.
+
+    Farneback measures displacement in reduced-image pixels. Interpolating the grid
+    alone keeps those reduced-pixel values, so the final vector must be multiplied
+    by ``width/flow_w`` and ``height/flow_h`` after the resize.
+    """
+    import cv2
+    scaled = np.asarray(flow, dtype=np.float32)
+    if scaled.shape[:2] != (height, width):
+        scaled = cv2.resize(scaled, (width, height), interpolation=cv2.INTER_LINEAR)
+    else:
+        scaled = scaled.copy()
+    scaled[..., 0] *= width / max(flow_w, 1)
+    scaled[..., 1] *= height / max(flow_h, 1)
     return scaled
 
 
-def warp_previous(previous, gray, offset=(0., 0.)):
+def warp_previous(previous, gray, offset=(0., 0.), previous_crop=None, current_crop=None):
     """Sample the previous matte in the current crop, with motion and crop offset.
 
-    Farneback runs at most ``FLOW_MAX_HEIGHT`` tall, then the vectors are scaled by
-    ``full_w/flow_w`` and ``full_h/flow_h`` before remapping, so the matte follows
-    real motion. ``offset`` is ``(current_left-previous_left, current_top-previous_top)``:
-    the previous matte was stored in the previous crop's coordinates, so the crop's
-    own movement must be added before the current-crop pixel is looked up.
+    Farneback runs at most ``FLOW_MAX_HEIGHT`` tall, then the flow grid is spatially
+    resized and vectors are scaled by ``full_w/flow_w`` and ``full_h/flow_h``.
+    ``offset`` is ``(current_left-previous_left, current_top-previous_top)``.
+    Crop rectangles optionally account for a different crop size: the previous matte
+    is resized to the current crop before motion sampling.
     """
     import cv2
     height, width = gray.shape
@@ -126,8 +136,17 @@ def warp_previous(previous, gray, offset=(0., 0.)):
     previous_small, _, _ = reduce_gray(previous['gray'])
     flow = cv2.calcOpticalFlowFarneback(current_small, previous_small, None, .5, 2, 15, 2, 5, 1.1, 0)
     flow = scale_flow(flow, width, height, flow_w, flow_h)
+    previous_alpha = np.asarray(previous['alpha'], dtype=np.float32)
+    if previous_alpha.shape != (height, width):
+        previous_alpha = cv2.resize(previous_alpha, (width, height), interpolation=cv2.INTER_LINEAR)
+    if previous_crop is not None and current_crop is not None:
+        # Source-space crop movement, expressed in current-crop pixels.
+        prev_w, prev_h = float(previous_crop[2]), float(previous_crop[3])
+        curr_w, curr_h = float(current_crop[2]), float(current_crop[3])
+        scale_x, scale_y = curr_w / max(prev_w, 1.), curr_h / max(prev_h, 1.)
+        offset = (offset[0] * scale_x, offset[1] * scale_y)
     yy, xx = np.indices((height, width), dtype=np.float32)
-    warped = cv2.remap(previous['alpha'], xx + flow[..., 0] + np.float32(offset[0]),
+    warped = cv2.remap(previous_alpha, xx + flow[..., 0] + np.float32(offset[0]),
                        yy + flow[..., 1] + np.float32(offset[1]), cv2.INTER_LINEAR,
                        borderMode=cv2.BORDER_CONSTANT, borderValue=0)
     return warped
@@ -416,8 +435,9 @@ def export(video, motion, output, masks=None, command=None, mode='person', activ
     track = None
     marker_frames=[]
     if mode == 'person':
-        if not mask_root or mask_frames / frames < .95:
-            raise ValueError('Person-only video requires segmentation for at least 95% of frames.')
+        if not mask_root or mask_frames != frames:
+            raise ValueError('Person-only video requires a complete observed segmentation matte; '
+                             'unrepaired gaps disable focused/alpha derivatives.')
         active = None if active_range is None else (times>=active_range[0])&(times<=active_range[1])
         track = following_crops(boxes, width, height, fps, active=active)
         w, h = track[0][2:]

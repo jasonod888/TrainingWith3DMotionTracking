@@ -7,18 +7,25 @@
  * loads the same draft through the same API and writes nothing.
  */
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {createEditorSession} from '../../editor/editor-session';
 import {
   ArrowLeft, ChevronRight, Mic, MicOff, MoreHorizontal, Pause, Play, Redo2, RotateCcw, Settings as SettingsIcon, Undo2, Video, Volume2, X,
 } from 'lucide-react';
 import {PracticePlayerDock} from '../../PracticePlayerDock';
 import {PianoPracticeWorkspace} from './PianoPracticeWorkspace';
+// Compatibility shim: the practice implementation is its own module and the Act
+// practice entry imports it directly. Existing callers that still import it from
+// the harness keep working without pulling the editor into the practice graph.
+export {PianoPracticeWorkspace};
 import {PracticePanel} from '../../PracticePanel';
 import {
   PracticeSettingsProvider, SettingsChoices, SettingsGroup, SettingsRow,
 } from '../../PracticeSettings';
 import '../../practice.css';
 import '../../practice-player.css';
-import {ApiError, assetUrl, getSession, request} from '../../api';
+import {assetUrl, getSession, request} from '../../api';
+import {classifySaveError, privateSaveMessage, saveReviewedReference, startReviewLoad,
+  type ReviewManifestDocument} from './editor-services';
 import {parseMusicDraftView} from '../../../../../packages/lesson-schema/parse';
 import {
   applyCommand, buildNotation, parseNotationDocument, selectionForOccurrence,
@@ -76,6 +83,7 @@ import {
 import {GuitarChordStrumHud} from './GuitarChordStrumHud';
 import GuitarNeckGuide from '../renderers/GuitarNeckGuide';
 import {detectGuitarChords} from './guitar-chords';
+import {instrumentAdapter} from './instrument-adapters';
 import {
   GUITAR_TUNINGS, assignGuitarFingers, normalizeGuitarSetup,
   openStringPitch, resolveGuitarPosition, type GuitarFinger, type GuitarTuningId,
@@ -387,6 +395,9 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
   const [saveError, setSaveError] = useState('');
   const [saveConflict, setSaveConflict] = useState(false);
   const [conflictKind, setConflictKind] = useState<'stale'|'verification'|'other'>('other');
+  const [editorSession] = useState(() => createEditorSession({
+    state: 'saved-private', revisionId: lessonIdProp ?? undefined, reviewed: true,
+  }));
   const [reopenMessage, setReopenMessage] = useState('');
   const [recoveryOffer, setRecoveryOffer] = useState<RecoveryCheckpoint | null>(null);
   const [staleCheckpoint, setStaleCheckpoint] = useState<RecoveryCheckpoint | null>(null);
@@ -579,7 +590,7 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
   }, []);
 
   const document = state?.document ?? null;
-  const guitar = document?.subject === 'guitar';
+  const guitar = instrumentAdapter(document?.subject)?.supportsTab ?? false;
   const activeSetup = normalizeGuitarSetup({tuning: document?.guitar_tuning, capo: document?.guitar_capo});
   useEffect(() => {
     if (!document) return;
@@ -1307,20 +1318,9 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       setLoading(true);
       setError('');
       // Both requests start together; a slow draft must not delay a saved reference.
-      const draftPromise = request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft`)
-        .catch(() => null);
-      let manifest: {revision_id: string; reference: {key: string; sha256?: string};
-        source_video?: Asset | null; piano_preview?: Asset | null; preview_identity?: string | null;
-        pedal?: MusicPedalSpan[];
-        draft_id?: string | null;
-        section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
-        assessment?: {assessment?: string}; feedback_enabled?: boolean | null} | null = null;
-      try {
-        manifest = await request(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false,
-        {'X-Lesson-Formats': '1,2'});
-      } catch {
-        manifest = null;
-      }
+      const sources = startReviewLoad<ReviewManifestDocument>(lessonId);
+      const draftPromise = sources.draft;
+      const manifest = await sources.manifest;
       if (!alive()) return;
 
       let restored = false;
@@ -1897,9 +1897,8 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       feedbackEnabled,
     });
     try {
-      const manifest = await request<{ revision_id: string }>(
-        `/lessons/${encodeURIComponent(lessonId)}/${base ? 'music-revision' : 'music-draft/review'}`,
-        'POST', body);
+      const manifest = await saveReviewedReference(lessonId, base, body);
+      editorSession.saved(manifest.revision_id);
       setSavedRevisionId(manifest.revision_id);
       setSavedSignature(snapshot);
       lastValidChordsRef.current = validatedChords;
@@ -1907,34 +1906,28 @@ function PianoReviewWorkspace({lessonId: lessonIdProp, embedded = false, mode = 
       const current = snapshot === workspaceSignatureRef.current;
       onSaved?.(manifest.revision_id, current);
       setSaveConflict(false);
-      if (snapshot === workspaceSignatureRef.current) {
+      const stillCurrent = snapshot === workspaceSignatureRef.current;
+      if (stillCurrent) {
         // The acknowledged snapshot is still the current work.
         clearRecovery();
         setRecoveryOffer(null);
         setRecoveryNotice('');
-        setSaveMessage(`Saved privately · revision ${manifest.revision_id.slice(0, 8)}`);
+        setSaveMessage(privateSaveMessage(manifest.revision_id, true));
       } else {
         // Newer edits exist; keep their checkpoint and say so rather than claim Saved.
-        setSaveMessage(`Saved an earlier version · revision ${manifest.revision_id.slice(0, 8)}; newer edits remain unsaved.`);
+        setSaveMessage(privateSaveMessage(manifest.revision_id, false));
       }
     } catch (cause) {
       // Edits stay in place; the local checkpoint keeps the work recoverable. A stale
       // base is a conflict with an explicit resolution, never silent data loss.
-      if (cause instanceof ApiError && cause.status === 409) {
+      const info = classifySaveError(cause);
+      if (info.conflict) {
+        editorSession.conflict(info.message);
         setSaveConflict(true);
-        const message = cause.message ?? '';
-        if (/verification|working notes/i.test(message)) {
-          setConflictKind('verification');
-          setSaveError('The verification decisions changed. Your edits are kept; reload the saved revision to review them.');
-        } else if (/already been reviewed|already edited|newer saved revision|newer revision/i.test(message)) {
-          setConflictKind('stale');
-          setSaveError('This lesson has a newer saved revision. Your edits are kept locally.');
-        } else {
-          setConflictKind('other');
-          setSaveError(`${message || 'The save conflicted with the saved lesson.'} Your edits are kept locally.`);
-        }
+        setConflictKind(info.kind ?? 'other');
+        setSaveError(info.message);
       } else {
-        setSaveError(cause instanceof Error ? cause.message : 'The save failed; your edits are kept.');
+        setSaveError(info.message);
       }
     } finally {
       setSaving(false);

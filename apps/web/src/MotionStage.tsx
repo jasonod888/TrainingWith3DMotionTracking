@@ -29,7 +29,8 @@ export function MotionStage({lesson,player,source=false,companion=false,onVideoU
   useEffect(()=>{
     // Three.js is never initialised for a video-only movement: there is no GLB to
     // load, and a renderer would only add a blank pane behind the instructor video.
-    if(source||!lesson.animation)return;
+    const animation = lesson.animation;
+    if(source||!animation)return;
     const fitEnvelope=fit==='envelope';
     let disposed=false,frame=0;let renderer:THREE.WebGLRenderer|undefined,mixer:THREE.AnimationMixer|undefined,model:THREE.Group|undefined;
     const host=mount.current!;const scene=new THREE.Scene();const aligned=!!framing?.active;
@@ -123,7 +124,7 @@ export function MotionStage({lesson,player,source=false,companion=false,onVideoU
             setLoading(false);return;
           }catch(error){console.warn('Prepared avatar unavailable; showing the canonical reference.',error);}
         }
-        loader.load(assetUrl(lesson.animation!.key),gltf=>{
+        loader.load(assetUrl(animation.key),gltf=>{
           if(disposed){disposeModel(gltf.scene);return;}
           if(!gltf.animations[0]){setError('This reference has no animation.');setLoading(false);return;}
           model=gltf.scene;anchor.add(model);mixer=new THREE.AnimationMixer(model);action=mixer.clipAction(continuousPlayback(gltf.animations[0]));action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();mixer.setTime((lesson.animation_start??0)+lesson.standing_time);model.updateMatrixWorld(true);

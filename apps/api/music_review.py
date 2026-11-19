@@ -22,7 +22,7 @@ from .music_assessment import assessment_for_subject
 from .music_alignment import validate_alignment
 from .music_notation import validate_notation
 from .music_preview import performance_changed, invalidate_preview
-from . import interactive_limit
+from . import acts, interactive_limit
 
 
 class ReviewAssessment(Contract):
@@ -226,7 +226,8 @@ def install_music_review(app,settings,identity,db):
             assessment=policy,feedback_enabled=feedback_enabled,
             warnings=proposal.warnings)
         revision=LessonRevision(id=manifest.revision_id,lesson_id=lesson_id,version=version,
-            manifest=manifest.model_dump(),subject=proposal.subject,experience_family='music',instrument=proposal.subject)
+            manifest=manifest.model_dump(),subject=proposal.subject,experience_family='music',instrument=proposal.subject,
+            act_id=acts.act_for_subject(proposal.subject).id)
         session.add(revision)
         session.add(LessonAsset(lesson_id=lesson_id,**asset.model_dump()))
         session.flush()

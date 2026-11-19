@@ -8,7 +8,7 @@ export function InstructorMarkers({lesson,video,mirrored}:{lesson:LessonManifest
  const svg=useRef<SVGSVGElement>(null),groups=useRef<(SVGGElement|null)[]>([]);
  useEffect(()=>{
   const abort=new AbortController();let frame=0,track:ReturnType<typeof markerTrack>=null;
-  if(lesson.focused_video)void fetch(`${assetUrl(lesson.landmarks.key)}?v=${lesson.landmarks.sha256}`,{signal:abort.signal,credentials:'same-origin'})
+  if(lesson.focused_video&&lesson.landmarks)void fetch(`${assetUrl(lesson.landmarks.key)}?v=${lesson.landmarks.sha256}`,{signal:abort.signal,credentials:'same-origin'})
    .then(r=>r.ok?r.json():null).then(value=>{track=markerTrack(value?.instructorMarkers,lesson.focused_video!.sha256);}).catch(()=>{});
   const draw=()=>{
    const v=video.current,overlay=svg.current;

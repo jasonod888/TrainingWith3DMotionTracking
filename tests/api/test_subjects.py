@@ -17,7 +17,7 @@ def owner_of(system):
 
 def test_catalogue_is_the_single_source():
     assert [item['id'] for item in subjects.catalogue()] == [
-        'movement_other', 'dance', 'taekwondo', 'boxing', 'piano', 'guitar']
+        'movement_other', 'dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'drawing']
     assert subjects.label_for('movement_other') == 'Full Body Movement'
     assert subjects.label_for(None) == 'Full Body Movement'
     assert subjects.family_for('piano') == 'music'

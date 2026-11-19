@@ -5,7 +5,66 @@ import subprocess
 import numpy as np
 import pytest
 
-from focus_instructor_video import padded_crop, following_crops, composite_person, limb_markers, export, digest
+from focus_instructor_video import (padded_crop, following_crops, composite_person,
+    limb_markers, export, digest, scale_flow, warp_previous)
+
+
+def test_scale_flow_resizes_grid_before_scaling_displacements():
+    pytest.importorskip('cv2')
+    # Unchanged size: values remain exact full-resolution pixels.
+    same = np.ones((6, 8, 2), dtype=np.float32) * np.array([2., 3.], dtype=np.float32)
+    out = scale_flow(same, 8, 6, 8, 6)
+    assert out.shape == (6, 8, 2)
+    assert np.allclose(out[..., 0], 2) and np.allclose(out[..., 1], 3)
+
+    # Reduced flow grid (4x3) must become full (8x6) before x2/y2 scaling.
+    reduced = np.ones((3, 4, 2), dtype=np.float32)
+    out = scale_flow(reduced, 8, 6, 4, 3)
+    assert out.shape == (6, 8, 2)
+    assert np.allclose(out[..., 0], 2) and np.allclose(out[..., 1], 2)
+
+    # Non-square, taller-than-480 source: 400x720 crop with a 480-high flow grid.
+    reduced = np.ones((480, 267, 2), dtype=np.float32)
+    out = scale_flow(reduced, 720, 400, 267, 480)
+    assert out.shape == (400, 720, 2)
+    assert np.allclose(out[..., 0], 720 / 267, atol=1e-5)
+    assert np.allclose(out[..., 1], 400 / 480, atol=1e-5)
+
+
+def test_warp_previous_handles_crop_shift_and_matte_resize():
+    pytest.importorskip('cv2')
+    gray = np.zeros((60, 80), dtype=np.uint8)
+    alpha = np.zeros((60, 80), dtype=np.float32)
+    alpha[20:40, 30:50] = 1
+    previous = {'gray': gray, 'alpha': alpha}
+    warped = warp_previous(previous, gray, offset=(5., 0.))
+    assert warped.shape == (60, 80)
+    # Sampling x+5 shifts the rectangle five pixels left.
+    assert warped[30, 25] > .99 and warped[30, 55] < .01
+
+    # Different crop sizes are resized to the current crop before sampling.
+    small = {'gray': gray, 'alpha': np.ones((30, 40), dtype=np.float32)}
+    resized = warp_previous(small, gray)
+    assert resized.shape == (60, 80)
+    assert resized.mean() > .99
+
+
+def test_person_export_refuses_any_unrepaired_matte_gap(source):
+    cv2 = pytest.importorskip('cv2')
+    video, motion, output = source
+    root = video.parent / 'grounding'
+    (root / 'masks').mkdir(parents=True)
+    (root / 'data.json').write_text(json.dumps({'video_sha256': digest(video),
+        'motion_sha256': digest(motion), 'width': 320, 'height': 240,
+        'times': (np.arange(15) / 15).tolist()}))
+    for i in range(15):
+        if i == 7:
+            continue
+        mask = np.zeros((240, 320), dtype=np.uint8); mask[40:200, 120:200] = 255
+        cv2.imwrite(str(root / 'masks' / f'{i:06d}.png'), mask)
+    with pytest.raises(ValueError, match='complete observed segmentation matte'):
+        export(video, motion, output, root, mode='person')
+    assert not output.exists()
 
 
 def test_fixed_crop_contains_entire_movement_with_even_pixel_padding():

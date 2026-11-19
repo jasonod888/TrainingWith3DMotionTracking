@@ -22,6 +22,7 @@ export function MovementUploadPanel({lesson, disabled=false}:{lesson:LessonManif
     abort.current=controller;
     setBusy(true);setError('');setReport(null);setProgress(0);
     try{
+      if(!lesson.landmarks)throw new Error('This lesson has no movement comparison reference.');
       const response=await fetch(assetUrl(lesson.landmarks.key),{credentials:'same-origin',signal:controller.signal});
       if(!response.ok)throw new Error('The movement comparison reference could not load.');
       const reference=await response.json() as {times?:unknown;keypoints?:unknown};

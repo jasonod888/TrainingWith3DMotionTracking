@@ -6,11 +6,12 @@ import {createVideoScrubber} from './video-scrubber';
 import {VideoTimeline} from './VideoTimeline';
 import {clampTime,trimBounds} from './timeline';
 import {saveClip,loadClip,loadClipMeta,removeClip,pruneClips,savePoster,loadPoster} from './clipCache';
+import {AUTHORING_LABELS} from './editor/authoring-lifecycle';
 
 export type ConversionJob={id:string;title:string;filename:string;bytes:number;start:number;duration:number;state:string;attempts:number;frames:number;error:string|null;provider:string;processor_online:boolean;retryable:boolean;lesson_id:string|null;parts:Record<string,{sha256:string;bytes:number}>;part_size:number;subject?:string;instrument?:string|null;preparation?:Record<string,unknown>;feedback_enabled?:boolean|null;media_findings?:Record<string,unknown>;pipeline_version?:string};
 export type LessonSubjectOption={id:string;label:string;experience_family:'body'|'music';instrument:'piano'|'guitar'|null;movement:boolean};
 type Limits={max_bytes:number;max_seconds:number;max_active:number;part_size:number;processing:{provider:string;available:boolean;external_processing:boolean};body_route?:{id:string;pipeline_version:string;available:boolean;worker_online:boolean};subjects?:LessonSubjectOption[];routes?:Record<string,{available:boolean}>;capabilities?:{conversion?:boolean;music_piano?:boolean;music_guitar?:boolean}};
-const labels:Record<string,string>={uploading:'Upload paused',queued:'Waiting to begin',validating:'Checking your video',processing:'Preparing your 3D move',exporting:'Creating your 3D move',verifying:'Checking the result',ready_for_review:'Ready to check',failed:'Needs attention',cancelled:'Cancelled'};
+const labels:Record<string,string>={uploading:'Upload paused',queued:'Waiting to begin',validating:'Checking your video',processing:'Preparing your 3D move',exporting:'Creating your 3D move',verifying:'Checking the result',ready_for_review:'Ready to check',failed:AUTHORING_LABELS.processingFailed,cancelled:AUTHORING_LABELS.cancelled};
 // The CPU MediaPipe route produces a video reference, not a 3D reconstruction, so it
 // must not promise a 3D move anywhere in the progress copy.
 const moveLabels:Record<string,string>={...labels,processing:'Preparing your move',exporting:'Creating your move'};

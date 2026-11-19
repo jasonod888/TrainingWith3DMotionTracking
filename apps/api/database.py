@@ -16,6 +16,10 @@ class Lesson(Base):
     subject: Mapped[str] = mapped_column(String(32), default='movement_other', server_default='movement_other', index=True)
     experience_family: Mapped[str] = mapped_column(String(16), default='body', server_default='body')
     instrument: Mapped[str | None] = mapped_column(String(16))
+    # Product experience identity (full_body/piano/guitar). Nullable for legacy
+    # rows; readers resolve through the deterministic subject adapter and never
+    # guess an unknown Act. Metadata only: the revision manifest is untouched.
+    act_id: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
     version: Mapped[int] = mapped_column(Integer, default=1, server_default='1')
@@ -38,6 +42,9 @@ class LessonRevision(Base):
     subject: Mapped[str | None] = mapped_column(String(32))
     experience_family: Mapped[str | None] = mapped_column(String(16))
     instrument: Mapped[str | None] = mapped_column(String(16))
+    # Act identity frozen with this revision, so a later relabel cannot change
+    # what an existing release was published as.
+    act_id: Mapped[str | None] = mapped_column(String(16))
 
 class Account(Base):
     __tablename__ = 'accounts'
@@ -108,6 +115,48 @@ class PracticeProgress(Base):
     time: Mapped[float] = mapped_column(Float)
     speed: Mapped[float] = mapped_column(Float)
     mode: Mapped[str] = mapped_column(String(16))
+
+class PracticePlanProgress(Base):
+    """Plan-scoped resume state shared by every Act.
+
+    The legacy ``practice_progress`` row stays body-only; this additive table is
+    scoped by (account, lesson, revision, plan) so a changed plan cannot be handed
+    another plan's position.
+    """
+    __tablename__ = 'practice_plan_progress'
+    account_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'), primary_key=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), primary_key=True)
+    revision_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    plan_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    unit_id: Mapped[str | None] = mapped_column(String(120))
+    time: Mapped[float] = mapped_column(Float, default=0.0)
+    speed: Mapped[float] = mapped_column(Float, default=1.0)
+    mode: Mapped[str] = mapped_column(String(16), default='sections')
+    loop: Mapped[bool] = mapped_column(Boolean, default=False)
+    repetitions: Mapped[int] = mapped_column(Integer, default=0)
+    countdown_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    rest_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class PracticeAttempt(Base):
+    """Neutral attempt envelope. Act-specific detail stays in ``report``."""
+    __tablename__ = 'practice_attempts'
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'), index=True)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), index=True)
+    revision_id: Mapped[str] = mapped_column(String(80), index=True)
+    act_id: Mapped[str] = mapped_column(String(16))
+    mode: Mapped[str] = mapped_column(String(16))
+    plan_id: Mapped[str] = mapped_column(String(160))
+    unit_id: Mapped[str | None] = mapped_column(String(120))
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(24))
+    assessment_adapter: Mapped[str | None] = mapped_column(String(80))
+    rubric_version: Mapped[str | None] = mapped_column(String(80))
+    report: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
 
 class Conversion(Base):
     __tablename__ = 'conversions'
@@ -208,6 +257,8 @@ class LessonPublication(Base):
     creator_name: Mapped[str] = mapped_column(String(80), default='')
     listed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     moderation_hidden: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
+    # Explicit public representation allowlist chosen at release time.
+    roles: Mapped[list | None] = mapped_column(JSON)
     rights_acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     listed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -216,6 +267,14 @@ class LessonTag(Base):
     __tablename__ = 'lesson_tags'
     lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), primary_key=True)
     tag: Mapped[str] = mapped_column(String(40), primary_key=True, index=True)
+
+class LessonLike(Base):
+    """One idempotent like per account and stable lesson identity."""
+    __tablename__ = 'lesson_likes'
+    __table_args__ = (UniqueConstraint('lesson_id', 'account_id', name='uq_lesson_like'),)
+    lesson_id: Mapped[str] = mapped_column(ForeignKey('lessons.id'), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey('accounts.id'), primary_key=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class Group(Base):
     __tablename__ = 'groups'
@@ -435,8 +494,10 @@ def database_ready(engine):
         connection.execute(text('SELECT a.id, s.token_hash, t.token_hash, l.version, l.archived, m.key, h.hits '
                                 'FROM accounts a, login_sessions s, account_tokens t, lessons l, lesson_assets m, auth_throttles h LIMIT 0'))
         connection.execute(text('SELECT account_id, lesson_id, revision_id, time FROM practice_progress LIMIT 0'))
-        connection.execute(text('SELECT id, owner_id, title, subject, experience_family, instrument FROM lessons LIMIT 0'))
-        connection.execute(text('SELECT id, lesson_id, version, subject, experience_family, instrument FROM lesson_revisions LIMIT 0'))
+        connection.execute(text('SELECT account_id, lesson_id, revision_id, plan_id, time FROM practice_plan_progress LIMIT 0'))
+        connection.execute(text('SELECT id, account_id, lesson_id, revision_id, act_id, mode, plan_id, status FROM practice_attempts LIMIT 0'))
+        connection.execute(text('SELECT id, owner_id, title, subject, experience_family, instrument, act_id FROM lessons LIMIT 0'))
+        connection.execute(text('SELECT id, lesson_id, version, subject, experience_family, instrument, act_id FROM lesson_revisions LIMIT 0'))
         connection.execute(text('SELECT id, state, lease_until, provider, pipeline_version, submission_state, target_lesson_id, subject, instrument, preparation, media_findings FROM conversions LIMIT 0'))
         connection.execute(text('SELECT id, provider, pipeline_version, silhouettes FROM worker_credentials LIMIT 0'))
         connection.execute(text('SELECT l.published_revision_id, g.account_id, i.token_hash, r.id '
@@ -444,8 +505,9 @@ def database_ready(engine):
         connection.execute(text('SELECT id, account_id, revision_id, sequence FROM mimic_pairs LIMIT 0'))
         connection.execute(text('SELECT id, account_id, revision_id FROM mimic_attempts LIMIT 0'))
         connection.execute(text('SELECT lesson_id, revision_id, account_id FROM lesson_acceptances LIMIT 0'))
-        connection.execute(text('SELECT lesson_id, listed, revision_id FROM lesson_publications LIMIT 0'))
+        connection.execute(text('SELECT lesson_id, listed, revision_id, roles FROM lesson_publications LIMIT 0'))
         connection.execute(text('SELECT lesson_id, tag FROM lesson_tags LIMIT 0'))
+        connection.execute(text('SELECT lesson_id, account_id FROM lesson_likes LIMIT 0'))
         connection.execute(text('SELECT id, owner_id, name, contribution_policy FROM groups LIMIT 0'))
         connection.execute(text('SELECT group_id, account_id, role FROM group_members LIMIT 0'))
         connection.execute(text('SELECT id, group_id, email FROM group_invitations LIMIT 0'))

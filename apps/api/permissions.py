@@ -12,7 +12,45 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .auth import now
+from . import acts, publication as publication_mod
 from .database import Lesson, LessonAcceptance, LessonGrant, LessonPublication, LessonRevision
+
+
+def _act_for(lesson, revision=None):
+    """Resolve the Act behind a lesson without inferring one from the payload."""
+    subject = getattr(revision, 'subject', None) or getattr(lesson, 'subject', None)
+    act_id = getattr(lesson, 'act_id', None) or getattr(revision, 'act_id', None)
+    return acts.resolve_act(act_id, subject)
+
+
+def _is_music(lesson, revision):
+    """True when the lesson belongs to a music Act.
+
+    A stored v2 manifest is also music even if identity metadata is missing, so
+    the existing strict check is preserved rather than replaced.
+    """
+    try:
+        if _act_for(lesson, revision).experience_family == 'music':
+            return True
+    except acts.ActError:
+        pass
+    return (getattr(revision, 'manifest', None) or {}).get('schema_version') == 2
+
+
+def audience_for(session, lesson, account_id, reasons):
+    """Coarse audience label for the negotiated context envelope.
+
+    Separate from ``access_reasons`` so a share-link reader is still described as a
+    link without changing the authorization decisions those reasons drive.
+    """
+    if 'owner' in reasons:
+        return 'owner'
+    if 'group' in reasons:
+        return 'group'
+    if 'direct' in reasons:
+        grant = session.get(LessonGrant, (lesson.id, account_id)) if account_id else None
+        return 'link' if grant is not None and grant.source == 'link' else 'invited'
+    return 'public'
 
 
 def latest_revision(session, lesson):
@@ -66,8 +104,15 @@ def access_reasons(session, lesson_id, account_id):
     publication = session.get(LessonPublication, lesson_id)
     if publication and publication.listed and not publication.moderation_hidden and lesson.published_revision_id:
         released = session.get(LessonRevision, lesson.published_revision_id)
-        if released and released.manifest.get('schema_version') == 1:
-            reasons.append('public')
+        if released:
+            try:
+                policy = acts.publication_policy(_act_for(lesson, released).id)
+            except acts.ActError:
+                policy = None
+            # Listed metadata without an approved role is not a public lesson.
+            if (policy is not None and policy.public
+                    and publication_mod.effective_roles(publication, released.manifest)):
+                reasons.append('public')
     return lesson, reasons
 
 
@@ -97,7 +142,7 @@ def accept_revision(session, lesson, revision, account_id, warnings=None, source
     check and the two legacy shortcuts (publish, trim-with-accept) must not be able
     to accept unreviewed music.
     """
-    if (revision.manifest or {}).get('schema_version') == 2 and source != 'music-review':
+    if _is_music(lesson, revision) and source != 'music-review':
         raise HTTPException(409, 'Accept this music lesson through the reference review, not the movement check.')
     existing = accepted(session, lesson.id, revision.id)
     if existing:
@@ -124,7 +169,11 @@ def ensure_release(session, lesson, revision, account_id, source='publish'):
     revision is accepted only by its owner review, and only the latest reviewed revision
     may become the shared release; this never publishes music publicly.
     """
-    if (revision.manifest or {}).get('schema_version') == 2:
+    try:
+        descriptor = _act_for(lesson, revision)
+    except acts.ActError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    if descriptor.experience_family == 'music':
         record = accepted(session, lesson.id, revision.id)
         if not record or record.source != 'music-review' or record.account_id != lesson.owner_id or account_id != lesson.owner_id:
             raise HTTPException(409, 'Save the reviewed reference before sharing this music lesson.')
@@ -160,7 +209,7 @@ def readable_lesson(session, lesson_id, account_id, revision_id=None):
 
 
 def public_lesson(session, lesson_id):
-    """Public projection source: only a listed, accepted release is readable."""
+    """Public projection source: a listed, accepted release with approved roles."""
     lesson = active_lesson(session, lesson_id)
     if not lesson:
         raise HTTPException(404, 'Move unavailable.')
@@ -170,28 +219,43 @@ def public_lesson(session, lesson_id):
     revision = session.get(LessonRevision, lesson.published_revision_id)
     if not revision or revision.lesson_id != lesson_id or not accepted(session, lesson_id, revision.id):
         raise HTTPException(404, 'Move unavailable.')
-    if revision.manifest.get('schema_version') != 1:
+    roles = publication_mod.effective_roles(publication, revision.manifest)
+    if not roles:
+        raise HTTPException(404, 'Move unavailable.')
+    try:
+        descriptor = _act_for(lesson, revision)
+        policy = acts.publication_policy(descriptor.id)
+    except acts.ActError as exc:
+        raise HTTPException(404, 'Move unavailable.') from exc
+    if not policy.public:
         raise HTTPException(404, 'Move unavailable.')
     return lesson, revision, publication
 
 
-def public_manifest(revision, publication, tags):
-    """Remove private media and private identity from a manifest for public delivery."""
-    if (revision.manifest or {}).get('schema_version') != 1:
-        # Music publication needs its own projection and permission policy; until
-        # then a music revision is never a public object.
+def public_manifest(revision, publication, tags, act_id=None, lesson_id=None):
+    """Project only the approved public roles; every private media slot is nulled."""
+    try:
+        descriptor = acts.resolve_act(act_id, revision.manifest.get('subject'))
+        policy = acts.publication_policy(descriptor.id)
+    except acts.ActError as exc:
+        raise HTTPException(404, 'Move unavailable.') from exc
+    if not policy.public:
         raise HTTPException(404, 'Move unavailable.')
-    value = dict(revision.manifest)
-    value['source_video'] = None
-    value['focused_video'] = None
-    # Conversion thumbnails contain frames from the private upload, not the 3D model.
-    value['thumbnail'] = None
-    value['presentation'] = {name:asset for name,asset in value.get('presentation',{}).items() if name in ('male','female')}
-    value['title'] = publication.title or value.get('title', 'Move')
-    value['public_tags'] = tags
-    value['public_creator'] = publication.creator_name
-    from .music_assessment import with_effective_feedback
-    return with_effective_feedback(value)
+    roles = publication_mod.effective_roles(publication, revision.manifest)
+    if not roles:
+        raise HTTPException(404, 'Move unavailable.')
+    if lesson_id is None:
+        # Derive from a stored asset key for callers that only hold the revision.
+        for value in (revision.manifest or {}).values():
+            if isinstance(value, dict) and str(value.get('key', '')).startswith('lessons/'):
+                lesson_id = value['key'].split('/')[1]
+                break
+    if not lesson_id:
+        raise HTTPException(404, 'Move unavailable.')
+    return publication_mod.project_manifest(
+        revision.manifest, lesson_id, roles,
+        title=publication.title or revision.manifest.get('title', 'Move'),
+        creator=publication.creator_name, tags=tags)
 
 
 def visible_manifest(session, lesson, revision, account_id):
@@ -206,8 +270,8 @@ def visible_manifest(session, lesson, revision, account_id):
         tags = list(session.scalars(select(LessonTag.tag).where(LessonTag.lesson_id == lesson.id)))
         publication = session.get(LessonPublication, lesson.id)
         if publication and publication.listed and not publication.moderation_hidden:
-            from .public import public_keys
-            return public_keys(public_manifest(revision, publication, tags), lesson.id)
+            return public_manifest(revision, publication, tags,
+                                   act_id=_act_for(lesson, revision).id, lesson_id=lesson.id)
         from .music_assessment import with_effective_feedback
         return with_effective_feedback({**revision.manifest, 'source_video': None, 'focused_video': None, 'thumbnail': None})
     from .music_assessment import with_effective_feedback

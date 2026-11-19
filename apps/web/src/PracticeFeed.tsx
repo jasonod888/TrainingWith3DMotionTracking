@@ -5,16 +5,17 @@ import {assetUrl,loadPublicMoves,loadPublicSubjects,needsCheck,type Account,type
 import {availableSubjects,matchesSubject,publicPageKey,resolveSubject,subjectFor} from './feed-subject';
 
 import {summarizeBody} from './lesson-summary';
+import {musicFeedBadge} from './app/capability-labels';
 import {FeedCard,PublicFeedCard} from './FeedCard';
 import {FeedEmpty,FeedSkeleton} from './FeedStates';
 import {Button} from './ui/controls';
 
 export type FeedFilter='all'|'own'|'shared'|'public';
 type ManageAction='check'|'edit'|'share'|'remove'|'report'|'copy';
-type Props={filter:FeedFilter;setFilter:(value:FeedFilter)=>void;active:boolean;query:string;onQuery:(value:string)=>void;account:Account|null;library:LessonSummary[];shared:LessonSummary[];states:MoveState[];subjectFilterEnabled:boolean;demo:LessonManifest|null;loading:boolean;onOpen:(lesson:LessonSummary,owned:boolean,check:boolean)=>void;onPublic:(id:string)=>void;onManage:(lesson:LessonSummary,action:ManageAction)=>void;onCreate:()=>void;onSignIn:()=>void;children?:ReactNode};
+type Props={filter:FeedFilter;setFilter:(value:FeedFilter)=>void;active:boolean;query:string;onQuery:(value:string)=>void;account:Account|null;library:LessonSummary[];shared:LessonSummary[];states:MoveState[];subjectFilterEnabled:boolean;demo:LessonManifest|null;loading:boolean;musicChallengeEnabled?:boolean;onOpen:(lesson:LessonSummary,owned:boolean,check:boolean)=>void;onPublic:(id:string)=>void;onManage:(lesson:LessonSummary,action:ManageAction)=>void;onCreate:()=>void;onSignIn:()=>void;hasMore?:boolean;loadingMore?:boolean;onLoadMore?:()=>void;total?:number;subject?:string;onSubject?:(value:string)=>void;serverSubjects?:string[];children?:ReactNode};
 const filters:{id:FeedFilter;label:string}[]=[{id:'all',label:'All'},{id:'own',label:'My practices'},{id:'shared',label:'Shared with me'},{id:'public',label:'Public'}];
 
-export function PracticeFeed({filter,setFilter,active,query,onQuery,account,library,shared,states,subjectFilterEnabled,demo,loading,onOpen,onPublic,onManage,onCreate,onSignIn,children}:Props){
+export function PracticeFeed({filter,setFilter,active,query,onQuery,account,library,shared,states,subjectFilterEnabled,demo,loading,musicChallengeEnabled=false,onOpen,onPublic,onManage,onCreate,onSignIn,hasMore=false,loadingMore=false,onLoadMore,total=0,subject:controlledSubject,onSubject,serverSubjects=[],children}:Props){
  const [publicMoves,setPublicMoves]=useState<PublicMove[]>([]),[publicLoading,setPublicLoading]=useState(true),[publicError,setPublicError]=useState(''),[more,setMore]=useState(false),[moreBusy,setMoreBusy]=useState(false),[retry,setRetry]=useState(0),[moreError,setMoreError]=useState('');
  // Facets are independent of the search and public page, so a selection cannot
  // remove the options that produced it. A failed facet request leaves local cards usable.
@@ -27,10 +28,13 @@ export function PracticeFeed({filter,setFilter,active,query,onQuery,account,libr
   loadPublicSubjects().then(value=>{if(!Array.isArray(value.subjects))throw new Error('Invalid subject list');if(!stopped)setPublicSubjects(value.subjects);}).catch(()=>{if(!stopped)setFacetError(true);});
   return()=>{stopped=true;};
  },[subjectFilterEnabled,active,account?.id,facetRetry]);
- const [subject,setSubject]=useState('all');
+ const [localSubject,setLocalSubject]=useState('all');
+ const subject=controlledSubject??localSubject;
+ const setSubject=(value:string)=>{setLocalSubject(value);onSubject?.(value);};
  const generation=useRef(0),loadedKey=useRef('');
  const showPublic=filter==='all'||filter==='public';
- const subjectOptions=availableSubjects(library,shared,demo?[summarizeBody(demo)]:[],publicSubjects);
+ const serverCarriers=serverSubjects.map(id=>({subject:id,subject_label:id}));
+ const subjectOptions=availableSubjects(library,shared,demo?[summarizeBody(demo)]:[],publicSubjects,serverCarriers);
  const subjectOptionKey=subjectOptions.map(option=>option.id).join(',');
  const activeSubject=subjectFilterEnabled?resolveSubject(subject,subjectOptions):'all';
  // A selection that is no longer offered must not keep filtering invisibly.
@@ -58,7 +62,7 @@ export function PracticeFeed({filter,setFilter,active,query,onQuery,account,libr
   const state=states.find(item=>item.lesson_id===lesson.lesson_id),check=source==='own'&&lesson.experience_family==='body'&&needsCheck(lesson,state);
   const label=lesson.subject_label;
   const creator=source==='own'?'You':source==='demo'?'Form · Demonstration':'Shared with you';
-  const badge=lesson.experience_family==='music'?'Preview only':check?'Ready to check':source==='own'?'Your practice':source==='demo'?'Try a practice':'Shared with you';
+  const badge=lesson.experience_family==='music'?musicFeedBadge({subject:lesson.subject,challengeEnabled:musicChallengeEnabled,check}):check?'Ready to check':source==='own'?'Your practice':source==='demo'?'Try a practice':'Shared with you';
   const actions=source==='own'&&lesson.experience_family==='body'?[...(check?[{label:'Check movement',Icon:Check,action:()=>onManage(lesson,'check')}]:[]),{label:'Adjust practice',Icon:Scissors,action:()=>onManage(lesson,'edit')},{label:'Share practice',Icon:Share2,action:()=>onManage(lesson,'share')},{label:'Remove practice',Icon:Trash2,action:()=>onManage(lesson,'remove')}]:source==='own'?[...(lesson.experience_family==='music'?[{label:'Edit lesson',Icon:Scissors,action:()=>onManage(lesson,'edit')},{label:'Share lesson',Icon:Share2,action:()=>onManage(lesson,'share')}]:[]),{label:'Remove practice',Icon:Trash2,action:()=>onManage(lesson,'remove')}]:source==='demo'?[{label:account?'Add private copy':'Sign in to save',Icon:Plus,action:()=>onManage(lesson,'copy')}]:account?[{label:'Report practice',Icon:Flag,action:()=>onManage(lesson,'report')}]:[];
   return <FeedCard key={`${source}-${lesson.lesson_id}`} title={lesson.title} subjectLabel={label} family={lesson.experience_family} thumbnail={lesson.poster?assetUrl(lesson.poster.key):null} seconds={lesson.duration} creator={creator} badge={badge} kind={source} detail={`${lesson.section_count} ${lesson.section_count===1?'section':'sections'}${check?' · Check before practising':''}`} onOpen={()=>onOpen(lesson,source==='own',check)} actions={actions}/>;
  };
@@ -71,6 +75,7 @@ export function PracticeFeed({filter,setFilter,active,query,onQuery,account,libr
   {showPublic&&publicError&&<div className="feed-load-error" role="status"><span>Public practices couldn’t load. Your available practices are shown below.</span><Button variant="feed-inline" onClick={()=>setRetry(n=>n+1)}>Try again</Button></div>}
   {(loading||showPublic&&publicLoading)&&!count?<FeedSkeleton/>:count?<div className="feed-grid">{own.map(item=>localCard(item,'own'))}{received.map(item=>localCard(item,'shared'))}{discovery.map(item=><PublicFeedCard key={item.lesson_id} move={item} onOpen={()=>onPublic(item.lesson_id)}/>)}{sample&&localCard(summarizeBody(sample),'demo')}</div>:<FeedEmpty icon={filter==='shared'?<Users size={28}/>:filter==='public'?<Globe size={28}/>:<Search size={28}/>} title={query?'No matching practices':filter==='own'?'Your practices start here':filter==='shared'?'Nothing shared with you yet':filter==='public'?'Public practices are on their way':'Your next practice starts here'} description={query?'Try a different title or browse another source.':!account&&(filter==='own'||filter==='shared')?'Sign in to see your practices and anything shared with you.':filter==='shared'?'Practices shared directly or through your groups will appear here.':filter==='public'?'Practices appear here when their creators publish them.':'Add a video, or browse the public practices available to you.'}>{query?<Button variant="app-secondary" className="secondary" onClick={()=>onQuery('')}>Clear search</Button>:filter==='own'||filter==='all'?<Button variant="app-primary" className="primary" onClick={account?onCreate:onSignIn}><Plus size={17}/>{account?'Create a practice':'Sign in to create'}</Button>:!account&&filter==='shared'?<Button variant="app-primary" className="primary" onClick={onSignIn}>Sign in</Button>:null}</FeedEmpty>}
   {showPublic&&moreError&&<div className="feed-more" role="status"><span className="small">More practices could not load.</span><Button variant="app-secondary" className="secondary" disabled={moreBusy} onClick={loadMore}>Try again</Button></div>}
+  {hasMore&&onLoadMore&&<div className="feed-more"><span className="small muted">{total} practices</span><Button variant="app-secondary" className="secondary" disabled={loadingMore} onClick={onLoadMore}>{loadingMore?'Loading…':'Load more practices'}<ChevronRight size={16}/></Button></div>}
   {showPublic&&more&&!publicLoading&&<div className="feed-more"><Button variant="app-secondary" className="secondary" disabled={moreBusy} onClick={loadMore}>{moreBusy?'Loading…':'More practices'}<ChevronRight size={16}/></Button></div>}
  </section>;
 }

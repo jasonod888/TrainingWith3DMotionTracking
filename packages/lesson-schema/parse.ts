@@ -14,6 +14,7 @@ import {validateSections} from './index';
 import type {
   AssessmentPolicy, Asset, InstrumentConfig, LessonDocument, LessonManifest, LessonSummary,
   MusicLessonManifest, MusicDraftView, MusicDraftEvent, MusicDraftCorrection, Section, SectionSet, SummaryCapabilities,
+  DrawingLessonManifest, DrawingStep,
 } from './index';
 
 export type ParseErrorCode = 'malformed' | 'unsupported_format';
@@ -33,7 +34,7 @@ const isCount = (value: unknown): value is number => isNumber(value) && Number.i
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(item => typeof item === 'string');
 
-const SUBJECTS = ['dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'movement_other'] as const;
+const SUBJECTS = ['dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'drawing', 'movement_other'] as const;
 const MUSIC_SUBJECTS = ['piano', 'guitar'] as const;
 const BODY_ENGINES = ['sam-3d-body', 'mediapipe', 'synthetic'];
 const ROOT_MOTIONS = ['estimated-camera-relative', 'hip-relative', 'in-place', 'floor-guided'];
@@ -58,7 +59,86 @@ const MUSIC_KEYS = new Set([
 const SUMMARY_KEYS = new Set([
   'summary_version', 'lesson_id', 'revision_id', 'title', 'subject', 'subject_label',
   'experience_family', 'instrument', 'duration', 'section_count', 'poster', 'capabilities',
+  'act_id', 'effective_capabilities',
 ]);
+
+const DRAWING_KEYS = new Set([
+  'schema_version', 'experience_family', 'lesson_id', 'revision_id', 'title', 'subject',
+  'medium', 'steps', 'assessment', 'reference_guide', 'poster', 'warnings', 'feedback_enabled',
+]);
+const DRAWING_STEP_KEYS = new Set(['id', 'title', 'instruction', 'reference_guide', 'media_role']);
+const DRAWING_MEDIA = ['reference_guide', 'example', 'detail'];
+
+/** Strict drawing reader. A body or music field makes the payload malformed. */
+export function parseDrawingLessonManifest(value: unknown): ParseResult<DrawingLessonManifest> {
+  if (!isRecord(value)) return malformed('This drawing lesson could not be read.');
+  if (value.schema_version !== 3) return unsupported('This drawing format is not supported.');
+  if (value.experience_family !== 'visual' || value.subject !== 'drawing') {
+    return malformed('This drawing lesson has the wrong identity.');
+  }
+  if (!Object.keys(value).every(key => DRAWING_KEYS.has(key))) {
+    return malformed('This drawing lesson has unexpected fields.');
+  }
+  if (!isId(value.lesson_id) || !isId(value.revision_id) || !isTitle(value.title)) {
+    return malformed('This drawing lesson is missing a valid identity.');
+  }
+  if (!['pencil', 'charcoal', 'digital'].includes(String(value.medium))) {
+    return malformed('This drawing lesson has an unknown medium.');
+  }
+  if (value.assessment !== 'none') {
+    return malformed('A drawing lesson cannot claim an assessment policy.');
+  }
+  if (!Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 200) {
+    return malformed('A drawing lesson needs between 1 and 200 steps.');
+  }
+  const steps: DrawingStep[] = [];
+  const ids = new Set<string>();
+  for (const raw of value.steps) {
+    if (!isRecord(raw)) return malformed('A drawing step could not be read.');
+    if (!Object.keys(raw).every(key => DRAWING_STEP_KEYS.has(key))) {
+      return malformed('A drawing step has unexpected fields.');
+    }
+    if (!isId(raw.id) || ids.has(raw.id)) return malformed('Drawing step ids must be unique.');
+    if (!isTitle(raw.title) || !isText(raw.instruction) || raw.instruction.length > 1000) {
+      return malformed('A drawing step is missing its instruction.');
+    }
+    const guide = readAsset(raw.reference_guide);
+    if (guide === undefined) return malformed('A drawing step has an invalid guide.');
+    const mediaRole = raw.media_role === undefined || raw.media_role === null
+      ? null : String(raw.media_role);
+    if (mediaRole !== null && !DRAWING_MEDIA.includes(mediaRole)) {
+      return malformed('A drawing step has an unknown media role.');
+    }
+    ids.add(raw.id);
+    steps.push({id: raw.id, title: raw.title, instruction: raw.instruction,
+      reference_guide: guide ?? null, media_role: mediaRole as DrawingStep['media_role']});
+  }
+  const referenceGuide = readAsset(value.reference_guide);
+  if (referenceGuide === undefined) return malformed('This drawing lesson has an invalid guide.');
+  const poster = readAsset(value.poster);
+  if (poster === undefined) return malformed('This drawing lesson has an invalid poster.');
+  if (poster && !poster.mime.startsWith('image/')) return malformed('A drawing poster must be an image.');
+  const warnings = value.warnings === undefined ? [] : value.warnings;
+  if (!Array.isArray(warnings) || warnings.length > 50 || warnings.some(item => !isText(item))) {
+    return malformed('This drawing lesson has invalid warnings.');
+  }
+  const feedback = value.feedback_enabled === undefined || value.feedback_enabled === null
+    ? null : value.feedback_enabled;
+  if (feedback !== null && typeof feedback !== 'boolean') {
+    return malformed('This drawing lesson has an invalid feedback policy.');
+  }
+  return {
+    ok: true,
+    value: {
+      schema_version: 3, experience_family: 'visual', lesson_id: value.lesson_id,
+      revision_id: value.revision_id, title: value.title, subject: 'drawing',
+      medium: value.medium as DrawingLessonManifest['medium'], steps,
+      assessment: 'none', reference_guide: referenceGuide ?? null,
+      poster: poster ?? null, warnings: [...warnings],
+      feedback_enabled: feedback,
+    },
+  };
+}
 
 const ASSET_KEY = /^[a-zA-Z0-9][a-zA-Z0-9_./-]*$/;
 const safeKey = (key: string): boolean =>
@@ -194,7 +274,8 @@ function readPresentations(value: unknown): boolean {
 }
 
 /** Body v1. Rejects a v2 payload rather than silently treating it as a body lesson. */
-export function parseLessonManifest(value: unknown): ParseResult<LessonManifest> {
+export function parseLessonManifest(value: unknown,
+  options: {publicVideoOnly?: boolean} = {}): ParseResult<LessonManifest> {
   if (!isRecord(value)) return malformed('This lesson could not be read.');
   if (value.schema_version === 2) return unsupported('This lesson needs a newer version of the app.');
   if (value.schema_version !== 1) return unsupported('This lesson format is not supported.');
@@ -228,12 +309,15 @@ export function parseLessonManifest(value: unknown): ParseResult<LessonManifest>
   // needs the clip the person actually watches. `animation` is nullable on the wire.
   const animation: OptionalAsset = readAsset(value.animation);
   const landmarks = readAsset(value.landmarks);
-  if (animation === undefined || !landmarks) return malformed('This lesson is missing its movement assets.');
+  const sourceVideo: OptionalAsset = readAsset(value.source_video);
+  const publicVideoOnly = Boolean(options.publicVideoOnly && !animation && sourceVideo);
+  if (animation === undefined || (!landmarks && !publicVideoOnly)) {
+    return malformed('This lesson is missing its movement assets.');
+  }
   if (animation && animation.mime !== 'model/gltf-binary') return malformed('This lesson animation is not a GLB.');
-  if (landmarks.mime !== 'application/json') return malformed('This lesson landmarks are not JSON.');
+  if (landmarks && landmarks.mime !== 'application/json') return malformed('This lesson landmarks are not JSON.');
   const engine = value.engine as LessonManifest['engine'];
   if (engine !== 'mediapipe' && !animation) return malformed('This 3D lesson is missing its animation.');
-  const sourceVideo: OptionalAsset = readAsset(value.source_video);
   const thumbnail: OptionalAsset = readAsset(value.thumbnail);
   const focused: OptionalAsset = readAsset(value.focused_video);
   const alpha: OptionalAsset = readAsset(value.focused_video_alpha);
@@ -264,7 +348,7 @@ export function parseLessonManifest(value: unknown): ParseResult<LessonManifest>
     value: {
       ...(value as unknown as LessonManifest),
       animation,
-      landmarks,
+      landmarks: landmarks ?? null,
       source_video: sourceVideo ?? null,
       thumbnail: thumbnail ?? null,
       focused_video: focused ?? null,
@@ -346,14 +430,172 @@ export function parseMusicLessonManifest(value: unknown): ParseResult<MusicLesso
   };
 }
 
+const PUBLIC_ENVELOPE_KEYS = new Set([
+  'act_id', 'release_revision', 'published_revision_id', 'creator', 'creator_name',
+  'description', 'tags', 'subjects', 'roles', 'public_roles', 'representations',
+  'effective_actions', 'audience', 'like_count', 'liked_by_viewer',
+  'playable_preview', 'public_poster', 'poster', 'reference_guide', 'effective_capabilities',
+]);
+
+export type PublicLessonMetadata = {
+  actId: string | null;
+  releaseRevision: string | null;
+  publishedRevisionId: string | null;
+  creator: {id: string; displayName: string} | null;
+  creatorName: string | null;
+  description: string | null;
+  tags: string[];
+  subjects: {id: string; label: string}[];
+  roles: string[];
+  publicRoles: string[];
+  representations: string[];
+  effectiveActions: {watch: boolean; practice: boolean; challenge: boolean} | null;
+  audience: string | null;
+  likeCount: number | null;
+  likedByViewer: boolean | null;
+  playablePreview: Asset | null;
+  poster: Asset | null;
+  referenceGuide: Asset | null;
+  effectiveCapabilities: Record<string, unknown> | null;
+};
+
+const stringList = (value: unknown): string[] | undefined => {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some(item => !isText(item))) return undefined;
+  return [...value] as string[];
+};
+
+/** Validate a public projection envelope, then hand only the document to strict readers. */
+export function parsePublicLessonDocument(value: unknown): ParseResult<{
+  document: LessonDocument; metadata: PublicLessonMetadata;
+}> {
+  if (!isRecord(value)) return malformed('This public lesson could not be read.');
+  const record = value;
+
+  const tags = stringList(record.tags);
+  const roles = stringList(record.roles);
+  const publicRoles = stringList(record.public_roles);
+  const representations = stringList(record.representations);
+  if (!tags || !roles || !publicRoles || !representations) {
+    return malformed('This public lesson has invalid metadata.');
+  }
+  const optionalText = (key: string): string | null | undefined => {
+    const raw = record[key];
+    if (raw === undefined || raw === null) return null;
+    return isText(raw) ? raw : undefined;
+  };
+  const actId = optionalText('act_id');
+  const releaseRevision = optionalText('release_revision');
+  const publishedRevisionId = optionalText('published_revision_id');
+  const creatorName = optionalText('creator_name');
+  const description = optionalText('description');
+  const audience = optionalText('audience');
+  if (actId === undefined || releaseRevision === undefined || publishedRevisionId === undefined
+      || creatorName === undefined || description === undefined || audience === undefined) {
+    return malformed('This public lesson has invalid identity metadata.');
+  }
+
+  let creator: {id: string; displayName: string} | null = null;
+  if (record.creator !== undefined && record.creator !== null) {
+    const rawCreator = record.creator;
+    if (!isRecord(rawCreator) || !isId(rawCreator.id) || !isText(rawCreator.display_name)) {
+      return malformed('This public lesson has an invalid creator.');
+    }
+    creator = {id: rawCreator.id, displayName: rawCreator.display_name};
+  }
+
+  let subjects: {id: string; label: string}[] = [];
+  if (record.subjects !== undefined) {
+    if (!Array.isArray(record.subjects)) return malformed('This public lesson has invalid subjects.');
+    for (const raw of record.subjects) {
+      if (!isRecord(raw) || !isId(raw.id) || !isText(raw.label)) {
+        return malformed('This public lesson has an invalid subject.');
+      }
+      subjects.push({id: raw.id, label: raw.label});
+    }
+  }
+
+  let effectiveActions: PublicLessonMetadata['effectiveActions'] = null;
+  if (record.effective_capabilities !== undefined
+      && !isRecord(record.effective_capabilities)) {
+    return malformed('This public lesson has invalid capabilities.');
+  }
+  const effectiveCapabilities = isRecord(record.effective_capabilities)
+    ? record.effective_capabilities : null;
+  if (record.effective_actions !== undefined) {
+    const raw = record.effective_actions;
+    if (!isRecord(raw) || typeof raw.watch !== 'boolean' || typeof raw.practice !== 'boolean'
+        || typeof raw.challenge !== 'boolean') {
+      return malformed('This public lesson has invalid actions.');
+    }
+    effectiveActions = {watch: raw.watch, practice: raw.practice, challenge: raw.challenge};
+  }
+
+  const likeCount = record.like_count === undefined ? null : record.like_count;
+  if (likeCount !== null && (!isNumber(likeCount) || likeCount < 0)) {
+    return malformed('This public lesson has an invalid like count.');
+  }
+  const likedByViewer = record.liked_by_viewer === undefined ? null : record.liked_by_viewer;
+  if (likedByViewer !== null && typeof likedByViewer !== 'boolean') {
+    return malformed('This public lesson has an invalid like state.');
+  }
+  const playablePreview = readAsset(record.playable_preview);
+  const poster = readAsset(record.poster ?? record.public_poster);
+  const referenceGuide = readAsset(record.reference_guide);
+  if (playablePreview === undefined || poster === undefined || referenceGuide === undefined) {
+    return malformed('This public lesson has an invalid representation.');
+  }
+
+  // Only the known public envelope is removed; anything else must still pass the
+  // strict private reader, so unknown/malicious fields remain rejected.
+  const documentValue: Record<string, unknown> = {...record};
+  for (const key of PUBLIC_ENVELOPE_KEYS) delete documentValue[key];
+  // A public video representation is a movement source for a video-only body
+  // release. Map it only in the public adapter; private parsing stays strict.
+  if (documentValue.schema_version === 1 && playablePreview
+      && !documentValue.animation && !documentValue.landmarks
+      && !documentValue.source_video && !documentValue.focused_video) {
+    // Public video-only projection intentionally nulls pose artifacts. Keep
+    // landmarks null: an MP4 is never a pose reference and its MIME is never forged.
+    documentValue.source_video = playablePreview;
+    documentValue.landmarks = null;
+    documentValue.engine = 'mediapipe';
+  }
+  const parsed = parseLessonDocument(documentValue, {publicVideoOnly: true});
+  if (!parsed.ok) return parsed;
+  return {
+    ok: true,
+    value: {
+      document: parsed.value,
+      metadata: {
+        actId, releaseRevision, publishedRevisionId, creator, creatorName, description,
+        tags, subjects, roles, publicRoles, representations, effectiveActions, audience,
+        likeCount: likeCount as number | null,
+        likedByViewer: likedByViewer as boolean | null,
+        playablePreview: playablePreview ?? null,
+        poster: poster ?? null,
+        referenceGuide: referenceGuide ?? null,
+        effectiveCapabilities,
+      },
+    },
+  };
+}
+
 export function parseLessonSummary(value: unknown): ParseResult<LessonSummary> {
   if (!isRecord(value)) return malformed('This lesson summary could not be read.');
-  if (value.summary_version !== 1) return unsupported('This lesson summary format is not supported.');
+  if (value.summary_version !== 1 && value.summary_version !== 2) return unsupported('This lesson summary format is not supported.');
   if (!Object.keys(value).every(key => SUMMARY_KEYS.has(key))) return malformed('This lesson summary has unexpected fields.');
   if (!isId(value.lesson_id) || !isId(value.revision_id) || !isTitle(value.title)) return malformed('This summary is missing a valid identity.');
   if (!SUBJECTS.includes(value.subject as (typeof SUBJECTS)[number])) return malformed('This summary has an unknown subject.');
   if (!isText(value.subject_label)) return malformed('This summary has no subject label.');
-  if (value.experience_family !== 'body' && value.experience_family !== 'music') return malformed('This summary has an unknown family.');
+  if (value.summary_version === 2 && !isText(value.act_id)) {
+    return malformed('This summary is missing its Act identity.');
+  }
+  if (value.effective_capabilities !== undefined && !isRecord(value.effective_capabilities)) {
+    return malformed('This summary has invalid capabilities.');
+  }
+  if (value.experience_family !== 'body' && value.experience_family !== 'music'
+      && value.experience_family !== 'visual') return malformed('This summary has an unknown family.');
   const instrument = value.instrument === undefined || value.instrument === null ? null : value.instrument;
   if (instrument !== null && instrument !== 'piano' && instrument !== 'guitar') return malformed('This summary has an unknown instrument.');
   if (!isNumber(value.duration) || value.duration <= 0) return malformed('This summary has an invalid duration.');
@@ -362,8 +604,12 @@ export function parseLessonSummary(value: unknown): ParseResult<LessonSummary> {
   if (poster === undefined) return malformed('This summary has an invalid poster.');
   if (poster && !poster.mime.startsWith('image/')) return malformed('This summary poster is not an image.');
   const capabilities = value.capabilities;
-  if (!isRecord(capabilities) || !Object.keys(capabilities).every(key => ['preview', 'practice', 'live_input'].includes(key))) {
+  if (!isRecord(capabilities) || !Object.keys(capabilities).every(key => ['preview', 'practice', 'live_input', 'inputs'].includes(key))) {
     return malformed('This summary has no capabilities.');
+  }
+  if (capabilities.inputs !== undefined
+      && (!Array.isArray(capabilities.inputs) || capabilities.inputs.some(item => !isText(item)))) {
+    return malformed('This summary has invalid capability inputs.');
   }
   if (typeof capabilities.preview !== 'boolean' || typeof capabilities.practice !== 'boolean') return malformed('This summary has invalid capabilities.');
   const live = capabilities.live_input as string;
@@ -382,6 +628,12 @@ export function parseLessonSummary(value: unknown): ParseResult<LessonSummary> {
   if (value.experience_family === 'body' && (live === 'midi' || live === 'microphone')) {
     return malformed('This summary offers music input for a movement lesson.');
   }
+  if (value.experience_family === 'visual') {
+    if (value.subject !== 'drawing' || instrument !== null) {
+      return malformed('This summary disagrees about its drawing identity.');
+    }
+    if (live !== 'none') return malformed('A drawing summary cannot offer capture input.');
+  }
   return {
     ok: true,
     value: {
@@ -391,24 +643,30 @@ export function parseLessonSummary(value: unknown): ParseResult<LessonSummary> {
         preview: capabilities.preview,
         practice: capabilities.practice,
         live_input: live as SummaryCapabilities['live_input'],
+        ...(Array.isArray(capabilities.inputs) ? {inputs: [...capabilities.inputs] as string[]} : {}),
       },
     },
   };
 }
 
 /** Dispatch for a mixed response. This is the only place a lesson union exists. */
-export function parseLessonDocument(value: unknown): ParseResult<LessonDocument> {
+export function parseLessonDocument(value: unknown,
+  options: {publicVideoOnly?: boolean} = {}): ParseResult<LessonDocument> {
   if (!isRecord(value)) return malformed('This lesson could not be read.');
   if (value.schema_version === 2) {
     const parsed = parseMusicLessonManifest(value);
     return parsed.ok ? {ok: true, value: {kind: 'music', value: parsed.value}} : parsed;
+  }
+  if (value.schema_version === 3) {
+    const parsed = parseDrawingLessonManifest(value);
+    return parsed.ok ? {ok: true, value: {kind: 'drawing', value: parsed.value}} : parsed;
   }
   if (value.summary_version === 1) {
     const parsed = parseLessonSummary(value);
     return parsed.ok ? {ok: true, value: {kind: 'summary', value: parsed.value}} : parsed;
   }
   if (value.schema_version === 1) {
-    const parsed = parseLessonManifest(value);
+    const parsed = parseLessonManifest(value, options);
     return parsed.ok ? {ok: true, value: {kind: 'body', value: parsed.value}} : parsed;
   }
   return unsupported('This lesson format is not supported.');

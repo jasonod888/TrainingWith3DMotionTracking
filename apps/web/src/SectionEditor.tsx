@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import {createEditorSession} from './editor/editor-session';
 import { ArrowLeft, Box, Check, ChevronLeft, ChevronRight, Pause, Play, Plus, Video } from 'lucide-react';
 import type { LessonManifest, Section } from '../../../packages/lesson-schema/index';
 import { validateSections } from '../../../packages/lesson-schema/index';
@@ -8,6 +9,7 @@ import { clampSectionPreview, sectionPreviewRange, playSectionPreview } from './
 import { SectionInspector } from './SectionInspector';
 import { useSectionPlayback } from './useSectionPlayback';
 import { MarkerTimeline } from './MarkerTimeline';
+import {AUTHORING_LABELS} from './editor/authoring-lifecycle';
 import { addMarker, initialMarkers, newMarkerTime, moveMarker, removeMarker } from './section-markers';
 import { lessonFrameTime } from './lesson-clock';
 import { timeLabel } from './timeline';
@@ -28,6 +30,10 @@ export function SectionEditor({ lesson, onBack, onPractice, onSave, onDirty, per
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [session] = useState(() => createEditorSession({
+    state: persistent ? 'saved-private' : 'needs-review',
+    revisionId: lesson.revision_id, reviewed: persistent,
+  }));
   const fps = lesson.frame_rate ?? 15;
   const time = lessonFrameTime(lesson, state.time);
   const preview = sectionPreviewRange(draft, selected);
@@ -96,8 +102,14 @@ export function SectionEditor({ lesson, onBack, onPractice, onSave, onDirty, per
       const sections = draft.map((section, index) => ({ ...section, label: section.label.trim() || String(index + 1) }));
       await onSave(validateSections(sections, lesson.duration), title.trim(), feedbackEnabled);
       setDraft(sections); setDirty(false); onDirty?.(false);
+      session.saved(lesson.revision_id);
       setMessage(persistent ? 'All changes saved.' : 'Draft kept in this session.');
-    } catch (error) { setMessage((error as Error).message); }
+    } catch (error) {
+      const status = (error as {status?: number}).status;
+      if (status === 409) session.conflict((error as Error).message);
+      else session.fail((error as Error).message);
+      setMessage((error as Error).message);
+    }
     finally { setSaving(false); }
   };
   useEffect(() => {
@@ -134,7 +146,7 @@ export function SectionEditor({ lesson, onBack, onPractice, onSave, onDirty, per
       </div>
       <label className="section-feedback"><input aria-label="Enable practice feedback" type="checkbox" role="switch" checked={feedbackEnabled} disabled={saving}
         onChange={event => { setFeedbackEnabled(event.target.checked); setDirty(true); setMessage(''); }}/> Practice feedback</label>
-      <span className="section-save-state">{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
+      <span className="section-save-state" data-authoring-state={dirty ? 'editing' : 'saved-private'}>{dirty ? AUTHORING_LABELS.unsaved : persistent ? AUTHORING_LABELS.savedPrivate : 'Draft (session only)'}</span>
       <button className="studio-practice" disabled={dirty || saving} onClick={onPractice}>
         <Play size={15} />
         <span>Practise</span>

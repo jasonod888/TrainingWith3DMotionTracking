@@ -4,6 +4,8 @@ from math import isfinite
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .acts import ActId
+
 class Contract(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
 
@@ -242,6 +244,45 @@ class SummaryCapabilities(Contract):
     live_input: Literal['camera', 'midi', 'microphone', 'none'] = 'none'
 
 
+class DrawingStep(Contract):
+    """One ordered drawing instruction. Visual only: no pose or note fields."""
+
+    id: str = Field(min_length=1, max_length=80)
+    title: str = Field(min_length=1, max_length=120)
+    instruction: str = Field(min_length=1, max_length=1000)
+    reference_guide: Asset | None = None
+    media_role: Literal['reference_guide', 'example', 'detail'] | None = None
+
+
+class DrawingLessonManifest(Contract):
+    """Discriminated drawing document (`schema_version` 3, family `visual`).
+
+    Deliberately carries no body animation/landmarks and no music reference/events.
+    Assessment is explicitly `none`: practice is unassessed and never scored.
+    """
+
+    schema_version: Literal[3] = 3
+    experience_family: Literal['visual'] = 'visual'
+    lesson_id: str
+    revision_id: str
+    title: str
+    subject: Literal['drawing'] = 'drawing'
+    medium: Literal['pencil', 'charcoal', 'digital']
+    steps: list[DrawingStep] = Field(min_length=1, max_length=200)
+    assessment: Literal['none'] = 'none'
+    reference_guide: Asset | None = None
+    poster: Asset | None = None
+    warnings: list[str] = Field(default_factory=list)
+    feedback_enabled: bool | None = Field(default=None, strict=True)
+
+    @model_validator(mode='after')
+    def ordered_unique_steps(self):
+        ids = [step.id for step in self.steps]
+        if len(ids) != len(set(ids)):
+            raise ValueError('Drawing step ids must be unique.')
+        return self
+
+
 class LessonSummary(Contract):
     """Card-sized projection: no body assets and no musical events."""
 
@@ -249,14 +290,99 @@ class LessonSummary(Contract):
     lesson_id: str
     revision_id: str
     title: str
-    subject: Literal['dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'movement_other']
+    subject: Literal['dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'drawing', 'movement_other']
     subject_label: str
-    experience_family: Literal['body', 'music']
+    experience_family: Literal['body', 'music', 'visual']
     instrument: Literal['piano', 'guitar'] | None = None
     duration: float = Field(gt=0)
     section_count: int = Field(ge=1)
     poster: Asset | None = None
     capabilities: SummaryCapabilities = Field(default_factory=SummaryCapabilities)
+
+
+class CapabilityResult(Contract):
+    """One resolved capability with a stable reason.
+
+    ``support`` describes what the Act can ever do. ``available`` describes this
+    lesson, audience, policy, choice and device right now. A learner switching a
+    feature off is therefore ``supported`` but not ``available`` with reason
+    ``learner_off`` — never the same as an unsupported or missing capability.
+    """
+
+    support: Literal['supported', 'unsupported', 'unavailable']
+    available: bool
+    reasonCode: str
+    explanation: str
+
+
+class EffectiveCapabilities(Contract):
+    """Server-resolved capabilities. No capability is inferred from schema_version."""
+
+    canEdit: CapabilityResult
+    canReview: CapabilityResult
+    canPractice: CapabilityResult
+    canChallenge: CapabilityResult
+    canAssess: CapabilityResult
+    canRecord: CapabilityResult
+    canPublishPublicly: CapabilityResult
+    # A set of declared/available evidence inputs, not one exclusive live_input.
+    inputs: dict[Literal['camera', 'midi', 'microphone', 'uploaded_recording', 'pointer_stylus'],
+                 CapabilityResult] = Field(default_factory=dict)
+
+
+class ActRef(Contract):
+    """The Act identity carried by a negotiated envelope."""
+
+    id: ActId
+    label: str
+    descriptor_version: int = Field(ge=1)
+
+
+class SummaryCapabilitiesV2(Contract):
+    """Card capabilities plus the full input set.
+
+    ``live_input`` is retained so a v2 card can reuse v1 presentation, while
+    ``inputs`` lists every declared input instead of forcing one exclusive value.
+    """
+
+    preview: bool = True
+    practice: bool = True
+    live_input: Literal['camera', 'midi', 'microphone', 'none'] = 'none'
+    inputs: list[Literal['camera', 'midi', 'microphone', 'uploaded_recording', 'pointer_stylus']] = Field(
+        default_factory=list)
+
+
+class LessonSummaryV2(Contract):
+    """Negotiated card contract. Only served when the caller advertises Act v1."""
+
+    summary_version: Literal[2] = 2
+    lesson_id: str
+    revision_id: str
+    title: str
+    subject: Literal['dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'drawing', 'movement_other']
+    subject_label: str
+    experience_family: Literal['body', 'music', 'visual']
+    instrument: Literal['piano', 'guitar'] | None = None
+    duration: float = Field(gt=0)
+    section_count: int = Field(ge=1)
+    poster: Asset | None = None
+    capabilities: SummaryCapabilitiesV2 = Field(default_factory=SummaryCapabilitiesV2)
+    act_id: ActId
+    act: ActRef
+    effective_capabilities: EffectiveCapabilities
+
+
+class LessonContext(Contract):
+    """Outer detail envelope. ``document`` stays the unmodified specialized payload."""
+
+    context_version: Literal[1] = 1
+    act_id: ActId
+    act: ActRef
+    # Why this reader can see the lesson. Coarse by design: 'invited' covers a
+    # direct invite grant and 'link' a share-link grant.
+    audience: Literal['owner', 'invited', 'link', 'group', 'public'] = 'invited'
+    capabilities: EffectiveCapabilities
+    document: dict
 
 
 # The only union in the product: a validated loading boundary, never a body

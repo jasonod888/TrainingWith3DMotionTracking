@@ -1,6 +1,8 @@
 import {useEffect, useState} from 'react';
-import {ArrowLeft, Mail, Lock, X} from 'lucide-react';
-import {ApiError, request} from '../api';
+import {ArrowLeft, Globe, Mail, Lock, X} from 'lucide-react';
+import {ApiError, loadPublishability, request, updatePublic, type Publishability} from '../api';
+import {availableRoles, readiness, rolesSummary, type PublicationView} from '../sharing/publication-readiness';
+import {invalidateLessonContext} from '../app/lesson-context';
 
 type Sharing = {
   mode: 'private' | 'invite' | 'link';
@@ -9,6 +11,7 @@ type Sharing = {
   draft_revision_id: string | null;
   students: {id: string; email: string; active: boolean; revoked: boolean}[];
   invitations: {id: string; email: string; expires_at: string}[];
+  public_listed?: boolean;
 };
 
 /**
@@ -20,6 +23,13 @@ export function MusicShareLesson({lessonId, title, onBack, onChange}: {
 }) {
   const path = `/lessons/${encodeURIComponent(lessonId)}`;
   const [data, setData] = useState<Sharing | null>(null);
+  const [manifest, setManifest] = useState<Record<string, unknown> | null>(null);
+  const [publishability, setPublishability] = useState<Publishability | null>(null);
+  const [publicRoles, setPublicRoles] = useState<string[]>([]);
+  const [rights, setRights] = useState(false);
+  const [publicTitle, setPublicTitle] = useState(title);
+  const [creatorName, setCreatorName] = useState('Creator');
+  const [tags, setTags] = useState('music');
   const [email, setEmail] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -32,14 +42,60 @@ export function MusicShareLesson({lessonId, title, onBack, onChange}: {
     request<Sharing>(path + '/sharing')
       .then(value => { if (!stopped) setData(value); })
       .catch(cause => { if (!stopped) setError(cause.message); });
+    request<Record<string, unknown>>(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false,
+      {'X-Lesson-Formats': '1,2'})
+      .then(value => { if (!stopped) setManifest(value); })
+      .catch(() => { if (!stopped) setManifest(null); });
     return () => { stopped = true; };
-  }, [path]);
+  }, [path, lessonId]);
+
+  const view: PublicationView = {
+    actId: manifest?.subject === 'guitar' ? 'guitar' : 'piano',
+    hasAnimation: false,
+    hasPreviewVideo: Boolean(manifest?.playable_preview || manifest?.preview_video),
+    hasReference: Boolean(manifest?.reference),
+    hasPoster: Boolean(manifest?.public_poster || manifest?.poster),
+    accepted: Boolean(data?.accepted_revision_id) && data?.accepted_revision_id === data?.draft_revision_id,
+  };
+  const available = availableRoles(view);
+  const publicReadiness = readiness({view, audience: 'public', roles: publicRoles,
+    rightsAcknowledged: rights});
+
+  useEffect(() => {
+    let stopped = false;
+    if (!view.accepted) return () => { stopped = true; };
+    loadPublishability(lessonId, 'public', publicRoles).then(value => {
+      if (stopped) return;
+      setPublishability(value);
+      if (!publicRoles.length && value.roles.length) setPublicRoles(value.roles);
+    }).catch(() => { /* readiness UI still uses the local mirror */ });
+    return () => { stopped = true; };
+  }, [lessonId, view.accepted, publicRoles.join(',')]);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setError(''); setNotice('');
     try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'That action could not be completed.'); }
     finally { setBusy(false); }
   };
+
+  const savePublic = () => void run(async () => {
+    if (!publicReadiness.enabled) throw new Error(publicReadiness.reason);
+    await updatePublic(lessonId, {
+      listed: true, title: publicTitle.trim(), creator_name: creatorName.trim(),
+      tags: tags.split(',').map(value => value.trim()).filter(Boolean),
+      rights_acknowledged: true, public_roles: publicRoles,
+    });
+    invalidateLessonContext(lessonId);
+    setNotice('This music lesson is now public.');
+    setRights(false);
+    await load(); onChange?.();
+  });
+  const unlistPublic = () => void run(async () => {
+    await updatePublic(lessonId, {listed: false});
+    invalidateLessonContext(lessonId);
+    setNotice('This music lesson is no longer public.');
+    await load(); onChange?.();
+  });
 
   const ensurePublished = async () => {
     // Inviting a new person never changes what existing recipients are watching.
@@ -117,8 +173,37 @@ export function MusicShareLesson({lessonId, title, onBack, onChange}: {
     {!data && !error ? <p role="status">Loading who can see this lesson…</p> : data && <>
       <div className="audience-summary"><span className="audience-icon"><Lock size={16}/></span><div>
         <strong>{published ? 'Invitation only' : 'Private'}</strong>
-        <p>This music lesson cannot be shared by link, with a group or publicly. It has no public listing.</p>
+        <p>Invite people directly, or publish the approved public representation below.</p>
       </div></div>
+      {accepted && <div className="share-panel">
+        <h2><Globe size={16}/> Public gallery</h2>
+        {available.length ? available.map(role => <label className="check-line" key={role}>
+          <input type="checkbox" checked={publicRoles.includes(role)} disabled={busy}
+            onChange={event => setPublicRoles(current => event.target.checked
+              ? [...current, role] : current.filter(value => value !== role))}/>
+          <span>{rolesSummary([role])}</span>
+        </label>) : <p className="inline-notice" role="status">No approved public representation yet. Add a preview video or reviewed reference.</p>}
+        <p className="small muted" role="status">
+          {publicReadiness.reason || (publishability?.publishable
+            ? 'Server readiness confirmed. Choose representations and confirm rights.'
+            : 'Choose at least one representation, then confirm rights.')}
+        </p>
+        <label>Public title<input maxLength={200} value={publicTitle} disabled={busy}
+          onChange={event => setPublicTitle(event.target.value)}/></label>
+        <label>Creator name<input maxLength={80} value={creatorName} disabled={busy}
+          onChange={event => setCreatorName(event.target.value)}/></label>
+        <label>Tags<input maxLength={200} value={tags} disabled={busy}
+          onChange={event => setTags(event.target.value)}/></label>
+        <label className="check-line"><input type="checkbox" checked={rights} disabled={busy}
+          onChange={event => setRights(event.target.checked)}/>
+          <span>I have the right to publish this music lesson publicly.</span></label>
+        <div className="inline-actions">
+          <button className="primary" disabled={busy || !publicReadiness.enabled}
+            onClick={savePublic}><Globe size={16}/>List publicly</button>
+          {data.public_listed && <button className="secondary" disabled={busy}
+            onClick={unlistPublic}>Remove from public</button>}
+        </div>
+      </div>}
       {!accepted && <p className="inline-notice" role="status">Save the reviewed reference before sharing this music lesson.</p>}
       {published && data.published_revision_id !== data.draft_revision_id && <div className="check-banner">
         <span>People keep the current shared version, including new invitees. Review and explicitly update to release your newer changes.</span>

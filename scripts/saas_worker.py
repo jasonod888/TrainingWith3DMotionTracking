@@ -272,7 +272,7 @@ class Worker:
             manifest['focused_video']=assets['instructor.mp4']
             manifest['focused_video_start']=0.
             if 'instructor-alpha.webm' in assets:manifest['focused_video_alpha']=assets['instructor-alpha.webm']
-        else:manifest['warnings'].append('Person-only instructor video could not be prepared. The original wide video remains available.')
+        else:manifest['warnings'].append('Person-only instructor video could not be prepared (unrepaired matte gap or derivative failure). The original wide video remains available.')
         if grounding['status']=='applied':
             manifest['root_motion']='floor-guided'
             manifest['warnings'].append('Floor movement was corrected using a fixed-camera estimate; review tracking and foot placement.')
@@ -298,8 +298,8 @@ class Worker:
     def run_mediapipe(self,job,folder,command,check,advance,stage,headers,path,source):
         """CPU MediaPipe heavy route: video-only, no GLB, no SAM 2 and no avatars."""
         from process_video_mediapipe import (LANDMARK_FORMAT, frame_rate_filter, normalized_clock,
-                                             probe_video, standing_frame, target_frame_rate,
-                                             thumbnail_frame)
+                                             playback_duration, probe_video, standing_frame,
+                                             target_frame_rate, thumbnail_frame)
         import numpy as np
 
         job_id=job['id'];lease=job['attempt_token']
@@ -349,7 +349,7 @@ class Worker:
         # to treat it as a height reference.
         stand=standing_frame(world,image,visibility,times,width,height)
         poster=thumbnail_frame(world,image,visibility,times,width,height)
-        duration=float(times[-1])
+        duration=playback_duration(times,fps,produced.get('duration'))
         poster_time=float(times[poster])
         if duration>0:poster_time=min(poster_time,max(0.0,duration-1e-3))
         standing_available=stand is not None
@@ -372,7 +372,7 @@ class Worker:
                 check()
                 print(f'Focused instructor video unavailable ({type(exc).__name__}).',flush=True)
         else:
-            print('MediaPipe segmentation did not meet the 95%/0.5s contract; keeping the wide video.',flush=True)
+            print('MediaPipe matte has an unrepaired gap; focused/alpha derivatives disabled while preview and reference are kept.',flush=True)
         if focused:
             # The same reference carries the anatomical hand/foot guides the focused
             # video uses, stamped with that video's hash by the compositor.
@@ -423,7 +423,7 @@ class Worker:
             manifest['focused_video_start']=0.
             if 'instructor-alpha.webm' in assets:manifest['focused_video_alpha']=assets['instructor-alpha.webm']
         else:
-            warnings.append('Person-only instructor video could not be prepared. The original wide video remains available.')
+            warnings.append('Person-only instructor video could not be prepared (unrepaired matte gap or derivative failure). The original wide video remains available.')
         # Deliberately no export_glb, no source_grounding, no avatars and no /derivatives.
         check();result=self.api.post(path+'/finish',headers=headers,json=manifest);result.raise_for_status()
         print(f'Conversion {job_id}: ready for section review.',flush=True)

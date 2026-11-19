@@ -5,12 +5,17 @@ import {Playback} from '../../../packages/learning-engine/playback';
 import {MotionStage} from './MotionStage';
 import {VideoTimeline} from './VideoTimeline';
 import {acceptMove,saveSections,trimMove,assetUrl} from './api';
+import {createEditorSession} from './editor/editor-session';
 import {instructorStart,lessonFrameTime} from './lesson-clock';
+import {AUTHORING_LABELS} from './editor/authoring-lifecycle';
 
 export function MoveCheck({lesson,onBack,onAccepted,onChooseAnother,onDirty}:{
  lesson:LessonManifest;onBack:()=>void;onAccepted:(lesson:LessonManifest)=>void;onChooseAnother:()=>void;onDirty?:(dirty:boolean)=>void;
 }){
  const player=useRef(new Playback(lesson.section_set.sections,lesson.duration)).current;
+ const [session]=useState(()=>createEditorSession({state:'needs-review',revisionId:lesson.revision_id}));
+ const [sessionState,setSessionState]=useState(session.getSnapshot().state);
+ useEffect(()=>session.subscribe(value=>setSessionState(value.state)),[session]);
  const fps=lesson.frame_rate??15,total=Math.ceil(lesson.duration*fps),minimum=Math.ceil(.05*fps);
  const [start,setStart]=useState(0),[end,setEnd]=useState(total);
  const range=useRef({start:0,end:lesson.duration});range.current={start:start/fps,end:Math.min(end/fps,lesson.duration)};
@@ -43,8 +48,12 @@ export function MoveCheck({lesson,onBack,onAccepted,onChooseAnother,onDirty}:{
    value=await saveSections(value,value.section_set.sections,value.title,feedbackEnabled);
    await acceptMove(value.lesson_id,value.revision_id,value.warnings);
   }else if(!changed)await acceptMove(value.lesson_id,value.revision_id,value.warnings);
-  onDirty?.(false);onAccepted(value);
- }catch(e){setError((e as Error).message);}finally{setBusy(false);}};
+  onDirty?.(false);session.reviewed(value.revision_id);onAccepted(value);
+ }catch(e){
+  if((e as {status?:number}).status===409)session.conflict((e as Error).message);
+  else session.fail((e as Error).message);
+  setError((e as Error).message);
+ }finally{setBusy(false);}};
  const stamp=(time:number)=>`${Math.floor(time/60)}:${(time%60).toFixed(2).padStart(5,'0')}`;
  return <section className="workflow-screen check-screen" aria-label="Review and trim your move">
   <header className="check-heading"><button className="round" aria-label="Back to my moves" disabled={busy} onClick={onBack}><ArrowLeft size={20}/></button><div><p className="eyebrow">REVIEW & TRIM</p><h1 title={lesson.title}>{lesson.title}</h1></div><span className="check-instruction">Keep the movement you want to practise.</span></header>
@@ -60,7 +69,7 @@ export function MoveCheck({lesson,onBack,onAccepted,onChooseAnother,onDirty}:{
    <VideoTimeline compact frameRate={fps} source={previewVideo?assetUrl(previewVideo.key):undefined} sourceStart={instructorStart(lesson,Boolean(lesson.focused_video))} duration={lesson.duration} time={state.time} disabled={busy} onSeek={seek} range={{start:range.current.start,end:range.current.end,maxLength:lesson.duration,onChange:adjust}}/>
 
   </div>
-  <footer className="check-footer"><div className="check-feedback">{error?<p role="alert">{error}</p>:<span>Preview the selection, then keep it. {lesson.warnings.length>0&&<button onClick={()=>setWarnings(true)}>Review notes ({lesson.warnings.length})</button>}</span>}</div><label className="check-line"><input aria-label="Enable practice feedback" type="checkbox" role="switch" checked={feedbackEnabled} disabled={busy} onChange={event=>{setFeedbackEnabled(event.target.checked);setError('');}}/> Enable practice feedback <span className="small muted">On by default; playback still works when off.</span></label><div className="check-actions"><button className="secondary" disabled={busy} onClick={onChooseAnother}>Choose another video</button><button className="primary" disabled={busy} onClick={()=>void accept()}><Check size={18}/>{busy?'Saving…':'Looks good'}</button></div></footer>
+  <footer className="check-footer"><div className="check-feedback"><span className="section-save-state" data-authoring-state={sessionState}>{sessionState==='needs-review'?AUTHORING_LABELS.reviewRequired:session.statusLabel()}</span>{error?<p role="alert">{error}</p>:<span>Preview the selection, then keep it. {lesson.warnings.length>0&&<button onClick={()=>setWarnings(true)}>Review notes ({lesson.warnings.length})</button>}</span>}</div><label className="check-line"><input aria-label="Enable practice feedback" type="checkbox" role="switch" checked={feedbackEnabled} disabled={busy} onChange={event=>{setFeedbackEnabled(event.target.checked);setError('');}}/> Enable practice feedback <span className="small muted">On by default; playback still works when off.</span></label><div className="check-actions"><button className="secondary" disabled={busy} onClick={onChooseAnother}>Choose another video</button><button className="primary" disabled={busy} onClick={()=>void accept()}><Check size={18}/>{busy?'Saving…':'Looks good'}</button></div></footer>
   <dialog ref={notes} className="check-notes" aria-label="Review notes" onClose={()=>setWarnings(false)}><strong>Review notes</strong><ul>{lesson.warnings.map(w=><li key={w}>{w}</li>)}</ul><button className="primary" autoFocus onClick={()=>setWarnings(false)}>Got it</button></dialog>
  </section>;
 }

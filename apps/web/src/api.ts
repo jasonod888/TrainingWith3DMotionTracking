@@ -1,5 +1,5 @@
-import type {LessonManifest,LessonSummary} from '../../../packages/lesson-schema/index';
-import {parseLessonSummary} from '../../../packages/lesson-schema/parse';
+import type {DrawingLessonManifest,LessonManifest,LessonSummary} from '../../../packages/lesson-schema/index';
+import {parseDrawingLessonManifest,parseLessonSummary} from '../../../packages/lesson-schema/parse';
 import {publicMovesPath} from './feed-subject';
 import {clearClips} from './clipCache';
 export async function loadDemo(signal?:AbortSignal):Promise<LessonManifest|null>{
@@ -29,23 +29,62 @@ export async function signOut(){await request('/auth/logout','POST');csrf='';awa
 export const loadLibrary=()=>request<LessonManifest[]>('/lessons');
 const summaryQuery=(subject?:string)=>subject?`?subject=${encodeURIComponent(subject)}`:'';
 export function readLessonSummaries(value:unknown):LessonSummary[]{
- if(!Array.isArray(value))throw new Error('Your lesson list could not be read. Try again.');
- return value.map(item=>{const parsed=parseLessonSummary(item);if(!parsed.ok)throw new Error(parsed.message);return parsed.value;});
+ const rows=Array.isArray(value)?value
+  :(value&&typeof value==='object'&&Array.isArray((value as {lessons?:unknown}).lessons)
+    ?(value as {lessons:unknown[]}).lessons:null);
+ if(!rows)throw new Error('Your lesson list could not be read. Try again.');
+ return rows.map(item=>{const parsed=parseLessonSummary(item);if(!parsed.ok)throw new Error(parsed.message);return parsed.value;});
 }
-const loadSummaries=async(path:string)=>readLessonSummaries(await request<unknown>(path,'GET',undefined,false,{'X-Lesson-Formats':'1,2'}));
-export const loadLessonSummaries=(subject?:string)=>loadSummaries(`/lessons/summaries${summaryQuery(subject)}`);
-export const loadSharedSummaries=(subject?:string)=>loadSummaries(`/shared-lessons/summaries${summaryQuery(subject)}`);
+export type LessonSummaryPage={lessons:LessonSummary[];total:number;has_more:boolean;limit:number;offset:number;available_subjects:string[]};
+async function fetchSummaryPage(path:string,limit:number,offset:number,
+ filters:{q?:string;subject?:string}={}):Promise<LessonSummaryPage>{
+ const params=new URLSearchParams({limit:String(limit),offset:String(offset)});
+ if(filters.q?.trim())params.set('q',filters.q.trim());
+ if(filters.subject)params.set('subject',filters.subject);
+ const sep=path.includes('?')?'&':'?';
+ const raw=await request<unknown>(`${path}${sep}${params.toString()}`,'GET',undefined,false,
+  {'X-Lesson-Formats':'1,2,3','X-Act-Formats':'1'});
+ const lessons=readLessonSummaries(raw);
+ const meta=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw as Partial<LessonSummaryPage>:{};
+ return {lessons,total:typeof meta.total==='number'?meta.total:lessons.length,
+  has_more:meta.has_more===true,limit:typeof meta.limit==='number'?meta.limit:limit,
+  offset:typeof meta.offset==='number'?meta.offset:offset,
+  available_subjects:Array.isArray(meta.available_subjects)
+   ?meta.available_subjects.filter(value=>typeof value==='string'):[]};
+}
+export const loadLessonSummariesPage=(options:{limit?:number;offset?:number;q?:string;subject?:string}={})=>
+ fetchSummaryPage(`/lessons/summaries`,Math.min(options.limit??100,200),Math.max(options.offset??0,0),
+  {q:options.q,subject:options.subject});
+async function loadAllSummaryPages(path:string):Promise<LessonSummary[]>{
+ const all:LessonSummary[]=[];let offset=0;
+ while(true){
+  const value=await fetchSummaryPage(path,100,offset);
+  all.push(...value.lessons);
+  const nextOffset=offset+value.lessons.length;
+  if(!value.has_more||!value.lessons.length||nextOffset<=offset)break;
+  offset=nextOffset;
+ }
+ return all;
+}
+export const loadLessonSummaries=(subject?:string)=>loadAllSummaryPages(`/lessons/summaries${summaryQuery(subject)}`);
+export const loadSharedSummaries=(subject?:string)=>loadAllSummaryPages(`/shared-lessons/summaries${summaryQuery(subject)}`);
 export type Capabilities={music_piano_library_ui?:boolean;music_guitar_library_ui?:boolean;music_history?:boolean;music_challenge?:boolean;music_inference?:boolean;music_midi_setup?:boolean;subject_filter?:boolean;processing?:Record<string,boolean>};
 export const loadCapabilities=()=>request<Capabilities>('/capabilities');
 export const loadLesson=(id:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`);
 export const copyDemo=()=>request<LessonManifest>('/lessons/from-demo','POST');
+export const createDrawingLesson=async(input:{title:string;medium:'pencil'|'charcoal'|'digital';steps:{id:string;title:string;instruction:string}[]})=>{
+ const raw=await request<unknown>('/drawing/lessons','POST',input);
+ const parsed=parseDrawingLessonManifest(raw);
+ if(!parsed.ok)throw new Error(parsed.message);
+ return parsed.value as DrawingLessonManifest;
+};
 export const saveSections=(lesson:LessonManifest,sections:LessonManifest['section_set']['sections'],title:string,feedbackEnabled?:boolean)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/sections`,'PUT',{base_revision_id:lesson.revision_id,sections,title,...(feedbackEnabled===undefined?{}:{feedback_enabled:feedbackEnabled})});
 export const trimMove=(lesson:LessonManifest,start_frame:number,end_frame:number)=>request<LessonManifest>(`/lessons/${encodeURIComponent(lesson.lesson_id)}/trim`,'PUT',{base_revision_id:lesson.revision_id,start_frame,end_frame,accept:true});
 export const renameMove=(id:string,title:string)=>request<LessonManifest>(`/lessons/${encodeURIComponent(id)}`,'PATCH',{title});
 
 export type MoveAudiences={direct:number;groups:number;public:boolean};
 export type PublicListing={title:string;creator_name:string;tags:string[];listed_at:string|null};
-export type MoveState={lesson_id:string;subject?:string;subject_label?:string;experience_family?:'body'|'music';instrument?:'piano'|'guitar'|null;latest_revision_id:string|null;accepted_revision_id:string|null;accepted_at:string|null;
+export type MoveState={lesson_id:string;subject?:string;subject_label?:string;experience_family?:'body'|'music'|'visual';instrument?:'piano'|'guitar'|null;latest_revision_id:string|null;accepted_revision_id:string|null;accepted_at:string|null;
  published_revision_id:string|null;distribution:string;audiences:MoveAudiences;public_listing:PublicListing|null;warnings?:string[]};
 export const loadMoveStates=()=>request<{lessons:MoveState[]}>('/workflow/lessons');
 export const acceptMove=(lessonId:string,revisionId:string,warnings:string[]=[])=>
@@ -61,7 +100,7 @@ export const audienceLabel=(audiences:MoveAudiences)=>{
 
 export type GroupSummary={id:string;name:string;description:string;role:'owner'|'admin'|'member';members:number;moves:number};
 export type GroupMemberView={account_id:string;email:string;role:string;joined_at:string};
-export type GroupMoveView={lesson_id:string;title:string;revision_id:string;duration:number;sections:number;access_kind:'grant'|'collection';can_remove:boolean;subject?:string;subject_label?:string;experience_family?:'body'|'music';instrument?:'piano'|'guitar'|null};
+export type GroupMoveView={lesson_id:string;title:string;revision_id:string;duration:number;sections:number;access_kind:'grant'|'collection';can_remove:boolean;subject?:string;subject_label?:string;experience_family?:'body'|'music'|'visual';instrument?:'piano'|'guitar'|null};
 export type GroupDetail={id:string;name:string;description:string;role:string;can_manage:boolean;contribution_policy:'members'|'managers';invitations:{id:string;email:string;role:string;expires_at:string}[];members:GroupMemberView[];moves:GroupMoveView[]};
 export const loadGroups=()=>request<{groups:GroupSummary[]}>('/groups');
 export const createGroup=(name:string,description='')=>request<GroupSummary>('/groups','POST',{name,description});
@@ -74,23 +113,55 @@ export const removeGroupMove=(id:string,lessonId:string,accessKind:'grant'|'coll
 export const removeGroupMember=(id:string,accountId:string)=>request(`/groups/${encodeURIComponent(id)}/members/${encodeURIComponent(accountId)}`,'DELETE');
 export const transferGroup=(id:string,accountId:string)=>request(`/groups/${encodeURIComponent(id)}/transfer`,'POST',{account_id:accountId});
 
-export type PublicMove={lesson_id:string;title:string;creator_name:string;description:string;tags:string[];duration:number;thumbnail_url:string|null;subject?:string;subject_label?:string;experience_family?:'body'|'music';instrument?:'piano'|'guitar'|null};
-export type PublicDetail=LessonManifest&{creator_name:string;description:string;tags:string[]};
-export const loadPublicMoves=(query='',tag='',offset=0,subject='')=>{
+export type DiscoveryApiFields={act_id?:string;release_revision?:string;creator?:{id:string;display_name:string};
+ subjects?:{id:string;label:string}[];roles?:string[];representations?:string[];
+ effective_actions?:{watch:boolean;practice:boolean;challenge:boolean};audience?:string;
+ like_count?:number;liked_by_viewer?:boolean;poster?:{key?:string;url?:string}|null;content?:{sections?:number}};
+export type PublicMove={lesson_id:string;title:string;creator_name:string;description:string;tags:string[];duration:number;thumbnail_url:string|null;subject?:string;subject_label?:string;experience_family?:'body'|'music'|'visual';instrument?:'piano'|'guitar'|null}&DiscoveryApiFields;
+export type PublicDetail=LessonManifest&{creator_name:string;description:string;tags:string[]}&DiscoveryApiFields;
+export const loadPublicMoves=(query='',tag='',offset=0,subject='',act='')=>{
  const path=publicMovesPath(query,subject,offset);
+ const params=[tag?`tag=${encodeURIComponent(tag)}`:'',act?`act=${encodeURIComponent(act)}`:''].filter(Boolean);
  const separator=path.includes('?')?'&':'?';
- return request<{moves:PublicMove[]}>(tag?`${path}${separator}tag=${encodeURIComponent(tag)}`:path);
+ return request<{moves:PublicMove[];next_offset?:number|null;policy?:string}>(params.length?`${path}${separator}${params.join('&')}`:path);
 };
+export type RecommendationItem=PublicMove&{explanation:{reason:string;policy:string;matched?:Record<string,unknown>}};
+export const loadRecommendations=(lessonId?:string,limit=12)=>request<{policy:string;items:RecommendationItem[]}>(
+ `/public/recommendations?limit=${limit}${lessonId?`&lesson_id=${encodeURIComponent(lessonId)}`:''}`);
 export const loadPublicTags=()=>request<{tags:{tag:string;count:number}[]}>('/public/tags');
 export type PublicSubject={subject:string;subject_label:string;count:number};
 export const loadPublicSubjects=()=>request<{subjects:PublicSubject[]}>('/public/subjects');
-export const loadPublicMove=(id:string)=>request<PublicDetail>(`/public/moves/${encodeURIComponent(id)}`);
-export const updatePublic=(lessonId:string,body:{listed:boolean;title?:string;description?:string;creator_name?:string;tags?:string[];rights_acknowledged?:boolean;release_revision_id?:string})=>
+export const loadPublicMove=(id:string)=>request<PublicDetail>(`/public/moves/${encodeURIComponent(id)}`,'GET',undefined,false,{'X-Lesson-Formats':'1,2,3'});
+export const updatePublic=(lessonId:string,body:{listed:boolean;title?:string;description?:string;creator_name?:string;tags?:string[];rights_acknowledged?:boolean;release_revision_id?:string;public_roles?:string[]})=>
  request(`/public/lessons/${encodeURIComponent(lessonId)}`,'PATCH',body);
+
+export type Publishability={lesson_id:string;revision_id:string|null;audience:'invited'|'link'|'group'|'public';
+ publishable:boolean;roles:string[];allowed_roles:string[];representations:string[];missing:string[];reasons:string[]};
+export const loadPublishability=(lessonId:string,audience:'invited'|'link'|'group'|'public'='public',roles?:string[])=>
+ request<Publishability>(`/lessons/${encodeURIComponent(lessonId)}/publishability?audience=${encodeURIComponent(audience)}${roles?.length?`&roles=${encodeURIComponent(roles.join(','))}`:''}`);
 
 export type Progress={revision_id:string;time:number;speed:.25|.5|.75|1;mode:'sections'|'continuous'};
 export const loadProgress=(lesson:LessonManifest)=>request<Progress|null>(`/lessons/${lesson.lesson_id}/progress?revision_id=${encodeURIComponent(lesson.revision_id)}`);
 export const saveProgress=(lesson:LessonManifest,value:Omit<Progress,'revision_id'>)=>request(`/lessons/${lesson.lesson_id}/progress`,'PUT',{revision_id:lesson.revision_id,...value},true);
+
+export type PlanProgressRecord={lesson_id:string;revision_id:string;plan_id:string;unit_id:string|null;
+ time:number;speed:number;mode:'sections'|'continuous';loop:boolean;repetitions:number;
+ countdown_seconds:number;rest_seconds:number;updated_at:string|null};
+export type PlanProgressInput=Omit<PlanProgressRecord,'lesson_id'|'revision_id'|'plan_id'|'updated_at'>&{
+ lesson_id:string;revision_id:string;plan_id:string};
+export const loadPlanProgress=(lessonId:string,revisionId:string,planId:string)=>
+ request<PlanProgressRecord|null>(`/practice/progress?lesson_id=${encodeURIComponent(lessonId)}&revision_id=${encodeURIComponent(revisionId)}&plan_id=${encodeURIComponent(planId)}`);
+export const savePlanProgress=(value:PlanProgressInput)=>
+ request<PlanProgressRecord>('/practice/progress','PUT',value,true);
+
+export type PracticeAttemptPayload={attempt_id:string;lesson_id:string;revision_id:string;act_id:string;
+ mode:'watch'|'practice'|'challenge';plan_id:string;unit_id:string|null;duration_ms:number;
+ status:'completed'|'interrupted'|'unassessed'|'insufficient_evidence';
+ assessment_adapter:string|null;rubric_version:string|null;report?:Record<string,unknown>};
+export const submitPracticeAttempt=(attempt:PracticeAttemptPayload)=>
+ request<PracticeAttemptPayload>('/practice/attempts','POST',attempt);
+export const loadPracticeAttempts=(lessonId:string,revisionId:string)=>
+ request<PracticeAttemptPayload[]>(`/practice/attempts?lesson_id=${encodeURIComponent(lessonId)}&revision_id=${encodeURIComponent(revisionId)}`);
 export function uploadChunk(jobId:string,part:number,body:Blob,signal:AbortSignal,progress:(bytes:number)=>void):Promise<void>{
  return new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open('PUT',`/api/conversions/${jobId}/parts/${part}`);xhr.setRequestHeader('Content-Type','application/octet-stream');xhr.setRequestHeader('X-Form-Request','1');xhr.setRequestHeader('X-CSRF-Token',csrf);xhr.timeout=120000;
  const abort=()=>xhr.abort();signal.addEventListener('abort',abort,{once:true});const clean=()=>signal.removeEventListener('abort',abort);

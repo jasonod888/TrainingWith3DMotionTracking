@@ -14,7 +14,7 @@ public projection never consult a second filename allowlist.
 from dataclasses import dataclass
 from typing import Literal
 
-from . import subjects
+from . import acts, subjects
 from .processing import MEDIAPIPE_PIPELINE_VERSION, PIPELINE_VERSION
 
 Family = Literal['body', 'music']
@@ -36,6 +36,10 @@ MUSIC_OPTIONAL_ASSETS = ('source.mp4', 'preview.mp4', 'preview.wav', 'waveform.j
 class ProcessingRoute:
     id: str
     family: Family
+    # The Act this route implements. Several routes may implement one Act (the two
+    # body pipelines, or the piano basic-pitch and Kong routes), and an Act keeps
+    # its identity when a route is added, retired or offline.
+    act_id: str
     subjects: tuple[str, ...]
     pipeline_version: str
     capability: str
@@ -61,6 +65,7 @@ ROUTES: dict[str, ProcessingRoute] = {
     'body-default': ProcessingRoute(
         id='body-default',
         family='body',
+        act_id='full_body',
         subjects=subjects.MOVEMENT_SUBJECTS,
         pipeline_version=PIPELINE_VERSION,
         capability='conversion',
@@ -71,6 +76,7 @@ ROUTES: dict[str, ProcessingRoute] = {
     'body-mediapipe': ProcessingRoute(
         id='body-mediapipe',
         family='body',
+        act_id='full_body',
         subjects=subjects.MOVEMENT_SUBJECTS,
         pipeline_version=MEDIAPIPE_PIPELINE_VERSION,
         capability='conversion',
@@ -82,6 +88,7 @@ ROUTES: dict[str, ProcessingRoute] = {
     'music-piano': ProcessingRoute(
         id='music-piano',
         family='music',
+        act_id='piano',
         subjects=('piano',),
         pipeline_version='music-piano-v1',
         capability='music_piano',
@@ -95,6 +102,7 @@ ROUTES: dict[str, ProcessingRoute] = {
     'music-piano-kong': ProcessingRoute(
         id='music-piano-kong',
         family='music',
+        act_id='piano',
         subjects=('piano',),
         pipeline_version='music-piano-kong-v1',
         capability='music_piano',
@@ -109,6 +117,7 @@ ROUTES: dict[str, ProcessingRoute] = {
     'music-guitar': ProcessingRoute(
         id='music-guitar',
         family='music',
+        act_id='guitar',
         subjects=('guitar',),
         pipeline_version='music-guitar-v1',
         capability='music_guitar',
@@ -150,6 +159,10 @@ def route_for(subject: str | None, instrument: str | None = None, *,
         return body_route(settings)
     for route in ROUTES.values():
         if resolved in route.subjects:
+            # The route's declared Act must agree with the catalogue mapping, so a
+            # future route cannot silently implement the wrong product experience.
+            if route.act_id != acts.act_for_subject(resolved).id:
+                raise subjects.SubjectError('The processing route does not match this lesson Act.')
             return route
     raise subjects.SubjectError('No processing route is configured for this subject.')
 
@@ -190,11 +203,17 @@ def online(route: ProcessingRoute, settings, online_routes: set[tuple[str, str]]
     return (provider_for(route, settings), route.pipeline_version) in online_routes
 
 
+def routes_for_act(act_id: str) -> tuple[ProcessingRoute, ...]:
+    """Every route that can implement one Act, in registry order."""
+    return tuple(route for route in ROUTES.values() if route.act_id == act_id)
+
+
 def status(settings, online_routes: set[tuple[str, str]] | None = None) -> dict[str, dict]:
     online_routes = online_routes or set()
     return {
         route.id: {
             'id': route.id,
+            'act_id': route.act_id,
             'experience_family': route.family,
             'subjects': list(route.subjects),
             'pipeline_version': route.pipeline_version,
@@ -231,6 +250,7 @@ def public_catalogue() -> list[dict]:
     return [
         {
             'id': route.id,
+            'act_id': route.act_id,
             'experience_family': route.family,
             'subjects': list(route.subjects),
             'capability': route.capability,

@@ -29,7 +29,7 @@ from types import SimpleNamespace
 from .processing import (ENGINE_VERSION, MEDIAPIPE_ENGINE_VERSION, MEDIAPIPE_PIPELINE_VERSION,
                          PIPELINE_VERSION, Provider, processing_status)
 from .media_probe import MediaProbeError, probe_audio_media
-from . import processing_routes, subjects
+from . import acts, processing_routes, subjects
 
 PART_SIZE=5*1024*1024
 RUNNING=('validating','processing','exporting','verifying')
@@ -511,7 +511,8 @@ def install_conversions(app,engine,settings,identity,db):
         manifest.title=target.title if target else job.title
         manifest.feedback_enabled=feedback_for_job(job,session,target)
         manifest.section_set.id=uuid4().hex;manifest.section_set.revision=1
-        projection={'subject':manifest.subject,'experience_family':'music','instrument':manifest.instrument.instrument}
+        projection={'subject':manifest.subject,'experience_family':'music','instrument':manifest.instrument.instrument,
+                    'act_id':acts.act_for_subject(manifest.subject).id}
         if target:
             changed=session.execute(update(Lesson).where(Lesson.id==lesson_id,Lesson.owner_id==job.owner_id,
                 Lesson.version==target.version).values(version=version,title=target.title))
@@ -580,7 +581,8 @@ def install_conversions(app,engine,settings,identity,db):
         else:
             target=None
             session.add(Lesson(id=lesson_id,owner_id=job.owner_id,title=job.title,version=1,
-                               subject=job.subject,experience_family='music',instrument=job.instrument));session.flush()
+                               subject=job.subject,experience_family='music',instrument=job.instrument,
+                               act_id=acts.act_for_subject(job.subject).id));session.flush()
         body.feedback_enabled=feedback_for_job(job,session,target)
         draft_id=uuid4().hex
         key=f'lessons/{lesson_id}/{draft_id}-draft-reference.json'
@@ -743,7 +745,8 @@ def install_conversions(app,engine,settings,identity,db):
         body.feedback_enabled=feedback_for_job(job,session,target)
         # The subject the instructor chose travels with the job, so completion must not
         # reset a taekwondo or boxing lesson to the movement default.
-        projection={'subject':job.subject or subjects.DEFAULT_SUBJECT,'experience_family':'body','instrument':None}
+        projection={'subject':job.subject or subjects.DEFAULT_SUBJECT,'experience_family':'body','instrument':None,
+                    'act_id':acts.act_for_subject(job.subject or subjects.DEFAULT_SUBJECT).id}
         if target:
             changed=session.execute(update(Lesson).where(Lesson.id==lesson_id,Lesson.owner_id==job.owner_id,
                 Lesson.version==target.version).values(version=version,title=target.title))

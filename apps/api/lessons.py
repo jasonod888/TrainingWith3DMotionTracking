@@ -7,23 +7,34 @@ from typing import Literal
 
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from .contracts import (LessonManifest, LessonSummary, MusicLessonManifest,
-                        MusicPlaybackSettings, Section, SectionSet, SummaryCapabilities)
+from .contracts import (ActRef, CapabilityResult, EffectiveCapabilities, LessonContext,
+                        LessonManifest, LessonSummary, LessonSummaryV2, MusicLessonManifest,
+                        MusicPlaybackSettings, Section, SectionSet, SummaryCapabilities,
+                        SummaryCapabilitiesV2)
 from .music_verification import current_state_token
-from .database import (Account, Lesson, LessonAsset, LessonRevision, MusicDraft, MusicVerificationDecision,
+from .database import (Account, Lesson, LessonAsset, LessonPublication, LessonRevision, MusicDraft, MusicVerificationDecision,
                        PracticeProgress, LessonGrant)
 from .storage import storage_client
-from .permissions import access_reasons, latest_acceptance, owned_lesson,latest_revision,public_lesson,public_manifest,readable_lesson
+from .permissions import (access_reasons, audience_for, latest_acceptance, owned_lesson,
+                          latest_revision, public_lesson, public_manifest, readable_lesson)
 from .auth import now
-from . import processing_routes, subjects
+from . import acts, processing_routes, rollout, subjects
 
 
 FORMAT_HEADER = 'x-lesson-formats'
+# A client that understands Act context advertises this header. Without it every
+# response stays byte-identical to the v1 contract.
+ACT_FORMAT_HEADER = 'x-act-formats'
+
+
+def unsupported_act_response(exc):
+    """Safe refusal for an Act this server cannot resolve. Never body fallback."""
+    return JSONResponse({'code': 'unsupported_act', 'detail': str(exc)}, status_code=422)
 
 
 def subject_filter(subject):
@@ -44,11 +55,15 @@ def client_formats(request):
 
 
 def ensure_supported(lesson, revision, request):
-    """Refuse to hand a music object to a client that did not ask for v2."""
+    """Refuse to hand a specialized object to a client that did not ask for its format."""
     family = subject_projection(lesson, revision)['experience_family']
-    if family == 'music' and '2' not in client_formats(request):
+    formats = client_formats(request)
+    if family == 'music' and '2' not in formats:
         raise HTTPException(406, 'This lesson needs a newer version of the app. Refresh to update.',
                             headers={'X-Lesson-Format-Required': '2'})
+    if family == 'visual' and '3' not in formats:
+        raise HTTPException(406, 'This lesson needs a newer version of the app. Refresh to update.',
+                            headers={'X-Lesson-Format-Required': '3'})
 
 
 def subject_projection(lesson, revision=None, current=False):
@@ -85,6 +100,8 @@ def summary_of(lesson, revision, settings, include_private_poster=True, current=
     poster = None
     if family == 'music':
         poster = manifest.get('public_poster')
+    elif family == 'visual':
+        poster = manifest.get('poster')
     elif include_private_poster:
         poster = manifest.get('thumbnail')
     live_input = 'camera'
@@ -96,6 +113,10 @@ def summary_of(lesson, revision, settings, include_private_poster=True, current=
                 live_input = 'midi'
         except subjects.SubjectError:
             live_input = 'none'
+    elif family == 'visual':
+        # Step navigation is not an evidence input; no score is produced.
+        live_input = 'none'
+    steps = manifest.get('steps') or []
     return LessonSummary(
         lesson_id=lesson.id,
         revision_id=revision.id,
@@ -105,10 +126,179 @@ def summary_of(lesson, revision, settings, include_private_poster=True, current=
         experience_family=family,
         instrument=projection['instrument'],
         duration=max(0.001, float(manifest.get('duration') or 0)),
-        section_count=max(1, len((manifest.get('section_set') or {}).get('sections') or [])),
+        section_count=max(1, len(steps) if family == 'visual'
+                         else len((manifest.get('section_set') or {}).get('sections') or [])),
         poster=poster,
         capabilities=SummaryCapabilities(preview=True, practice=True, live_input=live_input),
     )
+
+
+def client_act_formats(request):
+    """Advertised Act contract versions. Empty means a v1-only client."""
+    raw = request.headers.get(ACT_FORMAT_HEADER, '')
+    return {part.strip() for part in raw.split(',') if part.strip()}
+
+
+def wants_act_context(request):
+    return str(acts.ACT_DESCRIPTOR_VERSION) in client_act_formats(request)
+
+
+def lesson_act(lesson, revision=None):
+    """Resolve this lesson's Act from persisted identity, then its subject.
+
+    Raises ``acts.ActError`` rather than guessing. Callers that serve a negotiated
+    envelope turn that into an ``unsupported_act`` response.
+    """
+    act_id = getattr(lesson, 'act_id', None)
+    subject = lesson.subject
+    if revision is not None:
+        act_id = act_id or getattr(revision, 'act_id', None)
+        subject = revision.subject or subject
+    return acts.resolve_act(act_id, subject)
+
+
+def _creator_feedback(manifest):
+    from .music_assessment import effective_feedback_enabled
+    return effective_feedback_enabled(manifest)
+
+
+def _capability(support='supported', available=True, reason='ok', explanation=''):
+    return CapabilityResult(support=support, available=available,
+                            reasonCode=reason, explanation=explanation)
+
+
+_CAPABILITY_NAMES = ('canEdit', 'canReview', 'canPractice', 'canChallenge',
+                     'canAssess', 'canRecord', 'canPublishPublicly')
+
+
+def _all_capabilities(result):
+    return EffectiveCapabilities(**{name: result for name in _CAPABILITY_NAMES}, inputs={})
+
+
+def effective_capabilities(lesson, revision, reasons, settings):
+    """Resolve server-known layers. Device readiness stays a client concern.
+
+    Layers combined here: Act support, lesson assets/review state, creator policy,
+    audience permission, and current publication policy. Learner preferences and
+    device readiness are deliberately *not* inferred: the client resolver combines
+    this result with those layers, so "off" never becomes "unsupported".
+
+    Worker online status is absent on purpose. It affects new processing jobs only;
+    it never disables playback or evidence inputs of an existing lesson.
+    """
+    try:
+        descriptor = lesson_act(lesson, revision)
+    except acts.ActError as exc:
+        return _all_capabilities(_capability('unsupported', False, 'unsupported_act', str(exc)))
+
+    manifest = revision.manifest or {}
+    schema = manifest.get('schema_version')
+    reviewed = schema != 2 or bool(manifest.get('reference_reviewed'))
+    feedback = _creator_feedback(manifest)
+    has_source = any(manifest.get(key) is not None for key in
+                     ('animation', 'landmarks', 'source_video', 'reference', 'piano_preview'))
+    policy = acts.publication_policy(descriptor.id)
+    owner = 'owner' in reasons
+
+    can_edit = _capability(explanation='You can edit this lesson.') if owner else \
+        _capability('supported', False, 'not_owner', 'Only the owner can edit this lesson.')
+    can_review = can_edit
+
+    if 'practice' not in descriptor.practice_modes:
+        can_practice = _capability('unsupported', False, 'act_unsupported',
+                                   'This Act has no practice mode.')
+    elif not has_source:
+        can_practice = _capability('unavailable', False, 'missing_source',
+                                   'This lesson has no playable source.')
+    else:
+        can_practice = _capability(explanation='Practice is available.')
+
+    if 'challenge' not in descriptor.practice_modes:
+        can_challenge = _capability('unsupported', False, 'act_unsupported',
+                                    'This Act has no challenge mode.')
+    elif descriptor.experience_family == 'music' and not getattr(settings, 'music_challenge_enabled', False):
+        # A deployment flag, not the Act: the mode exists but this deployment does
+        # not accept challenge attempts yet.
+        can_challenge = _capability('unavailable', False, 'deployment_disabled',
+                                    'Challenge is disabled on this deployment.')
+    elif not reviewed:
+        can_challenge = _capability('unavailable', False, 'not_reviewed',
+                                    'Review the reference before starting a challenge.')
+    elif not feedback:
+        can_challenge = _capability('unavailable', False, 'creator_disabled',
+                                    'The creator turned assessment feedback off for this lesson.')
+    else:
+        can_challenge = _capability(explanation='Challenge is available.')
+
+    if not descriptor.assessment_adapters:
+        can_assess = _capability('unsupported', False, 'act_unsupported',
+                                 'This Act has no assessment adapter.')
+    elif schema == 2 and not reviewed:
+        can_assess = _capability('unavailable', False, 'not_reviewed',
+                                 'Assessment needs a reviewed reference.')
+    elif not feedback:
+        can_assess = _capability('supported', False, 'creator_disabled',
+                                 'The creator turned assessment feedback off for this lesson.')
+    else:
+        can_assess = _capability(explanation='Assessment is available.')
+
+    capture_inputs = set(descriptor.practice_inputs) & {'camera', 'uploaded_recording'}
+    can_record = _capability(explanation='Recording is available.') if capture_inputs else \
+        _capability('unsupported', False, 'act_unsupported', 'This Act records no learner evidence.')
+
+    if not (policy.public and descriptor.publication_representations):
+        can_publish = _capability(
+            'unsupported', False, 'act_not_public',
+            policy.private_reason or 'This Act has no approved public representation.')
+    elif schema != 1:
+        can_publish = _capability('unavailable', False, 'unsupported_representation',
+                                  'This lesson has no approved public representation.')
+    elif manifest.get('animation') is None:
+        can_publish = _capability('unavailable', False, 'video_only',
+                                  'This move is video only, so it cannot be published publicly.')
+    else:
+        can_publish = _capability(explanation='This revision can be published publicly.')
+
+    inputs = {
+        name: _capability(explanation='Declared by the Act; device readiness is checked by the client.')
+        for name in descriptor.practice_inputs
+    }
+    return EffectiveCapabilities(canEdit=can_edit, canReview=can_review, canPractice=can_practice,
+                                 canChallenge=can_challenge, canAssess=can_assess,
+                                 canRecord=can_record, canPublishPublicly=can_publish, inputs=inputs)
+
+
+def act_ref(descriptor):
+    return ActRef(id=descriptor.id, label=descriptor.label,
+                  descriptor_version=acts.ACT_DESCRIPTOR_VERSION)
+
+
+def summary_v2_of(lesson, revision, settings, include_private_poster=True, current=False,
+                  reasons=('owner',)):
+    """Negotiated card projection: v1 card plus Act identity and capabilities."""
+    base = summary_of(lesson, revision, settings, include_private_poster, current)
+    descriptor = lesson_act(lesson, revision)
+    data = base.model_dump()
+    data['summary_version'] = 2
+    data['capabilities'] = SummaryCapabilitiesV2(
+        preview=base.capabilities.preview,
+        practice=base.capabilities.practice,
+        live_input=base.capabilities.live_input,
+        inputs=list(descriptor.practice_inputs),
+    ).model_dump()
+    data['act_id'] = descriptor.id
+    data['act'] = act_ref(descriptor).model_dump()
+    data['effective_capabilities'] = effective_capabilities(
+        lesson, revision, set(reasons), settings).model_dump()
+    return LessonSummaryV2(**data).model_dump()
+
+
+def lesson_context(lesson, revision, reasons, settings, document, audience='invited'):
+    """Wrap an unchanged specialized document with Act identity and capabilities."""
+    descriptor = lesson_act(lesson, revision)
+    return LessonContext(act_id=descriptor.id, act=act_ref(descriptor), audience=audience,
+                         capabilities=effective_capabilities(lesson, revision, reasons, settings),
+                         document=document).model_dump()
 
 
 
@@ -148,10 +338,10 @@ def import_fixture(engine, settings, owner_id, manifest_path, asset_dir):
             manifest.section_set.id = uuid4().hex
             manifest.section_set.revision = 1
             session.add(Lesson(id=lesson_id, owner_id=owner_id, title=manifest.title, version=1, archived=False,
-                               subject=subjects.DEFAULT_SUBJECT, experience_family='body'))
+                               subject=subjects.DEFAULT_SUBJECT, experience_family='body', act_id='full_body'))
             session.flush()
             session.add(LessonRevision(id=revision_id, lesson_id=lesson_id, manifest=manifest.model_dump(), version=1,
-                                       subject=subjects.DEFAULT_SUBJECT, experience_family='body'))
+                                       subject=subjects.DEFAULT_SUBJECT, experience_family='body', act_id='full_body'))
             for asset in assets:
                 session.add(LessonAsset(lesson_id=lesson_id, **asset.model_dump()))
             session.commit()
@@ -229,7 +419,8 @@ def import_music_fixture(engine, settings, owner_id, manifest_path, asset_dir):
 
 def subject_projection_for(subject, instrument=None):
     resolved, family, resolved_instrument = subjects.validate_selection(subject, instrument)
-    return {'subject': resolved, 'experience_family': family, 'instrument': resolved_instrument}
+    return {'subject': resolved, 'experience_family': family, 'instrument': resolved_instrument,
+            'act_id': acts.act_for_subject(resolved).id}
 
 
 class SaveSections(BaseModel):
@@ -274,35 +465,80 @@ def install_lessons(app, engine, settings, identity, db):
         return latest_revision(session,lesson)
 
     @router.get('')
-    def library(account=Depends(identity), session: Session = Depends(db)):
+    def library(limit: int | None = None, offset: int = 0,
+                account=Depends(identity), session: Session = Depends(db)):
         # Body-shaped list: a client that assumes v1 must never receive a v2 object.
         # Mixed-subject clients use /lessons/summaries instead.
-        rows = session.execute(select(LessonRevision).join(Lesson, Lesson.id == LessonRevision.lesson_id).where(
-            Lesson.owner_id == account.id, Lesson.archived.is_(False), Lesson.disabled.is_(False),
-            Lesson.experience_family == 'body', LessonRevision.version == Lesson.version)
-            .order_by(Lesson.created_at.desc())).scalars().all()
+        filters = (Lesson.owner_id == account.id, Lesson.archived.is_(False),
+                   Lesson.disabled.is_(False), Lesson.experience_family == 'body')
+        base = select(LessonRevision).join(Lesson, Lesson.id == LessonRevision.lesson_id).where(
+            *filters, LessonRevision.version == Lesson.version).order_by(Lesson.created_at.desc())
+        if limit is None and offset <= 0:
+            rows = session.scalars(base).all()
+            from .music_assessment import with_effective_feedback
+            return [with_effective_feedback(row.manifest) for row in rows]
+        page_limit = max(1, min(limit if limit is not None else 100, 200))
+        offset = max(0, offset)
+        total = session.scalar(select(func.count()).select_from(Lesson).where(*filters)) or 0
+        rows = session.scalars(base.offset(offset).limit(page_limit)).all()
         from .music_assessment import with_effective_feedback
-        return [with_effective_feedback(row.manifest) for row in rows]
+        values = [with_effective_feedback(row.manifest) for row in rows]
+        return {'lessons': values, 'total': int(total),
+                'has_more': offset + len(values) < int(total),
+                'limit': page_limit, 'offset': offset}
 
     @router.get('/summaries')
-    def summaries(request: Request, subject: str | None = None, account=Depends(identity), session: Session = Depends(db)):
+    def summaries(request: Request, subject: str | None = None, q: str | None = None,
+                  limit: int | None = None, offset: int = 0,
+                  account=Depends(identity), session: Session = Depends(db)):
         """Mixed-subject card projection for clients that advertise v1 and v2."""
         formats = client_formats(request)
+        act_context = wants_act_context(request)
         wanted = subject_filter(subject)
-        rows = session.execute(select(Lesson, LessonRevision).join(
-            LessonRevision, LessonRevision.lesson_id == Lesson.id).where(
-            Lesson.owner_id == account.id, Lesson.archived.is_(False), Lesson.disabled.is_(False),
-            LessonRevision.version == Lesson.version).order_by(Lesson.created_at.desc())).all()
+        base_filters = [Lesson.owner_id == account.id, Lesson.archived.is_(False),
+                        Lesson.disabled.is_(False), LessonRevision.version == Lesson.version]
+        # Negotiation and rollout filtering happen in SQL, before LIMIT/OFFSET.
+        if '2' not in formats:
+            base_filters.append(Lesson.experience_family != 'music')
+        if '3' not in formats or not rollout.enabled('act_drawing_enabled'):
+            base_filters.append(Lesson.experience_family != 'visual')
+        # Full-library facets are independent of the current page and filters.
+        available_subjects = sorted({value for value in session.scalars(select(LessonRevision.subject).join(
+            Lesson, Lesson.id == LessonRevision.lesson_id).where(
+            *base_filters).distinct()).all() if value})
+        filters = list(base_filters)
+        if wanted is not None:
+            filters.append(LessonRevision.subject == wanted)
+        query = (q or '').strip()[:80]
+        if query:
+            filters.append(Lesson.title.ilike(f'%{query}%'))
+        base = select(Lesson, LessonRevision).join(
+            LessonRevision, LessonRevision.lesson_id == Lesson.id).where(*filters).order_by(
+            Lesson.created_at.desc())
+        paginated = limit is not None or offset > 0
+        page_limit = max(1, min(limit if limit is not None else 100, 200))
+        page_offset = max(0, offset)
+        statement = base.offset(page_offset).limit(page_limit)
+        rows = session.execute(statement).all()
         values = []
         for lesson, revision in rows:
-            # The owner's list is the draft view: a relabel shows immediately.
-            projection = subject_projection(lesson, revision, current=True)
-            if projection['experience_family'] == 'music' and '2' not in formats:
-                continue
-            if wanted is not None and projection['subject'] != wanted:
-                continue
-            values.append(summary_of(lesson, revision, settings, current=True).model_dump())
-        return values
+            try:
+                # Identity is checked for v1 clients too: corrupt/unknown Act data
+                # must not be rendered as a body lesson.
+                lesson_act(lesson, revision)
+                if act_context:
+                    values.append(summary_v2_of(lesson, revision, settings, current=True))
+                else:
+                    values.append(summary_of(lesson, revision, settings, current=True).model_dump())
+            except acts.ActError as exc:
+                return unsupported_act_response(exc)
+        if not paginated:
+            return values
+        total = session.scalar(select(func.count()).select_from(base.subquery())) or 0
+        return {'lessons': values, 'total': int(total),
+                'has_more': page_offset + len(values) < int(total),
+                'limit': page_limit, 'offset': page_offset,
+                'available_subjects': available_subjects}
 
     @router.post('/from-demo', response_model=LessonManifest, status_code=201)
     def copy_demo(account=Depends(identity), session: Session = Depends(db)):
@@ -317,6 +553,8 @@ def install_lessons(app, engine, settings, identity, db):
     def detail(lesson_id: str, request: Request, account=Depends(identity), session: Session = Depends(db)):
         lesson,reasons=access_reasons(session,lesson_id,account.id)
         if not lesson or not reasons:raise HTTPException(404,'Move unavailable.')
+        if lesson.act_id == 'drawing' and not rollout.enabled('act_drawing_enabled'):
+            raise HTTPException(404, 'Drawing is not enabled on this deployment.')
         if (lesson.experience_family or 'body')=='music' and latest_revision(session,lesson) is None:
             # A draft reference has no manifest yet; it is not readable as a lesson.
             if 'owner' in reasons:
@@ -324,14 +562,31 @@ def install_lessons(app, engine, settings, identity, db):
             raise HTTPException(404,'Move unavailable.')
         if 'owner' in reasons or 'direct' in reasons or 'group' in reasons:
             _,revision=readable_lesson(session,lesson_id,account.id)
+            try:
+                lesson_act(lesson, revision)
+            except acts.ActError as exc:
+                return unsupported_act_response(exc)
             ensure_supported(lesson, revision, request)
             from .music_assessment import with_effective_feedback
-            return with_effective_feedback(revision.manifest)
-        # A public-only reader never receives private source media.
-        _,revision,publication=public_lesson(session,lesson_id)
-        ensure_supported(lesson, revision, request)
-        from .workflow import public_tags
-        return public_manifest(revision,publication,public_tags(session,lesson_id))
+            document = with_effective_feedback(revision.manifest)
+        else:
+            # A public-only reader never receives private source media.
+            _,revision,publication=public_lesson(session,lesson_id)
+            try:
+                descriptor = lesson_act(lesson, revision)
+            except acts.ActError as exc:
+                return unsupported_act_response(exc)
+            ensure_supported(lesson, revision, request)
+            from .workflow import public_tags
+            document = public_manifest(revision,publication,public_tags(session,lesson_id),
+                                       act_id=descriptor.id, lesson_id=lesson.id)
+        if wants_act_context(request):
+            try:
+                return lesson_context(lesson, revision, reasons, settings, document,
+                                      audience=audience_for(session, lesson, account.id, reasons))
+            except acts.ActError as exc:
+                return unsupported_act_response(exc)
+        return document
 
     @router.patch('/{lesson_id}/subject')
     def set_subject(lesson_id: str, body: SubjectInput, account=Depends(identity), session: Session = Depends(db)):
@@ -352,10 +607,34 @@ def install_lessons(app, engine, settings, identity, db):
         # published pointer keep referring to the same revision. A reader keeps the label
         # frozen on that revision; the public label changes when the owner next publishes.
         lesson.subject, lesson.experience_family, lesson.instrument = resolved, family, instrument
+        lesson.act_id = acts.act_for_subject(resolved).id
         session.commit()
         return {'lesson_id': lesson.id, 'revision_id': latest.id if latest else None,
                 **subject_projection(lesson, latest, current=True)}
 
+
+    @router.get('/{lesson_id}/publishability')
+    def publishability_view(lesson_id: str,
+                            audience: Literal['invited', 'link', 'group', 'public'] = 'public',
+                            roles: str | None = None,
+                            account=Depends(identity), session: Session = Depends(db)):
+        """Owner-facing readiness for one audience, using the same policy as release."""
+        lesson = owned_lesson(session, lesson_id, account.id)
+        revision = latest_revision(session, lesson)
+        publication = session.get(LessonPublication, lesson_id)
+        requested = [value for value in roles.split(',') if value] if roles else None
+        from .publication import publishability
+        result = publishability(
+            session, lesson, revision, audience, requested, False,
+            publication.roles if publication and publication.roles else None)
+        return result.model_dump()
+
+    @router.get('/{lesson_id}/editor-state')
+    def editor_state_view(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
+        """Shared authoring lifecycle/readiness for this owner's lesson."""
+        lesson = owned_lesson(session, lesson_id, account.id)
+        from .editor_lifecycle import editor_state
+        return editor_state(session, lesson)
 
     @router.get('/{lesson_id}/music-draft')
     def music_draft(lesson_id: str, account=Depends(identity), session: Session = Depends(db)):
@@ -459,7 +738,8 @@ def install_lessons(app, engine, settings, identity, db):
         manifest.section_set = section_set
         session.add(LessonRevision(id=manifest.revision_id, lesson_id=lesson.id, manifest=manifest.model_dump(),
                                    version=section_set.revision, subject=lesson.subject,
-                                   experience_family=lesson.experience_family, instrument=lesson.instrument))
+                                   experience_family=lesson.experience_family, instrument=lesson.instrument,
+                                   act_id=lesson_act(lesson, revision).id))
         session.commit()
         return manifest
 
@@ -507,7 +787,8 @@ def install_lessons(app, engine, settings, identity, db):
         manifest.section_set = SectionSet(id=manifest.section_set.id, revision=revision.version+1, duration=duration, sections=sections)
         trimmed = LessonRevision(id=manifest.revision_id, lesson_id=lesson.id, manifest=manifest.model_dump(),
                                  version=revision.version+1, subject=lesson.subject,
-                                 experience_family=lesson.experience_family, instrument=lesson.instrument)
+                                 experience_family=lesson.experience_family, instrument=lesson.instrument,
+                                 act_id=lesson_act(lesson, revision).id)
         session.add(trimmed)
         if body.accept:
             from .permissions import accept_revision

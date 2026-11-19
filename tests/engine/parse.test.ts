@@ -84,7 +84,7 @@ test('malformed input never throws', () => {
 });
 
 test('a document with an unknown version is unsupported, not malformed', () => {
-  const parsed = parseLessonDocument({schema_version: 3});
+  const parsed = parseLessonDocument({schema_version: 4});
   assert.equal(parsed.ok, false);
   if (!parsed.ok) assert.equal(parsed.code, 'unsupported_format');
 });

@@ -20,6 +20,69 @@ from apps.api.database import LessonRevision, WorkerCredential
 from apps.api.processing import MEDIAPIPE_ENGINE_VERSION, MEDIAPIPE_PIPELINE_VERSION, PIPELINE_VERSION
 from apps.api.processing_routes import BODY_ROUTES, ROUTES, body_route, body_status, route_for
 from apps.api.conversions import Heartbeat, body_processing
+from process_video_mediapipe import (MARKER_VISIBILITY, SCORING_VISIBILITY, STANDING_VISIBILITY,
+    playback_duration, pose_reference_contract, segmentation_contract, usable_scoring_pose)
+import numpy as np
+
+
+def test_playback_duration_includes_the_final_frame_interval():
+    ten = np.arange(10) / 10
+    assert ten[-1] == pytest.approx(.9)
+    assert playback_duration(ten, 10) == pytest.approx(1.0)
+    assert playback_duration(np.array([0., .2]), 5) == pytest.approx(.4)
+    for fps in (30000 / 1001, 24000 / 1001):
+        times = np.arange(120) / fps
+        assert playback_duration(times, fps) == pytest.approx(120 / fps)
+
+
+def test_any_unrepaired_matte_gap_disables_derivatives():
+    times = np.arange(20) / 30
+    complete = [True] * 20
+    assert segmentation_contract(times, 20, complete)['available'] is True
+    for index in (0, 10, 19):
+        observed = list(complete); observed[index] = False
+        value = segmentation_contract(times, 19, observed)
+        assert value['available'] is False
+        assert value['reason'] == 'unrepaired_matte_gap'
+    # Exact 95%/0.5s boundary still cannot hide the single missing frame.
+    observed = list(complete); observed[10] = False
+    boundary = segmentation_contract(times, 19, observed)
+    assert boundary['coverage'] == pytest.approx(.95)
+    assert boundary['available'] is False
+    # Repaired frames cannot be counted as observed.
+    assert segmentation_contract(times, 20, complete, repaired_frames=1)['available'] is False
+
+
+def test_pose_quality_failure_stays_separate_from_derivative_failure():
+    times = np.arange(20) / 30
+    usable = [True] * 20
+    assert pose_reference_contract(times, usable)['acceptable'] is True
+    bad_pose = [True] * 18 + [False, False]
+    assert pose_reference_contract(times, bad_pose)['acceptable'] is False
+    # A pose-acceptable reference can still have a derivative-only failure.
+    observed = [True] * 19 + [False]
+    assert pose_reference_contract(times, usable)['acceptable'] is True
+    assert segmentation_contract(times, 19, observed)['available'] is False
+
+
+def test_scoring_visibility_matches_browser_and_keeps_marker_calibration_separate():
+    assert SCORING_VISIBILITY == .60
+    assert MARKER_VISIBILITY == .55
+    assert STANDING_VISIBILITY == .65
+    world = np.zeros((33, 3), dtype=np.float32)
+    angles = ((11, 13, 15), (12, 14, 16), (13, 11, 23), (14, 12, 24),
+              (11, 23, 25), (12, 24, 26), (23, 25, 27), (24, 26, 28))
+    for value, expected in ((.55, False), (.59, False), (.60, True)):
+        visibility = np.full(33, value, dtype=np.float32)
+        assert usable_scoring_pose(world, visibility) is expected, value
+    # Only five of the eight scoring angles visible at 0.60 is insufficient.
+    visibility = np.zeros(33, dtype=np.float32)
+    for a, b, c in angles[:5]:
+        visibility[[a, b, c]] = .60
+    assert usable_scoring_pose(world, visibility) is False
+    for a, b, c in angles[:6]:
+        visibility[[a, b, c]] = .60
+    assert usable_scoring_pose(world, visibility) is True
 
 
 def mediapipe_credential(app, provider='local', pipeline=MEDIAPIPE_PIPELINE_VERSION):
@@ -236,20 +299,72 @@ def test_video_only_lesson_cannot_be_published_publicly(conversion):
             'rights_acknowledged': True}
     response = client.patch(f'/api/public/lessons/{lesson_id}', json=body)
     assert response.status_code == 409
-    assert 'video only' in response.json()['detail'].lower()
+    assert 'approved public representation' in response.json()['detail'].lower()
     # The same lesson is still readable to its owner, so nothing vanished.
     assert client.get('/api/lessons/' + lesson_id).status_code == 200
 
 
-def test_public_projection_tolerates_a_missing_animation():
+def test_public_projection_never_leaks_media_without_an_approved_role():
     from apps.api.public import public_keys
     value = public_keys({'schema_version': 1, 'animation': None,
                          'landmarks': {'key': 'lessons/x/reference.json', 'mime': 'application/json',
                                        'bytes': 1, 'sha256': 'a' * 64},
                          'presentation': {}}, 'lesson')
+    # A video-only lesson has no approved public role yet, so even landmarks and a
+    # private-looking reference are removed instead of being exposed.
     assert value['animation'] is None
     assert value['source_video'] is None
-    assert value['landmarks']['key'] == 'public/lesson/reference.json'
+    assert value['landmarks'] is None
+    assert value['public_roles'] == []
+
+
+def test_mediapipe_public_shared_journey_projects_only_approved_video(conversion):
+    client, app, _, _, system = conversion
+    system[2].max_active_conversions = 5
+    job, path, base, lease, claim, assets = run_mediapipe_job(client, app, system[2])
+    focused = put_asset(client, base, lease, 'instructor.mp4', b'\x00\x00\x00\x18ftypmp42')
+    manifest = mediapipe_manifest(job, claim['attempt_token'], assets, focused_video=focused)
+    finished = client.post(base + '/finish', headers=lease, json=manifest)
+    assert finished.status_code == 200, finished.text
+    lesson_id = finished.json()['lesson_id']
+    revision_id = client.get('/api/lessons/' + lesson_id).json()['revision_id']
+    assert client.post(f'/api/workflow/lessons/{lesson_id}/accept',
+                       json={'revision_id': revision_id}).status_code == 200
+    listed = client.patch(f'/api/public/lessons/{lesson_id}', json={
+        'listed': True, 'title': 'CPU move', 'creator_name': 'Ari', 'tags': ['cpu'],
+        'rights_acknowledged': True, 'public_roles': ['playable_preview']})
+    assert listed.status_code == 200, listed.text
+
+    discovery = client.get('/api/public/moves', params={'act': 'full_body', 'q': 'CPU'}).json()
+    assert lesson_id in {item['lesson_id'] for item in discovery['moves']}
+    body = client.get(f'/api/public/moves/{lesson_id}').json()
+    assert body['playable_preview']['key'].startswith('public/')
+    assert body['source_video'] is None
+    assert body['landmarks'] is None
+    assert body['animation'] is None
+    for private in ('preview.mp4', 'reference.json', 'source.mp4'):
+        assert client.get(f'/api/public/moves/{lesson_id}/assets/{private}').status_code == 404
+
+
+def test_mediapipe_failed_focused_derivative_keeps_private_watch_but_refuses_public(conversion):
+    client, app, _, _, system = conversion
+    system[2].max_active_conversions = 5
+    job, _, base, lease, claim, assets = run_mediapipe_job(client, app, system[2])
+    manifest = mediapipe_manifest(job, claim['attempt_token'], assets)
+    finished = client.post(base + '/finish', headers=lease, json=manifest)
+    assert finished.status_code == 200, finished.text
+    lesson_id = finished.json()['lesson_id']
+    detail = client.get('/api/lessons/' + lesson_id).json()
+    assert detail['source_video'] is not None and detail['landmarks'] is not None
+    assert detail['focused_video'] is None
+    revision_id = detail['revision_id']
+    assert client.post(f'/api/workflow/lessons/{lesson_id}/accept',
+                       json={'revision_id': revision_id}).status_code == 200
+    refused = client.patch(f'/api/public/lessons/{lesson_id}', json={
+        'listed': True, 'title': 'CPU move', 'creator_name': 'Ari', 'tags': ['cpu'],
+        'rights_acknowledged': True, 'public_roles': ['playable_preview']})
+    assert refused.status_code == 409
+    assert 'preview' in refused.json()['detail'].lower() or 'representation' in refused.json()['detail'].lower()
 
 
 def test_contract_requires_animation_for_3d_and_source_video_for_mediapipe():

@@ -327,6 +327,7 @@ export const MimicInterface=forwardRef<MimicHandle,{lesson:LessonManifest;player
    // Both body pipelines deliver a scoring reference here: SAM3D's MHR70 rows and
    // the MediaPipe heavy route's 33-landmark rows. The format travels with the data.
    if(lesson.engine==='sam-3d-body'||lesson.engine==='mediapipe'){
+   if(!lesson.landmarks)throw new Error('This video-only release has no approved pose reference; watch-only remains available.');
    const response=await fetch(assetUrl(lesson.landmarks.key));if(!response.ok)throw new Error('The movement comparison data could not load.');const reference=await response.json() as Reference;
    if(epoch!==r.epoch)return;
    const landmarkFormat:LandmarkFormat=reference.landmarkFormat==='mediapipe-33'?'mediapipe-33':'sam-3d-body';

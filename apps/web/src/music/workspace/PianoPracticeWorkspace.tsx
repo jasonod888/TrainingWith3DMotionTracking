@@ -5,6 +5,7 @@ import {
 } from '../../../../../packages/music-notation/index.ts';
 import type {MusicLessonManifest, MusicPedalSpan} from '../../../../../packages/lesson-schema/index';
 import {assetUrl, request} from '../../api';
+import {loadReferenceValue, type LessonContext} from '../../app/lesson-context';
 import {MUSIC_CAPABILITIES, voiceControl, type PracticeCapabilities} from '../../../../../packages/learning-engine/practice-capabilities';
 import {emptyPracticeSnapshot} from '../../../../../packages/learning-engine/practice-runtime';
 import {PracticeShell} from '../../practice/PracticeShell';
@@ -13,7 +14,13 @@ import {experienceModeCapabilitiesFrom, experienceModeToLegacy} from '../../../.
 import {useMusicPractice} from '../../practice/useMusicPractice';
 import {usePracticeVoice} from '../../practice/usePracticeVoice';
 import {voiceCommandToPractice} from '../../practice/practice-input';
-import {createLocalPracticeStore} from '../../practice/practice-store';
+import {createLocalPracticeStore, createServerPracticeStore, conservativeImport, importLocalProgress, readLocalOwner} from '../../practice/practice-store';
+import {resolvePracticePolicy} from '../../../../../packages/learning-engine/practice-policy';
+import {resolveMusicChallengeEligibility} from '../practice-challenge-policy';
+import {createResourceBag} from '../../../../../packages/learning-engine/practice-adapter';
+import {createSessionGuard,createContextRevalidator} from '../../practice/session-guard';
+import {buildAttemptEnvelope} from '../../../../../packages/learning-engine/attempt-envelope';
+import {submitPracticeAttempt} from '../../api';
 import {pianoPracticePlan} from '../../practice/practice-plans';
 import {buildPracticeChunks, type ChunkBarsOption} from '../practice-chunks';
 import {usePianoPreviewAsset} from '../usePianoPreviewAsset';
@@ -86,7 +93,7 @@ function readPracticePanels(): PracticePanel[] {
  * notation and alignment, shares the rendering/transport modules with review,
  * and lets the common runtime own every practice transition.
  */
-export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, embedded = false, challengeMode = false, challengeAvailable = false, challengeHistoryEnabled = false, audioAssessmentEnabled = false, onBack, onModeChange}: {
+export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, embedded = false, challengeMode = false, challengeAvailable = false, challengeHistoryEnabled = false, audioAssessmentEnabled = false, context, onBack, onModeChange}: {
   lessonId?: string;
   lessonTitle?: string;
   embedded?: boolean;
@@ -94,6 +101,8 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
   challengeAvailable?: boolean;
   challengeHistoryEnabled?: boolean;
   audioAssessmentEnabled?: boolean;
+  /** Preloaded neutral context. When present, no manifest request is made. */
+  context?: LessonContext;
   onBack?: () => void;
   onModeChange?: (mode: 'watch' | 'practice' | 'compete') => void;
 }) {
@@ -162,20 +171,16 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
     (async () => {
       try {
         if (!lessonId) throw new Error('This practice link is incomplete.');
-        const value = await request<Manifest>(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false,
-          {'X-Lesson-Formats': '1,2'});
+        // A passed-in context is already validated and release-checked. Fetching it
+        // again here both duplicated the request and could disagree with the shell.
+        const value = context && context.document.kind === 'music'
+          ? context.document.value as unknown as Manifest
+          : await request<Manifest>(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false,
+            {'X-Lesson-Formats': '1,2'});
         const reference = value.reference;
         if (!reference?.key) throw new Error('This lesson has no reviewed piano reference.');
-        const response = await fetch(assetUrl(reference.key), {credentials: 'same-origin'});
-        if (!response.ok) throw new Error('The reviewed piano reference could not be loaded.');
-        const bytes = await response.arrayBuffer();
-        const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
-          .map(value => value.toString(16).padStart(2, '0')).join('');
-        if (typeof reference.bytes === 'number' && bytes.byteLength !== reference.bytes
-          || reference.sha256 && digest !== reference.sha256) {
-          throw new Error('The piano reference does not match its reviewed file. Reopen the lesson.');
-        }
-        const payload = JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes));
+        // Immutable by hash; verified before it enters the cache.
+        const payload = await loadReferenceValue(reference);
         const restored = restoreFromReference(payload);
         if (!restored.ok) throw new Error(restored.message);
         if (cancelled) return;
@@ -200,7 +205,7 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
       }
     })();
     return () => { cancelled = true; };
-  }, [lessonId, lessonTitle]);
+  }, [lessonId, lessonTitle, context]);
 
   const chunks = useMemo(() => document && alignment
     ? buildPracticeChunks(document.measures, alignment, offsetSeconds, document.duration, chunkBars)
@@ -212,21 +217,73 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
     duration: document.duration,
     chunks,
   }) : null, [document, manifest, lessonId, title, chunks]);
-  const store = useMemo(() => createLocalPracticeStore(), []);
-  const capabilities = useMemo<PracticeCapabilities>(() => ({
-    ...MUSIC_CAPABILITIES,
+  // Authenticated lessons sync plan-scoped progress to the server; guests and
+  // public/demo contexts stay entirely local.
+  const store = useMemo(() => {
+    const scope = context?.accountScope;
+    return scope && scope !== 'public' && scope !== 'guest'
+      ? createServerPracticeStore({accountId: scope})
+      : createLocalPracticeStore();
+  }, [context?.accountScope]);
+  // The four-axis policy is resolved for the active reference; it is the same
+  // presentation the music practice surface uses for assessment/feedback.
+  const practicePolicy = useMemo(() => resolvePracticePolicy({
+    mode: 'practice',
+    act: {id: manifest?.subject === 'guitar' ? 'guitar' : 'piano', supportsChallenge: false,
+      allowsUnassessedChallenge: false,
+      assessmentAdapterId: manifest?.assessment?.assessment && manifest.assessment.assessment !== 'none'
+        ? `${manifest?.subject ?? 'piano'}-notes-v1` : null,
+      rubricVersion: manifest?.assessment?.assessment && manifest.assessment.assessment !== 'none'
+        ? 'rubric-v1' : null,
+      defaultFeedback: 'after_attempt', practiceInputs: ['midi', 'microphone']},
+    creator: {assessmentAllowed: manifest?.feedback_enabled !== false,
+      feedbackAllowed: manifest?.feedback_enabled !== false},
+    learner: {feedback: 'on', inputs: []},
+    reference: {reviewed: manifest?.reference_reviewed === true, eligible: Boolean(manifest?.reference)},
+    evidence: {selected: [], available: []},
+  }), [manifest]);
+  useEffect(() => {
+    const scope = context?.accountScope;
+    if (!plan || !manifest || !scope || scope === 'public' || scope === 'guest') return;
+    let stopped = false;
+    const identity = {lessonId: manifest.lesson_id, revisionId: manifest.revision_id,
+      planId: plan.id, duration: plan.duration};
+    void (async () => {
+      const local = createLocalPracticeStore(scope);
+      const record = await local.load(identity);
+      const decision = conservativeImport({
+        accountId: scope, localAccountId: readLocalOwner(identity, scope), localRecord: record,
+        targetRevisionId: manifest.revision_id, targetPlanId: plan.id,
+      });
+      if (stopped || !decision.allowed || !decision.record) return;
+      await importLocalProgress({
+        accountId: scope, localAccountId: readLocalOwner(identity, scope),
+        localRecord: decision.record, targetLessonId: manifest.lesson_id,
+        targetRevisionId: manifest.revision_id, targetPlanId: plan.id,
+      });
+    })();
+    return () => { stopped = true; };
+  }, [plan?.id, manifest, context?.accountScope]);
+  const capabilities = useMemo<PracticeCapabilities>(() => ({    ...MUSIC_CAPABILITIES,
     speeds: [0.25, 0.5, 0.75, 1, 1.25],
     countIn: {supported: true, value: 0, options: [0, 3, 5, 10].map(seconds => ({seconds, label: seconds ? `${seconds}s` : 'Off'}))},
     rest: {supported: true, value: 1.5, options: [0, 1.5, 3, 5]},
   }), []);
-  const practice = useMusicPractice({
-    plan: plan ?? {id: 'unavailable', lessonId, revisionId: 'unavailable', duration: document?.duration ?? 0, units: []},
+  const practice = useMusicPractice({    plan: plan ?? {id: 'unavailable', lessonId, revisionId: 'unavailable', duration: document?.duration ?? 0, units: []},
     mediaRef,
     transportKey: mediaKey,
     capabilities,
     store,
   });
   const snapshot = practice.snapshot;
+  const accessBag = useRef(createResourceBag()).current;
+  const [accessLost, setAccessLost] = useState(false);
+  const accessGuard = useMemo(() => practice.runtime && createContextRevalidator(context)
+    ? createSessionGuard({
+      runtime: practice.runtime, resources: accessBag,
+      revalidate: createContextRevalidator(context)!,
+      onLost: () => setAccessLost(true),
+    }) : null, [practice.runtime, accessBag, context]);
   useEffect(() => {
     if (livePiano && videoRef.current) videoRef.current.muted = true;
   }, [livePiano, snapshot?.status, videoUrl]);
@@ -293,7 +350,15 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
     challengeInputMode === 'midi' ? midi.connected : microphoneEligible),
     [listenAssessment, manifest?.subject, manifest?.reference_reviewed, lessonFeedbackEnabled, midi.connected, challengeInputMode, microphoneEligible]);
   const listenPlayEligible = listenEligibility.eligible;
-  const challengeEligible = challengeEligibility.eligible;
+  const challengePolicy = useMemo(() => resolveMusicChallengeEligibility({
+    subject: manifest?.subject === 'guitar' ? 'guitar' : 'piano',
+    assessmentEnabled: practicePolicy.assessment.enabled,
+    challengeEnabled: challengeMode,
+    referencePlayable: Boolean(manifest?.reference),
+    referenceReviewed: manifest?.reference_reviewed === true,
+    configuredEligible: challengeEligibility.eligible,
+  }), [manifest, challengeMode, challengeEligibility.eligible]);
+  const challengeEligible = challengePolicy.buttonEligible;
   const listenPlay = useListenPlay({
     runtime: practice.runtime, snapshot, lastAttempt: practice.lastAttempt,
     unit: listenUnit, speed: snapshot?.rate ?? 1,
@@ -311,7 +376,47 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
     onPauseRuntime: () => practice.dispatch({type: 'action', action: 'pause'}),
   });
   challengeRef.current = {active: challenge.active, recordAttack: challenge.recordAttack, cancel: challenge.cancel};
+  useEffect(() => {
+    const attempt = practice.lastAttempt;
+    if (!attempt?.completed || challenge.active || !manifest) return;
+    const neutral = buildAttemptEnvelope({
+      attemptId: attempt.id, lessonId: manifest.lesson_id, revisionId: manifest.revision_id,
+      actId: manifest.subject === 'guitar' ? 'guitar' : 'piano', mode: 'practice',
+      planId: plan?.id ?? `music-${manifest.revision_id}`, unitId: snapshot?.unitId ?? null,
+      durationMs: Math.max(0, attempt.end - attempt.start) * 1000, status: 'unassessed',
+      report: {reason: attempt.reason},
+    });
+    void submitPracticeAttempt({attempt_id: neutral.attemptId, lesson_id: neutral.lessonId,
+      revision_id: neutral.revisionId, act_id: neutral.actId, mode: neutral.mode,
+      plan_id: neutral.planId, unit_id: neutral.unitId, duration_ms: neutral.durationMs,
+      status: 'unassessed', assessment_adapter: null, rubric_version: null,
+      report: neutral.report}).catch(() => {});
+  }, [practice.lastAttempt?.id, challenge.active, manifest, plan?.id]);
   const upload=useUploadAssessment({expected:listenExpected,target:{start:0,end:document?.duration??0},sections:listenSections});
+  const uploadRef=useRef(upload);uploadRef.current=upload;
+  useEffect(()=>{
+    if(!accessGuard)return;
+    const stop=accessGuard.start();
+    accessBag.add({kind:'audio',label:'music playback',release:()=>{
+      mediaRef.current?.pause();
+      practice.dispatch({type:'action',action:'pause'});
+    }});
+    accessBag.add({kind:'audio',label:'midi input',release:()=>midi.disconnect()});
+    accessBag.add({kind:'microphone',label:'listen/challenge capture',release:()=>{
+      listenPlayRef.current?.cancel('Access to this lesson was removed.');
+      challengeRef.current?.cancel('Access to this lesson was removed.');
+      uploadRef.current.cancel();
+    }});
+    accessBag.add({kind:'worker',label:'practice runtime',release:()=>practice.runtime?.destroy()});
+    return()=>{stop();void accessBag.releaseAll();};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[accessGuard,accessBag]);
+  useEffect(()=>{
+    if(!accessLost)return;
+    listenPlayRef.current?.cancel('Access to this lesson was removed.');
+    challengeRef.current?.cancel('Access to this lesson was removed.');
+    uploadRef.current.cancel();
+  },[accessLost]);
   useEffect(() => {
     if (lessonFeedbackEnabled) return;
     if (listenPlay.active) listenPlay.cancel('The lesson creator disabled feedback. This run is not scored.');
@@ -378,9 +483,23 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
           duration: document?.duration ?? manifest.duration,
           inputMode: challenge.report ? (challenge.report.modelProfile ? 'microphone' : 'midi') : 'microphone',
         }));
+      const neutral = buildAttemptEnvelope({
+        attemptId: challengeSaveId.current, lessonId: manifest.lesson_id,
+        revisionId: manifest.revision_id, actId: manifest.subject === 'guitar' ? 'guitar' : 'piano',
+        mode: 'challenge', planId: plan?.id ?? `music-${manifest.revision_id}`,
+        unitId: snapshot?.unitId ?? null, durationMs: (document?.duration ?? 0) * 1000,
+        status: 'completed', assessmentAdapter: `${manifest.subject === 'guitar' ? 'guitar' : 'piano'}-notes-v1`,
+        rubricVersion: 'v1', report: {challenge: challengeReport},
+      });
+      void submitPracticeAttempt({attempt_id: neutral.attemptId, lesson_id: neutral.lessonId,
+        revision_id: neutral.revisionId, act_id: neutral.actId, mode: neutral.mode,
+        plan_id: neutral.planId, unit_id: neutral.unitId, duration_ms: neutral.durationMs,
+        status: 'completed', assessment_adapter: neutral.assessmentAdapter,
+        rubric_version: neutral.rubricVersion, report: neutral.report}).catch(() => {});
       setChallengeSave({state:'saved',message:'Challenge report saved to your private history.'});
     } catch (cause) {
       setChallengeSave({state:'error',message:cause instanceof Error ? cause.message : 'The challenge report was not saved.'});
+      void accessGuard?.handleError(cause);
     }
   };
   const stagePlayhead = listenPlay.capturePlayhead ?? playhead;
@@ -525,6 +644,10 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
     </div>}
   </div> : null;
 
+  if (accessLost) return <section className="ws-shell ws-shell-focused piano-practice-shell" data-access-lost="true" aria-label="Music practice">
+    <h1>Access to this lesson was removed.</h1>
+    <p role="status">Practice stopped and device resources were released.</p>
+  </section>;
   if (loading) return <section className="ws-shell ws-shell-focused piano-practice-shell" aria-busy="true">
     <p role="status">Opening practice…</p></section>;
   if (error || !document || !plan) return <section className="ws-shell ws-shell-focused piano-practice-shell">

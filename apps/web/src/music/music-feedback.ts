@@ -2,13 +2,19 @@
 import type {AssessmentPolicy, MusicLessonManifest} from '../../../../packages/lesson-schema/index';
 import {attackSourceTime, matchOnsets, type Attack, type ExpectedAttack, type RunClock} from '../../../../packages/music-engine/onsets';
 import {pitchName, type MusicReference} from './music-reference';
+import {instrumentAdapter} from './workspace/instrument-adapters';
 
 export type FeedbackEligibility = {eligible: boolean; reasons: string[]; warnings: string[]};
 
 export function assessmentPolicyForSubject(subject: string): AssessmentPolicy {
-  return subject === 'guitar'
-    ? {assessment: 'notes', input_modes: ['midi', 'microphone'], dimensions: ['pitch', 'timing'], rubric_version: 'guitar-notes-v1'}
-    : {assessment: 'notes', input_modes: ['midi', 'microphone'], dimensions: ['pitch', 'timing'], rubric_version: 'piano-midi-v1'};
+  // Instrument-specific rubric and evidence inputs live in the adapter.
+  const adapter = instrumentAdapter(subject);
+  return {
+    assessment: 'notes',
+    input_modes: [...(adapter?.inputModes ?? ['midi', 'microphone'])],
+    dimensions: ['pitch', 'timing'],
+    rubric_version: adapter?.rubricVersion ?? 'piano-midi-v1',
+  };
 }
 
 /** Creator-controlled availability; absent legacy music follows its actual rubric. */

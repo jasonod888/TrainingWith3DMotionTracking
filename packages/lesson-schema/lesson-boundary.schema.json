@@ -418,6 +418,7 @@
             "boxing",
             "piano",
             "guitar",
+            "drawing",
             "movement_other"
           ],
           "title": "Subject",
@@ -430,7 +431,8 @@
         "experience_family": {
           "enum": [
             "body",
-            "music"
+            "music",
+            "visual"
           ],
           "title": "Experience Family",
           "type": "string"

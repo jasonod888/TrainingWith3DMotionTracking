@@ -2,21 +2,25 @@ from contextlib import asynccontextmanager
 import json
 import logging
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from .config import Settings, ROOT
 from .contracts import LessonManifest
 from .database import make_engine, database_ready
 from .storage import check_storage
+from . import acts
 from .auth import install_auth
 from .admin import install_admin
 from .lessons import install_lessons
+from .practice_progress import install_practice_progress
+from .drawing import install_drawing
 from .conversions import install_conversions
 from .sharing import install_sharing
 from .workflow import install_workflow
 from .groups import install_groups
 from .public import install_public
+from .social import install_social
 from .mimic_pairing import install_mimic_pairing
 from .mimic_attempts import install_mimic_attempts
 
@@ -38,11 +42,14 @@ def create_app(settings: Settings | None = None):
     install_voice(app,settings,identity,optional_identity)
     install_admin(app, settings, identity, db)
     install_lessons(app, engine, settings, identity, db)
+    install_practice_progress(app, identity, db)
+    install_drawing(app, identity, db)
     install_conversions(app, engine, settings, identity, db)
     install_sharing(app,settings,identity,db)
     install_workflow(app,identity,db)
     install_groups(app,settings,identity,optional_identity,db)
-    install_public(app,settings,identity,db)
+    install_public(app,settings,identity,db,optional_identity)
+    install_social(app,identity,db,optional_identity)
     install_mimic_pairing(app,settings,identity,db)
     install_mimic_attempts(app,identity,db)
     from .music_attempts import install_music_attempts
@@ -104,15 +111,30 @@ def create_app(settings: Settings | None = None):
         return FileResponse(path, media_type=mime, headers={'Cache-Control':'private, max-age=300'})
 
     @app.get('/api/capabilities')
-    def capabilities():
-        from . import processing_routes, subjects
-        return {'phase':7, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':True, 'sharing':True,
+    def capabilities(request: Request):
+        from . import processing_routes, rollout, subjects
+        raw = request.query_params.get('act_version')
+        try:
+            requested = int(raw) if raw is not None else None
+            version = acts.require_version(requested)
+        except (TypeError, ValueError):
+            return JSONResponse({'code': 'unsupported_act',
+                                 'detail': 'Act descriptor version must be an integer.'}, status_code=422)
+        except acts.UnsupportedActVersion as exc:
+            return JSONResponse({'code': 'unsupported_act', 'detail': str(exc)}, status_code=422)
+        return {'phase':9, 'demo':settings.demo_enabled, 'accounts':True, 'conversion':True, 'sharing':True,
                 'acceptance':True, 'groups':True, 'public':True, 'take_export':True, 'studio':True,
                 'camera_calibration':settings.camera_calibration_enabled,
-                # Additive: subject catalogue, advertised lesson formats and per-capability
-                # availability. A missing music route never changes 'conversion'.
+                # Additive: temporary rollout surfaces, with named removal conditions.
+                'rollout':rollout.values(),
+                'rollout_flags':rollout.status(),
                 'subjects':subjects.catalogue(),
                 'lesson_formats':[1,2],
+                # Act descriptors are server-owned data, versioned and data-only. The
+                # frontend maps these ids to its own static, lazy implementations.
+                'act_descriptor_version':version,
+                'acts':[item for item in acts.catalogue()
+                        if item['id'] != 'drawing' or rollout.enabled('act_drawing_enabled')],
                 'subject_filter':settings.subject_filter_enabled,
                 'music_midi_setup':settings.music_midi_setup_enabled,
                 'music_history':settings.music_history_enabled,

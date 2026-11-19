@@ -3,6 +3,7 @@ import {ArrowLeft,ArrowRight,Copy,Globe,Link,Mail,Lock,Share2,Users,X} from 'luc
 import {parseLessonDocument} from '../../../packages/lesson-schema/parse';
 import type {LessonManifest,MusicLessonManifest} from '../../../packages/lesson-schema/index';
 import {ApiError,request,type Account,addMoveToGroup,createGroup,loadGroups,updatePublic,type GroupSummary} from './api';
+import {readiness} from './sharing/publication-readiness';
 
 type Sharing={mode:'private'|'invite'|'link';published_revision_id:string|null;draft_revision_id:string;accepted_revision_id:string|null;
  public_listed:boolean;groups:number;public_listing:{title:string;creator_name:string;description:string;tags:string[]}|null;link_active:boolean;link_expires_at:string|null;
@@ -54,13 +55,18 @@ export function ShareLesson({lesson,onBack,onChange}:{lesson:LessonManifest;onBa
  const savePublic=()=>void run(async()=>{
   if(!reviewed)throw new Error('Confirm you have the right to share this move publicly.');
   await updatePublic(lesson.lesson_id,{listed:true,title:publicTitle,description:publicDescription,creator_name:creatorName,
-   release_revision_id:data?.public_listed?undefined:lesson.revision_id,tags:publicTags.split(',').map(value=>value.trim()).filter(Boolean),rights_acknowledged:true});
+   release_revision_id:data?.public_listed?undefined:lesson.revision_id,tags:publicTags.split(',').map(value=>value.trim()).filter(Boolean),rights_acknowledged:true,public_roles:publicReadiness.roles});
   setNotice('This move is now public.');setReviewed(false);await load();onChange();
  });
  const unlist=()=>void run(async()=>{await updatePublic(lesson.lesson_id,{listed:false});setNotice('This move is no longer public.');await load();onChange();});
  const active=data?data.students.filter(person=>person.active&&!person.revoked).length:0,pending=data?.invitations.length??0;
  const audience=[active?`${active} ${active===1?'person':'people'}`:'',pending?`${pending} invited`:'',data?.link_active?'Link':'',data?.groups?`${data.groups} ${data.groups===1?'group':'groups'}`:'',data?.public_listed?'Public':''].filter(Boolean);
  const isShared=audience.length>0;
+ const publicRoles=lesson.animation?['interactive_data']:lesson.focused_video?['playable_preview']:[];
+ const publicReadiness=readiness({view:{actId:'full_body',hasAnimation:Boolean(lesson.animation),
+  hasPreviewVideo:Boolean(lesson.focused_video),hasReference:false,
+  accepted:Boolean(data&&data.accepted_revision_id===lesson.revision_id)},
+  audience:'public',roles:publicRoles,rightsAcknowledged:reviewed});
  return <section className="share-sheet">
   <button className="back-link" onClick={onBack}><ArrowLeft size={16}/>{lesson.title}</button>
   <div className="share-heading"><p className="eyebrow">SHARE THIS MOVE</p><h1>Send it to someone.</h1><p className="subtle">Choose who can open it. Sharing is optional.</p></div>
@@ -89,7 +95,8 @@ export function ShareLesson({lesson,onBack,onChange}:{lesson:LessonManifest;onBa
     <label>Description <span className="small muted">(optional)</span><textarea rows={2} maxLength={500} value={publicDescription} disabled={busy} onChange={e=>setPublicDescription(e.target.value)}/></label>
     <label>Tags <span className="small muted">separate with commas</span><input maxLength={200} placeholder="kick, basics" value={publicTags} disabled={busy} onChange={e=>setPublicTags(e.target.value)}/></label>
     <label className="check-line"><input type="checkbox" checked={reviewed} onChange={e=>setReviewed(e.target.checked)} disabled={busy}/><span>I have the right to share this move publicly.</span></label>
-    <div className="inline-actions"><button className="primary" disabled={busy||!reviewed||!publicTitle.trim()||!creatorName.trim()||!publicTags.trim()} onClick={savePublic}><Globe size={16}/>{busy?'Working…':data.public_listed?'Update public move':'List publicly'}</button>{data.public_listed&&<button className="back-link danger-link" disabled={busy} onClick={unlist}>Remove from public</button>}</div>
+    <div className="inline-actions"><button className="primary" disabled={busy||!reviewed||!publicTitle.trim()||!creatorName.trim()||!publicTags.trim()||!publicReadiness.enabled} onClick={savePublic}><Globe size={16}/>{busy?'Working…':data.public_listed?'Update public move':'List publicly'}</button>{data.public_listed&&<button className="back-link danger-link" disabled={busy} onClick={unlist}>Remove from public</button>}</div>
+    {!publicReadiness.enabled&&publicReadiness.reason&&<p className="small muted" role="status">{publicReadiness.reason}</p>}
     {data.public_listed&&data.published_revision_id!==lesson.revision_id&&<button className="secondary" disabled={busy||!reviewed} onClick={()=>void run(async()=>{await updatePublic(lesson.lesson_id,{listed:true,release_revision_id:lesson.revision_id,rights_acknowledged:true});setNotice('Shared version updated for friends, groups and public viewers.');await load();onChange();})}>Share this accepted version with everyone</button>}
     <p className="small muted">Only the accepted 3D move and these details are public. Everyone follows the same shared version.</p>
    </div>}

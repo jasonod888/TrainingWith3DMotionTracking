@@ -9,11 +9,13 @@ subject from a title, tag, filename or thumbnail.
 from dataclasses import dataclass
 from typing import Literal
 
-ExperienceFamily = Literal['body', 'music']
+from . import acts
+
+ExperienceFamily = Literal['body', 'music', 'visual']
 Instrument = Literal['piano', 'guitar']
 
 # The literal set is part of the versioned contracts, so keep it in one place.
-SubjectId = Literal['dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'movement_other']
+SubjectId = Literal['dance', 'taekwondo', 'boxing', 'piano', 'guitar', 'drawing', 'movement_other']
 
 
 @dataclass(frozen=True)
@@ -24,6 +26,11 @@ class Subject:
     instrument: Instrument | None = None
     movement: bool = True
 
+    @property
+    def act_id(self) -> str:
+        """The Act this subject belongs to, from the explicit mapping in acts.py."""
+        return acts.SUBJECT_TO_ACT[self.id]
+
 
 SUBJECTS: dict[str, Subject] = {
     'movement_other': Subject('movement_other', 'Full Body Movement', 'body'),
@@ -32,6 +39,7 @@ SUBJECTS: dict[str, Subject] = {
     'boxing': Subject('boxing', 'Boxing', 'body'),
     'piano': Subject('piano', 'Piano', 'music', 'piano', movement=False),
     'guitar': Subject('guitar', 'Guitar', 'music', 'guitar', movement=False),
+    'drawing': Subject('drawing', 'Drawing', 'visual', movement=False),
 }
 
 DEFAULT_SUBJECT = 'movement_other'
@@ -87,6 +95,10 @@ def validate_selection(subject: str | None, instrument: str | None) -> tuple[str
         if instrument:
             raise SubjectError('A movement lesson does not take an instrument.')
         return spec.id, 'body', None
+    if spec.family == 'visual':
+        if instrument:
+            raise SubjectError('A drawing lesson does not take an instrument.')
+        return spec.id, 'visual', None
     if instrument is None:
         return spec.id, 'music', spec.instrument
     if instrument != spec.instrument:
@@ -103,6 +115,7 @@ def catalogue() -> list[dict]:
             'experience_family': spec.family,
             'instrument': spec.instrument,
             'movement': spec.movement,
+            'act_id': spec.act_id,
         }
         for spec in SUBJECTS.values()
     ]

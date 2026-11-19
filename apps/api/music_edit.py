@@ -22,7 +22,7 @@ from .music_assessment import assessment_for_subject
 from .music_alignment import validate_alignment
 from .music_notation import validate_notation
 from .music_review import ReviewAssessment, canonical
-from . import interactive_limit
+from . import acts, interactive_limit
 from .permissions import accept_revision, accepted, latest_revision, owned_lesson
 from .storage import storage_client
 from .music_preview import performance_changed, invalidate_preview
@@ -217,7 +217,8 @@ def install_music_edit(app, settings, identity, db):
         })
         revision = LessonRevision(id=revision_id, lesson_id=lesson_id, version=version,
                                   manifest=manifest.model_dump(), subject=proposal.subject,
-                                  experience_family='music', instrument=proposal.subject)
+                                  experience_family='music', instrument=proposal.subject,
+                                  act_id=acts.act_for_subject(proposal.subject).id)
         session.add(revision)
         session.add(LessonAsset(lesson_id=lesson_id, **asset.model_dump()))
         session.flush()

@@ -4,10 +4,11 @@ import {Playback} from '../../../packages/learning-engine/playback';
 import type {LessonManifest} from '../../../packages/lesson-schema/index';
 import {MotionStage} from './MotionStage';
 import {PreviewScrubber} from './PreviewScrubber';
-import {addMoveToGroup,loadGroups,loadPublicMove,loadPublicMoves,loadPublicTags,request,type Account,type PublicDetail,type PublicMove,type GroupSummary} from './api';
+import {addMoveToGroup,assetUrl,loadGroups,loadPublicMove,loadPublicMoves,loadPublicTags,request,type Account,type PublicDetail,type PublicMove,type GroupSummary} from './api';
 
 import {PublicFeedCard} from './FeedCard';
 import {FeedEmpty,FeedSkeleton} from './FeedStates';
+import {LikeButton} from './social/LikeButton';
 import {Button} from './ui/controls';
 
 export function ExplorePage({query,onQuery,onOpen}:{query:string;onQuery:(value:string)=>void;onOpen:(id:string)=>void}){
@@ -37,6 +38,37 @@ export function ExplorePage({query,onQuery,onOpen}:{query:string;onQuery:(value:
  </section>;
 }
 
+export function PublicRepresentation({lesson}:{lesson:PublicDetail}){
+ const raw=lesson as unknown as {act_id?:string;playable_preview?:{key?:string;url?:string}|null;
+  steps?:{id:string;title:string;instruction:string}[];medium?:string;poster?:{key?:string}|null;
+  reference_guide?:{key?:string}|null;section_set?:{sections?:{title?:string;start?:number}[]};
+  instrument?:{instrument?:string;tuning?:string[];capo?:number}};
+ const act=raw.act_id??(((lesson as unknown as {schema_version?:number}).schema_version===2)?((lesson as unknown as {subject?:string}).subject==='guitar'?'guitar':'piano'):'full_body');
+ if(act==='drawing'){
+  return <div data-public-act="drawing" className="public-drawing">
+   <p className="eyebrow">DRAWING · {raw.medium??'pencil'}</p>
+   {raw.poster?.key&&<img src={assetUrl(raw.poster.key!)} alt={`${lesson.title} poster`}/>}
+   <ol>{raw.steps?.map(step=><li key={step.id}><strong>{step.title}</strong><p>{step.instruction}</p></li>)}</ol>
+  </div>;
+ }
+ if(act==='piano'||act==='guitar'){
+  const sections=raw.section_set?.sections??[];
+  return <div data-public-act={act} className="public-music">
+   {raw.playable_preview?.key
+    ? <video controls preload="metadata" src={assetUrl(raw.playable_preview.key!)} aria-label={`${lesson.title} preview`}/>
+    : <p className="small muted">No published audio/video preview for this release.</p>}
+   <p className="small muted">{sections.length} published section{sections.length===1?'':'s'}{raw.instrument?.tuning?.length?` · tuning ${raw.instrument.tuning.join(' ')}`:''}{raw.instrument?.capo?` · capo ${raw.instrument.capo}`:''}</p>
+   {sections.length>0&&<ol className="public-reference-summary">{sections.slice(0,8).map((section,index)=><li key={`${section.title??'section'}-${index}`}>{section.title??`Section ${index+1}`}</li>)}</ol>}
+  </div>;
+ }
+ if(raw.playable_preview?.key){
+  return <div data-public-act="video-only" className="public-video">
+   <video controls preload="metadata" src={assetUrl(raw.playable_preview.key!)} aria-label={`${lesson.title} published video`}/>
+  </div>;
+ }
+ return <p data-public-act="full_body" className="small muted">This release has no published representation to render.</p>;
+}
+
 export function PublicDetailPage({id,account,onBack,onTry,onSignIn}:{id:string;account:Account|null;onBack:()=>void;onTry:(lesson:PublicDetail)=>void;onSignIn:()=>void}){
  const [lesson,setLesson]=useState<PublicDetail|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[playing,setPlaying]=useState(false);
  const playerRef=useRef<Playback|null>(null);
@@ -47,12 +79,32 @@ export function PublicDetailPage({id,account,onBack,onTry,onSignIn}:{id:string;a
  const play=()=>{playerRef.current?.command(playerRef.current.state.playing?'pause':'play');};
  const report=()=>{const reason=window.prompt('What would you like to report?');if(reason&&reason.trim().length>=3)void request(`/lessons/${id}/report`,'POST',{reason}).then(()=>setNotice('Report received. Thank you.')).catch(e=>setError(e.message));};
  if(!lesson)return <section className="explore-screen"><Button variant="app-back" className="back-link" onClick={onBack}><ArrowLeft size={16}/>Explore</Button>{error?<p className="inline-notice error-notice" role="alert">{error}</p>:<p role="status">Loading move…</p>}</section>;
+ const neutral=((lesson as unknown as {schema_version?:number}).schema_version!==1
+  || !(lesson as LessonManifest).animation);
+ if(neutral){
+  // Honest fallback: a music/video-only release has no 3D stage. Never mount a
+  // body MotionStage for a document it cannot render.
+  const actions=(lesson as unknown as {effective_actions?:{practice?:boolean}}).effective_actions;
+  const representations=(lesson as unknown as {representations?:string[]}).representations??[];
+  return <section className="explore-screen">
+   <Button variant="app-back" className="back-link" onClick={onBack}><ArrowLeft size={16}/>Explore</Button>
+   <div className="share-heading"><p className="eyebrow">PUBLIC LESSON · {lesson.creator_name}</p><h1>{lesson.title}</h1>{lesson.description&&<p className="subtle">{lesson.description}</p>}<div className="tag-row small-tags">{lesson.tags.map(value=><em key={value}>{value}</em>)}</div></div>
+   <p className="small muted">This release is published as {representations.length?representations.join(' + '):'an approved representation'}.</p>
+   <PublicRepresentation lesson={lesson}/>
+   <div className="move-actions">
+    <Button variant="app-primary-large" className="primary" disabled={actions?.practice===false} onClick={()=>account?onTry(lesson):onSignIn()}>{actions?.practice===false?'Watch only':account?((lesson as unknown as {act_id?:string}).act_id==='drawing'?'Practice steps':(lesson as unknown as {act_id?:string}).act_id==='piano'||(lesson as unknown as {act_id?:string}).act_id==='guitar'?'Open in Practice':'Open this lesson'):'Sign in to practise'}</Button>
+    {account?<LikeButton lessonId={id} initialLiked={Boolean(lesson.liked_by_viewer)} initialCount={lesson.like_count??0}/>:null}
+   </div>
+   {notice&&<p className="inline-notice" role="status">{notice}</p>}
+   {error&&<p className="inline-notice error-notice" role="alert">{error}</p>}
+  </section>;
+ }
  return <section className="explore-screen">
   <Button variant="app-back" className="back-link" onClick={onBack}><ArrowLeft size={16}/>Explore</Button>
   <div className="share-heading"><p className="eyebrow">PUBLIC MOVE · {lesson.creator_name}</p><h1>{lesson.title}</h1>{lesson.description&&<p className="subtle">{lesson.description}</p>}<div className="tag-row small-tags">{lesson.tags.map(value=><em key={value}>{value}</em>)}</div></div>
   <div className="move-stage motion-stage"><MotionStage lesson={lesson as LessonManifest} player={playerRef.current!} source={false}/><Button variant="move-play" className="move-play" onClick={play} aria-label={playing?'Pause move':'Play move'}>{playing?<Pause size={20}/>:<Play size={20} fill="currentColor"/>}</Button></div>
   <PreviewScrubber player={playerRef.current!}/>
-  <div className="move-actions"><Button variant="app-primary-large" className="primary" onClick={()=>account?onTry(lesson):onSignIn()}>{account?<><Play size={18} fill="currentColor"/>Try this move</>:'Sign in to try'}</Button><Button variant="app-secondary-large" className="secondary" onClick={()=>{const url=new URL(`/?page=public&id=${encodeURIComponent(id)}`,location.origin).href;if(navigator.share)void navigator.share({title:lesson.title,url}).catch(e=>{if(e.name!=='AbortError')setError('Could not open sharing. Copy the address from your browser.');});else void navigator.clipboard.writeText(url).then(()=>setNotice('Public link copied.')).catch(()=>setNotice('Copy the address from your browser to share this move.'));}}><Share2 size={16}/>Share link</Button>{account&&<Button variant="app-secondary-large" className="secondary" onClick={report}><Flag size={16}/>Report</Button>}</div>
+  <div className="move-actions"><Button variant="app-primary-large" className="primary" onClick={()=>account?onTry(lesson):onSignIn()}>{account?<><Play size={18} fill="currentColor"/>Try this move</>:'Sign in to try'}</Button><Button variant="app-secondary-large" className="secondary" onClick={()=>{const url=new URL(`/?page=public&id=${encodeURIComponent(id)}`,location.origin).href;if(navigator.share)void navigator.share({title:lesson.title,url}).catch(e=>{if(e.name!=='AbortError')setError('Could not open sharing. Copy the address from your browser.');});else void navigator.clipboard.writeText(url).then(()=>setNotice('Public link copied.')).catch(()=>setNotice('Copy the address from your browser to share this move.'));}}><Share2 size={16}/>Share link</Button>{account&&<LikeButton lessonId={id} initialLiked={Boolean(lesson.liked_by_viewer)} initialCount={lesson.like_count??0}/>}{account&&<Button variant="app-secondary-large" className="secondary" onClick={report}><Flag size={16}/>Report</Button>}</div>
   {account&&groups.length>0&&<div className="invite-row"><label>Keep in a group<select value={groupId} onChange={e=>setGroupId(e.target.value)}><option value="">Choose a group</option>{groups.map(group=><option key={group.id} value={group.id}>{group.name}</option>)}</select></label><Button variant="app-secondary" className="secondary" disabled={!groupId||adding} onClick={()=>{setAdding(true);addMoveToGroup(groupId,id,'collection').then(()=>setNotice('Added to the collection. It stays available only while public.')).catch(e=>setError(e.message)).finally(()=>setAdding(false));}}>Add to group</Button></div>}
   {notice&&<p className="inline-notice" role="status">{notice}</p>}
   {error&&<p className="inline-notice error-notice" role="alert">{error}</p>}

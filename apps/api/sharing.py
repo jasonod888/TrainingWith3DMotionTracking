@@ -81,15 +81,25 @@ def install_sharing(app,settings,identity,db):
 
     @router.get('/shared-lessons/summaries')
     def shared_summaries(request:Request,subject:str|None=None,account=Depends(identity),session:Session=Depends(db)):
-        from .lessons import client_formats, subject_filter, summary_of, subject_projection
+        from . import acts
+        from .lessons import (client_formats, subject_filter, summary_of, summary_v2_of,
+                              subject_projection, unsupported_act_response, wants_act_context)
         formats=client_formats(request)
+        act_context=wants_act_context(request)
         wanted=subject_filter(subject)
         values=[]
         for lesson,revision in shared_pairs(session,account):
             projection=subject_projection(lesson,revision)
             if projection['experience_family']=='music' and '2' not in formats:continue
             if wanted is not None and projection['subject']!=wanted:continue
-            values.append(summary_of(lesson,revision,settings,include_private_poster=False).model_dump())
+            try:
+                if act_context:
+                    values.append(summary_v2_of(lesson,revision,settings,include_private_poster=False,
+                                                reasons=('direct',)))
+                else:
+                    values.append(summary_of(lesson,revision,settings,include_private_poster=False).model_dump())
+            except acts.ActError as exc:
+                return unsupported_act_response(exc)
         return values
 
     @router.get('/lessons/{lesson_id}/sharing')

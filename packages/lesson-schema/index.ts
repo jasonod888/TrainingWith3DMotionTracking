@@ -8,7 +8,7 @@ export type LessonManifest = {
   engine: 'sam-3d-body' | 'mediapipe' | 'synthetic'; engine_version: string;
   units: 'metres'; landmark_axes: 'x-right/y-down/z-forward';
   root_motion: 'estimated-camera-relative' | 'hip-relative' | 'in-place' | 'floor-guided';
-  confidence: 'unmeasured' | 'measured'; animation: Asset | null; landmarks: Asset;
+  confidence: 'unmeasured' | 'measured'; animation: Asset | null; landmarks: Asset | null;
   source_video: Asset | null; thumbnail: Asset | null; section_set: SectionSet; warnings: string[];
   focused_video?: Asset | null;
   focused_video_start?: number | null;
@@ -112,25 +112,54 @@ export type SummaryCapabilities = {
   live_input: 'camera' | 'midi' | 'microphone' | 'none';
 };
 
-export type LessonSubject = 'dance' | 'taekwondo' | 'boxing' | 'piano' | 'guitar' | 'movement_other';
+export type LessonSubject = 'dance' | 'taekwondo' | 'boxing' | 'piano' | 'guitar' | 'drawing' | 'movement_other';
+
+export type DrawingStep = {
+  id: string;
+  title: string;
+  instruction: string;
+  reference_guide?: Asset | null;
+  media_role?: 'reference_guide' | 'example' | 'detail' | null;
+};
+
+/** Discriminated drawing document. Never a body or music manifest. */
+export type DrawingLessonManifest = {
+  schema_version: 3;
+  experience_family: 'visual';
+  lesson_id: string;
+  revision_id: string;
+  title: string;
+  subject: 'drawing';
+  medium: 'pencil' | 'charcoal' | 'digital';
+  steps: DrawingStep[];
+  assessment: 'none';
+  reference_guide?: Asset | null;
+  poster?: Asset | null;
+  warnings: string[];
+  feedback_enabled?: boolean | null;
+};
 
 export type LessonSummary = {
-  summary_version: 1;
+  summary_version: 1 | 2;
   lesson_id: string;
   revision_id: string;
   title: string;
   subject: LessonSubject;
   subject_label: string;
-  experience_family: 'body' | 'music';
+  experience_family: 'body' | 'music' | 'visual';
   instrument?: 'piano' | 'guitar' | null;
   duration: number;
   section_count: number;
   poster?: Asset | null;
-  capabilities: SummaryCapabilities;
+  capabilities: SummaryCapabilities & {inputs?: string[]};
+  /** v2 only: server-authoritative Act and capability ceiling. */
+  act_id?: string;
+  effective_capabilities?: Record<string, unknown>;
 };
 
 /** The only union in the product: a validated loading boundary. */
 export type LessonDocument =
   | { kind: 'body'; value: LessonManifest }
   | { kind: 'music'; value: MusicLessonManifest }
+  | { kind: 'drawing'; value: DrawingLessonManifest }
   | { kind: 'summary'; value: LessonSummary };
