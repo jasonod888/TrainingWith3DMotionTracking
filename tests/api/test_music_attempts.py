@@ -96,6 +96,20 @@ def test_summary_save_is_exact_idempotent_bounded_and_deletable(tmp_path, monkey
         assert client.delete(path+'/'+value['id'],headers={'Content-Type':'application/json'}).status_code==404
 
 
+def test_note_feedback_policy_accepts_a_narrower_qualified_input_and_rejects_unknown_inputs(tmp_path):
+    with music_app(tmp_path, music_history_enabled=True) as system:
+        client, app, *_ = system
+        lesson = imported_music(system)
+        path = f'/api/lessons/{lesson.lesson_id}/music-attempts'
+        assert client.post(path, json=payload(lesson)).status_code == 201
+        with Session(app.state.engine) as session:
+            revision = session.get(LessonRevision, lesson.revision_id)
+            revision.manifest = {**revision.manifest, 'assessment': {
+                **revision.manifest['assessment'], 'input_modes': ['midi', 'unknown']}}
+            session.commit()
+        assert client.post(path, json=payload(lesson)).status_code == 409
+
+
 def test_history_is_personal_even_for_simulated_future_music_recipient(tmp_path):
     with music_app(tmp_path,music_history_enabled=True) as system:
         client, app, settings, store, mail = system

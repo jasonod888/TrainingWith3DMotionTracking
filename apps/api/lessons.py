@@ -422,12 +422,14 @@ def install_lessons(app, engine, settings, identity, db):
         if '3' not in formats or not rollout.enabled('act_drawing_enabled'):
             base_filters.append(Lesson.experience_family != 'visual')
         # Full-library facets are independent of the current page and filters.
-        available_subjects = sorted({value for value in session.scalars(select(LessonRevision.subject).join(
-            Lesson, Lesson.id == LessonRevision.lesson_id).where(
+        available_subjects = sorted({value for value in session.scalars(select(Lesson.subject).join(
+            LessonRevision, Lesson.id == LessonRevision.lesson_id).where(
             *base_filters).distinct()).all() if value})
         filters = list(base_filters)
         if wanted is not None:
-            filters.append(LessonRevision.subject == wanted)
+            # Owned summaries show the live subject label; a relabel is metadata and
+            # does not create a revision, so the revision subject would stay stale here.
+            filters.append(Lesson.subject == wanted)
         query = (q or '').strip()[:80]
         if query:
             filters.append(Lesson.title.ilike(f'%{query}%'))

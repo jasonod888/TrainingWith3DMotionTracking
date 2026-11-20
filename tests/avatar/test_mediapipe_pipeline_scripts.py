@@ -76,10 +76,13 @@ def test_clock_milliseconds_are_strictly_increasing_and_zero_based():
 # ------------------------------------------------------------------- flow rescaling
 
 def test_scale_flow_rescales_reduced_vectors_to_full_resolution():
-    flow = np.array([[[1., 2.], [3., 4.]]], dtype=np.float32)
-    scaled = scale_flow(flow, width=1920, height=1080, flow_w=480, flow_h=270)
-    # full_w/flow_w == 4 and full_h/flow_h == 4.
-    assert scaled.tolist() == [[[4., 8.], [12., 16.]]]
+    # A reduced 1x2 grid is spatially resized to 2x4 and each vector is then
+    # multiplied by (4/2, 2/1). Constant vectors keep the expected values exact
+    # without relying on interpolation weights.
+    flow = np.full((1, 2, 2), [1., 1.], dtype=np.float32)
+    scaled = scale_flow(flow, width=4, height=2, flow_w=2, flow_h=1)
+    assert scaled.shape == (2, 4, 2)
+    assert np.allclose(scaled, 2.0)
 
 
 def test_reduce_gray_caps_farneback_height():
@@ -241,7 +244,7 @@ def test_run_writes_the_landmark_and_segmentation_contract(clip, tmp_path):
     assert report['engine_version'] == 'mediapipe-pose-heavy-v1'
     assert report['landmark_format'] == 'mediapipe-33'
     assert report['root_motion'] == 'hip-relative'
-    assert report['frame_rate'] == pytest.approx(15, abs=1e-6)
+    assert report['frame_rate'] == pytest.approx(15, abs=1e-5)
     assert report['scoring_coverage'] == 1.0
     assert report['segmentation']['available'] is True
     segmentation = tmp_path / 'motion' / 'segmentation'

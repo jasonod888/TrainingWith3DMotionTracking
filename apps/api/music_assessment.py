@@ -24,6 +24,26 @@ def assessment_for_subject(subject: str | None) -> dict[str, Any] | None:
     }
 
 
+def note_feedback_policy_valid(manifest: dict[str, Any] | None, rubric_version: str) -> bool:
+    """Whether a reviewed music policy can record note-feedback summaries.
+
+    A creator may enable only a subset of the qualified inputs (for example MIDI
+    only). Requiring the policy to equal the full subject default would reject that
+    valid narrower choice; accepting unknown or empty inputs would weaken policy.
+    """
+    expected = assessment_for_subject((manifest or {}).get('subject'))
+    if expected is None or not (manifest or {}).get('reference_reviewed'):
+        return False
+    policy = (manifest or {}).get('assessment') or {}
+    modes = policy.get('input_modes') or []
+    return (policy.get('assessment') == 'notes'
+            and bool(modes)
+            and set(modes).issubset(expected['input_modes'])
+            and set(policy.get('dimensions') or []) == {'pitch', 'timing'}
+            and policy.get('rubric_version') == expected['rubric_version']
+            and rubric_version == expected['rubric_version'])
+
+
 def effective_feedback_enabled(manifest: dict[str, Any] | None) -> bool:
     """Return the creator's effective lesson-level switch.
 

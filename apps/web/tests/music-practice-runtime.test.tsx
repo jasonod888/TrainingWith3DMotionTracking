@@ -169,7 +169,7 @@ test('guitar playback survives renders, resumes in place, navigates, repeats and
     .find(button => button.textContent?.trim() === '1.25×');
   assert.ok(speedChoice, 'the shared settings panel exposes the declared 1.25× capability');
   fireEvent.click(speedChoice!);
-  await waitFor(() => assert.equal(JSON.parse(window.localStorage.getItem('form-practice-v2:preferences:guitar-fixture:rev-1') ?? '{}').speed, 1.25));
+  await waitFor(() => assert.equal(JSON.parse(window.localStorage.getItem('form-practice-v2:guest:preferences:guitar-fixture:rev-1') ?? '{}').speed, 1.25));
 
   fireEvent.keyDown(document.body, {key: 'ArrowRight'});
   await waitFor(() => assert.ok(Math.abs(video().currentTime - 2) < 0.05),

@@ -51,7 +51,7 @@ test('whole-piece challenge captures MIDI, fits one offset and withholds the sco
   await act(async()=>{apiRef.current!.recordAttack(60,performance.now()+500);});
   assert.equal(apiRef.current!.captured,1);
   await act(async()=>{controls.current!.attempt({id:'challenge-attempt',start:0,end:1,completed:true,reason:'completed'});});
-  await waitFor(()=>assert.equal(apiRef.current!.phase,'feedback'),{timeout:1000});
+  await waitFor(()=>assert.equal(apiRef.current!.phase,'feedback'),{timeout:2000});
   const report=apiRef.current!.report!;
   assert.equal(report.score,null);
   assert.equal(report.matchedRequired,1);

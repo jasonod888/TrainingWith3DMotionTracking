@@ -22,14 +22,15 @@ jobs:
       - run: pip install -r tests/requirements-lock.txt
       - name: Provision pinned optional midi2hands model
         run: python scripts/fetch_midi2hands_model.py --output tools/midi2hands/model.onnx
+      - name: Install web dependencies for cross-language contract tests
+        run: npm ci --no-audit --no-fund
+        working-directory: apps/web
       - name: Configure real hand-model interpreter
         run: |
           echo "HANDS_MODEL_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
           echo "HANDS_MODEL_ARTIFACT=$GITHUB_WORKSPACE/tools/midi2hands/model.onnx" >> "$GITHUB_ENV"
           echo "HANDS_MODEL_ENABLED=true" >> "$GITHUB_ENV"
       - run: python -m pytest
-      - run: npm ci --no-audit --no-fund
-        working-directory: apps/web
       - run: npm test
         working-directory: apps/web
       - name: Provision pinned Basic Pitch browser model

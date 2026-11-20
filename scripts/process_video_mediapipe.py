@@ -506,8 +506,8 @@ def run(video, output, model=DEFAULT_MODEL, max_frames=0, landmarker=None):
             index += 1
     finally:
         capture.release()
-        if created is not None:
-            created.close()
+        if landmarker is not None:
+            landmarker.close()
 
     world_array = np.stack(world_frames).astype(np.float32)
     image_array = np.stack(image_frames).astype(np.float32)

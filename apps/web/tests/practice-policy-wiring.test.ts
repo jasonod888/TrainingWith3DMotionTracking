@@ -9,7 +9,12 @@ const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'u
 test('active practice resolves the four-axis policy and persists neutral attempts', () => {
   const body = source('../src/PracticeWorkspace.tsx');
   assert.match(body, /resolvePracticePolicy\(/);
-  assert.match(body, /submitPracticeAttempt\(/);
+  assert.match(body, /import \{submitAttempt\} from '\.\/practice\/submit-attempt'/);
+  assert.match(body, /submitAttempt\(\{attemptId:a\.id/,
+    'the active practice attempt uses the shared submission owner');
+  assert.match(body, /status:assessed\?'completed':'unassessed'/);
+  assert.match(body, /guard:access\.guardRef\.current/,
+    'the shared submission receives the session access guard');
   assert.ok(body.indexOf("if(compete){const policy=resolvePracticePolicy") <
     body.indexOf("onModeChange(compete?'compete':'practice')"),
     'challenge policy is checked before forwarding the mode change');
@@ -19,7 +24,8 @@ test('active practice resolves the four-axis policy and persists neutral attempt
   assert.match(music, /resolveMusicChallengeEligibility\(/);
   assert.match(music, /challengeEligible = challengePolicy\.buttonEligible/);
   const drawing = source('../src/acts/drawing/DrawingPracticeEntry.tsx');
-  assert.match(drawing, /submitPracticeAttempt\(/);
+  assert.match(drawing, /import \{submitAttempt\} from '\.\.\/\.\.\/practice\/submit-attempt'/);
+  assert.match(drawing, /submitAttempt\(/);
   assert.match(drawing, /status: 'unassessed'/);
 });
 

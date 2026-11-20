@@ -278,17 +278,12 @@ def install_music_attempts(app, settings, identity, db):
                 raise HTTPException(409, 'Attempt identifier already has different contents.')
             return result(existing)
         manifest = revision.manifest
-        from .music_assessment import effective_feedback_enabled, assessment_for_subject
+        from .music_assessment import effective_feedback_enabled, note_feedback_policy_valid
         if not effective_feedback_enabled(manifest):
             raise HTTPException(409, 'Feedback is not enabled for this lesson.')
-        policy = manifest.get('assessment') or {}
-        expected = assessment_for_subject(manifest.get('subject'))
         if revision.id != body.revision_id or manifest['reference']['sha256'] != body.reference_sha256:
             raise HTTPException(409, 'The reviewed reference changed. Reopen the lesson.')
-        if (expected is None or not manifest.get('reference_reviewed') or
-            policy.get('assessment') != 'notes' or policy.get('input_modes') != expected['input_modes'] or
-            set(policy.get('dimensions') or []) != {'pitch', 'timing'} or
-            policy.get('rubric_version') != body.rubric_version):
+        if not note_feedback_policy_valid(manifest, body.rubric_version):
             raise HTTPException(409, 'This reference does not support note-feedback history.')
         sections = manifest['section_set']['sections']
         ranges = [(section['start'], section['end']) for section in sections if section['id'] == body.section_id]
@@ -315,15 +310,12 @@ def install_music_attempts(app, settings, identity, db):
                        account=Depends(identity), session: Session=Depends(db)):
         revision = music_revision(session, lesson_id, account.id, body.revision_id)
         manifest = revision.manifest
-        from .music_assessment import effective_feedback_enabled, assessment_for_subject
+        from .music_assessment import effective_feedback_enabled, note_feedback_policy_valid
         if not effective_feedback_enabled(manifest):
             raise HTTPException(409, 'Feedback is not enabled for this lesson.')
         policy = manifest.get('assessment') or {}
-        expected = assessment_for_subject(manifest.get('subject'))
-        if (expected is None or not manifest.get('reference_reviewed') or
-                policy.get('assessment') != 'notes' or body.input_mode not in (policy.get('input_modes') or []) or
-                set(policy.get('dimensions') or []) != {'pitch', 'timing'} or
-                policy.get('rubric_version') != body.rubric_version):
+        if (not note_feedback_policy_valid(manifest, body.rubric_version) or
+                body.input_mode not in (policy.get('input_modes') or [])):
             raise HTTPException(409, 'This reference does not support this challenge input.')
         if revision.id != body.revision_id or manifest['reference']['sha256'] != body.reference_sha256:
             raise HTTPException(409, 'The reviewed reference changed. Reopen the lesson.')
