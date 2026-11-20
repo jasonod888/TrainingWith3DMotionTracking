@@ -112,8 +112,9 @@ test('unmounting drawing practice stops revalidation listeners', async () => {
 
 test('body and music screens register real camera/audio/MIDI/runtime cleanup', () => {
   const body = readFileSync(new URL('../src/PracticeWorkspace.tsx', import.meta.url), 'utf8');
-  assert.ok(/accessBag\.add\(\{\s*kind:\s*'camera'/.test(body));
-  assert.ok(body.includes("accessBag.add({kind:'audio'") || body.includes("accessBag.add({kind: 'audio'"));
+  assert.ok(/bag\.add\(\{\s*kind:\s*'camera'/.test(body));
+  assert.ok(/bag\.add\(\{\s*kind:\s*'audio'/.test(body));
+  assert.ok(body.includes('usePracticeAccessGuard('));
   const music = readFileSync(new URL('../src/music/workspace/PianoPracticeWorkspace.tsx', import.meta.url), 'utf8');
   assert.ok(/kind:\s*'audio'/.test(music));
   assert.ok(music.includes("kind:'microphone'") || music.includes("kind: 'microphone'"));
@@ -121,6 +122,8 @@ test('body and music screens register real camera/audio/MIDI/runtime cleanup', (
   assert.ok(music.includes('listenPlayRef.current?.cancel'));
   assert.ok(music.includes("midi.disconnect()"));
   assert.ok(music.includes("practice.runtime?.destroy()"));
+  assert.ok(/bag\.add\(\{\s*kind:\s*'audio'[\s\S]*midi\.disconnect\(\)/.test(music));
+  assert.ok(/bag\.add\(\{\s*kind:\s*'microphone'/.test(music));
 });
 
 test('403 and 401 revoke a mounted session, while transient failures do not', async () => {

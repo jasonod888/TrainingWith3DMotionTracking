@@ -169,6 +169,8 @@ Primary files: `practice/useMusicPractice.ts`, `practice/practice-store.ts`, `pr
 
 ## Phase 5 — Separate large workspaces by responsibility
 
+Implementation sequence, owner contracts, migration slices, regression matrix, and completion checklist are detailed in the [Phase 5 Workspace Separation Plan](act-platform-phase5-workspace-separation-plan.md). The existing save-hook extraction is completed groundwork; the remaining responsibilities below are still required, not optional panel cleanup.
+
 Primary files: `music/workspace/PianoWorkspaceHarness.tsx`, `PianoPracticeWorkspace.tsx`, `PracticeWorkspace.tsx`, `MimicInterface.tsx`, `editor-services.ts`, `instrument-adapters.ts`, and specialist panels.
 
 ### Work

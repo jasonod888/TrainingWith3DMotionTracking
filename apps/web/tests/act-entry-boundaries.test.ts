@@ -20,8 +20,30 @@ test('the Act dispatch boundary sends practice to the practice entry, not the ha
   const host = source('../src/LessonExperienceHost.tsx');
   assert.ok(!/from ['"][^'"]*PianoWorkspaceHarness/.test(host),
     'host must not import the editor bundle');
-  assert.ok(host.includes("import('./acts/music/PracticeEntry')"));
+  assert.ok(host.includes("practiceEntryFor('piano')"),
+    'host invokes the registry practice loader');
   assert.ok(host.includes('context={context}'), 'the loaded context is passed to the Act entry');
+});
+
+test('practice surfaces import no extracted editor controller or review panel', () => {
+  const surfaces = [
+    '../src/PracticeWorkspace.tsx',
+    '../src/MimicInterface.tsx',
+    '../src/music/workspace/PianoPracticeWorkspace.tsx',
+  ];
+  const editorOwners = [
+    'PianoWorkspaceHarness', 'useMusicReviewLoad', 'useMusicReviewSave',
+    'useMusicWorkspaceDocument', 'useMusicEditorSelection', 'useMusicAlignmentEditor',
+    'useMusicVerificationController', 'useMusicEditorPlayback', 'MusicReviewHeader',
+    'MusicNoteInspector', 'MusicVerificationPanel', 'MusicReviewSettings',
+  ];
+  for (const path of surfaces) {
+    const text = source(path);
+    for (const owner of editorOwners) {
+      assert.ok(!new RegExp(`from ['"][^'"]*${owner}`).test(text),
+        `${path} must not import the review editor owner ${owner}`);
+    }
+  }
 });
 
 test('the registry maps both instruments to the practice entry and keeps the editor separate', () => {

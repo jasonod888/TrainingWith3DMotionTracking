@@ -1,93 +1,76 @@
-/**
- * Music review loading and save orchestration, extracted from the workspace view.
- *
- * These are transport/lifecycle services, not presentation: they start the saved
- * revision and draft requests together, choose the exact save endpoint, and turn a
- * conflict into a typed result. Undo history, selection and verification state stay
- * in the Act editor.
- */
+/** Music editor service boundary: review loading, save transport and outcomes. */
 import {ApiError, request} from '../../api';
 import type {Asset, MusicPedalSpan} from '../../../../../packages/lesson-schema/index';
 
-/** The saved-manifest fields the review workspace actually reads. */
 export type ReviewManifestDocument = {
-  revision_id: string;
-  reference: {key: string; sha256?: string};
-  source_video?: Asset | null;
-  piano_preview?: Asset | null;
-  preview_identity?: string | null;
-  pedal?: MusicPedalSpan[];
+  revision_id?: string;
+  reference?: {key: string; sha256?: string} | null;
+  notation?: unknown;
+  schema_version?: number;
   draft_id?: string | null;
+  source_video?: Asset | null;
+  preview_identity?: string | null;
+  sha256?: string;
+  pedal?: MusicPedalSpan[];
   section_set?: {sections?: {id: string; label: string; start: number; end: number}[]};
   assessment?: {assessment?: string};
   feedback_enabled?: boolean | null;
+  piano_preview?: Asset | null;
+  [key: string]: unknown;
 };
 
-/**
- * Start both requests together: a slow draft must not delay a saved reference.
- * Failures are returned as null so the caller can fall back deterministically.
- */
-export function startReviewLoad<TManifest = unknown>(lessonId: string): {
-  manifest: Promise<TManifest | null>;
-  draft: Promise<unknown | null>;
-} {
-  return {
-    manifest: request<TManifest>(`/lessons/${encodeURIComponent(lessonId)}`, 'GET', undefined, false,
-      {'X-Lesson-Formats': '1,2'}).catch(() => null),
-    draft: request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft`).catch(() => null),
-  };
+export type ReviewSources<T> = {
+  draft: Promise<T | null>;
+  manifest: Promise<ReviewManifestDocument | null>;
+};
+
+/** Start the two independent reads so a slow draft never blocks a saved revision. */
+export function startReviewLoad<T>(lessonId: string): ReviewSources<T> {
+  const encoded = encodeURIComponent(lessonId);
+  const draft = request<T>(`/lessons/${encoded}/music-draft`, 'GET')
+    .catch(() => null);
+  const manifest = request<ReviewManifestDocument>(`/lessons/${encoded}`,
+    'GET', undefined, true, {'X-Lesson-Formats': '1,2'}).catch(() => null);
+  return {draft, manifest};
 }
 
-/** A first review and a later private edit use different endpoints on purpose. */
 export function reviewPath(lessonId: string, baseRevisionId: string | null): string {
-  const lesson = encodeURIComponent(lessonId);
+  const encoded = encodeURIComponent(lessonId);
   return baseRevisionId
-    ? `/lessons/${lesson}/music-revision`
-    : `/lessons/${lesson}/music-draft/review`;
+    ? `/lessons/${encoded}/music-revision`
+    : `/lessons/${encoded}/music-draft/review`;
 }
 
-export function saveReviewedReference(
-  lessonId: string,
-  baseRevisionId: string | null,
-  body: unknown,
-): Promise<{revision_id: string}> {
-  return request<{revision_id: string}>(reviewPath(lessonId, baseRevisionId), 'POST', body);
+export async function saveReviewedReference(lessonId: string, baseRevisionId: string | null,
+  body: Record<string, unknown>): Promise<{revision_id: string} & Record<string, unknown>> {
+  return request<{revision_id: string} & Record<string, unknown>>(
+    reviewPath(lessonId, baseRevisionId), 'POST', {
+      ...body, ...(baseRevisionId ? {base_revision_id: baseRevisionId} : {}),
+    });
 }
 
-export type SaveConflictKind = 'verification' | 'stale' | 'other';
-
-export type SaveErrorInfo = {
-  conflict: boolean;
-  kind: SaveConflictKind | null;
-  message: string;
-};
-
-/**
- * 409 is a conflict with kept local edits, not a failed save. The message is
- * chosen once here so every caller classifies stale/verification conflicts alike.
- */
-export function classifySaveError(cause: unknown): SaveErrorInfo {
-  if (cause instanceof ApiError && cause.status === 409) {
-    const message = cause.message ?? '';
-    if (/verification|working notes/i.test(message)) {
+export function classifySaveError(cause: unknown): {
+  conflict: boolean; kind?: 'stale' | 'verification' | 'other'; message: string;
+} {
+  if ((cause instanceof ApiError && cause.status === 409)
+      || (cause as {status?: number} | null)?.status === 409) {
+    const detail = cause instanceof Error ? cause.message : '';
+    // A verification-state conflict needs the diagnostics resolved; presenting it as a
+    // generic newer revision would hide the actual recovery action.
+    if (/verification|correction/i.test(detail)) {
       return {conflict: true, kind: 'verification',
-        message: 'The verification decisions changed. Your edits are kept; reload the saved revision to review them.'};
+        message: detail || 'Verification changed for this proposal. Reload and resolve it before saving.'};
     }
-    if (/already been reviewed|already edited|newer saved revision|newer revision/i.test(message)) {
-      return {conflict: true, kind: 'stale',
-        message: 'This lesson has a newer saved revision. Your edits are kept locally.'};
-    }
-    return {conflict: true, kind: 'other',
-      message: `${message || 'The save conflicted with the saved lesson.'} Your edits are kept locally.`};
+    return {conflict: true, kind: 'stale',
+      message: `This lesson has a newer saved revision. Reload it or save on the latest revision.${
+        detail ? ` (${detail})` : ''}`};
   }
-  return {conflict: false, kind: null,
-    message: cause instanceof Error ? cause.message : 'The save failed; your edits are kept.'};
+  return {conflict: false, message: cause instanceof Error ? cause.message
+    : 'The save could not be completed.'};
 }
 
-/** Never claim "Saved" when newer edits exist; report exactly what was saved. */
 export function privateSaveMessage(revisionId: string, stillCurrent: boolean): string {
-  const short = revisionId.slice(0, 8);
   return stillCurrent
-    ? `Saved privately · revision ${short}`
-    : `Saved an earlier version · revision ${short}; newer edits remain unsaved.`;
+    ? `Saved privately · revision ${revisionId.slice(0, 8)}`
+    : `Saved privately · revision ${revisionId.slice(0, 8)} — newer edits are still unsaved.`;
 }

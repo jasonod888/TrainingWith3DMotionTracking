@@ -9,6 +9,7 @@ import {createEditorSession} from '../../editor/editor-session';
 import {editorReadiness} from '../../editor/editor-readiness';
 import {applySavedRevision} from '../../editor/revision-handoff';
 import {invalidateLessonContext} from '../../app/lesson-context';
+import {usePublicationController} from '../../sharing/usePublicationController';
 import {request} from '../../api';
 import type {DrawingLessonManifest, DrawingStep} from '../../../../../packages/lesson-schema/index';
 
@@ -74,13 +75,14 @@ export function DrawingEditorEntry({lesson, onBack, onSaved, creatorName = 'Crea
     } finally { setBusy(false); }
   };
 
+  const publication = usePublicationController({lessonId: lesson.lesson_id, initialRoles: ['reference']});
   const publish = async () => {
     setBusy(true); setError(''); setNotice('');
     try {
-      await request(`/public/lessons/${encodeURIComponent(lesson.lesson_id)}`, 'PATCH', {
-        listed: true, title, creator_name: creatorName, tags: ['drawing'],
-        rights_acknowledged: true, public_roles: ['reference'],
-      });
+      const ok = await publication.publish({title, creatorName, tags: ['drawing'],
+        rightsAcknowledged: true, roles: ['reference'],
+        releaseRevisionId: snapshot.revisionId ?? undefined});
+      if (!ok) throw new Error(publication.error || 'The drawing could not be published.');
       if (snapshot.revisionId) session.published(snapshot.revisionId);
       invalidateLessonContext(lesson.lesson_id);
       setNotice('Published');

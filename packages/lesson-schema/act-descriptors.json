@@ -1,0 +1,183 @@
+{
+  "descriptor_version": 1,
+  "acts": [
+    {
+      "id": "full_body",
+      "label": "Full Body",
+      "descriptor_version": 1,
+      "experience_family": "body",
+      "subjects": [
+        "dance",
+        "taekwondo",
+        "boxing",
+        "movement_other"
+      ],
+      "creation_inputs": [
+        "video"
+      ],
+      "processing_routes": [
+        "body-default",
+        "body-mediapipe"
+      ],
+      "editor_capabilities": [
+        "trim",
+        "sections",
+        "feedback-policy",
+        "warnings"
+      ],
+      "review_capabilities": [
+        "movement-check",
+        "section-edits"
+      ],
+      "practice_inputs": [
+        "camera",
+        "microphone"
+      ],
+      "practice_modes": [
+        "watch",
+        "practice",
+        "challenge"
+      ],
+      "assessment_adapters": [
+        "pose-v1"
+      ],
+      "publication_representations": [
+        "interactive_3d",
+        "video"
+      ],
+      "description": "Movement lesson with a 3D reference or a video-only MediaPipe reference."
+    },
+    {
+      "id": "piano",
+      "label": "Piano",
+      "descriptor_version": 1,
+      "experience_family": "music",
+      "subjects": [
+        "piano"
+      ],
+      "creation_inputs": [
+        "video",
+        "audio"
+      ],
+      "processing_routes": [
+        "music-piano",
+        "music-piano-kong"
+      ],
+      "editor_capabilities": [
+        "notes",
+        "hands",
+        "notation",
+        "alignment",
+        "velocity",
+        "pedal",
+        "sections",
+        "feedback-policy"
+      ],
+      "review_capabilities": [
+        "reference-review"
+      ],
+      "practice_inputs": [
+        "midi",
+        "microphone",
+        "uploaded_recording"
+      ],
+      "practice_modes": [
+        "watch",
+        "practice",
+        "challenge"
+      ],
+      "assessment_adapters": [
+        "piano-midi-v1"
+      ],
+      "publication_representations": [
+        "video",
+        "audio",
+        "interactive_notation",
+        "poster"
+      ],
+      "description": "Reviewed piano reference with local note feedback and an optional challenge."
+    },
+    {
+      "id": "guitar",
+      "label": "Guitar",
+      "descriptor_version": 1,
+      "experience_family": "music",
+      "subjects": [
+        "guitar"
+      ],
+      "creation_inputs": [
+        "video",
+        "audio"
+      ],
+      "processing_routes": [
+        "music-guitar"
+      ],
+      "editor_capabilities": [
+        "notes",
+        "positions",
+        "tab",
+        "chords",
+        "tuning",
+        "capo",
+        "sections",
+        "feedback-policy"
+      ],
+      "review_capabilities": [
+        "reference-review"
+      ],
+      "practice_inputs": [
+        "midi",
+        "microphone"
+      ],
+      "practice_modes": [
+        "watch",
+        "practice"
+      ],
+      "assessment_adapters": [
+        "guitar-notes-v1"
+      ],
+      "publication_representations": [
+        "video",
+        "audio",
+        "interactive_notation",
+        "poster"
+      ],
+      "description": "Reviewed guitar reference with TAB, chord shapes and unscored practice."
+    },
+    {
+      "id": "drawing",
+      "label": "Drawing",
+      "descriptor_version": 1,
+      "experience_family": "visual",
+      "subjects": [
+        "drawing"
+      ],
+      "creation_inputs": [
+        "image",
+        "video"
+      ],
+      "processing_routes": [],
+      "editor_capabilities": [
+        "steps",
+        "instructions",
+        "reference-guide"
+      ],
+      "review_capabilities": [
+        "step-review"
+      ],
+      "practice_inputs": [
+        "pointer_stylus"
+      ],
+      "practice_modes": [
+        "watch",
+        "practice"
+      ],
+      "assessment_adapters": [],
+      "publication_representations": [
+        "interactive_notation",
+        "poster"
+      ],
+      "description": "Ordered drawing steps with unassessed, step-by-step practice."
+    }
+  ]
+}

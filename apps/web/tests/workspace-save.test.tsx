@@ -60,6 +60,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   if (/\/lessons\/lesson-1$/.test(url)) {
     lessonGets += 1;
+    if (lessonManifest) return new Response(JSON.stringify(lessonManifest));
     return new Response(JSON.stringify({revision_id: 'rev-latest-9', reference: {key: 'lessons/lesson-1/ref.json'}}));
   }
   if (url.includes('/assets/ref.json')) {
@@ -71,7 +72,11 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 const {render, fireEvent, cleanup, waitFor} = await import('@testing-library/react');
 const {PianoWorkspaceHarness} = await import('../src/music/workspace/PianoWorkspaceHarness.tsx');
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  lessonManifest = null;
+  deferredSave = null;
+});
 
 async function open() {
   const view = render(<PianoWorkspaceHarness/>);
@@ -376,6 +381,108 @@ test('R5: opening a saved lesson uses its stored reference, not a regenerated dr
   assert.match(view.getByText(/Score alignment anchored/i).textContent ?? '', /anchored/i);
   assert.equal(reviewButton(view).disabled, true,
     'an opened saved revision is clean');
+});
+
+test('shared editorSession tracks draft hydration, an ordinary edit and undo back to clean', async () => {
+  posts = []; saveStatus = 200; latestReference = null; lessonManifest = null; localStorage.clear();
+  const dirtyCalls: boolean[] = [];
+  const view = render(<PianoWorkspaceHarness onDirty={value => dirtyCalls.push(value)}/>);
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-svg')));
+  const shell = () => view.container.querySelector('main.ws-shell')!;
+  await waitFor(() => {
+    assert.equal(shell().getAttribute('data-session-state'), 'needs-review');
+    assert.equal(shell().getAttribute('data-session-dirty'), 'false');
+  });
+  assert.equal(dirtyCalls[dirtyCalls.length - 1], false, 'a hydrated draft is clean');
+
+  dirtyEdit(view);
+  await waitFor(() => {
+    assert.equal(shell().getAttribute('data-workspace-dirty'), 'true');
+    assert.equal(shell().getAttribute('data-session-dirty'), 'true');
+    assert.equal(shell().getAttribute('data-session-state'), 'editing');
+  });
+  assert.equal(dirtyCalls[dirtyCalls.length - 1], true, 'onDirty mirrors the ordinary edit');
+
+  fireEvent.click(view.container.querySelector('.ws-undo')!);
+  await waitFor(() => {
+    assert.equal(shell().getAttribute('data-workspace-dirty'), 'false');
+    assert.equal(shell().getAttribute('data-session-dirty'), 'false');
+    assert.equal(shell().getAttribute('data-session-state'), 'needs-review');
+    assert.equal(shell().getAttribute('data-session-revision'), '');
+  });
+  assert.equal(dirtyCalls[dirtyCalls.length - 1], false,
+    'undo back to baseline clears the shared dirty flag');
+});
+
+test('shared editorSession records the loaded revision and restores it after undo-to-clean', async () => {
+  posts = []; saveStatus = 200; latestReference = null; localStorage.clear();
+  const {buildNotation} = await import('../../../packages/music-notation/index.ts');
+  const notation = buildNotation(fixture.events.map((event: any) => ({
+    id: event.id, onset: event.onset, duration: event.duration, pitch: event.pitch,
+    velocity: event.velocity ?? null, confidence: event.confidence ?? null, optional: Boolean(event.optional),
+    string: null, fret: null, notation_duration: event.notation_duration ?? null,
+  })), {duration: fixture.duration});
+  const authored = JSON.parse(JSON.stringify(notation));
+  authored.events.flatMap((event: any) => event.notes)
+    .find((note: any) => note.pitch === 60).spelling = 'B#3';
+  latestReference = {reference_version: 1, duration: fixture.duration, title: 'Stored revision',
+    events: notation.performance, spans: fixture.spans, notation: authored,
+    alignment: {alignment_version: 1, mode: 'anchored', basis: 'tempo', offset_seconds: 0.25,
+      anchors: [{seconds: 1, tick: 960}],
+      passages: [{kind: 'timed', source_seconds: [0, fixture.duration],
+        ticks: [0, Math.round(fixture.duration / (60 / (120 * 480)))]}]}};
+  lessonManifest = {revision_id: 'rev-hydrated-7',
+    reference: {key: 'lessons/lesson-1/ref.json'}};
+  const dirtyCalls: boolean[] = [];
+  const view = render(<PianoWorkspaceHarness onDirty={value => dirtyCalls.push(value)}/>);
+  await waitFor(() => assert.ok(view.container.querySelector('.ws-roll-svg')));
+  const shell = () => view.container.querySelector('main.ws-shell')!;
+  await waitFor(() => {
+    assert.equal(shell().getAttribute('data-session-state'), 'saved-private');
+    assert.equal(shell().getAttribute('data-session-dirty'), 'false');
+    assert.equal(shell().getAttribute('data-session-revision'), 'rev-hydrated-7');
+  });
+  assert.notEqual(shell().getAttribute('data-session-revision'), 'lesson-1',
+    'the shared session records the revision id, never the lesson id');
+  assert.equal(dirtyCalls[dirtyCalls.length - 1], false, 'a hydrated saved revision is clean');
+
+  dirtyEdit(view);
+  await waitFor(() => {
+    assert.equal(shell().getAttribute('data-session-dirty'), 'true');
+    assert.equal(shell().getAttribute('data-session-revision'), 'rev-hydrated-7');
+  });
+  assert.equal(dirtyCalls[dirtyCalls.length - 1], true);
+
+  fireEvent.click(view.container.querySelector('.ws-undo')!);
+  await waitFor(() => {
+    assert.equal(shell().getAttribute('data-workspace-dirty'), 'false');
+    assert.equal(shell().getAttribute('data-session-dirty'), 'false');
+    assert.equal(shell().getAttribute('data-session-state'), 'saved-private');
+    assert.equal(shell().getAttribute('data-session-revision'), 'rev-hydrated-7');
+  });
+  assert.equal(dirtyCalls[dirtyCalls.length - 1], false);
+});
+
+test('a successful reviewed save records saved-private review state on the shared session', async () => {
+  posts = []; saveStatus = 200; latestReference = null; lessonManifest = null; localStorage.clear();
+  const view = await open();
+  const shell = () => view.container.querySelector('main.ws-shell')!;
+  await waitFor(() => assert.equal(shell().getAttribute('data-session-state'), 'needs-review'));
+
+  dirtyEdit(view);
+  await waitFor(() => assert.equal(shell().getAttribute('data-session-dirty'), 'true'));
+
+  openReview(view);
+  fireEvent.click(reviewConfirm(view));
+  await waitFor(() => assert.equal(dialogSave(view).disabled, false, 'review confirmation enables saving'));
+  fireEvent.click(dialogSave(view));
+
+  await waitFor(() => {
+    assert.equal(shell().getAttribute('data-session-state'), 'saved-private');
+    assert.equal(shell().getAttribute('data-session-reviewed'), 'true');
+    assert.equal(shell().getAttribute('data-session-dirty'), 'false');
+    assert.equal(shell().getAttribute('data-session-revision'), 'rev-saved-1');
+  });
 });
 
 

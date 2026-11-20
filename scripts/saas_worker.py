@@ -44,6 +44,81 @@ class LeaseLost(Exception):pass
 class InvalidVideo(Exception):pass
 
 
+def _sha256(path):
+    digest=hashlib.sha256()
+    with Path(path).open('rb') as file:
+        for chunk in iter(lambda:file.read(1024*1024),b''):digest.update(chunk)
+    return digest.hexdigest()
+
+
+def publish_required_artifacts(api,path,headers,folder,names,check):
+    """Upload required files and verify the server checksum when it reports one."""
+    assets={}
+    for name in names:
+        check()
+        source=Path(folder)/name
+        if not source.is_file() or source.stat().st_size <= 0:
+            raise InvalidVideo(f'Required artifact is missing or empty: {name}.')
+        expected=_sha256(source)
+        with source.open('rb') as file:
+            response=api.put(path+'/files/'+name,
+                             headers={**headers,'Content-Type':'application/octet-stream'},content=file)
+        response.raise_for_status()
+        asset=response.json()
+        if asset.get('sha256') != expected:
+            raise InvalidVideo(f'Uploaded artifact checksum mismatch for {name}.')
+        assets[name]=asset
+    return assets
+
+
+def publish_optional_derivatives(api,path,headers,assets,reference,manifest,focused,check,warnings):
+    """Upload focused/alpha or invalidate every dependent marker coherently."""
+    check()
+    if focused:
+        try:
+            with Path(focused).open('rb') as file:
+                response=api.put(path+'/files/instructor.mp4',
+                                 headers={**headers,'Content-Type':'application/octet-stream'},content=file)
+            response.raise_for_status()
+            assets['instructor.mp4']=response.json()
+        except Exception as exc:
+            check()
+            focused=None
+            warnings.append(f'Person-only instructor video could not be prepared ({type(exc).__name__}). '
+                            'The original wide video remains available.')
+    if not focused:
+        invalidated=reference.pop('instructorMarkers',None) is not None
+        for key in ('focused_video','focused_video_start','focused_video_alpha'):
+            manifest.pop(key,None)
+        return None,invalidated
+    manifest['focused_video']=assets['instructor.mp4']
+    manifest['focused_video_start']=0.
+    # Alpha is a derivative of a *valid* focused video; never upload it alone.
+    alpha=Path(focused).with_name(Path(focused).stem+'-alpha.webm')
+    if alpha.is_file():
+        try:
+            check()
+            with alpha.open('rb') as file:
+                response=api.put(path+'/files/instructor-alpha.webm',
+                                 headers={**headers,'Content-Type':'application/octet-stream'},content=file)
+            response.raise_for_status()
+            assets['instructor-alpha.webm']=response.json()
+            manifest['focused_video_alpha']=assets['instructor-alpha.webm']
+        except Exception as exc:
+            check()
+            manifest.pop('focused_video_alpha',None)
+            warnings.append(f'Transparent instructor upload unavailable ({type(exc).__name__}).')
+    return focused,False
+
+
+def complete_pipeline_job(api,path,headers,manifest,check):
+    """Shared final lease check and finish payload; returns the server response."""
+    check()
+    result=api.post(path+'/finish',headers=headers,json=manifest)
+    result.raise_for_status()
+    return result
+
+
 class Worker:
     def __init__(self,url,token):
         parsed=urlparse(url)
@@ -237,14 +312,10 @@ class Worker:
                 output=gltf.accessors[sampler.output];buffer=gltf.bufferViews[output.bufferView]
                 values=np.frombuffer(gltf.binary_blob(),dtype='<f4',count=buffer.byteLength//4,offset=buffer.byteOffset or 0)
                 if not np.isfinite(values).all():raise InvalidVideo('Non-finite animation.')
-        (folder/'reference.json').write_text(json.dumps(reference,separators=(',',':')),encoding='utf-8')
+        (folder/'reference.json').write_text(json.dumps(reference,separators=(',',':'),allow_nan=False),encoding='utf-8')
         command(['ffmpeg','-nostdin','-v','error','-ss',str(reference['standingTime']),'-i',str(preview),'-frames:v','1','-vf','scale=640:-2',str(folder/'thumbnail.jpg')])
-        assets={}
-        for name in ('reference.glb','reference.json','preview.mp4','thumbnail.jpg'):
-            check()
-            with (folder/name).open('rb') as file:
-                response=self.api.put(path+'/files/'+name,headers={**headers,'Content-Type':'application/octet-stream'},content=file)
-            response.raise_for_status();assets[name]=response.json()
+        assets=publish_required_artifacts(self.api,path,headers,folder,
+                                          ('reference.glb','reference.json','preview.mp4','thumbnail.jpg'),check)
         if focused:
             try:
                 with focused.open('rb') as file:
@@ -268,11 +339,18 @@ class Worker:
             'section_set':{'id':job_id,'revision':1,'duration':reference['duration'],'sections':[{'id':'whole','label':'Full movement','start':0,'end':reference['duration']}]},
             'warnings':['Review the reconstruction before teaching. Pose accuracy and foot contact are not certified.',f'Source range starts at {job["start"]}s; preview is normalised to 15 fps with audio removed.']}
         # Avatar presentation is derived from the canonical export. Uploads must happen
-        if focused:
-            manifest['focused_video']=assets['instructor.mp4']
-            manifest['focused_video_start']=0.
-            if 'instructor-alpha.webm' in assets:manifest['focused_video_alpha']=assets['instructor-alpha.webm']
-        else:manifest['warnings'].append('Person-only instructor video could not be prepared (unrepaired matte gap or derivative failure). The original wide video remains available.')
+        if not focused:
+            manifest['warnings'].append('Person-only instructor video could not be prepared (unrepaired matte gap or derivative failure). The original wide video remains available.')
+        # Optional uploads happen after manifest assembly so a failed focused upload
+        # can remove its markers and alpha in one coherent step.
+        focused,reference_changed=publish_optional_derivatives(self.api,path,headers,assets,reference,manifest,
+                                                               focused,check,manifest['warnings'])
+        if reference_changed:
+            (folder/'reference.json').write_text(json.dumps(reference,separators=(',',':'),allow_nan=False),
+                                                 encoding='utf-8')
+            assets.update(publish_required_artifacts(self.api,path,headers,folder,
+                                                     ('reference.json',),check))
+            manifest['landmarks']=assets['reference.json']
         if grounding['status']=='applied':
             manifest['root_motion']='floor-guided'
             manifest['warnings'].append('Floor movement was corrected using a fixed-camera estimate; review tracking and foot placement.')
@@ -285,7 +363,7 @@ class Worker:
         except Exception as exc:
             print(f'Conversion {job_id}: avatar clips could not be built ({type(exc).__name__}); '
                   'the canonical lesson is unaffected.',flush=True)
-        check();result=self.api.post(path+'/finish',headers=headers,json=manifest);result.raise_for_status()
+        result=complete_pipeline_job(self.api,path,headers,manifest,check)
         print(f'Conversion {job_id}: ready for section review.',flush=True)
         lesson_id=(result.json() or {}).get('lesson_id')
         if prepared and lesson_id:
@@ -379,28 +457,8 @@ class Worker:
             instructor_report=json.loads(focused.with_suffix('.json').read_text(encoding='utf-8'))
             if instructor_report.get('instructor_markers'):reference['instructorMarkers']=instructor_report['instructor_markers']
         (folder/'reference.json').write_text(json.dumps(reference,separators=(',',':'),allow_nan=False),encoding='utf-8')
-        assets={}
-        for name in ('reference.json','preview.mp4','thumbnail.jpg'):
-            check()
-            with (folder/name).open('rb') as file:
-                response=self.api.put(path+'/files/'+name,headers={**headers,'Content-Type':'application/octet-stream'},content=file)
-            response.raise_for_status();assets[name]=response.json()
-        if focused:
-            try:
-                with focused.open('rb') as file:
-                    response=self.api.put(path+'/files/instructor.mp4',headers={**headers,'Content-Type':'application/octet-stream'},content=file)
-                response.raise_for_status();assets['instructor.mp4']=response.json()
-            except Exception as exc:
-                check();focused=None
-                print(f'Focused instructor upload unavailable ({type(exc).__name__}).',flush=True)
-        alpha=focused.with_name(focused.stem+'-alpha.webm') if focused else None
-        if alpha and alpha.is_file():
-            try:
-                with alpha.open('rb') as file:
-                    response=self.api.put(path+'/files/instructor-alpha.webm',headers={**headers,'Content-Type':'application/octet-stream'},content=file)
-                response.raise_for_status();assets['instructor-alpha.webm']=response.json()
-            except Exception as exc:
-                check();print(f'Transparent instructor upload unavailable ({type(exc).__name__}).',flush=True)
+        assets=publish_required_artifacts(self.api,path,headers,folder,
+                                          ('reference.json','preview.mp4','thumbnail.jpg'),check)
         warnings=['Review the movement before teaching. Pose accuracy is not certified.',
                   f'Source range starts at {job["start"]}s; preview is normalised to {fps:.3f} fps with audio removed.']
         if not standing_available:
@@ -418,14 +476,18 @@ class Worker:
                   'section_set':{'id':job_id,'revision':1,'duration':duration,
                                  'sections':[{'id':'whole','label':'Full movement','start':0,'end':duration}]},
                   'warnings':warnings}
-        if focused:
-            manifest['focused_video']=assets['instructor.mp4']
-            manifest['focused_video_start']=0.
-            if 'instructor-alpha.webm' in assets:manifest['focused_video_alpha']=assets['instructor-alpha.webm']
-        else:
+        focused,reference_changed=publish_optional_derivatives(self.api,path,headers,assets,reference,manifest,
+                                                               focused,check,warnings)
+        if reference_changed:
+            (folder/'reference.json').write_text(json.dumps(reference,separators=(',',':'),allow_nan=False),
+                                                 encoding='utf-8')
+            assets.update(publish_required_artifacts(self.api,path,headers,folder,
+                                                     ('reference.json',),check))
+            manifest['landmarks']=assets['reference.json']
+        if not focused:
             warnings.append('Person-only instructor video could not be prepared (unrepaired matte gap or derivative failure). The original wide video remains available.')
         # Deliberately no export_glb, no source_grounding, no avatars and no /derivatives.
-        check();result=self.api.post(path+'/finish',headers=headers,json=manifest);result.raise_for_status()
+        result=complete_pipeline_job(self.api,path,headers,manifest,check)
         print(f'Conversion {job_id}: ready for section review.',flush=True)
 
 

@@ -6,7 +6,23 @@ Migrations `0026`–`0029` introduced Acts, plan-scoped practice progress, publi
 roles and lesson likes. This runbook covers expand/migrate/contract, rollback, the four
 temporary flags, and the pre/post deployment checks.
 
-## 2. Migration sequence
+## 2. Consolidated owners
+
+The current production owners are `apps/api/policy.py` and
+`packages/lesson-schema/act-descriptors.json` for server policy/descriptor facts,
+`apps/web/src/app/lesson-opener.ts`/`useLibraryPages.ts` for shell opening/paging,
+`apps/web/src/sharing/usePublicationController.ts` for release mutations,
+`apps/web/src/practice/usePracticeAccessGuard.ts`/`submit-attempt.ts` and
+`apps/web/src/music/capture-job.ts` for practice lifetime/submission, and the shared
+artifact/completion helpers in `scripts/saas_worker.py`. Treat these as reuse
+boundaries during rollout; do not reimplement policy, opening, release or cleanup in
+individual Act screens.
+
+`apps/web/src/app/lesson-context.ts` owns a bounded SHA-256 reference cache
+(16 entries / 32 MiB / 8 MiB per entry) with active-session pins and oversized-asset
+bypass. Cache hits still require the original reviewed hash; sign-out clears it.
+
+## 3. Migration sequence
 
 ### Expand
 1. Take the normal database backup/snapshot.
@@ -34,7 +50,7 @@ temporary flags, and the pre/post deployment checks.
 2. Remove deprecated compatibility shims/flags in a dedicated change.
 3. Only then drop retired columns/tables (`alembic downgrade` is for rollback, not cleanup).
 
-## 3. Temporary rollout flags
+## 4. Temporary rollout flags
 
 All are read from the environment per request, default `true`, and only gate surfaces.
 
@@ -60,7 +76,7 @@ Behavior when off:
 Do not turn historical branches (e.g. body progress) into permanent settings. If a flag
 outlives its removal condition, delete it rather than adding another.
 
-## 4. Rollback
+## 5. Rollback
 
 ### Fast surface rollback (preferred)
 Set the relevant env flag to `0` and restart. No migration or data mutation is required.
@@ -82,7 +98,7 @@ Verify the endpoint returns 404 and `/api/capabilities` reflects the flag.
 - Never convert a drawing document into a body/piano manifest.
 - Unlisting or moderation hiding is reversible; deletion is not.
 
-## 5. Compatibility window
+## 6. Compatibility window
 
 - Body v1 remains readable by all supported clients.
 - Music v2 requires format negotiation; keep it private until the public music gate is
@@ -92,7 +108,7 @@ Verify the endpoint returns 404 and `/api/capabilities` reflects the flag.
 - `X-Lesson-Formats` semantics: callers advertise document versions they can parse;
   servers must not downgrade a specialized document to a different schema.
 
-## 6. Verification checklist
+## 7. Verification checklist
 
 - [ ] `alembic upgrade head`; `alembic current` shows `0029`.
 - [ ] `/api/capabilities`: phase 9, expected rollout values, descriptor version 1.
@@ -110,7 +126,7 @@ Verify the endpoint returns 404 and `/api/capabilities` reflects the flag.
       from the practice path.
 - [ ] Logs show no 500s on 404 paths; no revision/job mutation from flag changes.
 
-## 7. Deferred live checks
+## 8. Deferred live checks
 
 Database migration on Postgres (SQLite tests cover the SQLAlchemy paths), real browser
 media/permission behavior, public music playback, and production frame/memory budgets

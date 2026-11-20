@@ -105,10 +105,12 @@ test('Studio share loading negotiates 1,2,3 and routes music/drawing share surfa
     assert.ok(format.includes('3'));
   } finally { globalThis.fetch = original; }
   const library = readFileSync(new URL('../src/LibraryApp.tsx', import.meta.url), 'utf8');
-  assert.match(library, /onShare=\{item=>void run\(async\(\)=>\{const loaded=await loadLessonContext/);
-  assert.ok(library.includes("loaded.actId==='drawing'"));
-  assert.ok(library.includes("navigate('drawing-share')"));
-  assert.ok(library.includes("loaded.actId==='piano'||loaded.actId==='guitar'"));
+  assert.match(library, /onShare=\{item=>void run\(async\(\)=>\{const opened=await lessonOpener\.open\(\{lessonId:item\.lesson_id,source:'private',intent:'share'/);
+  assert.ok(library.includes('applyOpenedContext(opened,{owned:true'));
+  assert.ok(library.includes("if(doc.kind==='music')setShareMusic(item)"));
+  assert.ok(library.includes("if(doc.kind==='drawing')setDrawingShareId(item.lesson_id)"));
+  assert.ok(library.includes("setLesson(document.kind==='body'?document.value:null)"));
+  assert.ok(library.includes('navigate(destination)'));
 });
 
 test('PublicRepresentation renders video-only body with a real video player', () => {

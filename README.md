@@ -1,5 +1,18 @@
 # Local SAM 3D Body video experiment
 
+## AI agents and application architecture
+
+Before changing the SaaS application, read [AGENTS.md](AGENTS.md) and the
+[Act architecture and reuse guide](docs/act-platform-guide.md). They define the
+Editor, Practice, and Social Engines; specialized Acts; and shared functions/UI
+to reuse. Pending work is in the [consolidation plan](docs/act-platform-consolidation-plan.md).
+
+For a runner such as DeepSeek Harness that does not load repository instructions
+automatically, include `AGENTS.md` and `docs/act-platform-guide.md` in its startup
+task context. Automatic discovery for that harness has not been verified here.
+
+## Original local experiment
+
 Scope: run Meta's official SAM 3D Body on the RTX 4060, process one short
 single-person video, and export structured motion plus a skinned skeletal GLB.
 The reconstruction pipeline is kept separate from the browser practice interface.

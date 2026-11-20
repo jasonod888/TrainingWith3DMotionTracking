@@ -4,6 +4,7 @@ The worker is driven with a fake API and a fake command runner, so no ffmpeg, mo
 or network is needed. The assertions are about the exact completion contract the
 server enforces for ``body-mediapipe-v1``.
 """
+import hashlib
 import json
 
 import numpy as np
@@ -31,7 +32,10 @@ class FakeApi:
 
     def put(self, url, headers=None, content=None):
         self.files.append(url)
-        return FakeResponse({'key': url, 'mime': 'application/octet-stream', 'bytes': 1, 'sha256': 'a' * 64})
+        data = content.read() if hasattr(content, 'read') else b''
+        digest = hashlib.sha256(data).hexdigest()
+        return FakeResponse({'key': url, 'mime': 'application/octet-stream', 'bytes': len(data),
+                             'sha256': digest})
 
     def post(self, url, headers=None, json=None):
         self.posts.append((url, json))
@@ -112,7 +116,7 @@ def test_mediapipe_finish_is_video_only_and_skips_glb_and_avatars(harness, monke
     assert manifest['thumbnail']['key'].endswith('/thumbnail.jpg')
     assert manifest['landmarks']['key'].endswith('/reference.json')
     assert 'focused_video' not in manifest
-    assert manifest['duration'] == pytest.approx(float(harness['times'][-1]))
+    assert manifest['duration'] == pytest.approx(float(harness['times'][-1]) + 1.0 / 25.0)
     # No 3D, grounding or retarget step ran, and no derivative was published.
     assert not any('export_glb.py' in call for call in harness['calls'])
     assert not any('retarget_mixamo.py' in call for call in harness['calls'])

@@ -1,8 +1,8 @@
 import {useEffect, useState} from 'react';
 import {ArrowLeft, Globe, Mail, Lock, X} from 'lucide-react';
-import {ApiError, loadPublishability, request, updatePublic, type Publishability} from '../api';
+import {ApiError, loadPublishability, request, type Publishability} from '../api';
 import {availableRoles, readiness, rolesSummary, type PublicationView} from '../sharing/publication-readiness';
-import {invalidateLessonContext} from '../app/lesson-context';
+import {usePublicationController} from '../sharing/usePublicationController';
 
 type Sharing = {
   mode: 'private' | 'invite' | 'link';
@@ -31,6 +31,7 @@ export function MusicShareLesson({lessonId, title, onBack, onChange}: {
   const [creatorName, setCreatorName] = useState('Creator');
   const [tags, setTags] = useState('music');
   const [email, setEmail] = useState('');
+  const publication = usePublicationController({lessonId, initialRoles: []});
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -80,19 +81,18 @@ export function MusicShareLesson({lessonId, title, onBack, onChange}: {
 
   const savePublic = () => void run(async () => {
     if (!publicReadiness.enabled) throw new Error(publicReadiness.reason);
-    await updatePublic(lessonId, {
-      listed: true, title: publicTitle.trim(), creator_name: creatorName.trim(),
+    const ok = await publication.publish({
+      listed: true, title: publicTitle.trim(), creatorName: creatorName.trim(),
       tags: tags.split(',').map(value => value.trim()).filter(Boolean),
-      rights_acknowledged: true, public_roles: publicRoles,
-    });
-    invalidateLessonContext(lessonId);
+      rightsAcknowledged: true, roles: publicRoles,
+    } as never);
+    if (!ok) throw new Error(publication.error || 'This music lesson could not be published.');
     setNotice('This music lesson is now public.');
     setRights(false);
     await load(); onChange?.();
   });
   const unlistPublic = () => void run(async () => {
-    await updatePublic(lessonId, {listed: false});
-    invalidateLessonContext(lessonId);
+    if (!(await publication.unlist())) throw new Error(publication.error || 'This music lesson could not be unpublished.');
     setNotice('This music lesson is no longer public.');
     await load(); onChange?.();
   });

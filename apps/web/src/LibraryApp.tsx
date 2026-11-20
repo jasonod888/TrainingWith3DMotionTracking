@@ -1,6 +1,6 @@
 import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowRight,Home,Check,Globe,LogOut,MoveUpRight,Menu,Plus,SlidersHorizontal,User,Users,Video} from 'lucide-react';
-import type {DrawingLessonManifest,LessonDocument,LessonManifest,LessonSummary,MusicLessonManifest,Section} from '../../../packages/lesson-schema/index';
+import type {DrawingLessonManifest,LessonManifest,LessonSummary,MusicLessonManifest,Section} from '../../../packages/lesson-schema/index';
 const MimicReceiver=lazy(()=>import('./MimicReceiver').then(module=>({default:module.MimicReceiver})));
 import {LessonWorkspace} from './LessonWorkspace';
 import {CreateLesson,ConversionList} from './CreateLesson';
@@ -23,10 +23,11 @@ import {MusicShareLesson} from './music/MusicShareLesson';
 import type {PracticePreferences} from './practice-types';
 import {PracticePreview} from './PracticePreview';
 import {LessonExperienceHost} from './LessonExperienceHost';
-import {buildLessonContext,buildPublicLessonContext,clearLessonContextCache,invalidateLessonContext,loadLessonContext,type LessonContext} from './app/lesson-context';
+import {buildLessonContext,buildPublicLessonContext,clearLessonContextCache,invalidateLessonContext,type LessonContext} from './app/lesson-context';
 import {applyReleaseChange,applySavedRevision} from './editor/revision-handoff';
 import {groupInviteOf,lessonPageUrl,linkAction,pending,routeOf,type AuthView,type Page} from './app/routes';
-import {createLibraryPager} from './app/library-pager';
+import {createLessonOpener} from './app/lesson-opener';
+import {useLibraryPages} from './app/useLibraryPages';
 import {bodyOpenTarget,musicManageTarget} from './app/open-target';
 import {summarizeBody} from './lesson-summary';
 import {PracticeFeed,type FeedFilter} from './PracticeFeed';
@@ -34,7 +35,7 @@ import {AccountMenu} from './AccountMenu';
 import {FeedSearch} from './FeedSearch';
 import {Button, IconButton} from './ui/controls';
 import './feed.css';
-import {ApiError,assetUrl,createDrawingLesson,loadCapabilities,loadPublicMove,copyDemo,getSession,loadDemo,loadLesson,loadLessonSummaries,loadLessonSummariesPage,loadMoveStates,loadSharedSummaries,needsCheck,request,saveSections,signIn,signOut,type Account,type MoveState} from './api';
+import {ApiError,assetUrl,createDrawingLesson,loadCapabilities,copyDemo,getSession,loadDemo,loadLesson,loadMoveStates,loadSharedSummaries,needsCheck,request,saveSections,signIn,signOut,type Account,type MoveState} from './api';
 
 export function App(){
  const [feedQuery,setFeedQuery]=useState(''),[feedFilter,setFeedFilter]=useState<FeedFilter>('all'),[drawerOpen,setDrawerOpen]=useState(false),[smallScreen,setSmallScreen]=useState(()=>matchMedia('(max-width:760px)').matches),[accountPreferences,setAccountPreferences]=useState(false),[sidebarExpanded,setSidebarExpanded]=useState(()=>window.matchMedia('(min-width:1101px)').matches);
@@ -73,54 +74,38 @@ const [editId,setEditId]=useState<string|null>(routeOf().page==='music-edit'?rou
  const [states,setStates]=useState<MoveState[]>([]),[adjustFor,setAdjustFor]=useState<{lesson_id:string;title:string;subject?:string;feedback_enabled?:boolean}|null>(null);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[dirty,setDirty]=useState(false);
  const [routeReady,setRouteReady]=useState(false),replaceRoute=useRef(true),restoring=useRef(false);
- const [libraryTotal,setLibraryTotal]=useState(0);
- const [libraryHasMore,setLibraryHasMore]=useState(false);
- const [libraryLoadingMore,setLibraryLoadingMore]=useState(false);
  const [ownedSubject,setOwnedSubject]=useState('all');
- const [ownedAvailableSubjects,setOwnedAvailableSubjects]=useState<string[]>([]);
- const pager=useRef(createLibraryPager<LessonSummary>()).current;
+ const pages=useLibraryPages({accountId:account?.id??null,query:feedQuery,subject:ownedSubject});
+ const reloadPagesRef=useRef(pages.reload);reloadPagesRef.current=pages.reload;
+ useEffect(()=>{setLibrary(pages.lessons);},[pages.lessons]);
+ const lessonOpener=useRef(createLessonOpener()).current;
+ useEffect(()=>{lessonOpener.cancel();},[account?.id,lessonOpener]);
  const refresh=useCallback(async()=>{
-  const generation=pager.beginReload();
   setLoading(true);setError('');
-  try{const session=await getSession();setAccount(session?.account??null);const [preview,received,workflow]=await Promise.all([loadDemo(),session?loadSharedSummaries():Promise.resolve([]),session?loadMoveStates():Promise.resolve({lessons:[]})]);
-   const ownedPage=session?await loadLessonSummariesPage({limit:100,offset:0}):null;
-   const next=pager.reload(generation,ownedPage??{lessons:[],total:0,has_more:false,available_subjects:[]});
-   setDemo(preview);if(next){setLibrary(next.lessons);setLibraryTotal(next.total);setLibraryHasMore(next.hasMore);setOwnedAvailableSubjects(next.availableSubjects);}setShared(received);setStates(workflow.lessons);
+  try{const session=await getSession();setAccount(session?.account??null);if(session?.account)void reloadPagesRef.current();const [preview,received,workflow]=await Promise.all([loadDemo(),session?loadSharedSummaries():Promise.resolve([]),session?loadMoveStates():Promise.resolve({lessons:[]})]);
+   setDemo(preview);setShared(received);setStates(workflow.lessons);
    // The subject filter is a server-controlled rollout: absent or failing means off.
    void loadCapabilities().then(value=>{setSubjectFilter(Boolean(value.subject_filter));setMidiSetup(value.music_midi_setup===true);setMusicHistory(value.music_history===true);setMusicChallenge(value.music_challenge===true);setMusicInference(value.music_inference===true);setPianoLibrary(value.music_piano_library_ui===true);setGuitarLibrary(value.music_guitar_library_ui===true);}).catch(()=>{setSubjectFilter(false);setMidiSetup(false);setMusicHistory(false);setMusicChallenge(false);setMusicInference(false);setPianoLibrary(false);setGuitarLibrary(false);});
   }
   catch(e){setError((e as Error).message);}finally{setLoading(false);}
  },[]);
- const loadMoreLibrary=useCallback(async()=>{
-  if(libraryLoadingMore||!libraryHasMore)return;
-  const generation=pager.beginLoadMore();
-  const current={lessons:library,total:libraryTotal,hasMore:libraryHasMore,
-    availableSubjects:ownedAvailableSubjects,loadingMore:true};
-  setLibraryLoadingMore(true);
-  try{const page=await loadLessonSummariesPage({limit:100,offset:library.length,
-    q:feedQuery,subject:ownedSubject==='all'?undefined:ownedSubject});
-   const next=pager.append(generation,current,page);
-   if(!next)return;
-   setLibrary(next.lessons);setLibraryTotal(next.total);setLibraryHasMore(next.hasMore);
-   setOwnedAvailableSubjects(next.availableSubjects);
-  }catch(e){if(pager.isCurrent(generation))setError((e as Error).message);}
-  finally{if(pager.isCurrent(generation))setLibraryLoadingMore(false);}
- },[library,libraryTotal,libraryHasMore,libraryLoadingMore,feedQuery,ownedSubject,
-    ownedAvailableSubjects,pager]);
- useEffect(()=>{
-  if(!account)return;
-  const generation=pager.beginReload();
-  const timer=window.setTimeout(()=>{
-   loadLessonSummariesPage({limit:100,offset:0,q:feedQuery,
-    subject:ownedSubject==='all'?undefined:ownedSubject}).then(page=>{
-     const next=pager.reload(generation,page);
-     if(!next)return;
-     setLibrary(next.lessons);setLibraryTotal(next.total);setLibraryHasMore(next.hasMore);
-     setOwnedAvailableSubjects(next.availableSubjects);setLibraryLoadingMore(false);
-    }).catch(e=>{if(pager.isCurrent(generation))setError((e as Error).message);});
-  },200);
-  return()=>{window.clearTimeout(timer);};
- },[account?.id,feedQuery,ownedSubject,pager]);
+ const refreshOwned=useCallback(async()=>{await Promise.all([pages.reload(),
+   loadMoveStates().then(workflow=>setStates(workflow.lessons))]);},[pages.reload]);
+ const loadMoreLibrary=useCallback(()=>{void pages.loadMore();},[pages.loadMore]); const applyOpenedContext=(opened:{context:LessonContext;destinationPage:Page},
+   options:{owned?:boolean;destination?:Page;direct?:boolean;onApplied?:()=>void}={})=>{
+   const {context:openedContext}=opened;
+   const document=openedContext.document;
+   setContext(openedContext);
+   setLessonOwned(options.owned??openedContext.audience==='owner');
+   setSessionSection(null);
+   setDrawing(document.kind==='drawing'?document.value:null);
+   setMusic(document.kind==='music'?document.value:null);
+   setLesson(document.kind==='body'?document.value:null);
+   if(document.kind==='summary')throw new Error('This lesson cannot be opened here.');
+   options.onApplied?.();
+   const destination=options.destination??opened.destinationPage;
+   if(options.direct)setPage(destination);else navigate(destination);
+ };
  const restoreRoute=useCallback(async()=>{
   const route=routeOf();restoring.current=true;replaceRoute.current=true;setRouteReady(false);setError('');
   try{
@@ -132,21 +117,16 @@ const [editId,setEditId]=useState<string|null>(routeOf().page==='music-edit'?rou
    if(route.page==='music-comparison'){if(!account){pending('auth-return',location.search);setPage('account');return;}setComparisonId(route.id);setReviewId(route.linkedLesson);setLesson(null);setMusic(null);setPage('music-comparison');return;}
    if(['preview','compete','practice','review','check','move','share','group','public'].includes(route.page)&&!route.id)throw new Error('This link is incomplete. Choose a move from your library.');
    if(['preview','compete','practice','review','check','move','share'].includes(route.page)&&route.id){
-    if(route.source==='public'){const loaded=buildPublicLessonContext(await loadPublicMove(route.id));setContext(loaded);setLessonOwned(false);const doc=loaded.document;setMusic(null);setDrawing(null);setLesson(null);if(doc.kind==='drawing'){if(route.page!=='practice')throw new Error('This drawing lesson opens in practice.');setDrawing(doc.value);}else if(doc.kind==='music'){if(!['preview','practice','compete'].includes(route.page))throw new Error('This music lesson opens in preview.');setMusic(doc.value);}else if(doc.kind==='body'){setLesson(doc.value);}else throw new Error('This lesson cannot be opened here.');}
-    else if(route.source==='demo'){setMusic(null);setDrawing(null);const value=await loadDemo();setLesson(value);setLessonOwned(false);setContext(value?buildLessonContext({document:{kind:'body',value},audience:'demo',accountScope:'public'}):null);}
+    if(route.source==='public'){const opened=await lessonOpener.open({lessonId:route.id,source:'public',intent:route.page==='practice'?'practice':'preview',accountScope:account?.id??'public'});const doc=opened.context.document;if(doc.kind==='drawing'&&route.page!=='practice')throw new Error('This drawing lesson opens in practice.');if(doc.kind==='music'&&!['preview','practice','compete'].includes(route.page))throw new Error('This music lesson opens in preview.');if(!['body','music','drawing'].includes(doc.kind))throw new Error('This lesson cannot be opened here.');applyOpenedContext(opened,{owned:false,destination:route.page,direct:true});}
+    else if(route.source==='demo'){const value=await loadDemo();if(!value)throw new Error('Demonstration unavailable.');applyOpenedContext({context:buildLessonContext({document:{kind:'body',value},audience:'demo',accountScope:'public'}),destinationPage:'preview'},{owned:false,destination:route.page,direct:true});}
     else if(account){
      // The negotiated loader validates the specialized document and the Act.
-     const loaded=await loadLessonContext(route.id,{audience:'owner',accountScope:account.id,challengeEnabled:musicChallenge});
-     const document=loaded.document;
-     if(document.kind==='music'){
-      if(!['preview','practice','compete'].includes(route.page))throw new Error('This music lesson opens in preview on this version. Refresh to update.');
-      setDrawing(null);setMusic(document.value);setLesson(null);setLessonOwned(false);setContext(loaded);
-     }else if(document.kind==='drawing'){
-if(route.page!=='practice')throw new Error('This drawing lesson opens in practice.');
-setMusic(null);setDrawing(document.value);setLesson(null);setLessonOwned(false);setContext(loaded);
-}else if(document.kind==='body'){
-      setDrawing(null);setMusic(null);setLesson(document.value);setLessonOwned(library.some(item=>item.lesson_id===route.id));setContext(loaded);
-     }else throw new Error('Open this lesson from your library.');
+     const opened=await lessonOpener.open({lessonId:route.id,source:'private',intent:route.page==='practice'?'practice':route.page==='share'?'share':route.page==='review'?'edit':'preview',accountScope:account.id,audience:'owner',challengeEnabled:musicChallenge});
+     const document=opened.context.document;
+     if(document.kind==='music'&&!['preview','practice','compete'].includes(route.page))throw new Error('This music lesson opens in preview on this version. Refresh to update.');
+     if(document.kind==='drawing'&&route.page!=='practice')throw new Error('This drawing lesson opens in practice.');
+     if(!['body','music','drawing'].includes(document.kind))throw new Error('Open this lesson from your library.');
+     applyOpenedContext(opened,{owned:document.kind==='body'?library.some(item=>item.lesson_id===route.id):false,destination:route.page,direct:true});
     }
     else{pending('auth-return',location.search);setPage('account');return;}
    }
@@ -199,22 +179,20 @@ setMusic(null);setDrawing(document.value);setLesson(null);setLessonOwned(false);
   const musicTarget=owned&&workflow?.experience_family==='music'
     ? musicManageTarget({owned,mode,latestRevisionId:workflow.latest_revision_id}) : null;
   if(musicTarget==='music-review'){setReviewId(value.lesson_id);setLesson(null);setMusic(null);setDrawing(null);setContext(null);navigate('music-review');return;}
-  let document: LessonDocument;
-  if(demo?.lesson_id===value.lesson_id){
-   document={kind:'body' as const,value:demo};
-   setContext(buildLessonContext({document,audience:'demo',accountScope:account?.id??'public'}));
-  }else{
-   const loaded=await loadLessonContext(value.lesson_id,{audience:owned?'owner':'invited',accountScope:account?.id??'guest',challengeEnabled:musicChallenge});
-   document=loaded.document;setContext(loaded);
-  }
-  if(document.kind==='drawing'){setMusic(null);setDrawing(document.value);setLesson(null);setLessonOwned(owned);navigate('practice');return;}
-  if(document.kind==='music'){setDrawing(null);setMusic(document.value);setLesson(null);setLessonOwned(owned);navigate('preview');return;}
-  if(document.kind!=='body')throw new Error('This lesson is not available on this version.');
-  const current=document.value;
-  setDrawing(null);setMusic(null);setLesson(current);setLessonOwned(owned);
-  navigate(bodyOpenTarget({owned,mode,needsCheck:needsCheck(current,stateOf(current))}));
+  const opened=demo?.lesson_id===value.lesson_id
+   ?{context:buildLessonContext({document:{kind:'body' as const,value:demo},audience:'demo',accountScope:account?.id??'public'}),destinationPage:'preview' as Page}
+   :await lessonOpener.open({lessonId:value.lesson_id,source:'private',
+     intent:mode==='practice'?'practice':mode==='edit'?'edit':'preview',
+     accountScope:account?.id??'guest',audience:owned?'owner':'invited',
+     challengeEnabled:musicChallenge});
+  const document=opened.context.document;
+  if(!['body','music','drawing'].includes(document.kind))throw new Error('This lesson is not available on this version.');
+  const destination=document.kind==='body'
+    ?bodyOpenTarget({owned,mode,needsCheck:needsCheck(document.value,stateOf(document.value))})
+    :opened.destinationPage;
+  applyOpenedContext(opened,{owned,destination});
  });
-  const openPublicValue=async(id:string)=>{const loaded=buildPublicLessonContext(await loadPublicMove(id));setContext(loaded);const document=loaded.document;setLessonOwned(false);setSessionSection(null);setDrawing(null);setMusic(null);setLesson(null);if(document.kind==='drawing'){setDrawing(document.value);navigate('practice');return;}if(document.kind==='music'){setMusic(document.value);navigate('preview');return;}if(document.kind==='body'){setLesson(document.value);navigate('preview');return;}throw new Error('This lesson cannot be opened here.');};
+  const openPublicValue=async(id:string)=>{const opened=await lessonOpener.open({lessonId:id,source:'public',intent:'preview',accountScope:account?.id??'public'});if(!['body','music','drawing'].includes(opened.context.document.kind))throw new Error('This lesson cannot be opened here.');applyOpenedContext(opened,{owned:false});};
  const importDemo=()=>void run(async()=>{if(!account){navigate('account');return;}const value=await copyDemo();setLibrary(previous=>[summarizeBody(value),...previous]);setLesson(value);setLessonOwned(true);setStates(previous=>[...previous,{lesson_id:value.lesson_id,latest_revision_id:value.revision_id,accepted_revision_id:null,accepted_at:null,published_revision_id:null,distribution:'private',audiences:{direct:0,groups:0,public:false},public_listing:null}]);navigate('check');setNotice('Private copy added to your moves.');});
  const [sessionSection,setSessionSection]=useState<number|null>(null);
  const practicePreferences=useRef<Record<string,PracticePreferences>>({});
@@ -224,10 +202,10 @@ setMusic(null);setDrawing(document.value);setLesson(null);setLessonOwned(false);
  const save=async(sections:Section[],title:string,feedbackEnabled?:boolean)=>{
   if(!lesson)return;
   if(!lessonOwned)throw new Error('Only the move creator can edit these sections.');
-  if(saved){const value=await saveSections(lesson,sections,title,feedbackEnabled);setLesson(value);applySavedRevision(value.lesson_id,value.revision_id);setLibrary(previous=>previous.map(item=>item.lesson_id===value.lesson_id?summarizeBody(value,item):item));void refresh();setNotice('Saved to your private moves.');}
+  if(saved){const value=await saveSections(lesson,sections,title,feedbackEnabled);setLesson(value);applySavedRevision(value.lesson_id,value.revision_id);setLibrary(previous=>previous.map(item=>item.lesson_id===value.lesson_id?summarizeBody(value,item):item));void refreshOwned();setNotice('Saved to your private moves.');}
   else{const value={...lesson,section_set:{...lesson.section_set,sections},...(feedbackEnabled===undefined?{}:{feedback_enabled:feedbackEnabled})};setLesson(value);setDemo(value);setNotice('Draft kept in this session. Add a private copy to save permanently.');}
  };
- const logout=()=>{if(dirty&&!window.confirm('Leave without saving your changes or take?'))return;setDirty(false);setDrawerOpen(false);void run(async()=>{await signOut();pager.beginReload();clearLessonContextCache();sessionStorage.removeItem('group-invite');sessionStorage.removeItem('move-invite');sessionStorage.removeItem('auth-return');sessionStorage.removeItem('auth-action');setGroupInvite(null);setAccount(null);setLibrary([]);setShared([]);setStates([]);setIncoming(null);setLesson(null);setMusic(null);setDrawing(null);setContext(null);setDemo(null);setNotice('');await refresh();setPage('moves');});};
+ const logout=()=>{if(dirty&&!window.confirm('Leave without saving your changes or take?'))return;setDirty(false);setDrawerOpen(false);void run(async()=>{await signOut();clearLessonContextCache();sessionStorage.removeItem('group-invite');sessionStorage.removeItem('move-invite');sessionStorage.removeItem('auth-return');sessionStorage.removeItem('auth-action');setGroupInvite(null);setAccount(null);setLibrary([]);setShared([]);setStates([]);setIncoming(null);setLesson(null);setMusic(null);setDrawing(null);setContext(null);setDemo(null);setNotice('');await refresh();setPage('moves');});};
  const beginAdjust=(value:LessonManifest)=>{setLesson(value);navigate('check');};
  const destinations=(account?[{id:'moves' as const,label:'Home',Icon:Home},{id:'explore' as const,label:'Explore',Icon:Globe},{id:'groups' as const,label:'Groups',Icon:Users},{id:'create' as const,label:'Create',Icon:Plus},...(studioEnabled?[{id:'studio' as const,label:'Studio',Icon:SlidersHorizontal}]:[]),{id:'account' as const,label:'You',Icon:User}]:[{id:'moves' as const,label:'Home',Icon:Home},{id:'explore' as const,label:'Explore',Icon:Globe},{id:'create' as const,label:'Create',Icon:Plus},{id:'account' as const,label:'You',Icon:User}]);
  return <div data-ui-surface="app" className={`app feed-app ${sidebarExpanded?'sidebar-expanded':'sidebar-compact'} ${(page==='music-review'&&reviewFocused)||(['practice','compete'].includes(page)&&Boolean(music&&!lesson))?'music-review-focus':''} ${['practice','compete'].includes(page)?'practising':''} ${page==='preview'?'watching-lesson':''} ${drawerNavigation?'navigation-overlay':''} ${drawerOpen?'navigation-open':''} ${page==='create'&&account?'creating-move':''} ${page==='check'?'checking-move':''} ${page==='review'&&lessonOwned?'editing-sections':''}`}>
@@ -242,7 +220,7 @@ setMusic(null);setDrawing(document.value);setLesson(null);setLessonOwned(false);
    {error&&<div className="inline-notice error-notice" role="alert">{error}{page==='moves'&&<Button variant="feed-inline" className="back-link" onClick={()=>void refresh()}>Try again</Button>}</div>}
    {busy&&<p className="operation-status" role="status">One moment…</p>}
    {page==='receiver'&&<Suspense fallback={<p>Opening display…</p>}><MimicReceiver onBack={()=>navigate('moves')}/></Suspense>}
-   <div className="feed-page" hidden={page!=='moves'}><PracticeFeed filter={feedFilter} setFilter={setFeedFilter} active={page==='moves'} query={feedQuery} onQuery={setFeedQuery} account={account} library={library} shared={shared} subjectFilterEnabled={subjectFilter} states={states} demo={demo} loading={loading} musicChallengeEnabled={musicChallenge} hasMore={libraryHasMore} loadingMore={libraryLoadingMore} onLoadMore={()=>void loadMoreLibrary()} total={libraryTotal} subject={ownedSubject} onSubject={setOwnedSubject} serverSubjects={ownedAvailableSubjects}
+   <div className="feed-page" hidden={page!=='moves'}><PracticeFeed filter={feedFilter} setFilter={setFeedFilter} active={page==='moves'} query={feedQuery} onQuery={setFeedQuery} account={account} library={library} shared={shared} subjectFilterEnabled={subjectFilter} states={states} demo={demo} loading={loading} musicChallengeEnabled={musicChallenge} hasMore={pages.hasMore} loadingMore={pages.loadingMore} onLoadMore={()=>void loadMoreLibrary()} total={pages.total} subject={ownedSubject} onSubject={setOwnedSubject} serverSubjects={pages.availableSubjects}
     onCreate={()=>{setAdjustFor(null);navigate('create');}} onSignIn={()=>navigate('account')}
     onOpen={(item,owned,check)=>open(item,check?'check':'practice',owned)}
     onPublic={id=>void run(()=>openPublicValue(id))}
@@ -255,7 +233,7 @@ setMusic(null);setDrawing(document.value);setLesson(null);setLessonOwned(false);
     }}>
     {account&&page==='moves'&&<div className="feed-uploads"><ConversionList readyIds={states.filter(state=>!state.latest_revision_id||state.accepted_revision_id!==state.latest_revision_id).map(state=>state.lesson_id)} onReady={()=>void refresh()} onOpen={id=>open({lesson_id:id},'check')}/></div>}
    </PracticeFeed>{notice&&<p className="inline-notice" role="status">{notice}</p>}</div>
-   {page==='music-review'&&account&&reviewId&&<MusicReviewRoute lessonId={reviewId} onDirty={setDirty} onFocusedChange={setReviewFocused} onBack={()=>navigate('moves')} onReviewed={value=>{setDirty(false);applySavedRevision(value.lesson_id,value.revision_id);setMusic(value);setLesson(null);setLessonOwned(true);setPage('preview');void refresh();window.scrollTo({top:0});}}/>}
+   {page==='music-review'&&account&&reviewId&&<MusicReviewRoute lessonId={reviewId} onDirty={setDirty} onFocusedChange={setReviewFocused} onBack={()=>navigate('moves')} onReviewed={value=>{setDirty(false);applySavedRevision(value.lesson_id,value.revision_id);setMusic(value);setLesson(null);setLessonOwned(true);setPage('preview');void refreshOwned();window.scrollTo({top:0});}}/>}
    {page==='music-comparison'&&account&&<PianoModelComparison comparisonId={comparisonId} linkedLessonId={reviewId} onStarted={id=>setComparisonId(id)} onBack={()=>navigate(reviewId?'music-review':'moves')}/>}
    {page==='preview'&&music&&!lesson&&<PracticePreview key={music.revision_id} lesson={music} owned={lessonOwned} capabilities={context?.lessonId===music.lesson_id?context.capabilities:null} resumeAt={previewPositions.current[music.lesson_id+':'+music.revision_id]??0} onPosition={time=>{previewPositions.current[music.lesson_id+':'+music.revision_id]=time;}} onChoose={()=>{setSessionSection(null);navigate('practice');}} onBack={()=>navigate('moves')}
      lessons={[...library.map(value=>({lesson:value,owned:true})),...shared.map(value=>({lesson:value,owned:false})),...(demo?[{lesson:summarizeBody(demo),owned:false}]:[])]}
@@ -267,23 +245,23 @@ setMusic(null);setDrawing(document.value);setLesson(null);setLessonOwned(false);
     onPublic={id=>void run(()=>openPublicValue(id))}/>}
    {(page==='practice'||page==='compete'||(page==='review'&&!lessonOwned))&&(lesson||music||drawing)&&<LessonExperienceHost key={`${(lesson??music??drawing)!.revision_id}-${page}-${sessionSection}`} context={context?.lessonId===(lesson??music??drawing)!.lesson_id?context:null} document={lesson?{kind:'body',value:lesson}:music?{kind:'music',value:music}:{kind:'drawing',value:drawing!}} initialMode={page==='compete'?'compete':'practice'} challengeEnabled={musicChallenge} challengeHistoryEnabled={musicHistory} audioAssessmentEnabled={musicInference} onModeChange={mode=>{setSessionSection(null);navigate(mode==='watch'?'preview':mode);}} initialSettings={lesson?practicePreferences.current[lesson.lesson_id+':'+lesson.revision_id]:undefined} onSettings={value=>{if(lesson){practicePreferences.current[lesson.lesson_id+':'+lesson.revision_id]=value;}}} initialSection={sessionSection} onPracticeSection={index=>{setSessionSection(index<0?null:index);navigate('practice');}} sections={lesson?lesson.section_set.sections:[]} review={page==='review'&&lessonOwned} editable={lessonOwned} persistent={saved} legacyCompatible={lessonOwned&&saved&&Boolean(lesson?.animation)&&demo?.animation?.sha256===lesson?.animation?.sha256} onBack={()=>navigate(drawing||page==='review'?'moves':'preview')} onEdit={()=>navigate(page==='review'?'preview':'review')} onSave={save} onDirty={setDirty} notice={notice} pianoLibrary={pianoLibrary} guitarLibrary={guitarLibrary}/>}
    {page==='review'&&lesson&&lessonOwned&&<SectionEditor key={lesson.lesson_id} lesson={lesson} onBack={()=>navigate('moves')} onPractice={()=>navigate('preview')} onSave={save} onDirty={setDirty} persistent={saved}/>}
-   {page==='check'&&lesson&&lessonOwned&&<MoveCheck key={lesson.revision_id} lesson={lesson} onDirty={setDirty} onBack={()=>navigate('moves')} onAccepted={value=>{setLesson(value);applySavedRevision(value.lesson_id,value.revision_id);setLibrary(previous=>previous.map(item=>item.lesson_id===value.lesson_id?summarizeBody(value,item):item));setDirty(false);void refresh();setPage('move');window.scrollTo({top:0});}} onChooseAnother={()=>{setAdjustFor(null);navigate('create');}}/>}
+   {page==='check'&&lesson&&lessonOwned&&<MoveCheck key={lesson.revision_id} lesson={lesson} onDirty={setDirty} onBack={()=>navigate('moves')} onAccepted={value=>{setLesson(value);applySavedRevision(value.lesson_id,value.revision_id);setLibrary(previous=>previous.map(item=>item.lesson_id===value.lesson_id?summarizeBody(value,item):item));setDirty(false);void refreshOwned();setPage('move');window.scrollTo({top:0});}} onChooseAnother={()=>{setAdjustFor(null);navigate('create');}}/>}
    {page==='move'&&lesson&&lessonOwned&&<MoveDetail lesson={lesson} state={stateOf(lesson)} onBack={()=>navigate('moves')} onPractice={()=>navigate('preview')} onShare={()=>navigate('share')} onMore={()=>navigate('review')} onAdjust={()=>beginAdjust(lesson)} onRenamed={value=>{setLesson(value);setLibrary(previous=>previous.map(item=>item.lesson_id===value.lesson_id?summarizeBody(value,item):item));}}/>}
-   {page==='share'&&lesson&&lessonOwned&&<ShareLesson lesson={lesson} onBack={()=>navigate('move')} onChange={()=>{applyReleaseChange(lesson.lesson_id);void refresh();}}/>}
-   {page==='music-edit'&&(editMusic||editId)&&<Suspense fallback={<p role="status">Opening the lesson editor…</p>}><MusicLessonEditor lessonId={(editMusic?.lesson_id??editId)!} onDirty={setDirty} onBack={()=>{setEditMusic(null);setEditId(null);navigate('moves');}} onSaved={value=>{applySavedRevision(value.lesson_id,value.revision_id);setMusic(value);setLesson(null);setLessonOwned(true);setEditMusic(null);setEditId(null);navigate('preview');void refresh();}}/></Suspense>}
-   {page==='drawing-share'&&drawingShareId&&account&&<Suspense fallback={<p role="status">Opening drawing share…</p>}><DrawingShareLesson lessonId={drawingShareId} title={library.find(item=>item.lesson_id===drawingShareId)?.title??'Drawing'} onBack={()=>{setDrawingShareId(null);navigate('studio');}} onChange={()=>{invalidateLessonContext(drawingShareId);void refresh();}}/></Suspense>}
-    {page==='drawing-edit'&&drawingEditId&&account&&<Suspense fallback={<p role="status">Opening drawing editor…</p>}><DrawingEditorRoute lessonId={drawingEditId} accountId={account.id} onBack={()=>{setDrawingEditId(null);navigate('moves');}} onSaved={value=>{setDrawing(value);setDrawingEditId(value.lesson_id);invalidateLessonContext(value.lesson_id);void refresh();}}/></Suspense>}
-    {page==='share'&&!lesson&&shareMusic&&<MusicShareLesson key={shareMusic.lesson_id} lessonId={shareMusic.lesson_id} title={shareMusic.title} onBack={()=>{setShareMusic(null);navigate('moves');}} onChange={()=>{applyReleaseChange(shareMusic.lesson_id);void refresh();}}/>}
+   {page==='share'&&lesson&&lessonOwned&&<ShareLesson lesson={lesson} onBack={()=>navigate('move')} onChange={()=>{applyReleaseChange(lesson.lesson_id);void refreshOwned();}}/>}
+   {page==='music-edit'&&(editMusic||editId)&&<Suspense fallback={<p role="status">Opening the lesson editor…</p>}><MusicLessonEditor lessonId={(editMusic?.lesson_id??editId)!} onDirty={setDirty} onBack={()=>{setEditMusic(null);setEditId(null);navigate('moves');}} onSaved={value=>{applySavedRevision(value.lesson_id,value.revision_id);setMusic(value);setLesson(null);setLessonOwned(true);setEditMusic(null);setEditId(null);navigate('preview');void refreshOwned();}}/></Suspense>}
+   {page==='drawing-share'&&drawingShareId&&account&&<Suspense fallback={<p role="status">Opening drawing share…</p>}><DrawingShareLesson lessonId={drawingShareId} title={library.find(item=>item.lesson_id===drawingShareId)?.title??'Drawing'} onBack={()=>{setDrawingShareId(null);navigate('studio');}} onChange={()=>{invalidateLessonContext(drawingShareId);void refreshOwned();}}/></Suspense>}
+    {page==='drawing-edit'&&drawingEditId&&account&&<Suspense fallback={<p role="status">Opening drawing editor…</p>}><DrawingEditorRoute lessonId={drawingEditId} accountId={account.id} onBack={()=>{setDrawingEditId(null);navigate('moves');}} onSaved={value=>{setDrawing(value);setDrawingEditId(value.lesson_id);invalidateLessonContext(value.lesson_id);void refreshOwned();}}/></Suspense>}
+    {page==='share'&&!lesson&&shareMusic&&<MusicShareLesson key={shareMusic.lesson_id} lessonId={shareMusic.lesson_id} title={shareMusic.title} onBack={()=>{setShareMusic(null);navigate('moves');}} onChange={()=>{applyReleaseChange(shareMusic.lesson_id);void refreshOwned();}}/>}
    {page==='join'&&incoming&&<JoinLesson incoming={incoming} account={account} onSignIn={()=>navigate('account')} onBack={()=>navigate('moves')} onJoined={value=>{const musicValue=(value as MusicLessonManifest).schema_version===2?value as MusicLessonManifest:null;if(musicValue){setMusic(musicValue);setLesson(null);}else{setMusic(null);setLesson(value as LessonManifest);}setLessonOwned(false);try{setContext(buildLessonContext({document:musicValue?{kind:'music',value:musicValue}:{kind:'body',value:value as LessonManifest},audience:'invited',accountScope:account?.id??'guest',challengeEnabled:musicChallenge}));}catch{setContext(null);}setIncoming(null);sessionStorage.removeItem('move-invite');void loadSharedSummaries().then(setShared).catch(e=>setError(e.message));navigate('preview');}}/>}
    {page==='create'&&(account?<CreateLesson adjust={adjustFor??undefined} onBack={()=>{setAdjustFor(null);navigate('moves');}} onDone={()=>{setAdjustFor(null);navigate('moves');void refresh();}}/>:<section className="coming-screen"><div className="empty-state"><span className="note-art"><Video size={36}/></span><h1>Your next move.</h1><p className="subtle">Sign in to add a video and keep your moves.</p><button className="primary" onClick={()=>navigate('account')}>Sign in<ArrowRight size={18}/></button></div></section>)}
    {page==='explore'&&<ExplorePage query={feedQuery} onQuery={setFeedQuery} onOpen={id=>void run(()=>openPublicValue(id))}/>}
-   {page==='public'&&publicId&&<PublicDetailPage id={publicId} account={account} onBack={()=>navigate('explore')} onSignIn={()=>navigate('account')} onTry={value=>void run(async()=>{const loaded=buildPublicLessonContext(value);setContext(loaded);const document=loaded.document;setLessonOwned(false);setSessionSection(null);setDrawing(null);setMusic(null);setLesson(null);if(document.kind==='drawing'){setDrawing(document.value);navigate('practice');}else if(document.kind==='music'){setMusic(document.value);navigate('preview');}else if(document.kind==='body'){setLesson(document.value);navigate('preview');}else throw new Error('This lesson cannot be opened here.');})}/>}
+   {page==='public'&&publicId&&<PublicDetailPage id={publicId} account={account} onBack={()=>navigate('explore')} onSignIn={()=>navigate('account')} onTry={value=>void run(async()=>{const loaded=buildPublicLessonContext(value);if(!['body','music','drawing'].includes(loaded.document.kind))throw new Error('This lesson cannot be opened here.');applyOpenedContext({context:loaded,destinationPage:loaded.document.kind==='drawing'?'practice':'preview'},{owned:false});})}/>}
    {page==='groups'&&(account?<GroupsPage onOpen={id=>{setGroupId(id);navigate('group');}}/>:<section className="coming-screen"><div className="empty-state"><span className="note-art"><Users size={36}/></span><h1>Practise together.</h1><p className="subtle">Sign in to create or join a group.</p><button className="primary" onClick={()=>navigate('account')}>Sign in<ArrowRight size={18}/></button></div></section>)}
    {page==='group'&&groupId&&account&&<GroupDetailPage id={groupId} account={account} onBack={()=>navigate('groups')} onTry={move=>{if(move.access_kind!=='collection'){open(move,'practice',false);return;}void run(()=>openPublicValue(move.lesson_id));}}/>}
    {page==='groupjoin'&&groupInvite&&<GroupJoinPage invite={groupInvite} account={account} onSignIn={()=>navigate('account')} onBack={()=>navigate('moves')} onJoined={id=>{setGroupId(id);setGroupInvite(null);sessionStorage.removeItem('group-invite');navigate('group');}}/>}
-   {page==='studio'&&account&&<StudioPage lessons={library} states={states} onBack={()=>navigate('moves')} onOpen={item=>open(item,'practice')} onCheck={item=>open(item,'check')} onAdjust={item=>open(item,'edit')} onEdit={item=>{if(item.experience_family==='visual'){setDrawingEditId(item.lesson_id);navigate('drawing-edit');}else open(item,'edit');}} onShare={item=>void run(async()=>{const loaded=await loadLessonContext(item.lesson_id,{audience:'owner',accountScope:account.id});setContext(loaded);if(loaded.actId==='piano'||loaded.actId==='guitar'){setShareMusic(item);setMusic(loaded.document.kind==='music'?loaded.document.value:null);setLesson(null);navigate('share');return;}if(loaded.actId==='drawing'){setDrawingShareId(item.lesson_id);setDrawing(loaded.document.kind==='drawing'?loaded.document.value:null);navigate('drawing-share');return;}if(loaded.document.kind==='body'){setLesson(loaded.document.value);setLessonOwned(true);navigate('share');return;}throw new Error('This lesson cannot be shared.');})} onCreate={()=>{setAdjustFor(null);navigate('create');}} onCreateDrawing={()=>void run(async()=>{const value=await createDrawingLesson({title:'New drawing',medium:'pencil',steps:[{id:'step-1',title:'First step',instruction:'Describe the first mark.'}]});invalidateLessonContext(value.lesson_id);await refresh();setDrawingEditId(value.lesson_id);navigate('drawing-edit');})} hasMore={libraryHasMore} loadingMore={libraryLoadingMore} onLoadMore={()=>void loadMoreLibrary()}/>}
+   {page==='studio'&&account&&<StudioPage lessons={library} states={states} onBack={()=>navigate('moves')} onOpen={item=>open(item,'practice')} onCheck={item=>open(item,'check')} onAdjust={item=>open(item,'edit')} onEdit={item=>{if(item.experience_family==='visual'){setDrawingEditId(item.lesson_id);navigate('drawing-edit');}else open(item,'edit');}} onShare={item=>void run(async()=>{const opened=await lessonOpener.open({lessonId:item.lesson_id,source:'private',intent:'share',accountScope:account.id,audience:'owner'});const doc=opened.context.document;if(!['body','music','drawing'].includes(doc.kind))throw new Error('This lesson cannot be shared.');applyOpenedContext(opened,{owned:true,onApplied:()=>{if(doc.kind==='music')setShareMusic(item);if(doc.kind==='drawing')setDrawingShareId(item.lesson_id);}});})} onCreate={()=>{setAdjustFor(null);navigate('create');}} onCreateDrawing={()=>void run(async()=>{const value=await createDrawingLesson({title:'New drawing',medium:'pencil',steps:[{id:'step-1',title:'First step',instruction:'Describe the first mark.'}]});invalidateLessonContext(value.lesson_id);await refreshOwned();setDrawingEditId(value.lesson_id);navigate('drawing-edit');})} hasMore={pages.hasMore} loadingMore={pages.loadingMore} onLoadMore={()=>void loadMoreLibrary()}/>}
    {page==='admin'&&(account&&['admin','super_admin'].includes(account.platform_role)?<AdminPage account={account} onBack={()=>navigate('moves')} onSessionLost={()=>{void refresh();navigate('account');}}/>:<section className="account-card"><h1>Administration</h1><p>Administrative access is required.</p><button className="primary" onClick={()=>navigate('account')}>Account</button></section>)}
-   {page==='account'&&(account&&!initialLink?<section className="account-card"><span className="note-art"><Check size={32}/></span><p className="eyebrow">YOUR SPACE</p><h1>Ready to move.</h1><p className="account-email">{account.email}</p><p className="subtle">Your moves are saved privately. Sharing is always your choice.</p><button className="secondary" onClick={()=>navigate('receiver')}>Use as practice display</button>{['admin','super_admin'].includes(account.platform_role)&&<button className="secondary" onClick={()=>navigate('admin')}>Administration</button>}{musicHistory&&<Suspense fallback={<p>Opening music history…</p>}><MusicHistoryPanel key={account.id}/></Suspense>}<section id="account-preferences" className="account-preferences" tabIndex={-1}><h2>Preferences</h2><label className="check-line studio-toggle"><input type="checkbox" checked={studioEnabled} onChange={e=>setStudio(e.target.checked)}/><span>Show teaching tools (Studio)</span></label></section><button className="primary" onClick={()=>navigate('moves')}>My moves<ArrowRight size={18}/></button><button className="back-link" disabled={busy} onClick={logout}><LogOut size={16}/>Sign out</button></section>:<AuthPanel key={initialLink?.token??'sign-in'} initialLink={initialLink} onLinkHandled={()=>sessionStorage.removeItem('auth-action')} onSignedIn={async value=>{pager.beginReload();const savedLibrary=await loadLessonSummaries();const workflow=await loadMoveStates();setShared(await loadSharedSummaries());setAccount(value);setLesson(null);setMusic(null);setLibrary(savedLibrary);setStates(workflow.lessons);setInitialLink(null);sessionStorage.removeItem('auth-action');const destination=pending<string>('auth-return');sessionStorage.removeItem('auth-return');if(groupInvite)setPage('groupjoin');else if(incoming)setPage('join');else if(destination){history.replaceState(null,'','/'+destination);setRouteReady(false);}else setPage('moves');}}/>)}
+   {page==='account'&&(account&&!initialLink?<section className="account-card"><span className="note-art"><Check size={32}/></span><p className="eyebrow">YOUR SPACE</p><h1>Ready to move.</h1><p className="account-email">{account.email}</p><p className="subtle">Your moves are saved privately. Sharing is always your choice.</p><button className="secondary" onClick={()=>navigate('receiver')}>Use as practice display</button>{['admin','super_admin'].includes(account.platform_role)&&<button className="secondary" onClick={()=>navigate('admin')}>Administration</button>}{musicHistory&&<Suspense fallback={<p>Opening music history…</p>}><MusicHistoryPanel key={account.id}/></Suspense>}<section id="account-preferences" className="account-preferences" tabIndex={-1}><h2>Preferences</h2><label className="check-line studio-toggle"><input type="checkbox" checked={studioEnabled} onChange={e=>setStudio(e.target.checked)}/><span>Show teaching tools (Studio)</span></label></section><button className="primary" onClick={()=>navigate('moves')}>My moves<ArrowRight size={18}/></button><button className="back-link" disabled={busy} onClick={logout}><LogOut size={16}/>Sign out</button></section>:<AuthPanel key={initialLink?.token??'sign-in'} initialLink={initialLink} onLinkHandled={()=>sessionStorage.removeItem('auth-action')} onSignedIn={async value=>{const workflow=await loadMoveStates();setShared(await loadSharedSummaries());setAccount(value);setLesson(null);setMusic(null);setStates(workflow.lessons);setInitialLink(null);sessionStorage.removeItem('auth-action');const destination=pending<string>('auth-return');sessionStorage.removeItem('auth-return');if(groupInvite)setPage('groupjoin');else if(incoming)setPage('join');else if(destination){history.replaceState(null,'','/'+destination);setRouteReady(false);}else setPage('moves');}}/>)}
   </Suspense></main>
  </div>;
 }

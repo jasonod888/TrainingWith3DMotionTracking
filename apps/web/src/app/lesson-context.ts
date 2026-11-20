@@ -87,7 +87,7 @@ function assetsFor(document: LessonDocument, publicRepresentations: readonly str
     return {
       playable: Boolean(document.value.reference),
       reviewed: document.value.reference_reviewed === true,
-      publicRepresentation: false,
+      publicRepresentation: Boolean(document.value.reference || document.value.public_poster),
     };
   }
   if (document.kind === 'drawing') {
@@ -245,13 +245,15 @@ export function buildPublicLessonContext(value: unknown): LessonContext {
 
 const contextKey = (scope: string, audience: string, lessonId: string, revisionId: string) =>
   `${scope}|${audience}|${lessonId}|${revisionId}`;
-const contexts = new Map<string, LessonContext>();const references = new Map<string, unknown>();
+const contexts = new Map<string, LessonContext>();
+const references = new Map<string, ReferenceCacheEntry>();
 const referenceInFlight = new Map<string, Promise<unknown>>();
 
 /** Sign-out, account change, or explicit release invalidation. */
 export function clearLessonContextCache(): void {
   contexts.clear();
   references.clear();
+  referenceBytes = 0;
   referenceInFlight.clear();
 }
 
@@ -359,31 +361,78 @@ export function revalidateLessonContext(
 
 export type ReferenceAsset = {key: string; bytes?: number; sha256?: string};
 
+/** Active references are pinned so a practice/editor session cannot be evicted. */
+export const REFERENCE_CACHE_LIMITS = Object.freeze({
+  maxEntries: 16,
+  maxBytes: 32 * 1024 * 1024,
+  maxEntryBytes: 8 * 1024 * 1024,
+});
+type ReferenceCacheEntry = {value: unknown; bytes: number; lastUsed: number; pinned: boolean};
+let referenceClock = 0;
+let referenceBytes = 0;
+
 async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
 }
 
+function evictReferences(protectedSha?: string): void {
+  const evictable = () => [...references.entries()]
+    .filter(([sha, entry]) => !entry.pinned && sha !== protectedSha)
+    .sort((a, b) => a[1].lastUsed - b[1].lastUsed);
+  while (references.size > REFERENCE_CACHE_LIMITS.maxEntries
+      || referenceBytes > REFERENCE_CACHE_LIMITS.maxBytes) {
+    const victim = evictable()[0];
+    if (!victim) break; // every remaining entry is active; keep it rather than break a session
+    references.delete(victim[0]);
+    referenceBytes -= victim[1].bytes;
+  }
+}
+
+export function pinReference(sha256: string): void {
+  const entry = references.get(sha256);
+  if (!entry) return;
+  entry.pinned = true;
+  entry.lastUsed = ++referenceClock;
+}
+
+export function unpinReference(sha256: string): void {
+  const entry = references.get(sha256);
+  if (!entry) return;
+  entry.pinned = false;
+  entry.lastUsed = ++referenceClock;
+  evictReferences();
+}
+
 /**
  * Load a reviewed reference exactly once per SHA-256. The bytes are verified
  * against `bytes`/`sha256` before the parsed value is cached, so a cached value is
- * always the reviewed file — never a same-named replacement.
+ * always the reviewed file — never a same-named replacement. Oversized single
+ * references bypass the cache instead of failing playback.
  */
 export async function loadReferenceValue(asset: ReferenceAsset): Promise<unknown> {
-  if (!asset.sha256) return fetchReference(asset);
-  const cached = references.get(asset.sha256);
-  if (cached !== undefined) return cached;
+  if (!asset.sha256) return (await fetchReference(asset)).value;
+  const ref = references.get(asset.sha256);
+  if (ref !== undefined) {
+    ref.lastUsed = ++referenceClock;
+    return ref.value;
+  }
   const pending = referenceInFlight.get(asset.sha256);
   if (pending) return pending;
-  const request = fetchReference(asset).then(value => {
-    references.set(asset.sha256 as string, value);
+  const request = fetchReference(asset).then(({value, bytes}) => {
+    if (bytes <= REFERENCE_CACHE_LIMITS.maxEntryBytes) {
+      references.set(asset.sha256 as string, {
+        value, bytes, lastUsed: ++referenceClock, pinned: false});
+      referenceBytes += bytes;
+      evictReferences(asset.sha256);
+    }
     return value;
   }).finally(() => referenceInFlight.delete(asset.sha256 as string));
   referenceInFlight.set(asset.sha256, request);
   return request;
 }
 
-async function fetchReference(asset: ReferenceAsset): Promise<unknown> {
+async function fetchReference(asset: ReferenceAsset): Promise<{value: unknown; bytes: number}> {
   const response = await fetch(assetUrl(asset.key), {credentials: 'same-origin'});
   if (!response.ok) throw new Error('The reviewed reference could not be loaded.');
   const bytes = await response.arrayBuffer();
@@ -394,7 +443,7 @@ async function fetchReference(asset: ReferenceAsset): Promise<unknown> {
     throw new Error('The reviewed reference does not match its reviewed file. Reopen the lesson.');
   }
   const text = new TextDecoder('utf-8', {fatal: true}).decode(bytes);
-  return JSON.parse(text);
+  return {value: JSON.parse(text), bytes: bytes.byteLength};
 }
 
 /** Test/diagnostic helpers; production code clears through sign-out/account change. */
@@ -404,4 +453,12 @@ export function lessonContextCacheSize(): number {
 
 export function referenceCacheSize(): number {
   return references.size;
+}
+
+export function referenceCacheBytes(): number {
+  return referenceBytes;
+}
+
+export function referenceCacheHas(sha256: string): boolean {
+  return references.has(sha256);
 }

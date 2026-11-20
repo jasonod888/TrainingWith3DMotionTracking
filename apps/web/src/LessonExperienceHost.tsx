@@ -4,6 +4,7 @@ import type {LessonDocument} from '../../../packages/lesson-schema/index';
 import {LessonWorkspace} from './LessonWorkspace';
 import {effectiveFeedbackEnabled} from './music/music-feedback';
 import type {LessonContext} from './app/lesson-context';
+import {practiceEntryFor} from './acts/registry';
 
 /**
  * The only dispatch boundary in the app.
@@ -18,10 +19,8 @@ import type {LessonContext} from './app/lesson-context';
  * editor (`PianoWorkspaceHarness`) into the graph; the editor route loads it itself.
  */
 const MusicLessonHome = lazy(() => import('./music/MusicLessonHome'));
-const MusicPracticeEntry = lazy(() => import('./acts/music/PracticeEntry')
-  .then(module => ({default: module.MusicPracticeEntry})));
-const DrawingPracticeEntry = lazy(() => import('./acts/drawing/DrawingPracticeEntry')
-  .then(module => ({default: module.DrawingPracticeEntry})));
+const MusicPracticeEntry = lazy(practiceEntryFor('piano')!);
+const DrawingPracticeEntry = lazy(practiceEntryFor('drawing')!);
 
 type BodyProps = Omit<ComponentProps<typeof LessonWorkspace>, 'lesson'>;
 type LibraryGuideProps={pianoLibrary?:boolean;guitarLibrary?:boolean};

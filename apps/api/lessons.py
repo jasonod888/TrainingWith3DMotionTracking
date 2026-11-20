@@ -23,7 +23,7 @@ from .storage import storage_client
 from .permissions import (access_reasons, audience_for, latest_acceptance, owned_lesson,
                           latest_revision, public_lesson, public_manifest, readable_lesson)
 from .auth import now
-from . import acts, processing_routes, rollout, subjects
+from . import acts, policy, processing_routes, rollout, subjects
 
 
 FORMAT_HEADER = 'x-lesson-formats'
@@ -157,11 +157,6 @@ def lesson_act(lesson, revision=None):
     return acts.resolve_act(act_id, subject)
 
 
-def _creator_feedback(manifest):
-    from .music_assessment import effective_feedback_enabled
-    return effective_feedback_enabled(manifest)
-
-
 def _capability(support='supported', available=True, reason='ok', explanation=''):
     return CapabilityResult(support=support, available=available,
                             reasonCode=reason, explanation=explanation)
@@ -176,96 +171,20 @@ def _all_capabilities(result):
 
 
 def effective_capabilities(lesson, revision, reasons, settings):
-    """Resolve server-known layers. Device readiness stays a client concern.
-
-    Layers combined here: Act support, lesson assets/review state, creator policy,
-    audience permission, and current publication policy. Learner preferences and
-    device readiness are deliberately *not* inferred: the client resolver combines
-    this result with those layers, so "off" never becomes "unsupported".
-
-    Worker online status is absent on purpose. It affects new processing jobs only;
-    it never disables playback or evidence inputs of an existing lesson.
-    """
+    """Resolve server-known layers through the one pure policy resolver."""
     try:
         descriptor = lesson_act(lesson, revision)
     except acts.ActError as exc:
         return _all_capabilities(_capability('unsupported', False, 'unsupported_act', str(exc)))
 
-    manifest = revision.manifest or {}
-    schema = manifest.get('schema_version')
-    reviewed = schema != 2 or bool(manifest.get('reference_reviewed'))
-    feedback = _creator_feedback(manifest)
-    has_source = any(manifest.get(key) is not None for key in
-                     ('animation', 'landmarks', 'source_video', 'reference', 'piano_preview'))
-    policy = acts.publication_policy(descriptor.id)
-    owner = 'owner' in reasons
-
-    can_edit = _capability(explanation='You can edit this lesson.') if owner else \
-        _capability('supported', False, 'not_owner', 'Only the owner can edit this lesson.')
-    can_review = can_edit
-
-    if 'practice' not in descriptor.practice_modes:
-        can_practice = _capability('unsupported', False, 'act_unsupported',
-                                   'This Act has no practice mode.')
-    elif not has_source:
-        can_practice = _capability('unavailable', False, 'missing_source',
-                                   'This lesson has no playable source.')
-    else:
-        can_practice = _capability(explanation='Practice is available.')
-
-    if 'challenge' not in descriptor.practice_modes:
-        can_challenge = _capability('unsupported', False, 'act_unsupported',
-                                    'This Act has no challenge mode.')
-    elif descriptor.experience_family == 'music' and not getattr(settings, 'music_challenge_enabled', False):
-        # A deployment flag, not the Act: the mode exists but this deployment does
-        # not accept challenge attempts yet.
-        can_challenge = _capability('unavailable', False, 'deployment_disabled',
-                                    'Challenge is disabled on this deployment.')
-    elif not reviewed:
-        can_challenge = _capability('unavailable', False, 'not_reviewed',
-                                    'Review the reference before starting a challenge.')
-    elif not feedback:
-        can_challenge = _capability('unavailable', False, 'creator_disabled',
-                                    'The creator turned assessment feedback off for this lesson.')
-    else:
-        can_challenge = _capability(explanation='Challenge is available.')
-
-    if not descriptor.assessment_adapters:
-        can_assess = _capability('unsupported', False, 'act_unsupported',
-                                 'This Act has no assessment adapter.')
-    elif schema == 2 and not reviewed:
-        can_assess = _capability('unavailable', False, 'not_reviewed',
-                                 'Assessment needs a reviewed reference.')
-    elif not feedback:
-        can_assess = _capability('supported', False, 'creator_disabled',
-                                 'The creator turned assessment feedback off for this lesson.')
-    else:
-        can_assess = _capability(explanation='Assessment is available.')
-
-    capture_inputs = set(descriptor.practice_inputs) & {'camera', 'uploaded_recording'}
-    can_record = _capability(explanation='Recording is available.') if capture_inputs else \
-        _capability('unsupported', False, 'act_unsupported', 'This Act records no learner evidence.')
-
-    if not (policy.public and descriptor.publication_representations):
-        can_publish = _capability(
-            'unsupported', False, 'act_not_public',
-            policy.private_reason or 'This Act has no approved public representation.')
-    elif schema != 1:
-        can_publish = _capability('unavailable', False, 'unsupported_representation',
-                                  'This lesson has no approved public representation.')
-    elif manifest.get('animation') is None:
-        can_publish = _capability('unavailable', False, 'video_only',
-                                  'This move is video only, so it cannot be published publicly.')
-    else:
-        can_publish = _capability(explanation='This revision can be published publicly.')
-
-    inputs = {
-        name: _capability(explanation='Declared by the Act; device readiness is checked by the client.')
-        for name in descriptor.practice_inputs
-    }
-    return EffectiveCapabilities(canEdit=can_edit, canReview=can_review, canPractice=can_practice,
-                                 canChallenge=can_challenge, canAssess=can_assess,
-                                 canRecord=can_record, canPublishPublicly=can_publish, inputs=inputs)
+    result = policy.capabilities(
+        descriptor, revision.manifest or {}, owner='owner' in reasons,
+        reasons=reasons, settings=settings)
+    inputs = {name: CapabilityResult(**value.as_dict())
+              for name, value in result['inputs'].items()}
+    return EffectiveCapabilities(
+        **{name: CapabilityResult(**result[name].as_dict()) for name in _CAPABILITY_NAMES},
+        inputs=inputs)
 
 
 def act_ref(descriptor):

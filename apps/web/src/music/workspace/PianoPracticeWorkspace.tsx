@@ -5,7 +5,7 @@ import {
 } from '../../../../../packages/music-notation/index.ts';
 import type {MusicLessonManifest, MusicPedalSpan} from '../../../../../packages/lesson-schema/index';
 import {assetUrl, request} from '../../api';
-import {loadReferenceValue, type LessonContext} from '../../app/lesson-context';
+import {loadReferenceValue, pinReference, unpinReference, type LessonContext} from '../../app/lesson-context';
 import {MUSIC_CAPABILITIES, voiceControl, type PracticeCapabilities} from '../../../../../packages/learning-engine/practice-capabilities';
 import {emptyPracticeSnapshot} from '../../../../../packages/learning-engine/practice-runtime';
 import {PracticeShell} from '../../practice/PracticeShell';
@@ -17,10 +17,8 @@ import {voiceCommandToPractice} from '../../practice/practice-input';
 import {createLocalPracticeStore, createServerPracticeStore, conservativeImport, importLocalProgress, readLocalOwner} from '../../practice/practice-store';
 import {resolvePracticePolicy} from '../../../../../packages/learning-engine/practice-policy';
 import {resolveMusicChallengeEligibility} from '../practice-challenge-policy';
-import {createResourceBag} from '../../../../../packages/learning-engine/practice-adapter';
-import {createSessionGuard,createContextRevalidator} from '../../practice/session-guard';
-import {buildAttemptEnvelope} from '../../../../../packages/learning-engine/attempt-envelope';
-import {submitPracticeAttempt} from '../../api';
+import {usePracticeAccessGuard} from '../../practice/usePracticeAccessGuard';
+import {submitAttempt} from '../../practice/submit-attempt';
 import {pianoPracticePlan} from '../../practice/practice-plans';
 import {buildPracticeChunks, type ChunkBarsOption} from '../practice-chunks';
 import {usePianoPreviewAsset} from '../usePianoPreviewAsset';
@@ -48,6 +46,7 @@ import GuitarNeckGuide from '../renderers/GuitarNeckGuide';
 import {ContinuousScore} from './ContinuousScore';
 import {TimeRoll} from './TimeRoll';
 import {buildTimelineLayout} from './timeline-layout';
+import {readCompactView, writeCompactView, type CompactView} from './compact-view';
 import {useClockTime} from './clock';
 import {useElementWidth} from './useElementWidth';
 import {layoutMeasures, type TimeWindow} from './viewport';
@@ -118,6 +117,11 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
   const [guitarTone, setGuitarTone] = useState(25);
   const [guitarHandedness, setGuitarHandedness] = useState<'right' | 'left'>('right');
   const [guitarStage, setGuitarStage] = useState<'roll' | 'compact'>('roll');
+  const [compactView, setCompactView] = useState<CompactView>(readCompactView);
+  const chooseCompactView = (view: CompactView) => {
+    setCompactView(view);
+    writeCompactView(view);
+  };
   const [follow, setFollow] = useState(true);
   const [followSuspended, setFollowSuspended] = useState(false);
   const [sharedScrollLeft, setSharedScrollLeft] = useState(0);
@@ -164,6 +168,7 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
 
   useEffect(() => {
     let cancelled = false;
+    let pinned: string | null = null;
     setLoading(true);
     setError('');
     setDocument(null);
@@ -190,6 +195,8 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
           : alignmentFromSpans(restored.value.document, restored.value.spans);
         const anchored = applyAnchors(base, restored.value.document, saved?.anchors ?? []);
         if (anchored.problem) throw new Error(`The saved alignment could not be applied: ${anchored.problem}`);
+        if (cancelled) return;
+        if (reference.sha256) { pinReference(reference.sha256); pinned = reference.sha256; }
         setManifest(value);
         setDocument(restored.value.document);
         setAlignment(anchored.alignment);
@@ -204,7 +211,7 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; if (pinned) unpinReference(pinned); };
   }, [lessonId, lessonTitle, context]);
 
   const chunks = useMemo(() => document && alignment
@@ -276,14 +283,23 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
     store,
   });
   const snapshot = practice.snapshot;
-  const accessBag = useRef(createResourceBag()).current;
   const [accessLost, setAccessLost] = useState(false);
-  const accessGuard = useMemo(() => practice.runtime && createContextRevalidator(context)
-    ? createSessionGuard({
-      runtime: practice.runtime, resources: accessBag,
-      revalidate: createContextRevalidator(context)!,
-      onLost: () => setAccessLost(true),
-    }) : null, [practice.runtime, accessBag, context]);
+  const access = usePracticeAccessGuard({runtime: practice.runtime, context,
+    onLost: () => setAccessLost(true),
+    register: bag => {
+      bag.add({kind:'audio',label:'music playback',release:()=>{
+        mediaRef.current?.pause();
+        practice.dispatch({type:'action',action:'pause'});
+      }});
+      bag.add({kind:'audio',label:'midi input',release:()=>midi.disconnect()});
+      bag.add({kind:'microphone',label:'listen/challenge capture',release:()=>{
+        listenPlayRef.current?.cancel('Access to this lesson was removed.');
+        challengeRef.current?.cancel('Access to this lesson was removed.');
+        uploadRef.current.cancel();
+      }});
+      bag.add({kind:'worker',label:'practice runtime',release:()=>practice.runtime?.destroy()});
+    },
+  });
   useEffect(() => {
     if (livePiano && videoRef.current) videoRef.current.muted = true;
   }, [livePiano, snapshot?.status, videoUrl]);
@@ -379,38 +395,16 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
   useEffect(() => {
     const attempt = practice.lastAttempt;
     if (!attempt?.completed || challenge.active || !manifest) return;
-    const neutral = buildAttemptEnvelope({
+    void submitAttempt({
       attemptId: attempt.id, lessonId: manifest.lesson_id, revisionId: manifest.revision_id,
       actId: manifest.subject === 'guitar' ? 'guitar' : 'piano', mode: 'practice',
       planId: plan?.id ?? `music-${manifest.revision_id}`, unitId: snapshot?.unitId ?? null,
       durationMs: Math.max(0, attempt.end - attempt.start) * 1000, status: 'unassessed',
-      report: {reason: attempt.reason},
-    });
-    void submitPracticeAttempt({attempt_id: neutral.attemptId, lesson_id: neutral.lessonId,
-      revision_id: neutral.revisionId, act_id: neutral.actId, mode: neutral.mode,
-      plan_id: neutral.planId, unit_id: neutral.unitId, duration_ms: neutral.durationMs,
-      status: 'unassessed', assessment_adapter: null, rubric_version: null,
-      report: neutral.report}).catch(() => {});
+      report: {reason: attempt.reason}, accountScope: context?.accountScope ?? 'guest',
+    }, {guard: access.guardRef.current});
   }, [practice.lastAttempt?.id, challenge.active, manifest, plan?.id]);
   const upload=useUploadAssessment({expected:listenExpected,target:{start:0,end:document?.duration??0},sections:listenSections});
   const uploadRef=useRef(upload);uploadRef.current=upload;
-  useEffect(()=>{
-    if(!accessGuard)return;
-    const stop=accessGuard.start();
-    accessBag.add({kind:'audio',label:'music playback',release:()=>{
-      mediaRef.current?.pause();
-      practice.dispatch({type:'action',action:'pause'});
-    }});
-    accessBag.add({kind:'audio',label:'midi input',release:()=>midi.disconnect()});
-    accessBag.add({kind:'microphone',label:'listen/challenge capture',release:()=>{
-      listenPlayRef.current?.cancel('Access to this lesson was removed.');
-      challengeRef.current?.cancel('Access to this lesson was removed.');
-      uploadRef.current.cancel();
-    }});
-    accessBag.add({kind:'worker',label:'practice runtime',release:()=>practice.runtime?.destroy()});
-    return()=>{stop();void accessBag.releaseAll();};
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[accessGuard,accessBag]);
   useEffect(()=>{
     if(!accessLost)return;
     listenPlayRef.current?.cancel('Access to this lesson was removed.');
@@ -483,23 +477,19 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
           duration: document?.duration ?? manifest.duration,
           inputMode: challenge.report ? (challenge.report.modelProfile ? 'microphone' : 'midi') : 'microphone',
         }));
-      const neutral = buildAttemptEnvelope({
+      void submitAttempt({
         attemptId: challengeSaveId.current, lessonId: manifest.lesson_id,
         revisionId: manifest.revision_id, actId: manifest.subject === 'guitar' ? 'guitar' : 'piano',
         mode: 'challenge', planId: plan?.id ?? `music-${manifest.revision_id}`,
         unitId: snapshot?.unitId ?? null, durationMs: (document?.duration ?? 0) * 1000,
         status: 'completed', assessmentAdapter: `${manifest.subject === 'guitar' ? 'guitar' : 'piano'}-notes-v1`,
         rubricVersion: 'v1', report: {challenge: challengeReport},
-      });
-      void submitPracticeAttempt({attempt_id: neutral.attemptId, lesson_id: neutral.lessonId,
-        revision_id: neutral.revisionId, act_id: neutral.actId, mode: neutral.mode,
-        plan_id: neutral.planId, unit_id: neutral.unitId, duration_ms: neutral.durationMs,
-        status: 'completed', assessment_adapter: neutral.assessmentAdapter,
-        rubric_version: neutral.rubricVersion, report: neutral.report}).catch(() => {});
+        accountScope: context?.accountScope ?? 'guest',
+      }, {guard: access.guardRef.current});
       setChallengeSave({state:'saved',message:'Challenge report saved to your private history.'});
     } catch (cause) {
       setChallengeSave({state:'error',message:cause instanceof Error ? cause.message : 'The challenge report was not saved.'});
-      void accessGuard?.handleError(cause);
+      void access.guardRef.current?.handleError(cause);
     }
   };
   const stagePlayhead = listenPlay.capturePlayhead ?? playhead;
@@ -551,7 +541,8 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
 
   const listenPlayInProgress = listenPlay.phase==='listening'||listenPlay.phase==='guard'
     ||listenPlay.phase==='count-in'||listenPlay.phase==='capturing'||listenPlay.phase==='analyzing';
-  const stage = document ? <div className={`ws-stage piano-practice-stage ${!guitar&&practicePanels.length>1?'has-combined-panels':''}`}>
+  const stage = document ? <div className={`ws-stage piano-practice-stage ${!guitar&&practicePanels.length>1?'has-combined-panels':''}`}
+    data-compact-view={compactView}>
     {listenPlayInProgress &&
       <div className={`listen-play-overlay listen-play-${listenPlay.phase}`} role="status" aria-live="polite">
         <strong>{listenPlay.phase==='listening'?'Listening':listenPlay.phase==='guard'?'Acoustic guard':listenPlay.phase==='count-in'?'Get ready':listenPlay.phase==='capturing'?'Play it back':'Analysing'}</strong>
@@ -666,6 +657,15 @@ export function PianoPracticeWorkspace({lessonId: lessonIdProp, lessonTitle, emb
     autoStartVoice
     status={shellStatus}
     toolsBefore={<>
+      <div className="ws-compact-switch" role="group" aria-label="Compact view"
+        onClick={() => chooseCompactView('guide')}>
+        <button type="button" aria-pressed={compactView === 'guide'}
+          className={compactView === 'guide' ? 'is-active' : ''}
+          onClick={event => { event.stopPropagation(); chooseCompactView('guide'); }}>Guide</button>
+        <button type="button" aria-pressed={compactView === 'sheet'}
+          className={compactView === 'sheet' ? 'is-active' : ''}
+          onClick={event => { event.stopPropagation(); chooseCompactView('sheet'); }}>Sheet</button>
+      </div>
       {!guitar && <PracticeCheckboxMenu label="View"
         options={[{value:'notes',label:'Notes'},{value:'waterfall',label:'Waterfall'},{value:'keys',label:'Piano keys'}]}
         selected={practicePanels} onToggle={togglePracticePanel}/>}

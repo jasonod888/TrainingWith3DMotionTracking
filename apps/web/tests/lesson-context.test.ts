@@ -4,7 +4,8 @@ import {readFileSync} from 'node:fs';
 import {parseLessonDocument} from '../../../packages/lesson-schema/parse';
 import {
   buildLessonContext, buildPublicLessonContext, clearLessonContextCache, lessonContextCacheSize,
-  loadLessonContext, loadReferenceValue, referenceCacheSize, revalidateLessonContext,
+  loadLessonContext, loadReferenceValue, pinReference, referenceCacheBytes, referenceCacheHas,
+  referenceCacheSize, revalidateLessonContext, unpinReference,
   UnsupportedActError,
 } from '../src/app/lesson-context';
 
@@ -276,4 +277,94 @@ test('a reference whose bytes do not match its reviewed hash is rejected and not
     /does not match its reviewed file/,
   );
   assert.equal(referenceCacheSize(), 0);
+});
+
+async function hashed(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return {bytes, sha256: [...new Uint8Array(digest)].map(v => v.toString(16).padStart(2, '0')).join('')};
+}
+
+test('reference cache evicts LRU entries at the entry budget', async () => {
+  clearLessonContextCache();
+  let current = new Uint8Array();
+  mockFetch(() => new Response(current, {status: 200}));
+  let firstSha = '';
+  for (let index = 0; index < 17; index += 1) {
+    const value = await hashed(JSON.stringify({index}));
+    current = value.bytes;
+    if (!firstSha) firstSha = value.sha256;
+    await loadReferenceValue({key: `lessons/${index}.json`, bytes: value.bytes.byteLength,
+      sha256: value.sha256});
+  }
+  assert.equal(referenceCacheSize(), 16);
+  assert.equal(referenceCacheHas(firstSha), false, 'oldest unpinned entry was evicted');
+});
+
+test('pinned active references survive LRU pressure and release with unpin', async () => {
+  clearLessonContextCache();
+  let current = new Uint8Array();
+  mockFetch(() => new Response(current, {status: 200}));
+  const active = await hashed(JSON.stringify({active: true}));
+  current = active.bytes;
+  await loadReferenceValue({key: 'lessons/active.json', bytes: active.bytes.byteLength,
+    sha256: active.sha256});
+  pinReference(active.sha256);
+  for (let index = 0; index < 16; index += 1) {
+    const value = await hashed(JSON.stringify({index}));
+    current = value.bytes;
+    await loadReferenceValue({key: `lessons/pinned-${index}.json`,
+      bytes: value.bytes.byteLength, sha256: value.sha256});
+  }
+  assert.equal(referenceCacheHas(active.sha256), true);
+  unpinReference(active.sha256);
+});
+
+test('unpin releases a reference so LRU eviction can reclaim it', async () => {
+  clearLessonContextCache();
+  let current = new Uint8Array();
+  mockFetch(() => new Response(current, {status: 200}));
+  const active = await hashed(JSON.stringify({active: true}));
+  current = active.bytes;
+  await loadReferenceValue({key: 'lessons/active.json', bytes: active.bytes.byteLength,
+    sha256: active.sha256});
+  pinReference(active.sha256);
+  for (let index = 0; index < 16; index += 1) {
+    const value = await hashed(JSON.stringify({index}));
+    current = value.bytes;
+    await loadReferenceValue({key: `lessons/unpin-${index}.json`,
+      bytes: value.bytes.byteLength, sha256: value.sha256});
+  }
+  assert.equal(referenceCacheHas(active.sha256), true);
+  unpinReference(active.sha256);
+  for (let index = 0; index < 16; index += 1) {
+    const extra = await hashed(JSON.stringify({extra: index}));
+    current = extra.bytes;
+    await loadReferenceValue({key: `lessons/extra-${index}.json`,
+      bytes: extra.bytes.byteLength, sha256: extra.sha256});
+  }
+  assert.equal(referenceCacheHas(active.sha256), false);
+});
+
+test('byte budget evicts old entries and oversized references bypass caching', async () => {
+  clearLessonContextCache();
+  let current = new Uint8Array();
+  mockFetch(() => new Response(current, {status: 200}));
+  const payload = (index: number) => JSON.stringify({index,
+    data: 'x'.repeat(7 * 1024 * 1024 - 64)});
+  for (let index = 0; index < 5; index += 1) {
+    const large = await hashed(payload(index));
+    current = large.bytes;
+    await loadReferenceValue({key: `lessons/large-${index}.json`,
+      bytes: large.bytes.byteLength, sha256: large.sha256});
+  }
+  assert.ok(referenceCacheBytes() <= 32 * 1024 * 1024);
+  assert.equal(referenceCacheSize(), 4);
+
+  clearLessonContextCache();
+  const oversized = await hashed(JSON.stringify({data: 'y'.repeat(8 * 1024 * 1024)}));
+  current = oversized.bytes;
+  await loadReferenceValue({key: 'lessons/oversized.json', bytes: oversized.bytes.byteLength,
+    sha256: oversized.sha256});
+  assert.equal(referenceCacheSize(), 0, 'oversized asset is returned without being cached');
 });

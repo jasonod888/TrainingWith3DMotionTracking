@@ -12,6 +12,7 @@ import {
 } from '../../../../packages/music-engine/listen-play';
 import {captureMicrophonePcm} from './audio-capture';
 import {transcribeCapturedAudio} from './audio-assessment';
+import {createCaptureJob} from './capture-job';
 
 export type ListenPlayPhase = 'idle' | 'listening' | 'guard' | 'count-in' | 'capturing' | 'analyzing' | 'feedback' | 'error';
 export type ListenPlayUnit = {id:string; label:string; start:number; end:number};
@@ -70,6 +71,8 @@ export function useListenPlay(input:{
   const captureAbort=useRef<AbortController|null>(null);
   const capturePromise=useRef<Promise<{pcm:Float32Array;sampleRate:number;duration:number}>|null>(null);
   const mounted=useRef(true);
+  const captureJob=useRef(createCaptureJob()).current;
+  const runToken=useRef(0);
 
   const updatePhase=(next:ListenPlayPhase)=>{phaseRef.current=next;setPhase(next);};
   const clearTimers=()=>{
@@ -79,6 +82,7 @@ export function useListenPlay(input:{
   };
   const reset=()=>{
     generation.current+=1;
+    captureJob.cancel();
     clearTimers();
     timeline.current=null;
     attacks.current=[];
@@ -115,6 +119,7 @@ export function useListenPlay(input:{
     if((inputRef.current.inputMode??'midi')==='microphone'){
       const controller=new AbortController();
       captureAbort.current=controller;
+      captureJob.register({release:()=>controller.abort()});
       const capture=inputRef.current.microphone?.capture??captureMicrophonePcm;
       capturePromise.current=capture({duration:current.captureDuration,signal:controller.signal});
     }
@@ -181,6 +186,7 @@ export function useListenPlay(input:{
       :[{id:state.unit.id,label:state.unit.label,start:unit.start,end:unit.end}]);
     const capture=listenPlayCaptureSpan(current);
     const isCurrent=()=>mounted.current&&generation.current===generationAtStart
+      &&captureJob.isCurrent(runToken.current)
       &&phaseRef.current==='analyzing'&&!signal?.aborted;
     clearTimers();
     updatePhase('analyzing');
@@ -202,6 +208,7 @@ export function useListenPlay(input:{
         setReport(result.report);
         setRemaining(0);
         updatePhase('feedback');
+        captureJob.settle(runToken.current,true);
         return;
       }
       const search={min:-Math.max(0.5,timing.current.early)*current.speed,
@@ -213,6 +220,7 @@ export function useListenPlay(input:{
       setReport(assessment);
       setRemaining(0);
       updatePhase('feedback');
+      captureJob.settle(runToken.current,true);
     }catch(cause){
       if(isCurrent())fail(cause instanceof Error?cause.message:'The performance could not be analysed.');
     }
@@ -225,6 +233,7 @@ export function useListenPlay(input:{
     if((state.inputMode??'midi')==='microphone'&&(typeof navigator==='undefined'||!navigator.mediaDevices?.getUserMedia)){fail('Microphone capture is unavailable in this browser.');return;}
     reset();
     setError('');
+    runToken.current=captureJob.begin().generation;
     const configured={...DEFAULT_LISTEN_PLAY,...state.timing};
     const early=configured.earlyStartSeconds, late=configured.lateStartSeconds;
     timing.current={early,late};
@@ -288,7 +297,7 @@ export function useListenPlay(input:{
 
   useEffect(()=>{
     mounted.current=true;
-    return ()=>{mounted.current=false;generation.current+=1;clearTimers();};
+    return ()=>{mounted.current=false;generation.current+=1;captureJob.cancel();clearTimers();};
   },[]);
 
   useEffect(()=>{

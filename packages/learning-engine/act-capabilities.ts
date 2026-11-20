@@ -187,6 +187,9 @@ export function resolveCapabilities(input: CapabilityInput): CapabilitySet {
     canChallenge = capability('unsupported', false, 'act_unsupported', 'This Act has no challenge mode.');
   } else if (!input.deployment.challengeEnabled) {
     canChallenge = capability('unavailable', false, 'deployment_disabled', 'Challenge is disabled on this deployment.');
+  } else if (!input.assets.playable) {
+    canChallenge = capability('unavailable', false, 'missing_source',
+      'A challenge needs a playable pose or reference.');
   } else if (!input.assets.reviewed) {
     canChallenge = capability('unavailable', false, 'not_reviewed', 'Review this lesson before starting a challenge.');
   } else if (!input.creator.feedbackEnabled) {
@@ -201,6 +204,9 @@ export function resolveCapabilities(input: CapabilityInput): CapabilitySet {
   if (act.assessmentAdapters.length === 0) {
     canAssess = capability('unsupported', false, 'no_assessment_adapter',
       'This Act has no assessment adapter.');
+  } else if (!input.assets.playable) {
+    canAssess = capability('unavailable', false, 'missing_source',
+      'Assessment needs a playable pose or reference.');
   } else if (!input.assets.reviewed) {
     canAssess = capability('unavailable', false, 'not_reviewed', 'Assessment needs a reviewed reference.');
   } else if (!input.creator.feedbackEnabled) {

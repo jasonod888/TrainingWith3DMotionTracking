@@ -109,9 +109,17 @@ test('a stale load-more response cannot overwrite a newer search', () => {
  assert.equal(stale,null);
  assert.deepEqual(reloaded.lessons,[{lesson_id:'new'}]);
  const source=readFileSync(new URL('../src/LibraryApp.tsx',import.meta.url),'utf8');
- assert.match(source,/pager\.beginLoadMore\(\)/);
- assert.match(source,/pager\.append\(generation,current,page\)/);
- assert.match(source,/const generation=pager\.beginReload\(\)/);
+ assert.match(source,/useLibraryPages\(/);
+ assert.match(source,/pages\.loadMore\(\)/);
+ assert.match(source,/const reloadPagesRef=useRef\(pages\.reload\)/);
+ assert.match(source,/void reloadPagesRef\.current\(\)/);
+ const refresh=source.match(/const refresh=useCallback\(async\(\)=>\{([\s\S]*?)\},\[\]\);/);
+ assert.ok(refresh);
+ assert.ok(!refresh[1].includes('pages.reload'));
+ const hook=readFileSync(new URL('../src/app/useLibraryPages.ts',import.meta.url),'utf8');
+ assert.match(hook,/pager\.beginLoadMore\(\)/);
+ assert.match(hook,/pager\.append\(generation,\s*current,\s*page\)/);
+ assert.match(hook,/const generation\s*=\s*pager\.beginReload\(\)/);
 });
 
 test('owned and shared discovery negotiate summaries rather than full manifests',async()=>{

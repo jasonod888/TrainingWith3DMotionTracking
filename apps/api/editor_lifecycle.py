@@ -14,7 +14,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from . import acts
+from . import acts, policy as policy_mod
 from .database import LessonPublication
 from .permissions import latest_acceptance, latest_revision
 
@@ -141,7 +141,7 @@ def editor_state(session, lesson) -> dict:
         family = descriptor.experience_family
         policy = acts.publication_policy(descriptor.id)
     except acts.ActError:
-        act_id, family, policy = None, None, None
+        act_id, family, policy, descriptor = None, None, None, None
 
     readiness = (readiness_for(lesson, revision) if revision is not None
                  else _empty_readiness('This lesson has no saved revision yet.'))
@@ -164,6 +164,9 @@ def editor_state(session, lesson) -> dict:
         'public_listed': bool(publication and publication.listed
                               and not publication.moderation_hidden),
         'readiness': readiness.model_dump(),
+        'actions': (policy_mod.action_set(descriptor, revision.manifest or {})
+                    if revision is not None and descriptor is not None else
+                    {'watch': False, 'practice': False, 'challenge': False}),
         'can_save': revision is not None,
         'can_review': bool(revision and readiness.reviewReady and not accepted_current),
         'can_publish_private': bool(revision and accepted_current),

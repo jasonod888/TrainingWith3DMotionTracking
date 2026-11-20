@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "scenarios": [
+    {
+      "id": "sam_3d",
+      "descriptor": "full_body",
+      "manifest": {"schema_version": 1, "animation": {"key": "a.glb"}, "landmarks": {"key": "a.json"}, "feedback_enabled": true},
+      "public": false,
+      "roles": [],
+      "expected_actions": {"watch": true, "practice": true, "challenge": true},
+      "expected": {"canPractice": true, "canChallenge": true, "canAssess": true, "canPublishPublicly": true}
+    },
+    {
+      "id": "private_mediapipe",
+      "descriptor": "full_body",
+      "manifest": {"schema_version": 1, "animation": null, "landmarks": {"key": "a.json"}, "source_video": {"key": "preview.mp4"}, "feedback_enabled": true},
+      "public": false,
+      "roles": [],
+      "expected_actions": {"watch": true, "practice": true, "challenge": true},
+      "expected": {"canPractice": true, "canChallenge": true, "canAssess": true, "canPublishPublicly": false}
+    },
+    {
+      "id": "public_video_only",
+      "descriptor": "full_body",
+      "manifest": {"schema_version": 1, "animation": null, "landmarks": null, "source_video": {"key": "public/preview.mp4"}, "focused_video": {"key": "public/instructor.mp4"}, "feedback_enabled": true},
+      "public": true,
+      "roles": ["playable_preview"],
+      "expected_actions": {"watch": true, "practice": false, "challenge": false},
+      "expected": {"canPractice": false, "canChallenge": false, "canAssess": false, "canPublishPublicly": true}
+    },
+    {
+      "id": "reviewed_music",
+      "descriptor": "piano",
+      "manifest": {"schema_version": 2, "reference": {"key": "ref.json"}, "reference_reviewed": true, "feedback_enabled": true},
+      "public": true,
+      "roles": ["reference"],
+      "expected_actions": {"watch": true, "practice": true, "challenge": true},
+      "expected": {"canPractice": true, "canChallenge": true, "canAssess": true, "canPublishPublicly": true}
+    },
+    {
+      "id": "unreviewed_music",
+      "descriptor": "piano",
+      "manifest": {"schema_version": 2, "reference": {"key": "ref.json"}, "reference_reviewed": false, "feedback_enabled": true},
+      "public": true,
+      "roles": ["reference"],
+      "expected_actions": {"watch": true, "practice": true, "challenge": false},
+      "expected": {"canPractice": true, "canChallenge": false, "canAssess": false, "canPublishPublicly": true}
+    },
+    {
+      "id": "creator_disabled",
+      "descriptor": "full_body",
+      "manifest": {"schema_version": 1, "animation": {"key": "a.glb"}, "landmarks": {"key": "a.json"}, "feedback_enabled": false},
+      "public": false,
+      "roles": [],
+      "expected_actions": {"watch": true, "practice": true, "challenge": false},
+      "expected": {"canPractice": true, "canChallenge": false, "canAssess": false, "canPublishPublicly": true}
+    },
+    {
+      "id": "drawing",
+      "descriptor": "drawing",
+      "manifest": {"schema_version": 3, "steps": [{"id": "s1"}], "feedback_enabled": null},
+      "public": true,
+      "roles": ["reference"],
+      "expected_actions": {"watch": true, "practice": true, "challenge": false},
+      "expected": {"canPractice": true, "canChallenge": false, "canAssess": false, "canPublishPublicly": true}
+    }
+  ]
+}

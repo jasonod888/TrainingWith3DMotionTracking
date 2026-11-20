@@ -4,6 +4,7 @@ import {bestFitAlign, type FitAttack, type FitExpected} from '../../../../packag
 import {assessMusicAttempt, EXPERIMENTAL_MUSIC_ASSESSMENT_POLICY, type MusicAssessmentReport} from '../../../../packages/music-engine/assessment';
 import {captureMicrophonePcm} from './audio-capture';
 import {transcribeCapturedAudio} from './audio-assessment';
+import {createCaptureJob} from './capture-job';
 
 export type MusicChallengePhase = 'idle' | 'countdown' | 'capturing' | 'analyzing' | 'feedback' | 'error';
 export type MusicChallengeAttempt = {id:string; start:number; end:number; completed:boolean; reason:string};
@@ -58,10 +59,13 @@ export function useMusicChallenge(input:{
   const captureAbort=useRef<AbortController|null>(null);
   const capturePromise=useRef<Promise<{pcm:Float32Array;sampleRate:number;duration:number}>|null>(null);
   const mounted=useRef(true);
+  const captureJob=useRef(createCaptureJob()).current;
+  const runToken=useRef(0);
 
   const updatePhase=(next:MusicChallengePhase)=>{phaseRef.current=next;setPhase(next);};
   const reset=()=>{
     generation.current+=1;
+    captureJob.cancel();
     armed.current=false;
     if(pauseTimer.current!==null){window.clearTimeout(pauseTimer.current);pauseTimer.current=null;}
     if(captureTimer.current!==null){window.clearTimeout(captureTimer.current);captureTimer.current=null;}
@@ -110,6 +114,7 @@ export function useMusicChallenge(input:{
     const guardsAtStart={...guards.current};
     const rawAttacksAtStart=[...rawAttacks.current];
     const isCurrent=()=>mounted.current&&generation.current===generationAtStart
+      &&captureJob.isCurrent(runToken.current)
       &&phaseRef.current==='analyzing'&&!signal?.aborted;
     updatePhase('analyzing');
     try{
@@ -128,6 +133,7 @@ export function useMusicChallenge(input:{
         setCaptured(result.transcription.attacks.length);
         setReport(result.report);
         updatePhase('feedback');
+        captureJob.settle(runToken.current,true);
         return;
       }
       // The recording starts at the challenge action (including countdown) so the
@@ -145,6 +151,7 @@ export function useMusicChallenge(input:{
       setCaptured(timedAttacks.length);
       setReport(assessment);
       updatePhase('feedback');
+      captureJob.settle(runToken.current,true);
     }catch(cause){
       if(isCurrent())fail(cause instanceof Error?cause.message:'The challenge could not be analysed.');
     }
@@ -158,6 +165,7 @@ export function useMusicChallenge(input:{
     if(!Number.isFinite(state.duration)||state.duration<=0){fail('This lesson has no usable duration.');return;}
     reset();
     setError('');
+    runToken.current=captureJob.begin().generation;
     const runAtStart=generation.current;
     const countdown=state.countdownSeconds??5;
     const late=Math.max(0,state.lateStartSeconds??1.5);
@@ -169,6 +177,7 @@ export function useMusicChallenge(input:{
     if((state.inputMode??'midi')==='microphone'){
       const controller=new AbortController();
       captureAbort.current=controller;
+      captureJob.register({release:()=>controller.abort()});
       const capture=state.microphone?.capture??captureMicrophonePcm;
       capturePromise.current=capture({duration:Math.min(600,countdown+state.duration+late+tail+.25),signal:controller.signal,
         onStarted:timestamp=>{if(generation.current===runAtStart)captureStartMs.current=timestamp;}});
@@ -214,6 +223,7 @@ export function useMusicChallenge(input:{
       if((inputRef.current.inputMode??'midi')==='microphone'&&!capturePromise.current){
         const controller=new AbortController();
         captureAbort.current=controller;
+        captureJob.register({release:()=>controller.abort()});
         const runAtStart=generation.current;
         const capture=inputRef.current.microphone?.capture??captureMicrophonePcm;
         capturePromise.current=capture({duration:Math.min(600,inputRef.current.duration+guards.current.late+guards.current.tail),signal:controller.signal,
@@ -249,7 +259,7 @@ export function useMusicChallenge(input:{
 
   useEffect(()=>{
     mounted.current=true;
-    return ()=>{mounted.current=false;generation.current+=1;
+    return ()=>{mounted.current=false;generation.current+=1;captureJob.cancel();
       if(pauseTimer.current!==null)window.clearTimeout(pauseTimer.current);
       if(captureTimer.current!==null)window.clearTimeout(captureTimer.current);
       captureAbort.current?.abort();};

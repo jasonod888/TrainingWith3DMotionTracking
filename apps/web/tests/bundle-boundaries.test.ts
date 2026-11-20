@@ -54,5 +54,6 @@ test('PracticeEntry keeps the practice seam and never imports the review editor'
 test('the Act dispatch boundary does not statically import the review harness', () => {
   const host = source('../src/LessonExperienceHost.tsx');
   assert.ok(!/from ['"][^'"]*PianoWorkspaceHarness/.test(host));
-  assert.ok(host.includes("import('./acts/music/PracticeEntry')"));
+  assert.ok(host.includes("practiceEntryFor('piano')"));
+  assert.ok(source('../src/acts/registry.ts').includes("import('./music/PracticeEntry')"));
 });

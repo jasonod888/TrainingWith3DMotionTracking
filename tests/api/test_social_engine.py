@@ -96,7 +96,8 @@ def test_cross_act_discovery_items(system):
     assert moves[body]['creator'] == {'id': moves[body]['creator']['id'], 'display_name': 'Creator'}
 
     assert moves[video]['roles'] == ['playable_preview']
-    assert moves[video]['effective_actions']['practice'] is True
+    assert moves[video]['effective_actions']['practice'] is False
+    assert moves[video]['effective_actions']['challenge'] is False
     assert moves[piano]['act_id'] == 'piano'
     assert moves[guitar]['act_id'] == 'guitar'
     assert moves[piano]['subjects'][0]['id'] == 'piano'

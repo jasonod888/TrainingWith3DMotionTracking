@@ -9,8 +9,13 @@
  * the review editor. Each loader is a literal dynamic import; the server never
  * supplies executable paths.
  */
+import type {ComponentType} from 'react';
 import type { ActId, ActSupport, CapabilitySet } from '../../../../packages/learning-engine/act-capabilities';
 import { unsupportedActCapabilities } from '../../../../packages/learning-engine/act-capabilities';
+import serverActCatalogue from '../../../../packages/lesson-schema/act-descriptors.json';
+
+/** Generated server catalogue facts; executable loaders stay local below. */
+export const serverActDescriptors = serverActCatalogue;
 
 export type ActImplementation = {
   id: ActId;
@@ -23,66 +28,41 @@ const IMPLEMENTATIONS: Record<ActId, ActImplementation> = {
   full_body: {
     id: 'full_body',
     label: 'Full Body',
-    loadPractice: () => import('../PracticeWorkspace'),
+    loadPractice: () => import('../PracticeWorkspace')
+      .then(module => ({default: module.PracticeWorkspace})),
   },
   piano: {
     id: 'piano',
     label: 'Piano',
-    loadPractice: () => import('./music/PracticeEntry'),
+    loadPractice: () => import('./music/PracticeEntry')
+      .then(module => ({default: module.MusicPracticeEntry})),
   },
   guitar: {
     id: 'guitar',
     label: 'Guitar',
-    loadPractice: () => import('./music/PracticeEntry'),
+    loadPractice: () => import('./music/PracticeEntry')
+      .then(module => ({default: module.MusicPracticeEntry})),
   },
   drawing: {
     id: 'drawing',
     label: 'Drawing',
-    loadPractice: () => import('./drawing/DrawingPracticeEntry'),
+    loadPractice: () => import('./drawing/DrawingPracticeEntry')
+      .then(module => ({default: module.DrawingPracticeEntry})),
   },
 };
 
 /**
- * Static capability descriptors for this build.
- *
- * They mirror the server descriptor, and are only used when a response predates
- * the negotiated envelope (v1 compatibility) or when a client must resolve a
- * device/learner layer. The server remains authoritative for identity and policy.
+ * Capability facts generated from the Python descriptor catalogue. This removes
+ * hand-maintained drift; only executable entry loaders remain local.
  */
-const SUPPORT: Record<ActId, ActSupport> = {
-  full_body: {
-    id: 'full_body',
-    supported: true,
-    practiceInputs: ['camera', 'microphone'],
-    practiceModes: ['watch', 'practice', 'challenge'],
-    assessmentAdapters: ['pose-v1'],
-    publicationRepresentations: ['interactive_3d'],
-  },
-  piano: {
-    id: 'piano',
-    supported: true,
-    practiceInputs: ['midi', 'microphone', 'uploaded_recording'],
-    practiceModes: ['watch', 'practice', 'challenge'],
-    assessmentAdapters: ['piano-midi-v1'],
-    publicationRepresentations: [],
-  },
-  guitar: {
-    id: 'guitar',
-    supported: true,
-    practiceInputs: ['midi', 'microphone'],
-    practiceModes: ['watch', 'practice'],
-    assessmentAdapters: ['guitar-notes-v1'],
-    publicationRepresentations: [],
-  },
-  drawing: {
-    id: 'drawing',
-    supported: true,
-    practiceInputs: ['pointer_stylus'],
-    practiceModes: ['watch', 'practice'],
-    assessmentAdapters: [],
-    publicationRepresentations: ['interactive_notation', 'poster'],
-  },
-};
+const SUPPORT = Object.fromEntries(serverActDescriptors.acts.map(descriptor => [descriptor.id, {
+  id: descriptor.id,
+  supported: true,
+  practiceInputs: descriptor.practice_inputs,
+  practiceModes: descriptor.practice_modes,
+  assessmentAdapters: descriptor.assessment_adapters,
+  publicationRepresentations: descriptor.publication_representations,
+}])) as unknown as Record<ActId, ActSupport>;
 
 const BY_ID = IMPLEMENTATIONS as Record<string, ActImplementation>;
 
@@ -90,6 +70,17 @@ const BY_ID = IMPLEMENTATIONS as Record<string, ActImplementation>;
 export function implementationFor(actId: string | null | undefined): ActImplementation | null {
   if (!actId) return null;
   return Object.prototype.hasOwnProperty.call(BY_ID, actId) ? BY_ID[actId] : null;
+}
+
+export type PracticeEntryProps = Record<string, unknown>;
+export type PracticeEntryComponent = ComponentType<PracticeEntryProps>;
+
+/** The one executable practice-entry loader for an Act, consumed by the host. */
+export function practiceEntryFor(actId: string | null | undefined):
+  (() => Promise<{default: PracticeEntryComponent}>) | null {
+  const implementation = implementationFor(actId);
+  return implementation ? implementation.loadPractice as
+    () => Promise<{default: PracticeEntryComponent}> : null;
 }
 
 /** Registered ids, in stable display order. */

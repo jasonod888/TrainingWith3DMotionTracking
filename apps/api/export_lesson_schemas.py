@@ -4,11 +4,12 @@ Usage:
     python -m apps.api.export_lesson_schemas           # rewrite artifacts
     python -m apps.api.export_lesson_schemas --check   # exit non-zero on drift
 
-Three artifacts, one job each:
+Four artifacts, one job each:
 
 * ``manifest.schema.json``        body v1, unchanged by music work
 * ``music-manifest.schema.json``  music v2
 * ``lesson-boundary.schema.json`` the mixed boundary union used by new readers
+* ``act-descriptors.json`` the generated server Act descriptor facts consumed by web
 
 The body artifact is regenerated from the same model on purpose: an unauthorised
 body contract change must fail the drift check rather than slip through.
@@ -22,6 +23,7 @@ from pathlib import Path
 from pydantic import TypeAdapter
 
 from .contracts import LessonDocument, LessonManifest, MusicLessonManifest
+from . import acts
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_DIR = ROOT / 'packages' / 'lesson-schema'
@@ -35,6 +37,10 @@ ARTIFACTS = {
     'manifest.schema.json': lambda: LessonManifest.model_json_schema(),
     'music-manifest.schema.json': lambda: MusicLessonManifest.model_json_schema(),
     'lesson-boundary.schema.json': boundary_schema,
+    'act-descriptors.json': lambda: {
+        'descriptor_version': acts.ACT_DESCRIPTOR_VERSION,
+        'acts': acts.catalogue(),
+    },
 }
 
 

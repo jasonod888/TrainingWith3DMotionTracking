@@ -5,16 +5,14 @@
  * media time. Every acquisition/subscription is released through the resource bag.
  * There is no score: the surface says "unassessed" explicitly.
  */
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {PracticeRuntime} from '../../../../../packages/learning-engine/practice-runtime';
-import {createResourceBag} from '../../../../../packages/learning-engine/practice-adapter';
 import {buildAttemptEnvelope} from '../../../../../packages/learning-engine/attempt-envelope';
 import type {LessonContext} from '../../app/lesson-context';
 import type {DrawingLessonManifest} from '../../../../../packages/lesson-schema/index';
-import {submitPracticeAttempt,request} from '../../api';
-import {createContextRevalidator} from '../../practice/session-guard';
-import {createSessionGuard} from '../../practice/session-guard';
-import {saveLocalAttempt} from '../../practice/practice-store';
+import {request} from '../../api';
+import {usePracticeAccessGuard} from '../../practice/usePracticeAccessGuard';
+import {submitAttempt} from '../../practice/submit-attempt';
 import {createDrawingTransport, currentStep, drawingPlan} from './drawing-adapter';
 
 export function DrawingPracticeEntry({context, document: documentProp, onBack}: {
@@ -33,41 +31,25 @@ export function DrawingPracticeEntry({context, document: documentProp, onBack}: 
   const [finished, setFinished] = useState(false);
   const [attemptNotice, setAttemptNotice] = useState('');
   const [accessLost, setAccessLost] = useState(false);
-  const resources = useRef<ReturnType<typeof createResourceBag> | null>(null);
-  const guard = useRef<ReturnType<typeof createSessionGuard> | null>(null);
-
-  useEffect(() => {
-    if (!lesson || !transport) return;
-    const bag = createResourceBag();
-    resources.current = bag;
-    const revalidator = createContextRevalidator(context)
-      ?? (context ? null : async () => {
-        await request(`/lessons/${lesson.lesson_id}`, 'GET', undefined, false,
-          {'X-Lesson-Formats': '1,2,3'});
-      });
-    let stop = () => {};
-    if (runtime && revalidator) {
-      guard.current = createSessionGuard({
-        runtime, transport, resources: bag, revalidate: revalidator,
-        onLost: () => setAccessLost(true),
-      });
-      stop = guard.current.start();
-    }
-    bag.add({kind: 'worker', release: () => runtime?.destroy()});
-    bag.add({kind: 'subscription', release: transport.subscribe(() => {
-      setIndex(runtime?.snapshot.unitIndex ?? 0);
-    })});
-    const onKey = (event: KeyboardEvent) => {
-      // Actions are routed through the one runtime; the transport is never driven
-      // directly by the surface.
-      if (event.key === 'ArrowRight') runtime?.action('next');
-      if (event.key === 'ArrowLeft') runtime?.action('previous');
-    };
-    window.addEventListener('keydown', onKey);
-    bag.add({kind: 'pointer_stylus', release: () => window.removeEventListener('keydown', onKey)});
-    return () => { stop(); void bag.releaseAll(); };
-  }, [lesson, transport, runtime, context]);
-
+  const fallbackRevalidate = useMemo(() => context || !lesson ? undefined
+    : async () => { await request(`/lessons/${lesson.lesson_id}`, 'GET', undefined, false,
+      {'X-Lesson-Formats': '1,2,3'}); }, [context, lesson]);
+  const access = usePracticeAccessGuard({
+    runtime, transport, context, revalidate: fallbackRevalidate,
+    onLost: () => setAccessLost(true),
+    register: bag => {
+      bag.add({kind: 'worker', release: () => runtime?.destroy()});
+      bag.add({kind: 'subscription', release: transport?.subscribe(() => {
+        setIndex(runtime?.snapshot.unitIndex ?? 0);
+      }) ?? (() => {})});
+      const onKey = (event: KeyboardEvent) => {
+        if (event.key === 'ArrowRight') runtime?.action('next');
+        if (event.key === 'ArrowLeft') runtime?.action('previous');
+      };
+      window.addEventListener('keydown', onKey);
+      bag.add({kind: 'pointer_stylus', release: () => window.removeEventListener('keydown', onKey)});
+    },
+  });
   useEffect(() => () => {
     transport?.destroy?.();
     runtime?.destroy();
@@ -108,18 +90,15 @@ export function DrawingPracticeEntry({context, document: documentProp, onBack}: 
       mode: 'practice', planId: drawingPlan(lesson).id, unitId: step?.id ?? null,
       durationMs: 0, status: 'unassessed', report: {stepsSeen: total},
     });
-    void submitPracticeAttempt({
-      attempt_id: envelope.attemptId, lesson_id: envelope.lessonId,
-      revision_id: envelope.revisionId, act_id: envelope.actId, mode: envelope.mode,
-      plan_id: envelope.planId, unit_id: envelope.unitId, duration_ms: envelope.durationMs,
-      status: 'unassessed', assessment_adapter: null, rubric_version: null,
-      report: envelope.report,
-    }).then(() => setAttemptNotice('Attempt saved · unassessed.')).catch(cause => {
-      // Guests/offline keep the neutral envelope account-scoped on this device.
-      saveLocalAttempt(context?.accountScope ?? 'guest', envelope);
-      setAttemptNotice('Attempt kept on this device · unassessed.');
-      void guard.current?.handleError(cause);
-    });
+    void submitAttempt({attemptId: envelope.attemptId, lessonId: envelope.lessonId,
+      revisionId: envelope.revisionId, actId: envelope.actId, mode: envelope.mode,
+      planId: envelope.planId, unitId: envelope.unitId, durationMs: envelope.durationMs,
+      status: 'unassessed', report: envelope.report,
+      accountScope: context?.accountScope ?? 'guest'},
+      {guard: access.guardRef.current}).then(result => {
+        setAttemptNotice(result.ok ? 'Attempt saved · unassessed.'
+          : 'Attempt kept on this device · unassessed.');
+      });
   };
 
   return <section className="practice-runtime-shell" data-practice-mode="drawing" aria-label="Drawing practice">

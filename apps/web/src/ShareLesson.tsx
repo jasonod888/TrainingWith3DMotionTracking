@@ -2,8 +2,9 @@ import {useEffect,useState} from 'react';
 import {ArrowLeft,ArrowRight,Copy,Globe,Link,Mail,Lock,Share2,Users,X} from 'lucide-react';
 import {parseLessonDocument} from '../../../packages/lesson-schema/parse';
 import type {LessonManifest,MusicLessonManifest} from '../../../packages/lesson-schema/index';
-import {ApiError,request,type Account,addMoveToGroup,createGroup,loadGroups,updatePublic,type GroupSummary} from './api';
+import {ApiError,request,type Account,addMoveToGroup,createGroup,loadGroups,type GroupSummary} from './api';
 import {readiness} from './sharing/publication-readiness';
+import {usePublicationController} from './sharing/usePublicationController';
 
 type Sharing={mode:'private'|'invite'|'link';published_revision_id:string|null;draft_revision_id:string;accepted_revision_id:string|null;
  public_listed:boolean;groups:number;public_listing:{title:string;creator_name:string;description:string;tags:string[]}|null;link_active:boolean;link_expires_at:string|null;
@@ -22,6 +23,7 @@ export function ShareLesson({lesson,onBack,onChange}:{lesson:LessonManifest;onBa
  const [groups,setGroups]=useState<GroupSummary[]>([]),[selectedGroup,setSelectedGroup]=useState(''),[newGroup,setNewGroup]=useState('');
  const [publicTitle,setPublicTitle]=useState(''),[creatorName,setCreatorName]=useState(''),[publicTags,setPublicTags]=useState(''),[publicDescription,setPublicDescription]=useState('');
  const [email,setEmail]=useState(''),[emails,setEmails]=useState<string[]>([]),[link,setLink]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ const publication=usePublicationController({lessonId:lesson.lesson_id});
  const path=`/lessons/${lesson.lesson_id}`;
  const load=async()=>{const value=await request<Sharing>(path+'/sharing');setData(value);return value;};
  useEffect(()=>{let stopped=false;request<Sharing>(path+'/sharing').then(value=>{if(!stopped){setData(value);setTab(value.mode==='link'?'link':'friends');}}).catch(e=>{if(!stopped)setError(e.message);});return()=>{stopped=true;};},[path]);
@@ -54,11 +56,14 @@ export function ShareLesson({lesson,onBack,onChange}:{lesson:LessonManifest;onBa
  const shareGroup=()=>void run(async()=>{if(!selectedGroup)throw new Error('Choose a group first.');if(!reviewed)throw new Error('Confirm you have the right to share this move.');await addMoveToGroup(selectedGroup,lesson.lesson_id);setNotice('Shared with the group.');setReviewed(false);await load();onChange();});
  const savePublic=()=>void run(async()=>{
   if(!reviewed)throw new Error('Confirm you have the right to share this move publicly.');
-  await updatePublic(lesson.lesson_id,{listed:true,title:publicTitle,description:publicDescription,creator_name:creatorName,
-   release_revision_id:data?.public_listed?undefined:lesson.revision_id,tags:publicTags.split(',').map(value=>value.trim()).filter(Boolean),rights_acknowledged:true,public_roles:publicReadiness.roles});
+  const ok=await publication.publish({title:publicTitle,description:publicDescription,
+   creatorName:creatorName,tags:publicTags.split(',').map(value=>value.trim()).filter(Boolean),
+   rightsAcknowledged:true,roles:publicReadiness.roles,
+   releaseRevisionId:data?.public_listed?undefined:lesson.revision_id});
+  if(!ok)throw new Error(publication.error||'This move could not be published.');
   setNotice('This move is now public.');setReviewed(false);await load();onChange();
  });
- const unlist=()=>void run(async()=>{await updatePublic(lesson.lesson_id,{listed:false});setNotice('This move is no longer public.');await load();onChange();});
+ const unlist=()=>void run(async()=>{if(!(await publication.unlist()))throw new Error(publication.error||'This move could not be unpublished.');setNotice('This move is no longer public.');await load();onChange();});
  const active=data?data.students.filter(person=>person.active&&!person.revoked).length:0,pending=data?.invitations.length??0;
  const audience=[active?`${active} ${active===1?'person':'people'}`:'',pending?`${pending} invited`:'',data?.link_active?'Link':'',data?.groups?`${data.groups} ${data.groups===1?'group':'groups'}`:'',data?.public_listed?'Public':''].filter(Boolean);
  const isShared=audience.length>0;
@@ -97,7 +102,7 @@ export function ShareLesson({lesson,onBack,onChange}:{lesson:LessonManifest;onBa
     <label className="check-line"><input type="checkbox" checked={reviewed} onChange={e=>setReviewed(e.target.checked)} disabled={busy}/><span>I have the right to share this move publicly.</span></label>
     <div className="inline-actions"><button className="primary" disabled={busy||!reviewed||!publicTitle.trim()||!creatorName.trim()||!publicTags.trim()||!publicReadiness.enabled} onClick={savePublic}><Globe size={16}/>{busy?'Working…':data.public_listed?'Update public move':'List publicly'}</button>{data.public_listed&&<button className="back-link danger-link" disabled={busy} onClick={unlist}>Remove from public</button>}</div>
     {!publicReadiness.enabled&&publicReadiness.reason&&<p className="small muted" role="status">{publicReadiness.reason}</p>}
-    {data.public_listed&&data.published_revision_id!==lesson.revision_id&&<button className="secondary" disabled={busy||!reviewed} onClick={()=>void run(async()=>{await updatePublic(lesson.lesson_id,{listed:true,release_revision_id:lesson.revision_id,rights_acknowledged:true});setNotice('Shared version updated for friends, groups and public viewers.');await load();onChange();})}>Share this accepted version with everyone</button>}
+    {data.public_listed&&data.published_revision_id!==lesson.revision_id&&<button className="secondary" disabled={busy||!reviewed} onClick={()=>void run(async()=>{if(!(await publication.publish({title:publicTitle,description:publicDescription,creatorName:creatorName,tags:publicTags.split(',').map(value=>value.trim()).filter(Boolean),rightsAcknowledged:true,roles:publicReadiness.roles,releaseRevisionId:lesson.revision_id})))throw new Error(publication.error||'This move could not be published.');setNotice('Shared version updated for friends, groups and public viewers.');await load();onChange();})}>Share this accepted version with everyone</button>}
     <p className="small muted">Only the accepted 3D move and these details are public. Everyone follows the same shared version.</p>
    </div>}
    {tab==='link'&&<div className="share-panel">    <p className="subtle">A link anyone can open. Handy for a group chat; it can be forwarded, so use invitations for a private share.</p>

@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import acts, publication as publication_mod, rollout
+from . import acts, policy, publication as publication_mod, rollout
 from .database import (Lesson, LessonAcceptance, LessonLike, LessonPublication,
                        LessonRevision, LessonTag)
 from .permissions import public_lesson
@@ -32,23 +32,6 @@ def like_counts(session, lesson_ids, viewer_id=None):
         liked = set(session.scalars(select(LessonLike.lesson_id).where(
             LessonLike.lesson_id.in_(ids), LessonLike.account_id == viewer_id)).all())
     return counts, liked
-
-
-def _action_set(lesson, revision):
-    try:
-        descriptor = acts.resolve_act(getattr(lesson, 'act_id', None) or getattr(revision, 'act_id', None),
-                                      revision.subject or lesson.subject)
-    except acts.ActError:
-        return {'watch': False, 'practice': False, 'challenge': False}
-    manifest = revision.manifest or {}
-    practice = 'practice' in descriptor.practice_modes and bool(
-        manifest.get('animation') or manifest.get('landmarks')
-        or manifest.get('source_video') or manifest.get('reference')
-        or manifest.get('steps'))
-    challenge = ('challenge' in descriptor.practice_modes
-                 and bool(descriptor.assessment_adapters)
-                 and manifest.get('feedback_enabled') is not False)
-    return {'watch': True, 'practice': practice, 'challenge': challenge}
 
 
 def discovery_item(session, publication, lesson, viewer_id=None, likes=None, preloaded=None):
@@ -101,7 +84,7 @@ def discovery_item(session, publication, lesson, viewer_id=None, likes=None, pre
         'content': {'sections': len((manifest.get('section_set') or {}).get('sections') or [])},
         'roles': roles,
         'representations': representations,
-        'effective_actions': _action_set(lesson, revision),
+        'effective_actions': policy.action_set(descriptor, manifest, roles=roles, public=True),
         'audience': 'public',
         'like_count': counts.get(lesson.id, 0),
         'liked_by_viewer': lesson.id in liked,

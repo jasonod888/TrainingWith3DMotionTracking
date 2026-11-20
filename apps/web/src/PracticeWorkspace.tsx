@@ -38,10 +38,8 @@ import {CompetitionResults} from './CompetitionResults';
 import {MovementUploadPanel} from './MovementUploadPanel';
 import {AttemptFeedback} from '../../../packages/learning-engine/attempt-feedback';
 import {resolvePracticePolicy} from '../../../packages/learning-engine/practice-policy';
-import {buildAttemptEnvelope} from '../../../packages/learning-engine/attempt-envelope';
-import {submitPracticeAttempt} from './api';
-import {createResourceBag} from '../../../packages/learning-engine/practice-adapter';
-import {createSessionGuard,createContextRevalidator} from './practice/session-guard';
+import {submitAttempt} from './practice/submit-attempt';
+import {usePracticeAccessGuard} from './practice/usePracticeAccessGuard';
 import type {LessonContext} from './app/lesson-context';
 
 type Panel='settings'|'sections'|'history'|'voice'|null;
@@ -51,17 +49,14 @@ const stamp=(t:number)=>`${Math.floor(t/60)}:${Math.floor(t%60).toString().padSt
 const clamp01=(value:number)=>Number.isFinite(value)?Math.max(0,Math.min(1,value)):0;
 export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,notice,onDirty,initialMode='practice',onModeChange,onPracticeSection,initialSettings,onSettings,restoredAt,restoredUnitId,accountId=null,context=null}:{context?:LessonContext|null;accountId?:string|null;restoredAt?:number|null;restoredUnitId?:string|null;plan:PracticePlan;initialSettings?:PracticePreferences;onSettings?:(value:PracticePreferences)=>void;initialMode?:'practice'|'compete';onModeChange?:(mode:'watch'|'practice'|'compete')=>void;onPracticeSection?:(index:number)=>void;lesson:LessonManifest;player:Playback;onBack:()=>void;onEdit:()=>void;editable:boolean;notice:string;onDirty?:(value:boolean)=>void}){
  const [session]=useState(()=>{const value=new PracticeSession(player,plan);if(initialMode==='practice'&&initialSettings){value.loop=initialSettings.loop;value.countdownSeconds=initialSettings.countdown;value.repetitions=initialSettings.repetitions;value.restSeconds=initialSettings.rest;}return value;});
- const accessBag=useRef(createResourceBag()).current;
  const [accessLost,setAccessLost]=useState(false);
- const revalidator=useMemo(()=>createContextRevalidator(context),[context]);
- const accessGuard=useMemo(()=>revalidator?createSessionGuard({runtime:session.runtime,resources:accessBag,
-  revalidate:revalidator,
-  onLost:()=>setAccessLost(true)}):null,[session,accessBag,revalidator]);
- useEffect(()=>{if(!accessGuard)return;const stop=accessGuard.start();
-  accessBag.add({kind:'camera',release:()=>{camera.current?.stop();}});
-  accessBag.add({kind:'audio',release:()=>{recordingRef.current.stop();player.command('pause');}});
-  accessBag.add({kind:'worker',release:()=>session.runtime.destroy()});
-  return()=>{stop();void accessBag.releaseAll();};},[accessGuard,accessBag,player,session]);
+ const access=usePracticeAccessGuard({runtime:session.runtime,context,
+  onLost:()=>setAccessLost(true),
+  register:bag=>{
+   bag.add({kind:'camera',release:()=>{camera.current?.stop();}});
+   bag.add({kind:'audio',release:()=>{recordingRef.current.stop();player.command('pause');}});
+   bag.add({kind:'worker',release:()=>session.runtime.destroy()});
+  }});
  const camera=useRef<MimicHandle>(null),shell=useRef<HTMLElement>(null);
  const practiceDock=useRef<HTMLDivElement>(null);
  useEffect(()=>{
@@ -481,7 +476,7 @@ export function PracticeWorkspace({lesson,plan,player,onBack,onEdit,editable,not
  useEffect(()=>{const warn=(e:BeforeUnloadEvent)=>{if(recording.url&&!savedTake.current){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[recording.url]);
  useEffect(()=>{document.body.classList.add('in-practice');return()=>{document.body.classList.remove('in-practice');session.pause('exit');};},[session]);
  useEffect(()=>{let frame=0,last=performance.now(),draw=last;const tick=(now:number)=>{competition.tick((now-last)/1000);last=now;if(now-draw>80){redraw(n=>n+1);draw=now;}frame=requestAnimationFrame(tick);};frame=requestAnimationFrame(tick);const hide=()=>{if(document.hidden)session.pause('background');};document.addEventListener('visibilitychange',hide);return()=>{cancelAnimationFrame(frame);document.removeEventListener('visibilitychange',hide);};},[session]);
- useEffect(()=>{session.onPause=reason=>{recordNext.current=false;if(competition.interrupt(reason))setRunResultsOpen(true);};session.onAttemptStart=time=>{attemptFeedback.reset();if(recordNext.current){recordNext.current=false;takeActive.current=true;if(!recordingRef.current.begin(camera.current?.stream()??null,time,player.state.speed)){takeActive.current=false;}}};session.onAttempt=a=>{if(a.completed){const assessed=lesson.feedback_enabled!==false&&!instructorOnlyRef.current;const neutral=buildAttemptEnvelope({attemptId:a.id,lessonId:lesson.lesson_id,revisionId:lesson.revision_id,actId:'full_body',mode:competition.enabled?'challenge':'practice',planId:plan.id,unitId:player.current?.id??null,durationMs:Math.max(0,(a.end-a.start)*1000),status:assessed?'completed':'unassessed',assessmentAdapter:assessed?'pose-v1':null,rubricVersion:assessed?'pose-v1':null,report:assessed?{scored:true}:{scored:false}});void submitPracticeAttempt({attempt_id:neutral.attemptId,lesson_id:neutral.lessonId,revision_id:neutral.revisionId,act_id:neutral.actId,mode:neutral.mode,plan_id:neutral.planId,unit_id:neutral.unitId,duration_ms:neutral.durationMs,status:neutral.status,assessment_adapter:neutral.assessmentAdapter,rubric_version:neutral.rubricVersion,report:neutral.report}).catch(cause=>{void accessGuard?.handleError(cause);});}if(competition.enabled){competition.finish(a);if(competition.result)setRunResultsOpen(true);return;}if(takeActive.current){takeActive.current=false;recordingRef.current.stop();takePending.current=true;}if(a.completed&&!instructorOnlyRef.current){const result=attemptFeedback.result(),entry={date:new Date().toISOString(),section:player.current?.label??lesson.title,score:result.score,revision_id:lesson.revision_id,configuration:camera.current?.configuration()??'watch',start:a.start,end:a.end};
+ useEffect(()=>{session.onPause=reason=>{recordNext.current=false;if(competition.interrupt(reason))setRunResultsOpen(true);};session.onAttemptStart=time=>{attemptFeedback.reset();if(recordNext.current){recordNext.current=false;takeActive.current=true;if(!recordingRef.current.begin(camera.current?.stream()??null,time,player.state.speed)){takeActive.current=false;}}};session.onAttempt=a=>{if(a.completed){const assessed=lesson.feedback_enabled!==false&&!instructorOnlyRef.current;void submitAttempt({attemptId:a.id,lessonId:lesson.lesson_id,revisionId:lesson.revision_id,actId:'full_body',mode:competition.enabled?'challenge':'practice',planId:plan.id,unitId:player.current?.id??null,durationMs:Math.max(0,(a.end-a.start)*1000),status:assessed?'completed':'unassessed',assessmentAdapter:assessed?'pose-v1':null,rubricVersion:assessed?'pose-v1':null,report:assessed?{scored:true}:{scored:false},accountScope:accountId??'guest'},{guard:access.guardRef.current});}if(competition.enabled){competition.finish(a);if(competition.result)setRunResultsOpen(true);return;}if(takeActive.current){takeActive.current=false;recordingRef.current.stop();takePending.current=true;}if(a.completed&&!instructorOnlyRef.current){const result=attemptFeedback.result(),entry={date:new Date().toISOString(),section:player.current?.label??lesson.title,score:result.score,revision_id:lesson.revision_id,configuration:camera.current?.configuration()??'watch',start:a.start,end:a.end};
     setReviewSummary(result);setReview(a);setHistory(values=>[entry,...values].slice(0,100));if(saveHistoryRef.current&&lesson.feedback_enabled!==false)void request(`/lessons/${lesson.lesson_id}/attempts`,'POST',{id:a.id,scoring_version:'pose-v1',...entry,...result}).catch(()=>setHint('Attempt could not save. Your practice still works.'));}};return()=>{recordNext.current=false;session.onPause=undefined;session.onAttempt=undefined;session.onAttemptStart=undefined;};},[session,lesson,player,attemptFeedback,competition]);
  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(voiceStart.status==='asking'||voiceStart.status==='requesting'||voiceStart.status==='fallback'||panelRef.current||takeOpen||setupIntentRef.current)return;const command=practiceCommandForKey(e);if(!command||command.type!=='action')return;const mapped:Record<string,PracticeAction>={toggle:'play',next:'next',previous:'back','repeat-section':'again',pause:'pause',play:'play',resume:'resume',start:'play','restart-lesson':'restart-lesson'};const next=mapped[command.action];if(next){e.preventDefault();action(next);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[action,takeOpen,voiceStart.status]);
  useEffect(()=>{

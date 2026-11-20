@@ -209,9 +209,12 @@ export function parseVerificationState(value: unknown): Parsed<VerificationState
   }};
 }
 
-export async function loadVerification(lessonId: string, draftId: string): Promise<unknown | null> {
+export async function loadVerification(lessonId: string, draftId: string,
+                                       signal?: AbortSignal): Promise<unknown | null> {
   try {
-    return await request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-analysis/verification?draft_id=${encodeURIComponent(draftId)}`);
+    return await request<unknown>(
+      `/lessons/${encodeURIComponent(lessonId)}/music-analysis/verification?draft_id=${encodeURIComponent(draftId)}`,
+      'GET', undefined, false, {}, signal);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
@@ -220,18 +223,20 @@ export async function loadVerification(lessonId: string, draftId: string): Promi
 
 export function decideVerification(lessonId: string, draftId: string, baseProposalSha256: string,
                                    baseStateToken: string, baseReportSha256: string | null,
-                                   findingId: string, decision: 'accepted' | 'rejected' | 'cleared') {
+                                   findingId: string, decision: 'accepted' | 'rejected' | 'cleared',
+                                   signal?: AbortSignal) {
   return request<unknown>(`/lessons/${encodeURIComponent(lessonId)}/music-draft/verification-decision`, 'POST',
     {draft_id: draftId, base_proposal_sha256: baseProposalSha256, base_state_token: baseStateToken,
-     base_report_sha256: baseReportSha256, finding_id: findingId, decision});
+     base_report_sha256: baseReportSha256, finding_id: findingId, decision},
+    false, {}, signal);
 }
 
 export const findingDecision = (state: VerificationState, findingId: string) =>
   state.decisions.find(item => item.finding_id === findingId);
 
 export function rollbackAutomaticCorrections(lessonId: string, draftId: string,
-                                             baseStateToken: string) {
+                                             baseStateToken: string, signal?: AbortSignal) {
   return request<{rolled_back: boolean; draft_id: string}>(
     `/lessons/${encodeURIComponent(lessonId)}/music-draft/corrections/rollback`, 'POST',
-    {draft_id: draftId, base_state_token: baseStateToken});
+    {draft_id: draftId, base_state_token: baseStateToken}, false, {}, signal);
 }
